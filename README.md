@@ -29,9 +29,10 @@ Redesign of the [Radio Astronomy Master Clock](https://github.com/rjrouquette/ra
     - assembly as daughterboard allows for better isolation from thermal transients
 - IEEE 1588 PTP Master
     - MSP432E401Y
-        - integrated PHY with PTP support
+        - integrated EMAC+PHY with PTP support
         - PTP PPS generation for synchronization with GPSDO
-    - Uses 25MHz from GPSDO as ethernet PHY base clock
+    - Uses 25MHz from GPSDO as PTP and PHY base clock
+    - DHCP client
     - NTP server
     - HTTP status page
     - UART and Ethernet firmware updates
