@@ -1,1 +1,0 @@
-/opt/ti/msp430-gcc/bin/msp430-elf-gcc  -Os -Wall -mmcu=MSP430F5171 -ffunction-sections -fdata-sections -O3 -DNDEBUG   -mmcu=MSP430F5171 -Wl,--relax,--gc-sections CMakeFiles/gpsdo.dir/main.c.obj  -o gpsdo   -L/opt/ti/msp430-gcc/include 
