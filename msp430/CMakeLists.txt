@@ -1,9 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
 
-#generic avr flags
-set(MSP430_CFLAGS "-ffunction-sections -fdata-sections" CACHE STRING "MSP430 compilation flags")
-set(MSP430_LFLAGS "-Wl,--relax,--gc-sections" CACHE STRING "MSP430 link flags")
-
 #find toolchain programs
 find_program(MSP430-GCC msp430-elf-gcc)
 find_program(MSP430-GXX msp430-elf-g++)
