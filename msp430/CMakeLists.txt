@@ -19,7 +19,7 @@ set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_C_COMPILER ${MSP430-GCC})
 set(CMAKE_CXX_COMPILER ${MSP430-GXX})
 
-# don't test as they won't work
+# don't test since they are cross-compiling
 set(CMAKE_C_COMPILER_WORKS 1)
 set(CMAKE_CXX_COMPILER_WORKS 1)
 
