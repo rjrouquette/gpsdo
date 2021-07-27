@@ -21,9 +21,7 @@ The XO aging offset is derived from the residuals of the temperature coefficient
 ---
 ## I2C Bus
 
-The ublox MAX-8Q DDC interface consumes the entier I2C address space.  An
-LTC4317 is used to multiplex the I2C bus, and prevent address collision.
-Multiplexing is performed via the ENABLE[1:2] pins on the LTC4317.
+The ublox MAX-8Q DDC interface consumes the entier I2C address space. An LTC4317 is used to multiplex the I2C bus and prevent address collision. Multiplexing is performed via the ENABLE[1:2] pins on the LTC4317.
 
 - Bus 1
     - Si549 25 MHz DCXO (0x55) [549CAAC000111BBG]
@@ -54,7 +52,7 @@ tempCelsius = ((175.72 * code) / 65536) - 46.85
 ---
 ## TMP117
 
-Configure for 64 samples per second and 64 sample averaging.  Produces one result every second.
+Configure for 64 samples per second and 64 sample averaging. Produces one result every second.
 
 I2C Init:
 ```
