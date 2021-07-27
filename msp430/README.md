@@ -3,6 +3,22 @@
 Documentation for GPSDO microntroller.
 
 ---
+## DCXO Feedback Loop
+
+The feedback loop combines the XO aging offset, temperature coefficient, and PPS PI controller to compute the frequency offset for the DCXO.
+
+```
+FBt = Ct * temp + res(temp)
+FBg = Cp * Epps + Ci * Acc(Epps)
+
+FB = FBo + FBt
+```
+
+The temperature coefficient is computed using linear interpolation between the measured coefficient at different temperature increments.
+
+The XO aging offset is derived from the residuals of the temperature coefficient estimation.
+
+---
 ## I2C Bus
 
 The ublox MAX-8Q DDC interface consumes the entier I2C address space.  An
@@ -54,3 +70,5 @@ tempCelsius = code * 0.0078125
 
 ---
 ## ublox MAX-8Q
+
+TODO: add ublox DDC documentation
