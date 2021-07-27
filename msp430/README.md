@@ -8,10 +8,10 @@ Documentation for GPSDO microntroller.
 The feedback loop combines the XO aging offset, temperature coefficient, and PPS PI controller to compute the frequency offset for the DCXO.
 
 ```
-FBt = Ct * temp + res(temp)
+FBt = Ct * temp + C0(temp)
 FBg = Cp * Epps + Ci * Acc(Epps)
 
-FB = FBo + FBt
+FB = FBt + FBg
 ```
 
 The temperature coefficient is computed using linear interpolation between the measured coefficient at different temperature increments.
