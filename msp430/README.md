@@ -35,6 +35,12 @@ The ublox MAX-8Q DDC interface consumes the entier I2C address space. An LTC4317
 
 TODO: add documention for clock trimming
 
+Register values for 25 MHz:
+- LSDIV = 0
+- HSDIV = 432
+- FBDIV = 70.77326343
+- REG[23:31] = 0xB0 0x01 0xA7 0x97 0xF4 0xC5 0x46 0x00
+
 ---
 ## Si7051
 
