@@ -25,13 +25,13 @@ The ublox MAX-8Q DDC interface consumes the entier I2C address space. An LTC4317
 
 - Bus 1
     - Si549 25 MHz DCXO (0x55) [549CAAC000111BBG]
-    - Si7051 Temperature Sensor (0x40) [SI7051-A20-IM]
-        - may substitute with TMP117 (0x49) [TMP117AIDRVR ]
+    - TMP117 Temperature Sensor (0x49) [TMP117MAIDRVT]
+    - 47L64 64k-bit EERAM x2 (0xA1, 0xA3) [47L64-I/SN]
 - Bus 2
     - ublox MAX-8Q (0x00-0xFF) [MAX-8Q-0]
 
 ---
-## Si549
+## Si549 DCXO
 
 Register values for 25 MHz:
 - LSDIV = 0
@@ -61,21 +61,7 @@ S:0x55:W:A :0xE7:A :[0]:A :[1]:A :[2]:A:P
 ```
 
 ---
-## Si7051
-
-Poll at 64 Hz and average 64 samples to produce one result every second.
-
-I2C Read:
-```
-S:0x40:W:A :0xF3:A:P
-wait l2 ms
-S:0x40:R:A :MSB:A :LSB:A :CHKSUM:N:P
-```
-
-tempCelsius = ((175.72 * code) / 65536) - 46.85
-
----
-## TMP117
+## TMP117 Temperature Sensor
 
 Configure for 64 samples per second and 64 sample averaging. Produces one result every second.
 
@@ -87,6 +73,24 @@ S:0x49:W:A :0x01:A :0x00:A :0x60:A:P
 I2C Read:
 ```
 S:0x49:W:A :0x00:A RS:0x49:R:A :MSB:A :LSB:N:P
+```
+
+---
+## 47L64 EERAM w/ EEPROM
+
+Two 8kB banks:
+- 0xA1 - Configuration Data
+- 0xA3 - Temperature Compensation Data
+
+I2C Read:
+```
+S:CSA:W:A :ADDRH:A :ADDRL:A
+S:CSA:R:A :DATA[0]:A .. :DATA[N]:A:P
+```
+
+I2C Write:
+```
+S:CSA:W:A :ADDRH:A :ADDRL:A :DATA[0]:A .. :DATA[N]:A:P
 ```
 
 tempCelsius = code * 0.0078125
