@@ -1599,4 +1599,8 @@ Text Label 1000 1700 0    50   ~ 0
 uTXD
 Text Label 1000 1800 0    50   ~ 0
 uRXD
+Text Label 9400 5550 0    50   ~ 0
+PPS
+Text Label 9450 6200 0    50   ~ 0
+CLK
 $EndSCHEMATC

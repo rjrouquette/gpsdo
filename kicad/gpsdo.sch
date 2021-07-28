@@ -1603,4 +1603,29 @@ Text Label 9400 5550 0    50   ~ 0
 PPS
 Text Label 9450 6200 0    50   ~ 0
 CLK
+$Comp
+L Device:R_Small_US R10
+U 1 1 6101D1B0
+P 9550 850
+F 0 "R10" V 9345 850 50  0000 C CNN
+F 1 "47k" V 9436 850 50  0000 C CNN
+F 2 "Resistor_SMD:R_0603_1608Metric" H 9550 850 50  0001 C CNN
+F 3 "~" H 9550 850 50  0001 C CNN
+	1    9550 850 
+	0    -1   1    0   
+$EndComp
+Wire Wire Line
+	9650 850  9700 850 
+Connection ~ 9700 850 
+$Comp
+L power:+3.3V #PWR?
+U 1 1 6102115A
+P 9450 850
+F 0 "#PWR?" H 9450 700 50  0001 C CNN
+F 1 "+3.3V" V 9450 1100 50  0000 C CNN
+F 2 "" H 9450 850 50  0001 C CNN
+F 3 "" H 9450 850 50  0001 C CNN
+	1    9450 850 
+	0    -1   1    0   
+$EndComp
 $EndSCHEMATC
