@@ -79,7 +79,7 @@ S:0x49:W:A :0x00:A RS:0x49:R:A :MSB:A :LSB:N:P
 ## 47L64 EERAM w/ EEPROM
 
 Two 8kB banks:
-- 0xA1 - Configuration Data
+- 0xA1 - Configuration Data + Divisor LUT
 - 0xA3 - Temperature Compensation Data
 
 I2C Read:
