@@ -232,6 +232,17 @@ int main(int argc, char **argv) {
     cout << endl;
 
     cout << "fixed point math:" << endl;
+    cout << "Temp.";
+    cout << setw(8) << "Count";
+    cout << setw(12) << "Norm";
+    cout << setw(12) << "X * X";
+    cout << setw(12) << "X * 1";
+    cout << setw(12) << "Y * X";
+    cout << setw(12) << "Y * 1";
+    cout << setw(12) << "m";
+    cout << setw(12) << "b";
+    cout << endl;
+
     for(int i = 0; i < 256; i++) {
         if(fixedMath.count[i] == 0) continue;
         cout << setw(3) << i << ": ";
@@ -252,6 +263,17 @@ int main(int argc, char **argv) {
     cout << endl;
 
     cout << "floating point math:" << endl;
+    cout << "Temp.";
+    cout << setw(8) << "Count";
+    cout << setw(12) << "Norm";
+    cout << setw(12) << "X * X";
+    cout << setw(12) << "X * 1";
+    cout << setw(12) << "Y * X";
+    cout << setw(12) << "Y * 1";
+    cout << setw(12) << "m";
+    cout << setw(12) << "b";
+    cout << endl;
+
     for(int i = 0; i < 256; i++) {
         if(fixedMath.count[i] == 0) continue;
         cout << setw(3) << i << ": ";
