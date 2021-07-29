@@ -13,11 +13,13 @@ SELECT mean("temperature") AS "temp", mean("pll_ppm") AS "ppm", max("pll_rmse") 
 
 ## Results
 
-RMSE error of temperature compensation is 2.81 ppb.  Worst compensation error is 24.5 ppb.
+The RMSE error of temperature compensation is 2.81 ppb.  Worst compensation error is 24.5 ppb.  Long-term bias is 0.091 ppt.
 
 ```
 loaded 2844044 data samples
 
+biasI: -0.000091 ppm
+biasF: -0.000099 ppm
 rmseI: 0.002809 ppm (0.024494 ppm) [0]
 rmseF: 0.002810 ppm (0.024500 ppm) [0]
 

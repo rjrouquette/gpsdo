@@ -185,6 +185,7 @@ int main(int argc, char **argv) {
     cout << "loaded " << data.size() << " data samples" << endl;
     cout << endl;
 
+    double biasI = 0, biasF = 0;
     double maxI = 0, maxF = 0;
     double rmseI = 0, rmseF = 0;
     size_t cntI = 0, cntF = 0;
@@ -199,6 +200,7 @@ int main(int argc, char **argv) {
             auto iy = ((im * ix) >> 16) + ib;
             double id = (iy * IPPM_PREC) - s.ppm;
             if(std::isfinite(id)) {
+                biasI += id;
                 rmseI += id * id;
                 ++cntI;
             }
@@ -216,6 +218,7 @@ int main(int argc, char **argv) {
             auto fy = (fm * fx) + fb;
             auto fd = fy - s.ppm;
             if(std::isfinite(fd)) {
+                biasF += fd;
                 rmseF += fd * fd;
                 ++cntF;
             }
@@ -227,6 +230,8 @@ int main(int argc, char **argv) {
         }
         floatMath.update(s);
     }
+    cout << "biasI: " << (biasI / cntI) << " ppm" << endl;
+    cout << "biasF: " << (biasF / cntF) << " ppm" << endl;
     cout << "rmseI: " << sqrt(rmseI / cntI) << " ppm (" << maxI << " ppm) [" << errI << "]" << endl;
     cout << "rmseF: " << sqrt(rmseF / cntF) << " ppm (" << maxF << " ppm) [" << errF << "]" << endl;
     cout << endl;
