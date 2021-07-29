@@ -34,7 +34,7 @@ The coefficients are then applied in standard `y=mx+b` form to compute the frequ
 
 ## InfluxDB Export
 
-Example data set exported as `gpsdo.csv`
+Data set exported as `gpsdo.csv`. Truncated example available as `gpsdo.short.csv`.
 
 Query:
 ```
