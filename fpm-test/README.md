@@ -8,7 +8,7 @@ Example data set exported as `gpsdo.csv`
 
 Query:
 ```
-SELECT mean("temperature"), mean("pll_ppm") FROM "gpsdo" WHERE  AND time >= now() - 120d GROUP BY time(11s) fill(null)
+SELECT mean("temperature") AS "temp", mean("pll_ppm") AS "ppm", max("pll_rmse") AS "error" FROM "gpsdo" WHERE time >= now() - 365d GROUP BY time(11s) fill(null)
 ```
 
 ## Results
