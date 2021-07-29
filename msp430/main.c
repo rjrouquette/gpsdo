@@ -1,6 +1,10 @@
 #include <msp430.h>
+#include "tcxo.h"
 
 int main() {
+    TCXO_getCompensation(1234);
+    TCXO_updateCompensation(2345, 567890);
+
     // TODO remove demo code
     WDTCTL = WDTPW | WDTHOLD;               // Stop watchdog timer
     PM5CTL0 &= ~LOCKLPM5;                   // Disable the GPIO power-on default high-impedance mode
