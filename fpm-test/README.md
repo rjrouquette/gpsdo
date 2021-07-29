@@ -2,6 +2,34 @@
 
 Simple C++ program for testing temperature coefficient fixed point math.
 
+## Compensation Algorithm
+
+The temperature compenstation is performed using a piece-wise-linear estimation of the DCXO drift vs temperature.  The
+temperature is binned by the truncated value in Celsius.  The temperature value is also recentered around the mid-point of the bin.
+
+```C++
+binId = floor(celsius)
+x = temp - bindId - 0.5
+```
+
+Each bin has five accumulator cells for performing a linear OLS fit which are updated using an [EMA](https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average):
+- norm = accumulates unitary value for matrix normalization (equivalent to XX[1,1])
+- A = the [0,0] cell of the XX matrix (accumulates X * X)
+- B = the [1,0] cell of the XX matrix (accumulates X * 1)
+- C = the [0,0] cell of the XY matrix (accumulates Y * X)
+- D = the [1,0] cell of the XY matrix (accumulates Y * 1)
+
+To compute the correction coefficients, the four cell values are first normalized by dividing them by the norm value.  The correction coefficients are then computed as follows:
+
+```C++
+Z = A - (B * B)
+
+m = ((C * 1) - (B * D)) / Z;
+b = ((A * D) - (B * C)) / Z;
+```
+
+The coefficients are then applied in standard `y=mx+b` form to computed the frequency offset for the DCXO.
+
 ## InfluxDB Export
 
 Example data set exported as `gpsdo.csv`
@@ -13,7 +41,7 @@ SELECT mean("temperature") AS "temp", mean("pll_ppm") AS "ppm", max("pll_rmse") 
 
 ## Results
 
-The RMSE error of temperature compensation is 2.81 ppb.  Worst compensation error is 24.5 ppb.  Long-term bias is 0.091 ppt.
+The RMSE error of temperature compensation is 2.81 ppb.  Worst compensation error is 24.5 ppb.  Long-term bias is 0.091 ppb.
 
 ```
 loaded 2844044 data samples
