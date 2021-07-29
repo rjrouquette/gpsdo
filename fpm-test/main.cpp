@@ -38,20 +38,24 @@ struct Sample {
     }
 };
 
+// A = A + ((B - A) / 2^16)
 static void increment(uint32_t &acc) {
     acc -= acc >> 16u;
     acc += 1u << 15u;
 }
 
-static void accumulate(const int64_t value, int64_t &acc) {
+// A = A + ((B - A) / 2^16)
+static void accumulate(int64_t &acc, const int64_t value) {
     acc -= acc >> 16u;
     acc += value << 15u;
 }
 
-static void accumulate(const double value, double &acc) {
+// A = A + ((B - A) / 2^16)
+static void accumulate( double &acc, const double value) {
     acc += (value - acc) / 65536.0;
 }
 
+// integer long-division
 static void div(uint32_t div, uint64_t &rem, uint32_t &quo) {
     quo = 0;
     for(uint8_t i = 0; i < 64; i++) {
@@ -65,6 +69,7 @@ static void div(uint32_t div, uint64_t &rem, uint32_t &quo) {
     }
 }
 
+// signed integer long-division
 static void div(uint32_t div, int64_t &rem, int32_t &quo) {
     const bool neg = rem < 0;
     if(neg) rem = -rem;
@@ -92,10 +97,10 @@ struct FixedMath {
         int32_t ippm = floorf(s.ppm / IPPM_PREC);
 
         auto &m = mat[tidx];
-        accumulate((fpart * fpart) << 16, m[0]);
-        accumulate(fpart << 8, m[1]);
-        accumulate(ippm * fpart, m[2]);
-        accumulate(ippm, m[3]);
+        accumulate(m[0], (fpart * fpart) << 16);
+        accumulate(m[1], fpart << 8);
+        accumulate(m[2], ippm * fpart);
+        accumulate(m[3], ippm);
         increment(norm[tidx]);
         ++count[tidx];
     }
@@ -150,12 +155,12 @@ struct FloatMath {
         uint8_t tidx = ipart;
 
         auto &m = mat[tidx];
-        accumulate(fpart * fpart, m[0]);
-        accumulate(fpart, m[1]);
-        accumulate(fpart * s.ppm, m[2]);
-        accumulate(s.ppm, m[3]);
+        accumulate(m[0], fpart * fpart);
+        accumulate(m[1], fpart);
+        accumulate(m[2], fpart * s.ppm);
+        accumulate(m[3], s.ppm);
 
-        accumulate(1.0f, norm[tidx]);
+        accumulate(norm[tidx], 1.0);
         ++count[tidx];
     }
 
@@ -291,7 +296,7 @@ int main(int argc, char **argv) {
         cout << setw(3) << i << ": ";
         cout << setw(8) << fixedMath.count[i];
         const auto &mt = fixedMath.mat[i];
-        cout << setw(12) << fixedMath.norm[i] / 65536.0f / 65536.0f;
+        cout << setw(12) << fixedMath.norm[i] / 65536.0f / 32768.0f;
         cout << setw(12) << fixedMath.getCell(i, 0) / 65536.0f / 65536.0f;
         cout << setw(12) << fixedMath.getCell(i, 1) / 65536.0f;
         cout << setw(12) << fixedMath.getCell(i, 2) * IPPM_PREC / 256.0f;
