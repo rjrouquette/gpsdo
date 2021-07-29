@@ -19,15 +19,22 @@ using namespace std;
 struct Sample {
     float temp;
     float ppm;
+    float error;
 
     Sample () {
         temp = NAN;
         ppm = NAN;
+        error = NAN;
     }
 
     void clear() {
         temp = NAN;
         ppm = NAN;
+        error = NAN;
+    }
+
+    bool isValid() {
+        return isfinite(temp) && isfinite(ppm) && isfinite(error);
     }
 };
 
@@ -140,12 +147,12 @@ struct FloatMath {
 
 /* File format:
 name: gpsdo
-time                temp               ppm
-----                ----               ---
-1617149578000000000 51.8               -0.7276
-1617149589000000000 51.8               -0.7274
-1617149600000000000 51.7               -0.7272
-1617149611000000000 51.6               -0.7271
+time                temp               ppm                  error
+----                ----               ---                  -----
+1596026531000000000 52.4               -0.7289              11.2
+1596026542000000000 52.4               -0.729               10
+1596026553000000000 52.2               -0.7289              10
+1596026564000000000 52.3               -0.7289              10
 ...
 */
 
@@ -167,7 +174,8 @@ int main(int argc, char **argv) {
         parser >> discard;
         parser >> row.temp;
         parser >> row.ppm;
-        if(isfinite(row.temp) && isfinite(row.ppm))
+        parser >> row.error;
+        if(row.isValid())
             data.emplace_back(row);
         
         getline(fin, line);
@@ -180,7 +188,10 @@ int main(int argc, char **argv) {
     double maxI = 0, maxF = 0;
     double rmseI = 0, rmseF = 0;
     size_t cntI = 0, cntF = 0;
+    size_t errI = 0, errF = 0;
     for(auto s : data) {
+        if(s.error > 250.0f) continue;
+
         int32_t im, ib;
         if(fixedMath.coeff(s.temp, im, ib)) {
             int8_t it = (int) s.temp;
@@ -192,6 +203,10 @@ int main(int argc, char **argv) {
                 ++cntI;
             }
             maxI = std::max(maxI, std::abs(id));
+            if(std::abs(id) > 0.100) {
+                cout << s.temp << " " << s.ppm << " " << iy << endl;
+                ++errI;
+            }
         }
         fixedMath.update(s);
 
@@ -205,11 +220,15 @@ int main(int argc, char **argv) {
                 ++cntF;
             }
             maxF = std::max(maxF, std::abs(fd));
+            if(std::abs(fd) > 0.100) {
+                cout << s.temp << " " << s.ppm << " " << fy << endl;
+                ++errF;
+            }
         }
         floatMath.update(s);
     }
-    cout << "rmseI: " << sqrt(rmseI / cntI) << " ppm (" << maxI << " ppm)" << endl;
-    cout << "rmseF: " << sqrt(rmseF / cntF) << " ppm (" << maxF << " ppm)" << endl;
+    cout << "rmseI: " << sqrt(rmseI / cntI) << " ppm (" << maxI << " ppm) [" << errI << "]" << endl;
+    cout << "rmseF: " << sqrt(rmseF / cntF) << " ppm (" << maxF << " ppm) [" << errF << "]" << endl;
     cout << endl;
 
     cout << "fixed point math:" << endl;
