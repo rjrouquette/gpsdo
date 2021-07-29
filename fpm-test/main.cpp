@@ -38,17 +38,46 @@ struct Sample {
     }
 };
 
-static void accumulate(const int32_t value, int64_t &acc) {
-    acc += (((int64_t)value) << 16) - (acc >> 16);
+static void increment(uint32_t &acc) {
+    acc -= acc >> 16u;
+    acc += 1u << 15u;
+}
+
+static void accumulate(const int64_t value, int64_t &acc) {
+    acc -= acc >> 16u;
+    acc += value << 15u;
 }
 
 static void accumulate(const double value, double &acc) {
     acc += (value - acc) / 65536.0;
 }
 
+static void div(uint32_t div, uint64_t &rem, uint32_t &quo) {
+    quo = 0;
+    for(uint8_t i = 0; i < 64; i++) {
+        quo <<= 1;
+        const uint8_t shift = 63 - i;
+        uint32_t top = rem >> shift;
+        if(top >= div) {
+            rem -= ((uint64_t)div) << shift;
+            quo |= 1;
+        }
+    }
+}
+
+static void div(uint32_t div, int64_t &rem, int32_t &quo) {
+    const bool neg = rem < 0;
+    if(neg) rem = -rem;
+    ::div(div, (uint64_t &)rem, (uint32_t &)quo);
+    if(neg) {
+        rem = -rem;
+        quo = -quo;
+    }
+}
+
 struct FixedMath {
     uint64_t count[256];
-    int64_t n[256];
+    uint32_t norm[256];
     int64_t mat[256][4];
 
     FixedMath() : count{}, mat{} {
@@ -67,30 +96,39 @@ struct FixedMath {
         accumulate(fpart << 8, m[1]);
         accumulate(ippm * fpart, m[2]);
         accumulate(ippm, m[3]);
-
-        accumulate(1, n[tidx]);
+        increment(norm[tidx]);
         ++count[tidx];
+    }
+
+    int32_t getCell(uint8_t tidx, uint8_t cidx) {
+        int64_t rem = mat[tidx][cidx];
+        int32_t quo;
+        div(norm[tidx], rem, quo);
+        return quo;
     }
 
     bool coeff(const float temp, int32_t &m, int32_t &b) {
         int8_t ipart = (int) temp;
         uint8_t tidx = ipart;
-        if(n[tidx] == 0) return false;
+        if(norm[tidx] == 0) return false;
 
-        auto &mt = mat[tidx];
-        int64_t A = mt[0] / n[tidx]; // 0.32
-        int64_t B = mt[1] / n[tidx]; // 16.16
-        int64_t C = mt[2] / n[tidx]; // 24.8
-        int64_t D = mt[3] / n[tidx]; // 32.0
+        int64_t A = getCell(tidx, 0); // 0.32
+        int64_t B = getCell(tidx, 1); // 16.16
+        int64_t C = getCell(tidx, 2); // 24.8
+        int64_t D = getCell(tidx, 3); // 32.0
+        // adjust alignment
         C <<= 8; // 24.16
 
-        uint32_t Z = A - (B * B);
-        if(Z == 0 || count[tidx] < 1024) {
+        int32_t Z = A - (B * B);
+        if(Z <= 0 || count[tidx] < 64) {
             m = 0;
             b = D;
         } else {
-            m = (((C * 1) - (B * D)) << 24) / Z;
-            b = (((A * D) - (B * C))) / Z;
+            int64_t rem;
+            rem = ((C * 1) - (B * D)) << 24;
+            div(Z, rem, m);
+            rem = (A * D) - (B * C);
+            div(Z, rem, b);
         }
         return true;
     }
@@ -98,7 +136,7 @@ struct FixedMath {
 
 struct FloatMath {
     uint64_t count[256];
-    double n[256];
+    double norm[256];
     double mat[256][4];
 
     FloatMath() : count{}, mat{} {
@@ -117,22 +155,22 @@ struct FloatMath {
         accumulate(fpart * s.ppm, m[2]);
         accumulate(s.ppm, m[3]);
 
-        accumulate(1.0f, n[tidx]);
+        accumulate(1.0f, norm[tidx]);
         ++count[tidx];
     }
 
     bool coeff(const float temp, double &m, double &b) {
         uint8_t tidx = (uint8_t) ((int) temp);
-        if(n[tidx] == 0) return false;
+        if(norm[tidx] == 0) return false;
 
         auto &mt = mat[tidx];
-        double A = mt[0] / n[tidx];
-        double B = mt[1] / n[tidx];
-        double C = mt[2] / n[tidx];
-        double D = mt[3] / n[tidx];
+        double A = mt[0] / norm[tidx];
+        double B = mt[1] / norm[tidx];
+        double C = mt[2] / norm[tidx];
+        double D = mt[3] / norm[tidx];
 
         const double Z = A - (B * B);
-        if(Z == 0 || count[tidx] < 1024) {
+        if(Z <= 0 || count[tidx] < 64) {
             m = 0;
             b = D;
         } else {
@@ -253,11 +291,11 @@ int main(int argc, char **argv) {
         cout << setw(3) << i << ": ";
         cout << setw(8) << fixedMath.count[i];
         const auto &mt = fixedMath.mat[i];
-        cout << setw(12) << fixedMath.n[i] / 65536.0f / 65536.0f;
-        cout << setw(12) << ((float) mt[0] / (float) fixedMath.n[i]) / 65536.0f / 65536.0f;
-        cout << setw(12) << ((float) mt[1] / (float) fixedMath.n[i]) / 65536.0f;
-        cout << setw(12) << ((float) mt[2] / (float) fixedMath.n[i]) * IPPM_PREC / 256.0f;
-        cout << setw(12) << ((float) mt[3] / (float) fixedMath.n[i]) * IPPM_PREC;
+        cout << setw(12) << fixedMath.norm[i] / 65536.0f / 65536.0f;
+        cout << setw(12) << fixedMath.getCell(i, 0) / 65536.0f / 65536.0f;
+        cout << setw(12) << fixedMath.getCell(i, 1) / 65536.0f;
+        cout << setw(12) << fixedMath.getCell(i, 2) * IPPM_PREC / 256.0f;
+        cout << setw(12) << fixedMath.getCell(i, 3) * IPPM_PREC;
 
         int32_t m, b;
         fixedMath.coeff(i, m, b);
@@ -283,9 +321,9 @@ int main(int argc, char **argv) {
         if(fixedMath.count[i] == 0) continue;
         cout << setw(3) << i << ": ";
         cout << setw(8) << floatMath.count[i];
-        cout << setw(12) << floatMath.n[i];
+        cout << setw(12) << floatMath.norm[i];
         for(auto m : floatMath.mat[i])
-            cout << setw(12) << (m / floatMath.n[i]);
+            cout << setw(12) << (m / floatMath.norm[i]);
         double m, b;
         floatMath.coeff(i, m, b);
         cout << setw(12) << m;
