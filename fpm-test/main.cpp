@@ -71,11 +71,11 @@ struct FixedMath {
         if(n[tidx] == 0) return false;
 
         auto &mt = mat[tidx];
-        int64_t A = mt[0] / n[tidx];
-        int64_t B = mt[1] / n[tidx];
-        int64_t C = mt[2] / n[tidx];
-        int64_t D = mt[3] / n[tidx];
-        C <<= 8;
+        int64_t A = mt[0] / n[tidx]; // 0.32
+        int64_t B = mt[1] / n[tidx]; // 16.16
+        int64_t C = mt[2] / n[tidx]; // 24.8
+        int64_t D = mt[3] / n[tidx]; // 32.0
+        C <<= 8; // 24.16
 
         uint32_t Z = A - (B * B);
         if(Z == 0 || count[tidx] < 1024) {
