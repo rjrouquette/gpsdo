@@ -9,7 +9,7 @@ temperature is binned by the truncated value in Celsius.  The temperature value 
 
 ```C++
 binId = floor(celsius)
-x = temp - bindId - 0.5
+x = celsius - bindId - 0.5
 ```
 
 Each bin has five accumulator cells for performing a linear OLS fit which are updated using an [EMA](https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average):
@@ -22,13 +22,15 @@ Each bin has five accumulator cells for performing a linear OLS fit which are up
 To compute the correction coefficients, the four cell values are first normalized by dividing them by the norm value.  The correction coefficients are then computed as follows:
 
 ```C++
-Z = A - (B * B)
+// Z is the determinant of XX matrix
+Z = (A * 1) - (B * B)
 
+// expanded product of inverse XX matrix and XY matrix
 m = ((C * 1) - (B * D)) / Z;
 b = ((A * D) - (B * C)) / Z;
 ```
 
-The coefficients are then applied in standard `y=mx+b` form to computed the frequency offset for the DCXO.
+The coefficients are then applied in standard `y=mx+b` form to compute the frequency offset for the DCXO.
 
 ## InfluxDB Export
 
