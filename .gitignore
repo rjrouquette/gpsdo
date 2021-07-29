@@ -4,3 +4,6 @@ dist/
 
 # VSCode
 .vscode/
+
+# large data files
+gpsdo.csv
