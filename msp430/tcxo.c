@@ -2,6 +2,11 @@
 #include "math.h"
 #include "tcxo.h"
 
+#define XX (0)
+#define X1 (1)
+#define YX (2)
+#define Y1 (3)
+
 static uint8_t currBinIdx = 0;
 
 static struct TempBin {
@@ -75,21 +80,21 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     // output -2^31 if there is no data
     if(currBin.norm == 0) return 0x80000000l;
 
-    // load average offset for the bin
-    int32_t D = getCell(3); // 32.0
+    // load Y1 cell (average offset)
+    int32_t D = getCell(Y1); // 32.0
     // require at least 64 samples before performing OLS fit
     if(currBin.norm < 0x200000u) return D;
 
     // load XX cells
-    int32_t A = getCell(0); // 0.32
-    int32_t B = getCell(1); // 16.16
+    int32_t A = getCell(XX); // 0.32
+    int32_t B = getCell(X1); // 16.16
     // compute determinant
     int32_t Z = A - mult32s(B, B);
     // must satisfy E(x^2) > E(x)^2
     if(Z <= 0) return D;
 
-    // load XY cell
-    int32_t C = getCell(2); // 24.8
+    // load YX cell
+    int32_t C = getCell(YX); // 24.8
     // compute m
     rem = (mult64s(C, 256) - mult64s(B, D)) << 24;
     divS(Z, &rem, &m);
@@ -117,10 +122,10 @@ void TCXO_updateCompensation(int16_t tempC, int32_t offset) {
     int16_t x = getFracTemp(tempC);
     // update accumulators
     increment();
-    accumulate(0, mult32s(x, x) << 16u);
-    accumulate(1, x << 8u);
-    accumulate(2, mult64s(offset, x));
-    accumulate(3, offset);
+    accumulate(XX, mult32s(x, x) << 16u);
+    accumulate(X1, x << 8u);
+    accumulate(YX, mult64s(offset, x));
+    accumulate(Y1, offset);
     // store results
     storeBin();
 }
