@@ -41,7 +41,7 @@ static void accumulate(uint8_t i, const int64_t value) {
 
 // get normalized cell contents
 static int32_t getCell(uint8_t cidx) {
-    return div64s32u32s(currBin.mat[cidx], currBin.norm);
+    return div64s32u(currBin.mat[cidx], currBin.norm);
 }
 
 // load the specified temperature bin into memory
@@ -90,7 +90,7 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     // C is not left shifted here because HW multipier only supports 32-bit operands
 
     // compute m
-    const int32_t m = div64s32u32s(
+    const int32_t m = div64s32u(
         // C is multiplied by 256 to correct alignment (equivalent to left shift of 8)
         (mult64s(C, 256) - mult64s(B, D)) << 24u,
         // divide by determinant of XX
@@ -98,7 +98,7 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     );
 
     // compute b
-    const int32_t b = div64s32u32s(
+    const int32_t b = div64s32u(
         // B * C is left shifted by 8 to correct alignment
         mult64s(A, D) - (mult64s(B, C) << 8u),
         // divide by determinant of XX

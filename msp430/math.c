@@ -13,7 +13,7 @@ union i64 {
 };
 
 // signed/unsigned integer long-division
-int32_t div64s32u32s(int64_t rem, uint32_t div) {
+int32_t div64s32u(int64_t rem, uint32_t div) {
     // sign detection
     const uint8_t neg = rem < 0;
     if(neg) rem = -rem;
