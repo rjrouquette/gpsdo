@@ -1,40 +1,64 @@
 
+#include <msp430.h>
 #include "math.h"
 
-// integer long-division
-void divU(uint32_t div, uint64_t *rem, uint32_t *quo) {
-    quo = 0;
-    for(uint8_t i = 0; i < 64; i++) {
-        (*quo) <<= 1;
-        const uint8_t shift = 63 - i;
-        uint32_t top = (*rem) >> shift;
+union i32 {
+    uint16_t word[2];
+    int32_t full;
+};
+
+union i64 {
+    uint16_t word[4];
+    int64_t full;
+};
+
+// signed/unsigned integer long-division
+int32_t div64s32u32s(int64_t rem, uint32_t div) {
+    // sign detection
+    const uint8_t neg = rem < 0;
+    if(neg) rem = -rem;
+
+    // unsigned long division
+    uint32_t quo = 0;
+    for(int8_t shift = 63; shift >= 0; --shift) {
+        quo <<= 1;
+        uint32_t top = rem >> shift;
         if(top >= div) {
-            (*rem) -= ((uint64_t)div) << shift;
-            (*quo) |= 1;
+            rem -= ((uint64_t)div) << shift;
+            quo |= 1;
         }
     }
-}
 
-// signed integer long-division
-void divS(uint32_t div, int64_t *rem, int32_t *quo) {
-    (*quo) = 0;
-    const int8_t neg = (*rem) < 0;
-    if(neg) (*rem) = -(*rem);
-    divU(div, (uint64_t *) rem, (uint32_t *) quo);
-    if(neg) {
-        (*rem) = -(*rem);
-        (*quo) = -(*quo);
-    }
+    // sign restoration
+    return neg ? -quo : quo;
 }
 
 // signed integer multiplication
 int32_t mult32s(int16_t a, int16_t b) {
-    // TODO use hardware acceleration
-    return ((int32_t)a) * ((int32_t)b);
+    union i32 res;
+
+    // use hardware multiplier
+    MPYS = a;
+    OP2 = b;
+    // get result
+    res.word[0] = RESLO;
+    res.word[1] = RESHI;
+    return res.full;
 }
 
 // signed integer multiplication
 int64_t mult64s(int32_t a, int32_t b) {
-    // TODO use hardware acceleration
-    return ((int64_t)a) * ((int64_t)b);
+    union i64 res;
+
+    // use hardware multiplier
+    MPYS32L = ((union i32)a).word[0];
+    MPYS32H = ((union i32)a).word[1];
+    OP2L = ((union i32)b).word[0];
+    OP2H = ((union i32)b).word[1];
+    // get result
+    res.word[0] = RES0;
+    res.word[1] = RES1;
+    res.word[2] = RES2;
+    res.word[3] = RES3;
+    return res.full;
 }

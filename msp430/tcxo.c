@@ -41,10 +41,7 @@ static void accumulate(uint8_t i, const int64_t value) {
 
 // get normalized cell contents
 static int32_t getCell(uint8_t cidx) {
-    int64_t rem = currBin.mat[cidx];
-    int32_t quo;
-    divS(currBin.norm, &rem, &quo);
-    return quo;
+    return div64s32u32s(currBin.mat[cidx], currBin.norm);
 }
 
 // load the specified temperature bin into memory
@@ -70,40 +67,46 @@ static void storeBin() {
  * @return the DCXO digital frequency offset
 **/
 int32_t TCXO_getCompensation(int16_t tempC) {
-    int64_t rem;
-    int32_t m, b;
-
-    // load temperature bin
-    uint8_t binId = getBinId(tempC);
-    loadBin(binId);
+    loadBin(getBinId(tempC));
 
     // output -2^31 if there is no data
     if(currBin.norm == 0) return 0x80000000l;
 
     // load Y1 cell (average offset)
-    int32_t D = getCell(Y1); // 32.0
+    const int32_t D = getCell(Y1); // 32.0
     // require at least 64 samples before performing OLS fit
     if(currBin.norm < 0x200000u) return D;
 
     // load XX cells
-    int32_t A = getCell(XX); // 0.32
-    int32_t B = getCell(X1); // 16.16
+    const int32_t A = getCell(XX); // 0.32
+    const int32_t B = getCell(X1); // 16.16
     // compute determinant
-    int32_t Z = A - mult32s(B, B);
+    const int32_t Z = A - mult32s(B, B);
     // must satisfy E(x^2) > E(x)^2
     if(Z <= 0) return D;
 
     // load YX cell
-    int32_t C = getCell(YX); // 24.8
+    const int32_t C = getCell(YX); // 24.8
+    // C is not left shifted here because HW multipier only supports 32-bit operands
+
     // compute m
-    rem = (mult64s(C, 256) - mult64s(B, D)) << 24;
-    divS(Z, &rem, &m);
+    const int32_t m = div64s32u32s(
+        // C is multiplied by 256 to correct alignment (equivalent to left shift of 8)
+        (mult64s(C, 256) - mult64s(B, D)) << 24u,
+        // divide by determinant of XX
+        Z
+    );
+
     // compute b
-    rem = mult64s(A, D) - (mult64s(B, C) << 8);
-    divS(Z, &rem, &b);
+    const int32_t b = div64s32u32s(
+        // B * C is left shifted by 8 to correct alignment
+        mult64s(A, D) - (mult64s(B, C) << 8u),
+        // divide by determinant of XX
+        Z
+    );
 
     // get fractional part of temperature
-    int16_t x = getFracTemp(tempC);
+    const int16_t x = getFracTemp(tempC);
     // apply coefficients
     return (mult64s(m, x) >> 16u) + b;
 }
@@ -115,8 +118,7 @@ int32_t TCXO_getCompensation(int16_t tempC) {
 **/
 void TCXO_updateCompensation(int16_t tempC, int32_t offset) {
     // load temperature bin
-    uint8_t binId = getBinId(tempC);
-    loadBin(binId);
+    loadBin(getBinId(tempC));
 
     // get fractional part of temperature
     int16_t x = getFracTemp(tempC);
