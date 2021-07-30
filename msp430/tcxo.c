@@ -2,13 +2,17 @@
 #include "math.h"
 #include "tcxo.h"
 
-static uint8_t currBin = 0;
-uint32_t binNorm = 0;
-int64_t binMat[4];
+static uint8_t currBinIdx = 0;
+
+static struct TempBin {
+    int64_t mat[4];
+    uint32_t norm;
+} currBin;
 
 // extract bin ID from temperatute
 static uint8_t getBinId(int16_t tempC) {
-    return (uint8_t) ((tempC >> 8u) & ((int16_t) 0xffu));
+    uint8_t offset = tempC >> 8u;
+    return offset + 64u;
 }
 
 // reduce to fractional temperature (0.16 fixed point format)
@@ -19,31 +23,40 @@ static int8_t getFracTemp(int16_t tempC) {
 }
 
 // A = A + ((B - A) / 2^16)
-static void increment(uint32_t *acc) {
-    (*acc) -= (*acc) >> 16u;
-    (*acc) += 1u << 15u;
+static void increment() {
+    currBin.norm -= currBin.norm >> 16u;
+    currBin.norm += 1u << 15u;
 }
 
 // A = A + ((B - A) / 2^16)
-static void accumulate(int64_t *acc, const int64_t value) {
-    (*acc) -= (*acc) >> 16u;
-    (*acc) += value << 15u;
+static void accumulate(uint8_t i, const int64_t value) {
+    currBin.mat[i] -= currBin.mat[i] >> 16u;
+    currBin.mat[i] += value << 15u;
 }
 
 // get normalized cell contents
-int32_t getCell(uint8_t cidx) {
-    int64_t rem = binMat[cidx];
+static int32_t getCell(uint8_t cidx) {
+    int64_t rem = currBin.mat[cidx];
     int32_t quo;
-    divS(binNorm, &rem, &quo);
+    divS(currBin.norm, &rem, &quo);
     return quo;
 }
 
 // load the specified temperature bin into memory
 static void loadBin(uint8_t binId) {
-    if(binId == currBin) return;
+    if(binId == currBinIdx) return;
 
     // TODO load bin data from I2C EERAM
-    currBin = binId;
+    currBinIdx = binId;
+}
+
+// load the specified temperature bin into memory
+static void storeBin() {
+    uint16_t addr = currBinIdx;
+    addr *= sizeof(struct TempBin);
+
+    
+    // TODO store bin data to I2C EERAM
 }
 
 /**
@@ -61,8 +74,8 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     int32_t D = getCell(3); // 32.0
 
     int32_t Z = A - mult32s(B, B);
-    if(Z <= 0 || binNorm < 64)
-        return D;
+    if(Z <= 0) return D;
+    if(currBin.norm < (64ul << 15u)) return D;
 
     int32_t m, b;
     int64_t rem;
@@ -86,9 +99,10 @@ void TCXO_updateCompensation(int16_t tempC, int32_t offset) {
     loadBin(binId);
 
     int16_t x = getFracTemp(tempC);
-    increment(&binNorm);
-    accumulate(&binMat[0], mult32s(x, x) << 16u);
-    accumulate(&binMat[1], x << 8u);
-    accumulate(&binMat[2], mult64s(offset, x));
-    accumulate(&binMat[3], offset);
+    increment();
+    accumulate(0, mult32s(x, x) << 16u);
+    accumulate(1, x << 8u);
+    accumulate(2, mult64s(offset, x));
+    accumulate(3, offset);
+    storeBin();
 }

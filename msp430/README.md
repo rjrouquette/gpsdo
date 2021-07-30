@@ -75,11 +75,13 @@ I2C Read:
 S:0x49:W:A :0x00:A RS:0x49:R:A :MSB:A :LSB:N:P
 ```
 
+tempCelsius = code * 0.0078125
+
 ---
 ## 47L64 EERAM w/ EEPROM
 
 Two 8kB banks:
-- 0xA1 - Configuration Data + Divisor LUT
+- 0xA1 - Configuration Data
 - 0xA3 - Temperature Compensation Data
 
 I2C Read:
@@ -92,8 +94,6 @@ I2C Write:
 ```
 S:CSA:W:A :ADDRH:A :ADDRL:A :DATA[0]:A .. :DATA[N]:A:P
 ```
-
-tempCelsius = code * 0.0078125
 
 ---
 ## ublox MAX-8Q
