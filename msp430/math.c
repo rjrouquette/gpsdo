@@ -27,19 +27,25 @@ int32_t div64s32u(int64_t rem, uint32_t div) {
     uint8_t carry = 0;
     uint32_t head = 0;
     uint32_t quo = 0;
-    for(int8_t shift = 63; shift >= 0; --shift) {
-        // shift quotient to make room for new bit
-        quo <<= 1u;
-        // save msb of head register as carry flag
-        carry = ((union u32)head).word[1] >> 15u;
-        // shift msb of remainder into 32-bit head register
-        head <<= 1u;
-        head |= ((union i64)rem).word[3] >> 15u;
-        rem <<= 1u;
-        // compare head to divisor
-        if(carry || head >= div) {
-            head -= div;
-            quo |= 1;
+    // loop over each dividend word separately
+    #pragma GCC unroll 0
+    for(int8_t i = 3; i >= 0; --i) {
+        // loop over each bit in dividend word
+        #pragma GCC unroll 0
+        for(uint8_t j = 0; j < 16; ++j) {
+            // shift quotient to make room for new bit
+            quo <<= 1u;
+            // save msb of head register as carry flag
+            carry = ((union u32)head).word[1] >> 15u;
+            // shift msb of remainder into 32-bit head register
+            head <<= 1u;
+            head |= ((union i64)rem).word[i] >> 15u;
+            ((union i64)rem).word[i] <<= 1u;
+            // compare head to divisor
+            if(carry || head >= div) {
+                head -= div;
+                quo |= 1;
+            }
         }
     }
 
@@ -48,7 +54,7 @@ int32_t div64s32u(int64_t rem, uint32_t div) {
 }
 
 // signed integer multiplication
-int32_t mult32s(int16_t a, int16_t b) {
+int32_t mult16s16s(int16_t a, int16_t b) {
     union i32 res;
 
     // use hardware multiplier
@@ -61,7 +67,21 @@ int32_t mult32s(int16_t a, int16_t b) {
 }
 
 // signed integer multiplication
-int64_t mult64s(int32_t a, int32_t b) {
+int32_t mult24s8s(int32_t a, int16_t b) {
+    union i32 res;
+
+    // use hardware multiplier
+    MPYS32L = ((union i32)a).word[0];
+    MPYS32H = ((union i32)a).word[1];
+    OP2 = b;
+    // get result
+    res.word[0] = RESLO;
+    res.word[1] = RESHI;
+    return res.full;
+}
+
+// signed integer multiplication
+int64_t mult32s32s(int32_t a, int32_t b) {
     union i64 res;
 
     // use hardware multiplier

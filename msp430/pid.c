@@ -9,7 +9,7 @@ int32_t I = 0;
 
 // integrator
 int32_t prevError = 0;
-int64_t acc = 0;
+int32_t acc = 0;
 
 /**
  * Gets the DCXO adjustment for the given temperature.
@@ -21,13 +21,13 @@ int32_t PID_update(int32_t trackingError) {
     acc += trackingError;
 
     // compute loop output
-    int64_t out;
+    int64_t out = acc;
     // derivative
-    out = mult64s(D, trackingError - prevError);
+    out = mult32s32s(D, trackingError - prevError);
     // proportional
-    out += mult64s(P, trackingError);
+    out += mult32s32s(P, trackingError);
     // integral
-    out += I * acc;
+    out += mult32s32s(I, acc);
     // return result
     return out >> 24u;
 }

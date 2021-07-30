@@ -21,10 +21,8 @@ static uint8_t getBinId(int16_t tempC) {
 }
 
 // reduce to fractional temperature (0.16 fixed point format)
-static int8_t getFracTemp(int16_t tempC) {
-    int8_t x = (int8_t) (tempC & ((int16_t) 0xff));
-    x -= (int8_t) 128;
-    return x;
+static int16_t getFracTemp(int16_t tempC) {
+    return (tempC & 0xff) - 128;
 }
 
 // A = A + ((B - A) / 2^16)
@@ -34,9 +32,9 @@ static void increment() {
 }
 
 // A = A + ((B - A) / 2^16)
-static void accumulate(uint8_t i, const int64_t value) {
+static void accumulate(uint8_t i, const int32_t value) {
     currBin.mat[i] -= currBin.mat[i] >> 16u;
-    currBin.mat[i] += value << 15u;
+    currBin.mat[i] += ((int64_t)value) << 15u;
 }
 
 // get normalized cell contents
@@ -81,7 +79,7 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     const int32_t A = getCell(XX); // 0.32
     const int32_t B = getCell(X1); // 16.16
     // compute determinant
-    const int32_t Z = A - mult32s(B, B);
+    const int32_t Z = A - mult16s16s(B, B);
     // must satisfy E(x^2) > E(x)^2
     if(Z <= 0) return D;
 
@@ -92,7 +90,7 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     // compute m
     const int32_t m = div64s32u(
         // C is multiplied by 256 to correct alignment (equivalent to left shift of 8)
-        (mult64s(C, 256) - mult64s(B, D)) << 24u,
+        (mult32s32s(C, 256) - mult32s32s(B, D)) << 24u,
         // divide by determinant of XX
         Z
     );
@@ -100,7 +98,7 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     // compute b
     const int32_t b = div64s32u(
         // B * C is left shifted by 8 to correct alignment
-        mult64s(A, D) - (mult64s(B, C) << 8u),
+        mult32s32s(A, D) - (mult32s32s(B, C) << 8u),
         // divide by determinant of XX
         Z
     );
@@ -108,7 +106,7 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     // get fractional part of temperature
     const int16_t x = getFracTemp(tempC);
     // apply coefficients
-    return (mult64s(m, x) >> 16u) + b;
+    return (mult32s32s(m, x) >> 16u) + b;
 }
 
 /**
@@ -121,12 +119,12 @@ void TCXO_updateCompensation(int16_t tempC, int32_t offset) {
     loadBin(getBinId(tempC));
 
     // get fractional part of temperature
-    int16_t x = getFracTemp(tempC);
+    const int16_t x = getFracTemp(tempC);
     // update accumulators
     increment();
-    accumulate(XX, mult32s(x, x) << 16u);
+    accumulate(XX, mult16s16s(x, x) << 16u);
     accumulate(X1, x << 8u);
-    accumulate(YX, mult64s(offset, x));
+    accumulate(YX, mult24s8s(offset, x));
     accumulate(Y1, offset);
     // store results
     storeBin();

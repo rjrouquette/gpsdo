@@ -99,3 +99,38 @@ S:CSA:W:A :ADDRH:A :ADDRL:A :DATA[0]:A .. :DATA[N]:A:P
 ## ublox MAX-8Q
 
 TODO: add ublox DDC documentation
+
+---
+## Integer Math
+
+The `math.c` file contains functions for integer division and multiplication.  The multiplication routines utilize the MPY32 hardware multiplier and have been optimized for space.
+
+Disassembled code for multiplication functions:
+
+```
+00008198 <mult16s16s>:
+    8198:       82 4c c2 04     mov     r12,    &0x04c2 ;
+    819c:       82 4d c8 04     mov     r13,    &0x04c8 ;
+    81a0:       1c 42 ca 04     mov     &0x04ca,r12     ;0x04ca
+    81a4:       1d 42 cc 04     mov     &0x04cc,r13     ;0x04cc
+    81a8:       30 41           ret                     
+
+000081aa <mult24s8s>:
+    81aa:       82 4c d4 04     mov     r12,    &0x04d4 ;
+    81ae:       82 4d d6 04     mov     r13,    &0x04d6 ;
+    81b2:       82 4e c8 04     mov     r14,    &0x04c8 ;
+    81b6:       1c 42 ca 04     mov     &0x04ca,r12     ;0x04ca
+    81ba:       1d 42 cc 04     mov     &0x04cc,r13     ;0x04cc
+    81be:       30 41           ret                     
+
+000081c0 <mult32s32s>:
+    81c0:       82 4c d4 04     mov     r12,    &0x04d4 ;
+    81c4:       82 4d d6 04     mov     r13,    &0x04d6 ;
+    81c8:       82 4e e0 04     mov     r14,    &0x04e0 ;
+    81cc:       82 4f e2 04     mov     r15,    &0x04e2 ;
+    81d0:       1c 42 e4 04     mov     &0x04e4,r12     ;0x04e4
+    81d4:       1d 42 e6 04     mov     &0x04e6,r13     ;0x04e6
+    81d8:       1e 42 e8 04     mov     &0x04e8,r14     ;0x04e8
+    81dc:       1f 42 ea 04     mov     &0x04ea,r15     ;0x04ea
+    81e0:       30 41           ret
+```
