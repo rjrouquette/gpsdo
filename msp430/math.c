@@ -7,6 +7,11 @@ union i32 {
     int32_t full;
 };
 
+union u32 {
+    uint16_t word[2];
+    uint32_t full;
+};
+
 union i64 {
     uint16_t word[4];
     int64_t full;
@@ -19,12 +24,21 @@ int32_t div64s32u(int64_t rem, uint32_t div) {
     if(neg) rem = -rem;
 
     // unsigned long division
+    uint8_t carry = 0;
+    uint32_t head = 0;
     uint32_t quo = 0;
     for(int8_t shift = 63; shift >= 0; --shift) {
-        quo <<= 1;
-        uint32_t top = rem >> shift;
-        if(top >= div) {
-            rem -= ((uint64_t)div) << shift;
+        // shift quotient to make room for new bit
+        quo <<= 1u;
+        // save msb of head register as carry flag
+        carry = ((union u32)head).word[1] >> 15u;
+        // shift msb of remainder into 32-bit head register
+        head <<= 1u;
+        head |= ((union i64)rem).word[3] >> 15u;
+        rem <<= 1u;
+        // compare head to divisor
+        if(carry || head >= div) {
+            head -= div;
             quo |= 1;
         }
     }

@@ -55,29 +55,44 @@ static void accumulate( double &acc, const double value) {
     acc += (value - acc) / 65536.0;
 }
 
-// integer long-division
-static void div(uint32_t div, uint64_t &rem, uint32_t &quo) {
-    quo = 0;
-    for(uint8_t i = 0; i < 64; i++) {
-        quo <<= 1;
-        const uint8_t shift = 63 - i;
-        uint32_t top = rem >> shift;
-        if(top >= div) {
-            rem -= ((uint64_t)div) << shift;
+union u32 {
+    uint16_t word[2];
+    uint32_t full;
+};
+
+union i64 {
+    uint16_t word[4];
+    int64_t full;
+};
+
+// signed/unsigned integer long-division
+int32_t div64s32u(int64_t rem, uint32_t div) {
+    // sign detection
+    const uint8_t neg = rem < 0;
+    if(neg) rem = -rem;
+
+    // unsigned long division
+    uint8_t carry = 0;
+    uint32_t head = 0;
+    uint32_t quo = 0;
+    for(int8_t shift = 63; shift >= 0; --shift) {
+        // shift quotient to make room for new bit
+        quo <<= 1u;
+        // save msb of head register as carry flag
+        carry = ((union u32 &)head).word[1] >> 15u;
+        // shift msb of remainder into 32-bit head register
+        head <<= 1u;
+        head |= ((union i64 &)rem).word[3] >> 15u;
+        rem <<= 1u;
+        // compare head to divisor
+        if(carry || head >= div) {
+            head -= div;
             quo |= 1;
         }
     }
-}
 
-// signed integer long-division
-static void div(uint32_t div, int64_t &rem, int32_t &quo) {
-    const bool neg = rem < 0;
-    if(neg) rem = -rem;
-    ::div(div, (uint64_t &)rem, (uint32_t &)quo);
-    if(neg) {
-        rem = -rem;
-        quo = -quo;
-    }
+    // sign restoration
+    return neg ? -quo : quo;
 }
 
 struct FixedMath {
@@ -106,10 +121,7 @@ struct FixedMath {
     }
 
     int32_t getCell(uint8_t tidx, uint8_t cidx) {
-        int64_t rem = mat[tidx][cidx];
-        int32_t quo;
-        div(norm[tidx], rem, quo);
-        return quo;
+        return div64s32u(mat[tidx][cidx], norm[tidx]);
     }
 
     bool coeff(const float temp, int32_t &m, int32_t &b) {
@@ -132,11 +144,8 @@ struct FixedMath {
             m = 0;
             b = D;
         } else {
-            int64_t rem;
-            rem = ((C * 1) - (B * D)) << 24;
-            div(Z, rem, m);
-            rem = (A * D) - (B * C);
-            div(Z, rem, b);
+            m = div64s32u(((C * 1) - (B * D)) << 24, Z);
+            b = div64s32u((A * D) - (B * C), Z);
         }
         return true;
     }
@@ -203,13 +212,6 @@ time                temp               ppm                  error
 */
 
 int main(int argc, char **argv) {
-    uint32_t test = 0;
-    for(int i = 0; i < 64; i++) {
-        increment(test);
-    }
-    cout << test << endl;
-
-
     ifstream fin(argv[1]);
 
     // skip over headers
