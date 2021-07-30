@@ -74,8 +74,10 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     int32_t D = getCell(3); // 32.0
 
     int32_t Z = A - mult32s(B, B);
+    // require stable data
     if(Z <= 0) return D;
-    if(currBin.norm < (64ul << 15u)) return D;
+    // require at least 64 samples
+    if(currBin.norm < 0x200000u) return D;
 
     int32_t m, b;
     int64_t rem;

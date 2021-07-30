@@ -125,7 +125,10 @@ struct FixedMath {
         C <<= 8; // 24.16
 
         int32_t Z = A - (B * B);
-        if(Z <= 0 || count[tidx] < 64) {
+        if(
+            Z <= 0 ||               // bad data
+            norm[tidx] < 0x200000u  // 64 samples
+        ) {
             m = 0;
             b = D;
         } else {
@@ -200,6 +203,13 @@ time                temp               ppm                  error
 */
 
 int main(int argc, char **argv) {
+    uint32_t test = 0;
+    for(int i = 0; i < 64; i++) {
+        increment(test);
+    }
+    cout << test << endl;
+
+
     ifstream fin(argv[1]);
 
     // skip over headers
