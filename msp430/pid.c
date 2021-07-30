@@ -27,7 +27,7 @@ int32_t PID_update(int32_t trackingError) {
     // proportional
     out += mult64s(P, trackingError);
     // integral
-    out += mult64s(I, acc);
+    out += I * acc;
     // return result
     return out >> 24u;
 }
