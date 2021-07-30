@@ -1,9 +1,13 @@
 #include <msp430.h>
+#include "pid.h"
 #include "tcxo.h"
 
 int main() {
     TCXO_getCompensation(1234);
     TCXO_updateCompensation(2345, 567890);
+    // D = 1/4, P = 1/64, I = 1/2048
+    PID_setCoeff(((int32_t)1) << 18, ((int32_t)-1) << 14, 11u);
+    PID_update(1000);
 
     // TODO remove demo code
     WDTCTL = WDTPW | WDTHOLD;               // Stop watchdog timer

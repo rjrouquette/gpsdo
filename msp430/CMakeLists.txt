@@ -25,7 +25,7 @@ set(CMAKE_CXX_COMPILER_WORKS 1)
 
 project("gpsdo")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Og -g -Wall -mmcu=MSP430F5171 -ffunction-sections -fdata-sections")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os -Wall -mmcu=MSP430F5171 -ffunction-sections -fdata-sections")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--relax,--gc-sections")
 
 add_executable(
@@ -34,6 +34,8 @@ add_executable(
         main.c
         math.c
         math.h
+        pid.c
+        pid.h
         tcxo.c
         tcxo.h
 )
