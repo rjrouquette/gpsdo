@@ -22,4 +22,9 @@ int32_t PID_update(int32_t trackingError);
 **/
 void PID_setCoeff(int32_t d, int32_t p, int32_t i);
 
+/**
+ * Reset the PID accumulator
+**/
+void PID_clearIntegral();
+
 #endif

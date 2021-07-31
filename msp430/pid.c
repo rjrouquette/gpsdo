@@ -17,9 +17,6 @@ int32_t acc = 0;
  * @return the DCXO digital frequency offset
 **/
 int32_t PID_update(int32_t trackingError) {
-    // update integrator
-    acc += trackingError;
-
     // compute loop output
     int64_t out = acc;
     // derivative
@@ -28,6 +25,8 @@ int32_t PID_update(int32_t trackingError) {
     out += mult32s32s(P, trackingError);
     // integral
     out += mult32s32s(I, acc);
+    // update integrator
+    acc += trackingError;
     // return result
     return out >> 24u;
 }
@@ -42,4 +41,11 @@ void PID_setCoeff(int32_t d, int32_t p, int32_t i) {
     D = d;
     P = p;
     I = i;
+}
+
+/**
+ * Reset the PID accumulator
+**/
+void PID_clearIntegral() {
+    acc = 0;
 }

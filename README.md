@@ -17,7 +17,7 @@ Redesign of the [Radio Astronomy Master Clock](https://github.com/rjrouquette/ra
             - drift measurement against GPS
     - DCXO for more precise tuning
         - 25 MHz
-        - Si549 provides 26 ppt step size
+        - Si549 provides 116.4 ppt step size
         - I2C interface
     - Temperature sensor
         - same PCB thermal island with DCXO

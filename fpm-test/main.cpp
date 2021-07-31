@@ -12,7 +12,7 @@
 #include <string>
 #include <unistd.h>
 
-#define IPPM_PREC (0.000026f)
+#define IPPM_PREC (0.0001164f)
 
 using namespace std;
 
