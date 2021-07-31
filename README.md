@@ -20,7 +20,7 @@ Redesign of the [Radio Astronomy Master Clock](https://github.com/rjrouquette/ra
         - Si549 provides 116.4 ppt step size
         - I2C interface
     - Temperature sensor
-        - same PCB thermal island with DCXO
+        - same PCB thermal island as DCXO
         - allows for improved tracking and holdover accuracy
         - I2C interface
     - ublox MAX-8Q GPS

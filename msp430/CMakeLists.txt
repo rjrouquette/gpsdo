@@ -36,6 +36,8 @@ add_executable(
         math.h
         pid.c
         pid.h
+        pps.c
+        pps.h
         tcxo.c
         tcxo.h
 )
