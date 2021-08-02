@@ -6,6 +6,11 @@
 
 #define TIMER_TO_DCXO (43) // 5 ppb / 0.1164 ppb
 
+// global configuration
+struct {
+    int32_t ppsErrorOffset;
+} config;
+
 void doTrackingUpdate();
 
 int main() {
@@ -63,6 +68,7 @@ void doTrackingUpdate() {
         if(allowPidUpdate) {
             // TODO get actual PPS error
             int32_t ppsError = mult16s16s(PPS_getDelta(), TIMER_TO_DCXO);
+            ppsError += config.ppsErrorOffset;
             // Update PID tracking loop
             pidComp = PID_update(ppsError);
         }

@@ -47,5 +47,6 @@ uint8_t PPS_isReady() {
 **/
 int16_t PPS_getDelta() {
     int16_t delta = TD0CL0;
-    return 0;
+    delta -= TD0CL1;
+    return delta;
 }
