@@ -1,4 +1,5 @@
 
+#include "eeram.h"
 #include "math.h"
 #include "tcxo.h"
 
@@ -7,12 +8,13 @@
 #define YX (2)
 #define Y1 (3)
 
-static uint8_t currBinIdx = 0;
-
-static struct TempBin {
+struct TempBin {
     int64_t mat[4];
     uint32_t norm;
-} currBin;
+};
+
+static struct TempBin currBin;
+static uint8_t currBinIdx = 0;
 
 // extract bin ID from temperatute
 static uint8_t getBinId(int16_t tempC) {
@@ -47,6 +49,9 @@ static void loadBin(uint8_t binId) {
     if(binId == currBinIdx) return;
 
     // TODO load bin data from I2C EERAM
+    uint16_t addr = binId;
+    addr *= sizeof(struct TempBin);
+    EERAM_read(EERAM_CSA1, addr, &currBin, sizeof(struct TempBin));
     currBinIdx = binId;
 }
 
@@ -54,9 +59,7 @@ static void loadBin(uint8_t binId) {
 static void storeBin() {
     uint16_t addr = currBinIdx;
     addr *= sizeof(struct TempBin);
-
-    
-    // TODO store bin data to I2C EERAM
+    EERAM_write(EERAM_CSA1, addr, &currBin, sizeof(struct TempBin));
 }
 
 /**

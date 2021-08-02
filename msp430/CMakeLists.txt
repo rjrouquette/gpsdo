@@ -34,6 +34,8 @@ add_executable(
         main.c
         config.c
         config.h
+        eeram.c
+        eeram.h
         math.c
         math.h
         pid.c
