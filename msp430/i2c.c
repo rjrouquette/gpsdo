@@ -85,7 +85,7 @@ void I2C_startWrite(uint8_t csa) {
  * @param data - input buffer
  * @param size - number of bytes to read
  */
-void I2C_readBytes(void *data, uint16_t size) {
+void I2C_read(void *data, uint16_t size) {
     uint8_t *ptr = (uint8_t *) data;
     uint8_t *end = ptr + size;
     while(ptr < end) {
@@ -101,7 +101,7 @@ void I2C_readBytes(void *data, uint16_t size) {
  * @param data - output buffer
  * @param size - number of bytes to read
  */
-void I2C_writeBytes(const void *data, uint16_t size) {
+void I2C_write(const void *data, uint16_t size) {
     uint8_t *ptr = (uint8_t *) data;
     uint8_t *end = ptr + size;
     while(ptr < end) {
