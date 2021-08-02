@@ -31,6 +31,20 @@ void I2C_startRead(uint8_t csa);
 void I2C_startWrite(uint8_t csa);
 
 /**
+ * Read consecutive bytes
+ * @param data - input buffer
+ * @param size - number of bytes to read
+ */
+void I2C_readBytes(void *data, uint16_t size);
+
+/**
+ * Write consecutive bytes
+ * @param data - output buffer
+ * @param size - number of bytes to read
+ */
+void I2C_writeBytes(const void *data, uint16_t size);
+
+/**
  * Stop transaction
  */
 void I2C_stop();

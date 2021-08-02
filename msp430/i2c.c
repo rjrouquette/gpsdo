@@ -81,6 +81,40 @@ void I2C_startWrite(uint8_t csa) {
 }
 
 /**
+ * Read consecutive bytes
+ * @param data - input buffer
+ * @param size - number of bytes to read
+ */
+void I2C_readBytes(void *data, uint16_t size) {
+    uint8_t *ptr = (uint8_t *) data;
+    uint8_t *end = ptr + size;
+    while(ptr < end) {
+        // wait for byte to complete
+        while(!(UCB0IFG & UCRXIFG));
+        // store byte
+        *(ptr++) = UCB0RXBUF;
+    }
+}
+
+/**
+ * Write consecutive bytes
+ * @param data - output buffer
+ * @param size - number of bytes to read
+ */
+void I2C_writeBytes(const void *data, uint16_t size) {
+    uint8_t *ptr = (uint8_t *) data;
+    uint8_t *end = ptr + size;
+    while(ptr < end) {
+        // wait for previous byte to complete
+        while(!(UCB0IFG & UCTXIFG));
+        // transmit byte
+        *(ptr++) = UCB0RXBUF;
+    }
+    // wait for last byte to complete
+    while(!(UCB0IFG & UCTXIFG));
+}
+
+/**
  * Stop transaction
  */
 void I2C_stop() {
