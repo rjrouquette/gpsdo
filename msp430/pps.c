@@ -36,7 +36,7 @@ void PPS_clearReady() {
  * Reset the PPS ready indicator
 **/
 uint8_t PPS_isReady() {
-    return (TD0CCTL0 & CCIFG) | (TD0CCTL0 & CCIFG);
+    return (TD0CCTL0 & CCIFG) | (TD0CCTL1 & CCIFG);
 }
 
 /**
@@ -46,5 +46,6 @@ uint8_t PPS_isReady() {
  * @return the time offset between PPS leading edges
 **/
 int16_t PPS_getDelta() {
+    int16_t delta = TD0CL0;
     return 0;
 }
