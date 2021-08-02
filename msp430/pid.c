@@ -38,9 +38,12 @@ int32_t PID_update(int32_t trackingError) {
  * @param i - the integral coefficient in 8.24 fixed point format
 **/
 void PID_setCoeff(int32_t d, int32_t p, int32_t i) {
+    // set coefficients
     D = d;
     P = p;
     I = i;
+    // clear integrator
+    acc = 0;
 }
 
 /**

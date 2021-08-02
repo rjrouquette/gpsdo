@@ -1,15 +1,11 @@
 #include <msp430.h>
+#include "config.h"
 #include "math.h"
 #include "pid.h"
 #include "pps.h"
 #include "tcxo.h"
 
 #define TIMER_TO_DCXO (43) // 5 ppb / 0.1164 ppb
-
-// global configuration
-struct {
-    int32_t ppsErrorOffset;
-} config;
 
 void doTrackingUpdate();
 
@@ -20,10 +16,9 @@ int main() {
     // TODO bootstrap MCU
 
     // init code modules
+    SysConfig_load();
     PPS_init();
-
-    // D = 1/4, P = 1/64, I = 1/2048
-    PID_setCoeff(((int32_t)1) << 18, ((int32_t)-1) << 14, 11u);
+    PID_setCoeff(sysConfig.pidDeriv, sysConfig.pidProp, sysConfig.pidInteg);
 
     for(;;) {
         // check for PPS rising edge
@@ -68,7 +63,7 @@ void doTrackingUpdate() {
         if(allowPidUpdate) {
             // TODO get actual PPS error
             int32_t ppsError = mult16s16s(PPS_getDelta(), TIMER_TO_DCXO);
-            ppsError += config.ppsErrorOffset;
+            ppsError += sysConfig.ppsErrorOffset;
             // Update PID tracking loop
             pidComp = PID_update(ppsError);
         }

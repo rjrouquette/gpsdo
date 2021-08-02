@@ -32,6 +32,8 @@ add_executable(
         gpsdo
 
         main.c
+        config.c
+        config.h
         math.c
         math.h
         pid.c
