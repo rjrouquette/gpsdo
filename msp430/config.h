@@ -8,7 +8,7 @@ System Configuration
 #include <stdint.h>
 
 
-struct SysConfig {
+struct SysConf {
     // PPS offset trimming
     int32_t ppsErrorOffset;
     // PID loop coefficients
@@ -16,16 +16,16 @@ struct SysConfig {
 };
 
 // global system configuration
-extern struct SysConfig sysConfig;
+extern struct SysConf sysConf;
 
 /**
  * Fetch system configuration
 **/
-void SysConfig_load();
+void SysConf_load();
 
 /**
  * Update non-volaltile configuration
 **/
-void SysConfig_save();
+void SysConf_save();
 
 #endif

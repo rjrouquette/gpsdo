@@ -1,5 +1,7 @@
 #include <msp430.h>
 #include "config.h"
+#include "eeram.h"
+#include "i2c.h"
 #include "math.h"
 #include "pid.h"
 #include "pps.h"
@@ -14,11 +16,13 @@ int main() {
     WDTCTL = WDTPW | WDTHOLD;               
 
     // TODO bootstrap MCU
+    I2C_init();
 
     // init code modules
-    SysConfig_load();
+    EERAM_init();
+    SysConf_load();
     PPS_init();
-    PID_setCoeff(sysConfig.pidDeriv, sysConfig.pidProp, sysConfig.pidInteg);
+    PID_init();
 
     for(;;) {
         // check for PPS rising edge
@@ -63,7 +67,7 @@ void doTrackingUpdate() {
         if(allowPidUpdate) {
             // TODO get actual PPS error
             int32_t ppsError = mult16s16s(PPS_getDelta(), TIMER_TO_DCXO);
-            ppsError += sysConfig.ppsErrorOffset;
+            ppsError += sysConf.ppsErrorOffset;
             // Update PID tracking loop
             pidComp = PID_update(ppsError);
         }

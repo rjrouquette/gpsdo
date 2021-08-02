@@ -36,6 +36,8 @@ add_executable(
         config.h
         eeram.c
         eeram.h
+        i2c.c
+        i2c.h
         math.c
         math.h
         pid.c

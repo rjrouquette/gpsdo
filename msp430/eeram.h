@@ -1,5 +1,5 @@
 /*
-System Configuration
+I2C EERAM API
 */
 
 #ifndef MSP430_EERAM

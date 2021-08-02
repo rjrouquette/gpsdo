@@ -1,4 +1,5 @@
 
+#include "config.h"
 #include "math.h"
 #include "pid.h"
 
@@ -10,6 +11,10 @@ int32_t I = 0;
 // integrator
 int32_t prevError = 0;
 int32_t acc = 0;
+
+void PID_init() {
+    PID_setCoeff(sysConf.pidDeriv, sysConf.pidProp, sysConf.pidInteg);
+}
 
 /**
  * Gets the DCXO adjustment for the given temperature.
