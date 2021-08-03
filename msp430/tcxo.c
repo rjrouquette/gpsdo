@@ -3,20 +3,25 @@
 #include "math.h"
 #include "tcxo.h"
 
+// start of temperature bins in EERAM
+#define EERAM_OFFSET (1280u)
+// temperature limits
 #define TEMP_MIN (-64 << 8u)  // -64 Celsius
 #define TEMP_MAX (127 << 8u)  // 127 Celsius
-#define EERAM_OFFSET (1280u)
 
+// cell indices
 #define XX (0)
 #define X1 (1)
 #define YX (2)
 #define Y1 (3)
 
+// temperate bin
 struct TempBin {
     int64_t mat[4];
     uint32_t norm;
 };
 
+// internal state
 static struct TempBin currBin;
 static uint8_t currBinIdx = 0;
 
