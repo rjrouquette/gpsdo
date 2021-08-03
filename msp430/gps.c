@@ -2,6 +2,7 @@
 #include <msp430.h>
 #include "delay.h"
 #include "gps.h"
+#include "i2c.h"
 
 #define RST_PORT_SEL  P2SEL
 #define RST_PORT_OUT  P2OUT
@@ -31,13 +32,27 @@ void GPS_reset() {
 
     // clear fix flag
     hasFix = 0;
+
+    // configure GPS receiver
 }
 
 /**
  * Poll GPS DDC interface
  */
 void GPS_poll() {
-
+    // set register address
+    I2C_startWrite(GPS_CSA);
+    I2C_write8(0xFFu);
+    // start read
+    I2C_startRead(GPS_CSA);
+    // read pending data
+    for(;;) {
+        // get next byte
+        uint8_t byte = I2C_read8();
+        // if EOF, exit
+        if(byte == 0xFF) break;
+        // process byte
+    }
 }
 
 /**
