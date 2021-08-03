@@ -89,11 +89,32 @@ void I2C_read(void *data, uint16_t size) {
     uint8_t *ptr = (uint8_t *) data;
     uint8_t *end = ptr + size;
     while(ptr < end) {
-        // wait for byte to complete
-        while(!(UCB0IFG & UCRXIFG));
-        // store byte
+        I2C_waitRX();
         *(ptr++) = UCB0RXBUF;
     }
+}
+
+/**
+ * Read single byte
+ * @return data
+ */
+uint8_t I2C_read8() {
+    I2C_waitRX();
+    return UCB0RXBUF;
+}
+
+/**
+ * Read as big endian
+ * @return data
+ */
+uint16_t I2C_read16b() {
+    uint16_t result = 0u;
+    I2C_waitRX();
+    ((uint8_t*)result)[1] = UCB0RXBUF;
+    I2C_waitRX();
+    ((uint8_t*)result)[0] =  UCB0RXBUF;
+    // return result
+    return result;
 }
 
 /**
@@ -102,16 +123,35 @@ void I2C_read(void *data, uint16_t size) {
  * @param size - number of bytes to read
  */
 void I2C_write(const void *data, uint16_t size) {
-    uint8_t *ptr = (uint8_t *) data;
-    uint8_t *end = ptr + size;
+    const uint8_t *ptr = (const uint8_t *) data;
+    const uint8_t *end = ptr + size;
     while(ptr < end) {
-        // wait for previous byte to complete
-        while(!(UCB0IFG & UCTXIFG));
-        // transmit byte
-        *(ptr++) = UCB0RXBUF;
+        I2C_waitTX();
+        UCB0TXBUF = *(ptr++);
     }
-    // wait for last byte to complete
-    while(!(UCB0IFG & UCTXIFG));
+    I2C_waitTX();
+}
+
+/**
+ * Write single byte
+ * @param data - output buffer
+ */
+void I2C_write8(uint8_t data) {
+    I2C_waitTX();
+    UCB0TXBUF = data;
+    I2C_waitTX();
+}
+
+/**
+ * Write as big endian
+ * @param data - output buffer
+ */
+void I2C_write16b(uint16_t data) {
+    I2C_waitTX();
+    UCB0TXBUF = ((uint8_t*)&data)[1];
+    I2C_waitTX();
+    UCB0TXBUF = ((uint8_t*)&data)[0];
+    I2C_waitTX();
 }
 
 /**

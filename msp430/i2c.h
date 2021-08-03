@@ -8,7 +8,7 @@ I2C Interface API
 #include <stdint.h>
 
 /**
- * Init I2C
+ * Init I2C interface
 **/
 void I2C_init();
 
@@ -38,6 +38,18 @@ void I2C_startWrite(uint8_t csa);
 void I2C_read(void *data, uint16_t size);
 
 /**
+ * Read single byte
+ * @return data
+ */
+uint8_t I2C_read8();
+
+/**
+ * Read as big endian
+ * @return data
+ */
+uint16_t I2C_read16b();
+
+/**
  * Write consecutive bytes
  * @param data - output buffer
  * @param size - number of bytes to read
@@ -45,8 +57,36 @@ void I2C_read(void *data, uint16_t size);
 void I2C_write(const void *data, uint16_t size);
 
 /**
+ * Write single byte
+ * @param data - output buffer
+ */
+void I2C_write8(uint8_t data);
+
+/**
+ * Write as big endian
+ * @param data - output buffer
+ */
+void I2C_write16b(uint16_t data);
+
+/**
  * Stop transaction
  */
 void I2C_stop();
+
+/**
+ * Wait for RX operation to complete
+ */
+inline void I2C_waitRX() {
+    while(!(UCB0IFG & UCRXIFG));
+    UCB0IFG &= ~UCRXIFG;
+}
+
+/**
+ * Wait for TX operation to complete
+ */
+inline void I2C_waitTX() {
+    while(!(UCB0IFG & UCTXIFG));
+    UCB0IFG &= ~UCTXIFG;
+}
 
 #endif

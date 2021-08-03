@@ -1,4 +1,5 @@
 
+#include <msp430.h>
 #include "eeram.h"
 #include "i2c.h"
 
@@ -36,7 +37,7 @@ void EERAM_reset() {
 **/
 void EERAM_read(uint8_t csa, uint16_t addr, void *data, uint16_t size) {
     I2C_startWrite(csa);
-    I2C_write(&addr, 2);
+    I2C_write16b(addr);
     I2C_startRead(csa);
     I2C_read(data, size);
     I2C_stop();
@@ -47,7 +48,7 @@ void EERAM_read(uint8_t csa, uint16_t addr, void *data, uint16_t size) {
 **/
 void EERAM_write(uint8_t csa, uint16_t addr, const void *data, uint16_t size) {
     I2C_startWrite(csa);
-    I2C_write(&addr, 2);
+    I2C_write16b(addr);
     I2C_write(data, size);
     I2C_stop();
 }
@@ -57,17 +58,14 @@ void EERAM_write(uint8_t csa, uint16_t addr, const void *data, uint16_t size) {
 **/
 void EERAM_bzero(uint8_t csa, uint16_t addr, uint16_t size) {
     I2C_startWrite(csa);
-    I2C_write(&addr, 2);
+    I2C_write16b(addr);
 
-    // prepare zeroed word
-    uint64_t zero = 0ull;
-    // write non-word bytes
-    I2C_write(&zero, size & 7u);
-    // reduce remaining count to words
-    size = size >> 3u;
-    // write remaining words
-    while(size-- > 0)
-        I2C_write(&zero, 8u);
+    // transmit zeros
+    while(size-- > 0) {
+        I2C_waitTX();
+        UCB0TXBUF = 0u;
+    }
+    I2C_waitTX();
     // end I2C transaction
     I2C_stop();
 }
