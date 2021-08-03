@@ -36,7 +36,6 @@ void EERAM_reset() {
  * Read EERAM block
 **/
 void EERAM_read(uint8_t csa, uint16_t addr, void *data, uint16_t size) {
-    I2C_setBus(I2C_BUS_I2C);
     I2C_startWrite(csa);
     I2C_write16b(addr);
     I2C_startRead(csa);
@@ -48,7 +47,6 @@ void EERAM_read(uint8_t csa, uint16_t addr, void *data, uint16_t size) {
  * Write EERAM block
 **/
 void EERAM_write(uint8_t csa, uint16_t addr, const void *data, uint16_t size) {
-    I2C_setBus(I2C_BUS_I2C);
     I2C_startWrite(csa);
     I2C_write16b(addr);
     I2C_write(data, size);
@@ -59,7 +57,6 @@ void EERAM_write(uint8_t csa, uint16_t addr, const void *data, uint16_t size) {
  * Clear EERAM block
 **/
 void EERAM_bzero(uint8_t csa, uint16_t addr, uint16_t size) {
-    I2C_setBus(I2C_BUS_I2C);
     I2C_startWrite(csa);
     I2C_write16b(addr);
 

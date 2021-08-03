@@ -133,7 +133,6 @@ void doTrackingUpdate() {
 
 void DCXO_init() {
     uint8_t tmp[8];
-    I2C_setBus(I2C_BUS_I2C);
 
     // set register page
     tmp[0] = 0xFF;
@@ -192,7 +191,6 @@ void DCXO_init() {
 }
 
 void DCXO_setOffset(int32_t offset) {
-    I2C_setBus(I2C_BUS_I2C);
     I2C_startWrite(DCXO_CSA);
     I2C_write8(0xE7);
     I2C_write(&offset, 3);
@@ -200,7 +198,6 @@ void DCXO_setOffset(int32_t offset) {
 }
 
 void TempSens_init() {
-    I2C_setBus(I2C_BUS_I2C);
     // conf bytes
     uint8_t conf[3] = { 0x01, 0x00, 0x60 };
     // configure temp sensor
@@ -210,7 +207,6 @@ void TempSens_init() {
 }
 
 int16_t TempSens_read() {
-    I2C_setBus(I2C_BUS_I2C);
     // set register address
     I2C_startWrite(TEMP_CSA);
     I2C_write8(0x00);

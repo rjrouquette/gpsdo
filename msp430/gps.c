@@ -9,6 +9,8 @@
 #define RST_PORT_DIR  P2DIR
 #define RST_PIN       BIT2
 
+#define GPS_CSA (0x42u)
+
 // interal state
 uint8_t hasFix = 0;
 
