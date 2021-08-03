@@ -17,7 +17,7 @@ void I2C_init() {
     // Set software reset
     UCB0CTL1 |= UCSWRST;
     // Assign I2C pins to USCI_B0
-    I2C_PORT_SEL |= SDA_PIN + SCL_PIN;
+    I2C_PORT_SEL |= SDA_PIN | SCL_PIN;
     // I2C Master, synchronous mode
     UCB0CTL0 = UCMST | UCMODE_3 | UCSYNC;     
     // Use SMCLK, TX mode, keep SW reset
