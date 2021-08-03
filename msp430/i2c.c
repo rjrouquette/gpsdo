@@ -1,5 +1,6 @@
 
 #include <msp430.h>
+#include "delay.h"
 #include "i2c.h"
 
 
@@ -9,6 +10,12 @@
 #define I2C_PORT_DIR  P1DIR
 #define SDA_PIN       BIT4                  // UCB0SDA pin
 #define SCL_PIN       BIT5                  // UCB0SCL pin
+
+#define BUS_PORT_SEL  P2SEL
+#define BUS_PORT_OUT  P2OUT
+#define BUS_PORT_REN  P2REN
+#define BUS_PORT_DIR  P2DIR
+#define BUS_PORT_MSK  (I2C_BUS_I2C | I2C_BUS_GPS)
 
 /**
  * Init I2C
@@ -31,6 +38,29 @@ void I2C_init() {
     UCB0I2COA = 0u;
     // Clear software reset
     UCB0CTL1 &= ~UCSWRST;
+
+    // Configure bus select pins
+    BUS_PORT_SEL &= ~BUS_PORT_MSK;
+    BUS_PORT_REN &= ~BUS_PORT_MSK;
+    BUS_PORT_DIR |=  BUS_PORT_MSK;
+    BUS_PORT_OUT &= ~BUS_PORT_MSK;
+}
+
+/**
+ * Select I2C bus
+ */
+void I2C_setBus(uint8_t busId) {
+    // mask busId
+    busId &= BUS_PORT_MSK;
+    // get current bus selection
+    uint8_t curId = BUS_PORT_OUT & BUS_PORT_MSK;
+    // update bus selection
+    if(curId != busId) {
+        // apply bus selection
+        BUS_PORT_OUT = (BUS_PORT_OUT & ~BUS_PORT_MSK) | busId;
+        // wait ~1ms for bus to settle (25MHz)
+        delayLoop(8333u);
+    }
 }
 
 /**

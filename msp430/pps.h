@@ -13,6 +13,11 @@ Software defined TCXO controller
 void PPS_init();
 
 /**
+ * Update the PPS module internal state
+**/
+void PPS_poll();
+
+/**
  * Reset the PPS ready indicator
 **/
 void PPS_clearReady();

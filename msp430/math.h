@@ -15,8 +15,6 @@ int32_t mult24s8s(int32_t a, int16_t b) __attribute__ ((const));
 int64_t mult32s32s(int32_t a, int32_t b) __attribute__ ((const));
 
 // integer square root
-uint16_t sqrt32(uint32_t num);
-// integer square root
-uint32_t sqrt64(uint64_t num);
+uint32_t sqrt64(uint64_t num) __attribute__ ((const));
 
 #endif

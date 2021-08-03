@@ -98,27 +98,6 @@ int64_t mult32s32s(int32_t a, int32_t b) {
 }
 
 // integer square root
-uint16_t sqrt32(uint32_t num) {
-    uint32_t res = 0;
-    uint32_t bit = 1ul << 30u;
-
-    // find highest power of 4 less than num
-    while (bit > num)
-        bit >>= 2u;
-
-    // digit-by-digit method
-    while (bit > 0) {
-        if (num >= res + bit) {
-            num -= res + bit;
-            res = (res >> 1u) + bit;
-        } else
-            res >>= 1u;
-        bit >>= 2u;
-    }
-    return res;
-}
-
-// integer square root
 uint32_t sqrt64(uint64_t num) {
     uint64_t res = 0;
     uint64_t bit = 1ull << 62u;

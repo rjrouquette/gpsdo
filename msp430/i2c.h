@@ -5,12 +5,22 @@ I2C Interface API
 #ifndef MSP430_I2C
 #define MSP430_I2C
 
+#include <msp430.h>
 #include <stdint.h>
+
+#define I2C_BUS_I2C BIT5
+#define I2C_BUS_GPS BIT4
 
 /**
  * Init I2C interface
 **/
 void I2C_init();
+
+/**
+ * Select I2C bus
+ * @param busId - ID of bus to select
+ */
+void I2C_setBus(uint8_t busId);
 
 /**
  * Set I2C prescaler

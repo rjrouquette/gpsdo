@@ -1,6 +1,7 @@
 #include <msp430.h>
 #include "config.h"
 #include "eeram.h"
+#include "gps.h"
 #include "i2c.h"
 #include "math.h"
 #include "pid.h"
@@ -61,12 +62,15 @@ int main() {
     PID_init();
 
     for(;;) {
-        // check for PPS rising edge
+        // poll GPS data
+        GPS_poll();
+        // poll PPS state
+        PPS_poll();
+        // check for PPS measurement
         if(PPS_isReady()) {
             PPS_clearReady();
             doTrackingUpdate();
         }
-        // GPS_pollState();
     }
 
     return 0;
@@ -94,7 +98,7 @@ void doTrackingUpdate() {
         }
 
         // update GPS tracking loop
-        uint8_t allowPidUpdate = 1; //GPS_isLocked();
+        uint8_t allowPidUpdate = GPS_isLocked();
         allowTempUpdate &= allowPidUpdate;
         if(allowPidUpdate) {
             // TODO get actual PPS error
@@ -129,6 +133,7 @@ void doTrackingUpdate() {
 
 void DCXO_init() {
     uint8_t tmp[8];
+    I2C_setBus(I2C_BUS_I2C);
 
     // set register page
     tmp[0] = 0xFF;
@@ -187,6 +192,7 @@ void DCXO_init() {
 }
 
 void DCXO_setOffset(int32_t offset) {
+    I2C_setBus(I2C_BUS_I2C);
     I2C_startWrite(DCXO_CSA);
     I2C_write8(0xE7);
     I2C_write(&offset, 3);
@@ -194,6 +200,7 @@ void DCXO_setOffset(int32_t offset) {
 }
 
 void TempSens_init() {
+    I2C_setBus(I2C_BUS_I2C);
     // conf bytes
     uint8_t conf[3] = { 0x01, 0x00, 0x60 };
     // configure temp sensor
@@ -203,6 +210,7 @@ void TempSens_init() {
 }
 
 int16_t TempSens_read() {
+    I2C_setBus(I2C_BUS_I2C);
     // set register address
     I2C_startWrite(TEMP_CSA);
     I2C_write8(0x00);
@@ -218,6 +226,15 @@ void SysBoot() {
     WDTCTL = WDTPW | WDTHOLD;
 
     // configure internal OSC
+    // TODO configure REFO
+    // TODO configure DCO
+
+    // clear pin assignments
+    PASEL = 0; PBSEL = 0;
+    PADIR = 0; PBDIR = 0;
+    PAOUT = 0; PBOUT = 0;
+    // enable pull-down on all pins
+    PAREN = -1; PBREN = -1;
 }
 
 void SysClk() {

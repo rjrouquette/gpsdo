@@ -34,8 +34,11 @@ add_executable(
         main.c
         config.c
         config.h
+        delay.h
         eeram.c
         eeram.h
+        gps.c
+        gps.h
         i2c.c
         i2c.h
         math.c
