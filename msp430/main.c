@@ -8,11 +8,27 @@
 #include "tcxo.h"
 
 #define TIMER_NS (5) // 5 ns
+#define PPM_SCALE (0x218DEF41l)
 
 #define DCXO_CSA (0x55u)
 
 #define TEMP_CSA (0x49u)
 #define TEMP_ERR (0x8000)
+
+// internal state
+int32_t prevTempComp = 0x8000000l;
+int32_t tempComp = 0;
+int32_t pidComp = 0;
+int32_t totalComp = 0;
+
+// stat accumulators
+int64_t accAvgError = 0;
+uint64_t accRmsError = 0;
+
+// normalized stats
+int32_t avgError = 0; // 24.8 fixed-point (ns)
+int32_t rmsError = 0; // 24.8 fixed-point (ns)
+int32_t ppmAdjust = 0; // 16.16 fixed-point (ppm)
 
 void doTrackingUpdate();
 
@@ -56,10 +72,6 @@ int main() {
     return 0;
 }
 
-int32_t prevTempComp = 0x8000000l;
-int32_t tempComp = 0;
-int32_t pidComp = 0;
-int32_t totalComp = 0;
 void doTrackingUpdate() {
         // TODO get actual temp
         int16_t tempC = TempSens_read();
@@ -90,6 +102,12 @@ void doTrackingUpdate() {
             ppsError += sysConf.ppsErrorOffset;
             // Update PID tracking loop
             pidComp = PID_update(ppsError);
+            // Update average error (63s EMA)
+            accAvgError -= accAvgError >> 5u;
+            accAvgError += ppsError << 16u;
+            // Update RMS error (63s EMA)
+            accRmsError -= accRmsError >> 5u;
+            accRmsError += (uint64_t)mult32s32s(ppsError, ppsError) << 16u;
         }
 
         // combine compensation values
@@ -101,6 +119,12 @@ void doTrackingUpdate() {
             // adjust temperature compensation
             TCXO_updateCompensation(tempC, totalComp);
         }
+
+        // compute tracking stats (24.8 fixed point)
+        avgError = accAvgError >> 13u;
+        rmsError = sqrt64(rmsError >> 5u);
+        // compute normalized dcxo offset in ppm (16.16 fixed-point)
+        ppmAdjust = mult32s32s(totalComp, PPM_SCALE) >> 32u;
 }
 
 void DCXO_init() {
