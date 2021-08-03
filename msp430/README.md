@@ -77,8 +77,8 @@ tempCelsius = code * 0.0078125
 ## 47L64 EERAM w/ EEPROM
 
 Two 8kB banks:
-- 0xA1 - Configuration Data
-- 0xA3 - Temperature Compensation Data
+- 0x51 - Configuration Data
+- 0x53 - Temperature Compensation Data
 
 I2C Read:
 ```

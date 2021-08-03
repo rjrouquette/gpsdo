@@ -7,8 +7,8 @@ I2C EERAM API
 
 #include <stdint.h>
 
-#define EERAM_CSA0 (0xA1u)
-#define EERAM_CSA1 (0xA3u)
+#define EERAM_CSA0 (0x51u)
+#define EERAM_CSA1 (0x53u)
 
 /**
  * Init EERAM
