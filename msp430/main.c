@@ -7,7 +7,7 @@
 #include "pps.h"
 #include "tcxo.h"
 
-#define TIMER_TO_DCXO (43) // 5 ppb / 0.1164 ppb
+#define TIMER_NS (5) // 5 ns
 
 #define DCXO_CSA (0x55u)
 
@@ -86,7 +86,7 @@ void doTrackingUpdate() {
         allowTempUpdate &= allowPidUpdate;
         if(allowPidUpdate) {
             // TODO get actual PPS error
-            int32_t ppsError = mult16s16s(PPS_getDelta(), TIMER_TO_DCXO);
+            int32_t ppsError = mult16s16s(PPS_getDelta(), TIMER_NS);
             ppsError += sysConf.ppsErrorOffset;
             // Update PID tracking loop
             pidComp = PID_update(ppsError);
