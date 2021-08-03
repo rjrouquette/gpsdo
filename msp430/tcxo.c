@@ -3,6 +3,10 @@
 #include "math.h"
 #include "tcxo.h"
 
+#define TEMP_MIN (-64 << 8u)  // -64 Celsius
+#define TEMP_MAX (127 << 8u)  // 127 Celsius
+#define EERAM_OFFSET (1280u)
+
 #define XX (0)
 #define X1 (1)
 #define YX (2)
@@ -51,7 +55,8 @@ static void loadBin(uint8_t binId) {
     // TODO load bin data from I2C EERAM
     uint16_t addr = binId;
     addr *= sizeof(struct TempBin);
-    EERAM_read(EERAM_CSA1, addr, &currBin, sizeof(struct TempBin));
+    addr += EERAM_OFFSET;
+    EERAM_read(addr, &currBin, sizeof(struct TempBin));
     currBinIdx = binId;
 }
 
@@ -59,7 +64,8 @@ static void loadBin(uint8_t binId) {
 static void storeBin() {
     uint16_t addr = currBinIdx;
     addr *= sizeof(struct TempBin);
-    EERAM_write(EERAM_CSA1, addr, &currBin, sizeof(struct TempBin));
+    addr += EERAM_OFFSET;
+    EERAM_write(addr, &currBin, sizeof(struct TempBin));
 }
 
 /**
@@ -68,10 +74,13 @@ static void storeBin() {
  * @return the DCXO digital frequency offset
 **/
 int32_t TCXO_getCompensation(int16_t tempC) {
+    // check for invalid temperatures
+    if(tempC < TEMP_MIN) return TCXO_ERR;
+    if(tempC > TEMP_MAX) return TCXO_ERR;
     loadBin(getBinId(tempC));
 
     // output -2^31 if there is no data
-    if(currBin.norm == 0) return 0x80000000l;
+    if(currBin.norm == 0) return TCXO_ERR;
 
     // load Y1 cell (average offset)
     const int32_t D = getCell(Y1); // 32.0
@@ -118,6 +127,9 @@ int32_t TCXO_getCompensation(int16_t tempC) {
  * @param offset - the DCXO digital frequency offset in 32.0 fixed point format
 **/
 void TCXO_updateCompensation(int16_t tempC, int32_t offset) {
+    // ignore invalid temperatures
+    if(tempC < TEMP_MIN) return;
+    if(tempC > TEMP_MAX) return;
     // load temperature bin
     loadBin(getBinId(tempC));
 

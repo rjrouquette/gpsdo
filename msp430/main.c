@@ -17,7 +17,7 @@
 #define TEMP_ERR (0x8000)
 
 // internal state
-int32_t prevTempComp = 0x8000000l;
+int32_t prevTempComp = TCXO_ERR;
 int32_t tempComp = 0;
 int32_t pidComp = 0;
 int32_t totalComp = 0;
@@ -85,13 +85,13 @@ void doTrackingUpdate() {
             tempC <<= 1u;
             // get temperature compensation
             tempComp = TCXO_getCompensation(tempC);
-            if(tempComp == 0x8000000l) {
-                if(prevTempComp == 0x8000000l)
+            if(tempComp == TCXO_ERR) {
+                if(prevTempComp == TCXO_ERR)
                     tempComp = 0;
                 else
                     tempComp = prevTempComp;
             } else {
-                if(prevTempComp == 0x8000000l)
+                if(prevTempComp == TCXO_ERR)
                     PID_clearIntegral();
                 prevTempComp = tempComp;
             }

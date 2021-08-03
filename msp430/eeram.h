@@ -7,9 +7,6 @@ I2C EERAM API
 
 #include <stdint.h>
 
-#define EERAM_CSA0 (0x51u)
-#define EERAM_CSA1 (0x53u)
-
 /**
  * Init EERAM
 **/
@@ -23,16 +20,16 @@ void EERAM_reset();
 /**
  * Read EERAM block
 **/
-void EERAM_read(uint8_t csa, uint16_t addr, void *data, uint16_t size);
+void EERAM_read(uint16_t addr, void *data, uint16_t size);
 
 /**
  * Write EERAM block
 **/
-void EERAM_write(uint8_t csa, uint16_t addr, const void *data, uint16_t size);
+void EERAM_write(uint16_t addr, const void *data, uint16_t size);
 
 /**
  * Clear EERAM block
 **/
-void EERAM_bzero(uint8_t csa, uint16_t addr, uint16_t size);
+void EERAM_bzero(uint16_t addr, uint16_t size);
 
 #endif

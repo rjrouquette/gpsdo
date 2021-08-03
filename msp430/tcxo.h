@@ -7,6 +7,8 @@ Software defined TCXO controller
 
 #include <stdint.h>
 
+#define TCXO_ERR (0x8000000l)
+
 /**
  * Gets the DCXO adjustment for the given temperature.
  * @param tempC - temperature in Celsius and 8.8 fixed point format
