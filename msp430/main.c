@@ -44,16 +44,11 @@ void SysClk();
 
 
 int main() {
-    SysBoot();             
-
-    // Init I2C interace
+    // bootstrap MCU
+    SysBoot();
     I2C_init();
-    // Init DCXO (25 MHz)
     DCXO_init();
-    // Init system clock
     SysClk();
-    // set I2C clk to 400 kHz
-    I2C_prescaler(6250u);
 
     // init code modules
     EERAM_init();
@@ -61,7 +56,15 @@ int main() {
     PPS_init();
     PID_init();
 
+    // pet watchdog
+    WDTCTL |= WDTPW | WDTCNTCL;
+    // release watchdog
+    WDTCTL = WDTPW | (WDTCTL & 0x7F);
+
+    // main processing loop
     for(;;) {
+        // pet watchdog
+        WDTCTL |= WDTPW | WDTCNTCL;
         // poll GPS data
         GPS_poll();
         // poll PPS state
@@ -209,11 +212,8 @@ int16_t TempSens_read() {
 void SysBoot() {
     // Stop watchdog timer
     WDTCTL = WDTPW | WDTHOLD;
-
-    // configure internal OSC
-    // TODO configure REFO
-    // TODO configure DCO
-
+    // Switch FLL reference to REFO
+    UCSCTL3 = SELREF__REFOCLK | FLLREFDIV__1;
     // clear pin assignments
     PASEL = 0; PBSEL = 0;
     PADIR = 0; PBDIR = 0;
@@ -223,5 +223,19 @@ void SysBoot() {
 }
 
 void SysClk() {
-    // switch clock to DCXO
+    // change XT1 to HF bypass mode
+    UCSCTL6 = XT1BYPASS | XTS;
+    // select XT1 function on pin
+    PJSEL = BIT5;
+    // set all dividers to 1
+    UCSCTL5 = 0;
+    // set ACLK to REFO, other clocks to XT1
+    UCSCTL4 = SELA__REFOCLK | SELS__XT1CLK | SELM__XT1CLK;
+    // disable DCO and FLL
+    __bis_SR_register(SCG0);
+    __bis_SR_register(SCG1);
+    // set I2C clk to 400 kHz
+    I2C_prescaler(6250u);
+    // configure watchdog with 1s interval
+    WDTCTL = WDTPW | WDTHOLD | WDTSSEL__ACLK | WDTCNTCL | WDTIS__32K;
 }
