@@ -131,62 +131,51 @@ void doTrackingUpdate() {
         ppmAdjust = mult32s32s(totalComp, PPM_SCALE) >> 32u;
 }
 
+// DCXO configuration strings
+#define FLASH __attribute__ ((section(".text.const")))
+// set register page
+FLASH const uint8_t DCXO_REG_PAGE[] = { 0xFF, 0x00 };
+// disable FCAL
+FLASH const uint8_t DCXO_FCAL_OFF[] = { 0x45, 0x00 };
+// disable output
+FLASH const uint8_t DCXO_OUT_OFF [] = { 0x11, 0x00 };
+// set LSDIV = 0 and HSDIV = 432
+FLASH const uint8_t DCXO_HLDIV   [] = { 0x17, 0xB0, 0x01 };
+// set FBDIV to 70.77326343 (0x00 46 C5 F4 97 A7)
+FLASH const uint8_t DCXO_FBDIV   [] = { 0x1A, 0xA7, 0x97, 0xF4, 0xC5, 0x46, 0x00 };
+// enable FCAL
+FLASH const uint8_t DCXO_FCAL_ON [] = { 0x07, 0x08 };
+// enable output
+FLASH const uint8_t DCXO_OUT_ON  [] = { 0x11, 0x01 };
+
 void DCXO_init() {
-    uint8_t tmp[8];
-
-    // set register page
-    tmp[0] = 0xFF;
-    tmp[1] = 0x00;
+    // send configuration sequence
     I2C_startWrite(DCXO_CSA);
-    I2C_write(tmp, 2);
+    I2C_write(DCXO_REG_PAGE, sizeof(DCXO_REG_PAGE));
     I2C_stop();
-
-    // disable FCAL
-    tmp[0] = 0x45;
-    tmp[1] = 0x00;
+    // send configuration sequence
     I2C_startWrite(DCXO_CSA);
-    I2C_write(tmp, 2);
+    I2C_write(DCXO_FCAL_OFF, sizeof(DCXO_FCAL_OFF));
     I2C_stop();
-
-    // disable output
-    tmp[0] = 0x11;
-    tmp[1] = 0x00;
+    // send configuration sequence
     I2C_startWrite(DCXO_CSA);
-    I2C_write(tmp, 2);
+    I2C_write(DCXO_OUT_OFF, sizeof(DCXO_OUT_OFF));
     I2C_stop();
-
-    // set LSDIV = 0 and HSDIV = 432
-    tmp[0] = 0x17;
-    tmp[1] = 0xB0;
-    tmp[2] = 0x01;
+    // send configuration sequence
     I2C_startWrite(DCXO_CSA);
-    I2C_write(tmp, 3);
+    I2C_write(DCXO_HLDIV, sizeof(DCXO_HLDIV));
     I2C_stop();
-
-    // set FBDIV to 70.77326343 (0x00 46 C5 F4 97 A7)
-    tmp[0] = 0x1A;
-    tmp[1] = 0xA7;
-    tmp[2] = 0x97;
-    tmp[3] = 0xF4;
-    tmp[4] = 0xC5;
-    tmp[5] = 0x46;
-    tmp[6] = 0x00;
+    // send configuration sequence
     I2C_startWrite(DCXO_CSA);
-    I2C_write(tmp, 7);
+    I2C_write(DCXO_FBDIV, sizeof(DCXO_FBDIV));
     I2C_stop();
-
-    // start FCAL
-    tmp[0] = 0x07;
-    tmp[1] = 0x08;
+    // send configuration sequence
     I2C_startWrite(DCXO_CSA);
-    I2C_write(tmp, 2);
+    I2C_write(DCXO_FCAL_ON, sizeof(DCXO_FCAL_ON));
     I2C_stop();
-
-    // enable output
-    tmp[0] = 0x11;
-    tmp[1] = 0x00;
+    // send configuration sequence
     I2C_startWrite(DCXO_CSA);
-    I2C_write(tmp, 2);
+    I2C_write(DCXO_OUT_ON, sizeof(DCXO_OUT_ON));
     I2C_stop();
 }
 

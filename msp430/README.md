@@ -21,14 +21,10 @@ The XO aging offset is derived from the residuals of the temperature coefficient
 ---
 ## I2C Bus
 
-The ublox MAX-8Q DDC interface consumes the entier I2C address space. An LTC4317 is used to multiplex the I2C bus and prevent address collision. Multiplexing is performed via the ENABLE[1:2] pins on the LTC4317.
-
-- Bus 1
-    - Si549 25 MHz DCXO (0x55) [549CAAC000111BBG]
-    - TMP117 Temperature Sensor (0x49) [TMP117MAIDRVT]
-    - 47L64 64k-bit EERAM x2 (0xA1, 0xA3) [47L64-I/SN]
-- Bus 2
-    - ublox MAX-8Q (0x00-0xFF) [MAX-8Q-0]
+- (0x42) ublox MAX-8Q [MAX-8Q-0]
+- (0x49) TMP117 Temperature Sensor [TMP117MAIDRVT]
+- (0x51) 47L64 64k-bit EERAM [47L64-I/SN]
+- (0x55) Si549 25 MHz DCXO [549CAAC000111BBG]
 
 ---
 ## Si549 DCXO
@@ -76,9 +72,10 @@ tempCelsius = code * 0.0078125
 ---
 ## 47L64 EERAM w/ EEPROM
 
-Two 8kB banks:
-- 0x51 - Configuration Data
-- 0x53 - Temperature Compensation Data
+One 8kB bank:
+- [0x0000] 64-bit magic number
+- [0x0008] Configuration Data
+- [0x0500] Temperature Compensation Data
 
 I2C Read:
 ```
