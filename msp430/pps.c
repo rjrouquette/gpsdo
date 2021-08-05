@@ -48,6 +48,20 @@ void PPS_init() {
     // input clock is >15MHz
     TD0HCTL1 = TDHCLKCR;
 
+    // configure TD1 for PPS generation
+    // No grouping, 16-bit, submodule clcok, no clk divisor, continuous mode
+    TD1CTL0 = TDCLGRP_0 | CNTL__16 | TDSSEL__SMCLK| ID__1 | MC__CONTINOUS;
+    // no clk divisor
+    TD1CTL1 = TDIDEX__1;
+    // capture mode on channel 1
+    TD1CTL2 = TDCAPM1;
+    // output compare mode
+    TD1CCTL0 = CLLD_0 | OUTMOD_6;
+    // positive edge capture on CCI0B
+    TD1CCTL1 = CM_1 | CCIS_1 | SCS | CLLD_0 | CAP | OUTMOD_0;
+    // disable high-res
+    TD0HCTL0 = 0;
+    TD0HCTL1 = 0;
 }
 
 /**
