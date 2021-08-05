@@ -21,6 +21,6 @@ void GPS_poll();
  * Check if GPS has position fix
  * @return non-zero if GPS has position fix
  */
-uint8_t GPS_isLocked();
+uint8_t GPS_hasFix();
 
 #endif

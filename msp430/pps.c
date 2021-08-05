@@ -1,7 +1,32 @@
 
 #include <msp430.h>
+#include "gps.h"
 #include "pps.h"
 
+// These values are tuned for 25 MHz clock
+#define PPS_TARGET_INCR (190)
+#define PPS_OFFSET_INCR (48160)
+// Coarse Lock offset tolerance (1 us)
+#define CTOL (25)
+
+union i32 {
+    uint16_t word[2];
+    int32_t full;
+};
+
+// internal state
+uint16_t coarseLocked = 0;
+// PPS ISR macro timer
+uint16_t ppsMacroTime = 0;
+// PPS generation triggers
+uint16_t ppsTarget = 0;
+uint16_t ppsOffset = 0;
+// GPS PPS capture
+uint16_t gpsTarget = 0;
+uint16_t gpsOffset = 0;
+uint16_t gpsReady = 0;
+// PPS delta calulation
+uint16_t deltaTarget = 0;
 
 /**
  * Initialize the PPS module
@@ -22,38 +47,87 @@ void PPS_init() {
     TD0HCTL0 = TDHD_0 | TDHM__8 | TDHRON | TDHEAEN | TDHREGEN | TDHEN;
     // input clock is >15MHz
     TD0HCTL1 = TDHCLKCR;
+
 }
 
 /**
  * Update the PPS module internal state
+ * return PPS delta measurement (5ns resolution)
 **/
-void PPS_poll() {
-    // TODO implement coarse-grained PPS adjustment
+int16_t PPS_poll() {
+    int16_t ppsTimer;
+    // service PPS generation
+    _disable_interrupts();
+    ppsTimer = ppsMacroTime - ppsTarget;
+    if(ppsTimer <= 0) {
+        _enable_interrupts();
+        return PPS_IDLE;
+    }
+    ppsTarget += PPS_TARGET_INCR;
+    ppsOffset += PPS_OFFSET_INCR;
+    _enable_interrupts();
+
+    // process GPS PPS event
+    if(gpsReady) {
+        // clear status flag
+        gpsReady = 0;
+
+        // get timestamp snapshot
+        _disable_interrupts();
+        int16_t diffT = ppsTarget;
+        int16_t diffO = ppsOffset;
+        diffT -= gpsTarget;
+        diffO -= gpsOffset;
+        _enable_interrupts();
+        // adjust for polling mis-alignment
+        if(diffT >= PPS_TARGET_INCR) {
+            diffT -= PPS_TARGET_INCR;
+            diffO -= PPS_OFFSET_INCR;
+        }
+        // verify lock tolerance
+        if(diffT == -1 && (diffO >= -CTOL) && (diffO <= CTOL)) {
+            // coarse lock satisfied
+            coarseLocked = 1;
+        } else {
+            // coarse lock has failed
+            coarseLocked = 0;
+            // forcefully align PPS edge
+            ppsTarget = gpsTarget + PPS_TARGET_INCR;
+            ppsOffset = gpsOffset + PPS_OFFSET_INCR;
+            // set PPS since next update will be the half-way mark
+            TD1CCTL0 &= OUTMOD2;
+        }
+    }
+
+    // check if PPS delta is ready
+    if(!(CCIFG & TD0CCTL0 & TD0CCTL1)) return PPS_IDLE;
+    // clear interrupt flags
+    TD0CCTL0 &= CCIFG;
+    TD0CCTL1 &= CCIFG;
+    // check if GPS has fix
+    if(!GPS_hasFix()) return PPS_NOLOCK;
+    // check if PPS has coarse lock
+    if(!coarseLocked) return PPS_NOLOCK;
+    // return PPS delta
+    return TD0CL0 - TD0CL1;
 }
 
-/**
- * Reset the PPS ready indicator
-**/
-void PPS_clearReady() {
-    TD0CCTL0 &= ~CCIFG;
-    TD0CCTL1 &= ~CCIFG;
-}
+// output compare on TD1-0
+__attribute__ ( ( interrupt( TIMER0_D1_VECTOR ) ) )
+void TIMER0_D1_ISR() {
+    // increment macro counter
+    if(++ppsMacroTime == ppsTarget) {
+        TD1CL0 = ppsOffset;
+        TD1CCTL0 ^= OUTMOD2;
+    }
 
-/**
- * Reset the PPS ready indicator
-**/
-uint8_t PPS_isReady() {
-    return (TD0CCTL0 & CCIFG) | (TD0CCTL1 & CCIFG);
-}
-
-/**
- * Get the time delta between the generated PPS and GPS PPS leading edges.
- * Value is restricted to 16-bit range
- * LSB represents 5ns
- * @return the time offset between PPS leading edges
-**/
-int16_t PPS_getDelta() {
-    int16_t delta = TD0CL0;
-    delta -= TD0CL1;
-    return delta;
+    // check for GPS PPS
+    if(TD1CCTL1 & CCIFG) {
+        // clear interrupt flag
+        TD1CCTL1 &= CCIFG;
+        // record event time
+        gpsOffset = TD1CL1;
+        gpsTarget = ppsMacroTime;
+        gpsReady = 1;
+    }
 }

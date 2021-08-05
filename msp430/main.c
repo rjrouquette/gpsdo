@@ -9,6 +9,7 @@
 #include "tcxo.h"
 
 #define TIMER_NS (5) // 5 ns
+#define TEMP_PPS_TOL (100) // 100ns
 #define PPM_SCALE (0x218DEF41l)
 
 #define DCXO_CSA (0x55u)
@@ -31,7 +32,7 @@ int32_t avgError = 0; // 24.8 fixed-point (ns)
 int32_t rmsError = 0; // 24.8 fixed-point (ns)
 int32_t ppmAdjust = 0; // 16.16 fixed-point (ppm)
 
-void doTrackingUpdate();
+void doTrackingUpdate(int16_t ppsDelay);
 
 void DCXO_init();
 void DCXO_setOffset(int32_t);
@@ -49,6 +50,7 @@ int main() {
     I2C_init();
     DCXO_init();
     SysClk();
+    _enable_interrupts();
 
     // init code modules
     EERAM_init();
@@ -67,19 +69,17 @@ int main() {
         WDTCTL |= WDTPW | WDTCNTCL;
         // poll GPS data
         GPS_poll();
-        // poll PPS state
-        PPS_poll();
         // check for PPS measurement
-        if(PPS_isReady()) {
-            PPS_clearReady();
-            doTrackingUpdate();
+        int16_t ppsDelay = PPS_poll();
+        if(ppsDelay != PPS_IDLE) {
+            doTrackingUpdate(ppsDelay);
         }
     }
 
     return 0;
 }
 
-void doTrackingUpdate() {
+void doTrackingUpdate(int16_t ppsDelay) {
         // TODO get actual temp
         int16_t tempC = TempSens_read();
         uint8_t allowTempUpdate = (tempC != TEMP_ERR);
@@ -100,12 +100,10 @@ void doTrackingUpdate() {
             }
         }
 
-        // update GPS tracking loop
-        uint8_t allowPidUpdate = GPS_isLocked();
-        allowTempUpdate &= allowPidUpdate;
-        if(allowPidUpdate) {
+        // update PPS tracking loop
+        if(ppsDelay != PPS_NOLOCK) {
             // TODO get actual PPS error
-            int32_t ppsError = mult16s16s(PPS_getDelta(), TIMER_NS);
+            int32_t ppsError = mult16s16s(ppsDelay, TIMER_NS);
             ppsError += sysConf.ppsErrorOffset;
             // Update PID tracking loop
             pidComp = PID_update(ppsError);
@@ -115,6 +113,11 @@ void doTrackingUpdate() {
             // Update RMS error (63s EMA)
             accRmsError -= accRmsError >> 5u;
             accRmsError += (uint64_t)mult32s32s(ppsError, ppsError) << 16u;
+            // wait for loop to settle before updating temperature compensation
+            if(ppsError < -TEMP_PPS_TOL) allowTempUpdate = 0;
+            if(ppsError >  TEMP_PPS_TOL) allowTempUpdate = 0;
+        } else {
+            allowTempUpdate = 0;
         }
 
         // combine compensation values
@@ -127,9 +130,6 @@ void doTrackingUpdate() {
             TCXO_updateCompensation(tempC, totalComp);
         }
 
-        // compute tracking stats (24.8 fixed point)
-        avgError = accAvgError >> 13u;
-        rmsError = sqrt64(rmsError >> 5u);
         // compute normalized dcxo offset in ppm (16.16 fixed-point)
         ppmAdjust = mult32s32s(totalComp, PPM_SCALE) >> 32u;
 }

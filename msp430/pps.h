@@ -7,6 +7,9 @@ Software defined TCXO controller
 
 #include <stdint.h>
 
+#define PPS_IDLE (0x8000)
+#define PPS_NOLOCK (0x8001)
+
 /**
  * Initialize the PPS module
 **/
@@ -14,25 +17,8 @@ void PPS_init();
 
 /**
  * Update the PPS module internal state
+ * return the time offset between PPS leading edges
 **/
-void PPS_poll();
-
-/**
- * Reset the PPS ready indicator
-**/
-void PPS_clearReady();
-
-/**
- * Reset the PPS ready indicator
-**/
-uint8_t PPS_isReady();
-
-/**
- * Get the time delta between the generated PPS and GPS PPS leading edges.
- * Value is restricted to 16-bit range
- * LSB represents 5ns
- * @return the time offset between PPS leading edges
-**/
-int16_t PPS_getDelta();
+int16_t PPS_poll();
 
 #endif
