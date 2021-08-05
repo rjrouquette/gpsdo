@@ -95,14 +95,14 @@ void GPS_poll() {
         // process byte
         if(msgEnd == 0) {
             // if EOF, exit
-            if(byte == 0xFF) break;
+            if(byte == 0xFFu) break;
             // message is NEMA format
             if(byte == '$') {
                 msgBuff[msgEnd++] = byte;
                 stopChar = '\n';
             }
             // message is UBX format
-            else if(byte == 0xB5) {
+            else if(byte == 0xB5u) {
                 msgBuff[msgEnd++] = byte;
                 stopChar = -1u;
             }
