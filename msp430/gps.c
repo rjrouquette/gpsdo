@@ -14,6 +14,13 @@
 
 // interal state
 uint8_t hasFix = 0;
+// receive buffer
+uint8_t msgBuff[256];
+uint16_t msgEnd = 0;
+uint16_t stopChar = 0;
+uint16_t stopByte = sizeof(msgBuff);
+
+static void processMessage();
 
 // GPS configuration strings
 #define FLASH __attribute__ ((section(".text.const")))
@@ -82,12 +89,39 @@ void GPS_poll() {
     // start read
     I2C_startRead(GPS_CSA);
     // read pending data
-    for(;;) {
+    for(uint16_t i = 0; i < 64; i++) {
         // get next byte
         uint8_t byte = I2C_read8();
-        // if EOF, exit
-        if(byte == 0xFF) break;
         // process byte
+        if(msgEnd == 0) {
+            // if EOF, exit
+            if(byte == 0xFF) break;
+            // message is NEMA format
+            if(byte == '$') {
+                msgBuff[msgEnd++] = byte;
+                stopChar = '\n';
+            }
+            // message is UBX format
+            else if(byte == 0xB5) {
+                msgBuff[msgEnd++] = byte;
+                stopChar = -1u;
+            }
+        }
+        else {
+            if(msgEnd == 5 && stopChar == -1u) {
+                msgBuff[msgEnd++] = byte;
+                stopByte = *(uint16_t*)(msgBuff+4);
+                stopByte += 8;
+            }
+            if(msgEnd < sizeof(msgBuff)) {
+                msgBuff[msgEnd++] = byte;
+            }
+            if(msgEnd >= stopByte || byte == stopChar) {
+                processMessage();
+                msgEnd = 0;
+                stopByte = sizeof(msgBuff);
+            }
+        }
     }
     I2C_stop();
 }
@@ -98,4 +132,8 @@ void GPS_poll() {
  */
 uint8_t GPS_isLocked() {
     return hasFix;
+}
+
+static void processMessage() {
+    // TODO process GPS messages
 }

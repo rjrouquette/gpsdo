@@ -23,8 +23,8 @@ void I2C_init() {
     UCB0CTL0 = UCMST | UCMODE_3 | UCSYNC;     
     // Use SMCLK, TX mode, keep SW reset
     UCB0CTL1 = UCSSEL__SMCLK | UCTR | UCSWRST;
-    // fSCL = SMCLK/12 = ~100kHz
-    UCB0BR0 = 12u;
+    // fSCL = SMCLK/16
+    UCB0BR0 = 16u;
     UCB0BR1 = 0u;
     // Clear slave address
     UCB0I2CSA = 0u;
