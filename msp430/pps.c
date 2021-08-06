@@ -48,6 +48,12 @@ void PPS_init() {
     // input clock is >15MHz
     TD0HCTL1 = TDHCLKCR;
 
+    // configure input pins
+    P1DIR &= ~(BIT6 | BIT7);
+    P1SEL |=  (BIT6 | BIT7);
+    P1REN &= ~(BIT6 | BIT7);
+    P1OUT &= ~(BIT6 | BIT7);
+
     // configure TD1 for PPS generation
     // No grouping, 16-bit, submodule clcok, no clk divisor, continuous mode
     TD1CTL0 = TDCLGRP_0 | CNTL__16 | TDSSEL__SMCLK| ID__1 | MC__CONTINOUS;
@@ -56,12 +62,19 @@ void PPS_init() {
     // capture mode on channel 1
     TD1CTL2 = TDCAPM1;
     // output compare mode
-    TD1CCTL0 = CLLD_0 | OUTMOD_6;
+    TD1CCTL0 = CLLD_0 | OUTMOD_5;
     // positive edge capture on CCI0B
     TD1CCTL1 = CM_1 | CCIS_1 | SCS | CLLD_0 | CAP | OUTMOD_0;
     // disable high-res
     TD0HCTL0 = 0;
     TD0HCTL1 = 0;
+
+    // configure input pins
+    P2DIR |=  BIT1;     // P2-1 is MSP PPS output
+    P2DIR &= ~BIT2;     // P2-2 is GPS PPS input
+    P2SEL |=  (BIT1 | BIT2);
+    P2REN &= ~(BIT1 | BIT2);
+    P2OUT &= ~(BIT1 | BIT2);
 }
 
 /**
@@ -114,7 +127,8 @@ int16_t PPS_poll() {
     }
 
     // check if PPS delta is ready
-    if(!(CCIFG & TD0CCTL0 & TD0CCTL1)) return PPS_IDLE;
+    if(!(CCIFG & TD0CCTL0 & TD0CCTL1))
+        return PPS_IDLE;
     // clear interrupt flags
     TD0CCTL0 &= CCIFG;
     TD0CCTL1 &= CCIFG;
@@ -123,11 +137,11 @@ int16_t PPS_poll() {
     // check if PPS has coarse lock
     if(!coarseLocked) return PPS_NOLOCK;
     // return PPS delta
-    return TD0CL0 - TD0CL1;
+    return TD0CL1 - TD0CL0;
 }
 
 // output compare on TD1-0
-__attribute__ ( ( interrupt( TIMER0_D1_VECTOR ) ) )
+__interrupt_vec(TIMER0_D1_VECTOR)
 void TIMER0_D1_ISR() {
     // increment macro counter
     if(++ppsMacroTime == ppsTarget) {
