@@ -18,7 +18,7 @@ L Oscillator:Si570 U3
 U 1 1 60FCFECF
 P 4650 6050
 F 0 "U3" H 4300 6450 50  0000 C CNN
-F 1 "549CAAC000111BBG" H 5100 5650 50  0000 C CNN
+F 1 "544CAAC000112BBG" H 5100 5650 50  0000 C CNN
 F 2 "Oscillator:Oscillator_SMD_SI570_SI571_Standard" H 4650 5750 50  0001 C CNN
 F 3 "http://www.silabs.com/Support%20Documents/TechnicalDocs/si570.pdf" H 4250 6750 50  0001 C CNN
 	1    4650 6050
@@ -728,13 +728,6 @@ Wire Wire Line
 Wire Wire Line
 	5100 6950 4650 6950
 Connection ~ 4650 6950
-Wire Wire Line
-	4250 5850 4150 5850
-Wire Wire Line
-	4150 5850 4150 5650
-Wire Wire Line
-	4150 5650 4650 5650
-Connection ~ 4650 5650
 $Comp
 L power:+3.3V #PWR0103
 U 1 1 611AB77B
@@ -1373,17 +1366,6 @@ F 3 "" H 1600 1900 50  0001 C CNN
 	1    1600 1900
 	0    -1   -1   0   
 $EndComp
-$Comp
-L power:+3.3V #PWR0121
-U 1 1 611DA46C
-P 1600 1600
-F 0 "#PWR0121" H 1600 1450 50  0001 C CNN
-F 1 "+3.3V" V 1600 1850 50  0000 C CNN
-F 2 "" H 1600 1600 50  0001 C CNN
-F 3 "" H 1600 1600 50  0001 C CNN
-	1    1600 1600
-	0    -1   -1   0   
-$EndComp
 Wire Wire Line
 	1400 5700 1400 2800
 Wire Wire Line
@@ -1410,4 +1392,37 @@ F 3 "" H 9400 2300 50  0001 C CNN
 	1    9400 2300
 	0    1    1    0   
 $EndComp
+Text GLabel 3750 5850 0    50   Input ~ 0
+OE_CLK
+Text GLabel 1600 1600 0    50   Input ~ 0
+OE_CLK
+Wire Wire Line
+	3750 5850 4100 5850
+$Comp
+L Device:R_Small_US R4
+U 1 1 610EB04B
+P 4100 5550
+F 0 "R4" V 3895 5550 50  0000 C CNN
+F 1 "15k" V 3986 5550 50  0000 C CNN
+F 2 "Resistor_SMD:R_0603_1608Metric" H 4100 5550 50  0001 C CNN
+F 3 "~" H 4100 5550 50  0001 C CNN
+	1    4100 5550
+	-1   0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR0121
+U 1 1 610EB8DD
+P 4100 5450
+F 0 "#PWR0121" H 4100 5200 50  0001 C CNN
+F 1 "GND" H 4105 5277 50  0000 C CNN
+F 2 "" H 4100 5450 50  0001 C CNN
+F 3 "" H 4100 5450 50  0001 C CNN
+	1    4100 5450
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	4100 5650 4100 5850
+Connection ~ 4100 5850
+Wire Wire Line
+	4100 5850 4250 5850
 $EndSCHEMATC
