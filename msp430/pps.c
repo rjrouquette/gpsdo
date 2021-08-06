@@ -61,8 +61,8 @@ void PPS_init() {
     TD1CTL1 = TDIDEX__1;
     // capture mode on channel 1
     TD1CTL2 = TDCAPM1;
-    // output compare mode
-    TD1CCTL0 = CLLD_0 | OUTMOD_5;
+    // output compare mode w/ interrupt
+    TD1CCTL0 = CLLD_0 | OUTMOD_5 | CCIE;
     // positive edge capture on CCI0B
     TD1CCTL1 = CM_1 | CCIS_1 | SCS | CLLD_0 | CAP | OUTMOD_0;
     // disable high-res
@@ -122,7 +122,7 @@ int16_t PPS_poll() {
             ppsTarget = gpsTarget + PPS_TARGET_INCR;
             ppsOffset = gpsOffset + PPS_OFFSET_INCR;
             // set PPS since next update will be the half-way mark
-            TD1CCTL0 &= OUTMOD2;
+            TD1CCTL0 &= ~OUTMOD2;
         }
     }
 
@@ -130,8 +130,8 @@ int16_t PPS_poll() {
     if(!(CCIFG & TD0CCTL0 & TD0CCTL1))
         return PPS_IDLE;
     // clear interrupt flags
-    TD0CCTL0 &= CCIFG;
-    TD0CCTL1 &= CCIFG;
+    TD0CCTL0 &= ~(COV | CCIFG);
+    TD0CCTL1 &= ~(COV | CCIFG);
     // check if GPS has fix
     if(!GPS_hasFix()) return PPS_NOLOCK;
     // check if PPS has coarse lock
@@ -148,11 +148,13 @@ void TIMER0_D1_ISR() {
         TD1CL0 = ppsOffset;
         TD1CCTL0 ^= OUTMOD2;
     }
+    // clear overflow if set
+    TD1CCTL0 &= ~COV;
 
     // check for GPS PPS
     if(TD1CCTL1 & CCIFG) {
         // clear interrupt flag
-        TD1CCTL1 &= CCIFG;
+        TD1CCTL1 &= ~(COV | CCIFG);
         // record event time
         gpsOffset = TD1CL1;
         gpsTarget = ppsMacroTime;

@@ -7,6 +7,7 @@ I2C DCXO API
 
 #include <stdint.h>
 
+// use Si544 DCXO configuration
 #define __DCXO_SI544
 
 /**
