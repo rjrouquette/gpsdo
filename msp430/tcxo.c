@@ -23,17 +23,11 @@ struct TempBin {
 
 // internal state
 static struct TempBin currBin;
-static uint8_t currBinIdx = 0;
-
-// extract bin ID from temperatute
-static uint8_t getBinId(int16_t tempC) {
-    uint8_t offset = tempC >> 8u;
-    return offset + 64u;
-}
+static uint16_t currBinIdx = -1u;
 
 // reduce to fractional temperature (0.16 fixed point format)
 static int16_t getFracTemp(int16_t tempC) {
-    return (tempC & 0xff) - 128;
+    return (tempC & 0xFF) - 128;
 }
 
 // A = A + ((B - A) / 2^16)
@@ -54,18 +48,29 @@ static int32_t getCell(uint8_t cidx) {
 }
 
 // load the specified temperature bin into memory
-static void loadBin(uint8_t binId) {
-    if(binId == currBinIdx) return;
+static uint16_t loadBin(int16_t tempC) {
+    // check for invalid temperatures
+    if(tempC < TEMP_MIN) return 1;
+    if(tempC > TEMP_MAX) return 1;
 
-    // TODO load bin data from I2C EERAM
-    uint16_t addr = binId;
-    addr *= sizeof(struct TempBin);
-    addr += EERAM_OFFSET;
-    EERAM_read(addr, &currBin, sizeof(struct TempBin));
+    // extract bin ID from temperature
+    uint16_t binId = (tempC >> 8u) & 0xFFu;
+    // bin 0 = -64 Celsius
+    binId += 64u;
+
+    // skip EERAM load if binID has not changed
+    if(binId == currBinIdx)
+        return 0;
+
+    // load bin data from EERAM
     currBinIdx = binId;
+    binId *= sizeof(struct TempBin);
+    binId += EERAM_OFFSET;
+    EERAM_read(binId, &currBin, sizeof(struct TempBin));
+    return 0;
 }
 
-// load the specified temperature bin into memory
+// save the specified temperature bin to EERAM
 static void storeBin() {
     uint16_t addr = currBinIdx;
     addr *= sizeof(struct TempBin);
@@ -79,12 +84,10 @@ static void storeBin() {
  * @return the DCXO digital frequency offset
 **/
 int32_t TCXO_getCompensation(int16_t tempC) {
-    // check for invalid temperatures
-    if(tempC < TEMP_MIN) return TCXO_ERR;
-    if(tempC > TEMP_MAX) return TCXO_ERR;
-    loadBin(getBinId(tempC));
+    // load temperature bin
+    if(loadBin(tempC)) return TCXO_ERR;
 
-    // output return error if there is no data
+    // return error if there is no data
     if(currBin.norm == 0) return TCXO_ERR;
 
     // load Y1 cell (average offset)
@@ -132,11 +135,7 @@ int32_t TCXO_getCompensation(int16_t tempC) {
  * @param offset - the DCXO digital frequency offset in 32.0 fixed point format
 **/
 void TCXO_updateCompensation(int16_t tempC, int32_t offset) {
-    // ignore invalid temperatures
-    if(tempC < TEMP_MIN) return;
-    if(tempC > TEMP_MAX) return;
-    // load temperature bin
-    loadBin(getBinId(tempC));
+    if(loadBin(tempC)) return;
 
     // get fractional part of temperature
     const int16_t x = getFracTemp(tempC);
