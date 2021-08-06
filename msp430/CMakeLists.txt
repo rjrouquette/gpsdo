@@ -51,4 +51,6 @@ add_executable(
         pps.h
         tcxo.c
         tcxo.h
+        uart.c
+        uart.h
 )

@@ -15,18 +15,18 @@ union i32 {
 };
 
 // internal state
-uint16_t coarseLocked = 0;
+volatile uint16_t coarseLocked = 0;
 // PPS ISR macro timer
-uint16_t ppsMacroTime = 0;
+volatile uint16_t ppsMacroTime = 0;
 // PPS generation triggers
-uint16_t ppsTarget = 0;
-uint16_t ppsOffset = 0;
+volatile uint16_t ppsTarget = 0;
+volatile uint16_t ppsOffset = 0;
 // GPS PPS capture
-uint16_t gpsTarget = 0;
-uint16_t gpsOffset = 0;
-uint16_t gpsReady = 0;
+volatile uint16_t gpsTarget = 0;
+volatile uint16_t gpsOffset = 0;
+volatile uint16_t gpsReady = 0;
 // PPS delta calulation
-uint16_t deltaTarget = 0;
+volatile uint16_t deltaTarget = 0;
 
 /**
  * Initialize the PPS module
