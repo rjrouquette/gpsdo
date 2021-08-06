@@ -70,14 +70,6 @@ static uint16_t loadBin(int16_t tempC) {
     return 0;
 }
 
-// save the specified temperature bin to EERAM
-static void storeBin() {
-    uint16_t addr = currBinIdx;
-    addr *= sizeof(struct TempBin);
-    addr += EERAM_OFFSET;
-    EERAM_write(addr, &currBin, sizeof(struct TempBin));
-}
-
 /**
  * Gets the DCXO adjustment for the given temperature.
  * @param tempC - temperature in Celsius and 8.8 fixed point format
@@ -145,6 +137,10 @@ void TCXO_updateCompensation(int16_t tempC, int32_t offset) {
     accumulate(X1, x << 8u);
     accumulate(YX, mult24s8s(offset, x));
     accumulate(Y1, offset);
-    // store results
-    storeBin();
+
+    // save results to EERAM
+    uint16_t addr = currBinIdx;
+    addr *= sizeof(struct TempBin);
+    addr += EERAM_OFFSET;
+    EERAM_write(addr, &currBin, sizeof(struct TempBin));
 }
