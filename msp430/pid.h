@@ -7,14 +7,17 @@ Software defined TCXO controller
 
 #include <stdint.h>
 
+/**
+ * Initialize the PID controller
+**/
 void PID_init();
 
 /**
  * Gets the DCXO adjustment for the given temperature.
- * @param trackingError - DCXO tracking error (same resolution as DCXO frequency offset)
+ * @param error - DCXO tracking error (same resolution as DCXO frequency offset)
  * @return the DCXO digital frequency offset
 **/
-int32_t PID_update(int32_t trackingError);
+int32_t PID_update(int32_t error);
 
 /**
  * Set the PID coefficients to the given values

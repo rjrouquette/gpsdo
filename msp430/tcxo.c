@@ -4,7 +4,7 @@
 #include "tcxo.h"
 
 // start of temperature bins in EERAM
-#define EERAM_OFFSET (1280u)
+#define EERAM_OFFSET (0x0500u)
 // temperature limits
 #define TEMP_MIN (-64 << 8u)  // -64 Celsius
 #define TEMP_MAX (127 << 8u)  // 127 Celsius
@@ -84,7 +84,7 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     if(tempC > TEMP_MAX) return TCXO_ERR;
     loadBin(getBinId(tempC));
 
-    // output -2^31 if there is no data
+    // output return error if there is no data
     if(currBin.norm == 0) return TCXO_ERR;
 
     // load Y1 cell (average offset)
