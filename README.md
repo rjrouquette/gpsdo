@@ -9,10 +9,8 @@ Redesign of the [Radio Astronomy Master Clock](https://github.com/rjrouquette/ra
             - provides 5 ns resolution for offset measurement
         - PPS generation
         - GPS PPS capture
-        - external PPS capture
-            -high resolution comparison with generated PPS
         - DCXO control loop
-            - age compensation
+            - age compensation (continuous learning)
             - temperature compensation
             - drift measurement against GPS
     - DCXO for more precise tuning
