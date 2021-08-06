@@ -34,6 +34,8 @@ add_executable(
         main.c
         config.c
         config.h
+        dcxo.c
+        dcxo.h
         delay.h
         eeram.c
         eeram.h
