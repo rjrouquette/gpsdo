@@ -4,10 +4,12 @@
 
 #define FRAME_MAGIC (0x4ab7)
 
-volatile uint16_t rxPos = -1u;
-volatile uint8_t rxBuff[64];
-volatile uint16_t txPos = -1u;
-volatile uint8_t txBuff[64];
+volatile uint8_t rxHead = 0;
+volatile uint8_t rxTail = 0;
+volatile uint8_t rxBuff[256];
+volatile uint8_t txHead = 0;
+volatile uint8_t txTail = 0;
+volatile uint8_t txBuff[256];
 
 void appendCRC(uint8_t *buff, uint16_t len);
 uint16_t verifyCRC(uint8_t *buff, uint16_t len);
@@ -70,14 +72,13 @@ __interrupt_vec(USCI_A0_VECTOR)
 void USCI_A0_ISR() {
     switch(UCA0IV) {
         case UCRXIFG:
-            rxBuff[rxPos++] = UCA0RXBUF;
-            if(rxPos >= sizeof(rxBuff))
-                UCA0IE &= ~UCRXIE;
+            rxBuff[rxHead] = UCA0RXBUF;
+            ++rxHead;
             break;
         case UCTXIFG:
-            UCA0TXBUF = txBuff[txPos++];
-            if(txPos >= sizeof(txBuff))
-                UCA0IE &= ~UCTXIE;
+            UCA0TXBUF = txBuff[txTail];
+            if(++txTail == txHead)
+                UCA0IE &= UCTXIE;
             break;
     }
 }
