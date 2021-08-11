@@ -1,4 +1,28 @@
+# KiCad Projects
+
+This directory contains the KiCad project files for the GPSDO and Ethernet boards.
+
+---
+## Ethernet
+
+The IEEE 1588 PTP ethernet board.
+
+Main Files:
+- `ethernet.pro`
+- `ethernet.sch`
+- `ethernet.kicad_pcb`
+
+
+---
 ## GPSDO
+
+The GPSDO daughter board.
+
+Main Files:
+- `gpsdo.pro`
+- `gpsdo.sch`
+- `gpsdo.kicad_pcb`
+
 
 ---
 ### Errata
