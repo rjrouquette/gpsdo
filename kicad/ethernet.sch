@@ -1,0 +1,106 @@
+EESchema Schematic File Version 4
+EELAYER 30 0
+EELAYER END
+$Descr B 17000 11000
+encoding utf-8
+Sheet 1 1
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L MCU_Texas:MSP432E401Y U1
+U 1 1 6114C5E6
+P 8050 4800
+F 0 "U1" H 8050 1011 50  0000 C CNN
+F 1 "MSP432E401Y" H 8050 920 50  0000 C CNN
+F 2 "Package_QFP:LQFP-128_14x14mm_P0.4mm" H 10150 1200 50  0001 R CNN
+F 3 "http://www.ti.com/lit/ds/symlink/msp432e401y.pdf" H 7350 3000 50  0001 C CNN
+	1    8050 4800
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:Conn_01x04_Male J2
+U 1 1 611334C9
+P 13400 1600
+F 0 "J2" H 13508 1881 50  0000 C CNN
+F 1 "Conn_01x04_Male" H 13508 1790 50  0000 C CNN
+F 2 "" H 13400 1600 50  0001 C CNN
+F 3 "~" H 13400 1600 50  0001 C CNN
+	1    13400 1600
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:Conn_01x04_Male J4
+U 1 1 611359D0
+P 14300 1600
+F 0 "J4" H 14408 1881 50  0000 C CNN
+F 1 "Conn_01x04_Male" H 14408 1790 50  0000 C CNN
+F 2 "" H 14300 1600 50  0001 C CNN
+F 3 "~" H 14300 1600 50  0001 C CNN
+	1    14300 1600
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:Conn_01x04_Male J5
+U 1 1 6113611F
+P 14300 2350
+F 0 "J5" H 14408 2631 50  0000 C CNN
+F 1 "Conn_01x04_Male" H 14408 2540 50  0000 C CNN
+F 2 "" H 14300 2350 50  0001 C CNN
+F 3 "~" H 14300 2350 50  0001 C CNN
+	1    14300 2350
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:Conn_01x04_Male J3
+U 1 1 61136625
+P 13400 2350
+F 0 "J3" H 13508 2631 50  0000 C CNN
+F 1 "Conn_01x04_Male" H 13508 2540 50  0000 C CNN
+F 2 "" H 13400 2350 50  0001 C CNN
+F 3 "~" H 13400 2350 50  0001 C CNN
+	1    13400 2350
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:RJ45_Abracon_ARJP11A-MASA-B-A-EMU2 J1
+U 1 1 61137196
+P 1500 6700
+F 0 "J1" H 1500 8217 50  0000 C CNN
+F 1 "RJ45_Abracon_ARJP11A-MASA-B-A-EMU2" H 1500 8126 50  0000 C CNN
+F 2 "Connector_RJ:RJ45_Abracon_ARJP11A-MA_Horizontal" H 1500 8100 50  0001 C CNN
+F 3 "https://abracon.com/Magnetics/lan/ARJP11A.PDF" H 1350 5850 50  0001 C CNN
+	1    1500 6700
+	-1   0    0    -1  
+$EndComp
+Wire Wire Line
+	3550 6400 3550 6600
+Wire Wire Line
+	3550 6600 2200 6600
+Wire Wire Line
+	3550 6400 6750 6400
+Wire Wire Line
+	2200 7000 3650 7000
+Wire Wire Line
+	3650 7000 3650 6500
+Wire Wire Line
+	3650 6500 6750 6500
+Wire Wire Line
+	2200 7100 3750 7100
+Wire Wire Line
+	3750 7100 3750 6600
+Wire Wire Line
+	3750 6600 6750 6600
+Wire Wire Line
+	2200 7500 3850 7500
+Wire Wire Line
+	3850 7500 3850 6700
+Wire Wire Line
+	3850 6700 6750 6700
+$EndSCHEMATC
