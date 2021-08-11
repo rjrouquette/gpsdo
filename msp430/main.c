@@ -10,23 +10,17 @@
 #include "tcxo.h"
 
 #define TIMER_NS (5) // 5 ns
-#define TEMP_PPS_TOL (100) // 100ns
-#define PPM_SCALE (0x218DEF41l)
+#define TEMP_PPS_TOL (250) // 250ns
 
 // internal state
+int16_t curTempC = 0;
 int32_t prevTempComp = TCXO_ERR;
 int32_t tempComp = 0;
 int32_t pidComp = 0;
-int32_t totalComp = 0;
 
 // stat accumulators
 int64_t accAvgError = 0;
 uint64_t accRmsError = 0;
-
-// normalized stats
-int32_t avgError = 0; // 24.8 fixed-point (ns)
-int32_t rmsError = 0; // 24.8 fixed-point (ns)
-int32_t ppmAdjust = 0; // 16.16 fixed-point (ppm)
 
 void doTrackingUpdate(int16_t ppsDelay);
 
@@ -71,11 +65,11 @@ int main() {
 
 void doTrackingUpdate(int16_t ppsDelay) {
     // get DCXO temperature
-    const int16_t tempC = DCXO_getTemp();
-    uint8_t allowTempUpdate = (tempC != DCXO_TMPS_ERR);
+    curTempC = DCXO_getTemp();
+    uint8_t allowTempUpdate = (curTempC != DCXO_TMPS_ERR);
     if(allowTempUpdate) {
         // get temperature compensation
-        tempComp = TCXO_getCompensation(tempC);
+        tempComp = TCXO_getCompensation(curTempC);
         if(tempComp == TCXO_ERR) {
             if(prevTempComp == TCXO_ERR)
                 tempComp = 0;
@@ -91,8 +85,8 @@ void doTrackingUpdate(int16_t ppsDelay) {
     // update PPS tracking loop
     if(ppsDelay != PPS_NOLOCK) {
         // TODO get actual PPS error
-        int32_t ppsError = mult16s16s(ppsDelay, TIMER_NS);
-        ppsError += sysConf.ppsErrorOffset;
+        int32_t ppsError = sysConf.ppsErrorOffset;
+        ppsError += mult16s16s(ppsDelay, TIMER_NS);
         // Update PID tracking loop
         pidComp = PID_update(ppsError);
         // Update average error (63s EMA)
@@ -109,17 +103,13 @@ void doTrackingUpdate(int16_t ppsDelay) {
     }
 
     // combine compensation values
-    totalComp = pidComp + tempComp;
+    int32_t totalComp = pidComp + tempComp;
     // apply frequency adjustment
     DCXO_setOffset(totalComp);
 
-    if(allowTempUpdate) {
-        // adjust temperature compensation
-        TCXO_updateCompensation(tempC, totalComp);
-    }
-
-    // compute normalized dcxo offset in ppm (16.16 fixed-point)
-    ppmAdjust = mult32s32s(totalComp, PPM_SCALE) >> 32u;
+    if(!allowTempUpdate) return;
+    // update temperature compensation
+    TCXO_updateCompensation(curTempC, totalComp);
 }
 
 void SysBoot() {

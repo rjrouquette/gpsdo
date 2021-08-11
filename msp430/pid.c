@@ -30,7 +30,7 @@ void PID_init() {
 }
 
 /**
- * Gets the DCXO adjustment for the given temperature.
+ * Updates the GPS PID tracking loop.
  * @param error - DCXO tracking error (same resolution as DCXO frequency offset)
  * @return the DCXO digital frequency offset
 **/
