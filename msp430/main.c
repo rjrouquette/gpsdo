@@ -13,9 +13,6 @@
 #define TEMP_PPS_TOL (100) // 100ns
 #define PPM_SCALE (0x218DEF41l)
 
-#define TEMP_CSA (0x49u)
-#define TEMP_ERR (0x8000)
-
 // internal state
 int32_t prevTempComp = TCXO_ERR;
 int32_t tempComp = 0;
@@ -32,9 +29,6 @@ int32_t rmsError = 0; // 24.8 fixed-point (ns)
 int32_t ppmAdjust = 0; // 16.16 fixed-point (ppm)
 
 void doTrackingUpdate(int16_t ppsDelay);
-
-void TempSens_init();
-int16_t TempSens_read();
 
 void SysBoot();
 void SysClk();
@@ -76,78 +70,56 @@ int main() {
 }
 
 void doTrackingUpdate(int16_t ppsDelay) {
-        // TODO get actual temp
-        int16_t tempC = TempSens_read();
-        uint8_t allowTempUpdate = (tempC != TEMP_ERR);
-        if(allowTempUpdate) {
-            // adjust precision of temperature measurement 
-            tempC <<= 1u;
-            // get temperature compensation
-            tempComp = TCXO_getCompensation(tempC);
-            if(tempComp == TCXO_ERR) {
-                if(prevTempComp == TCXO_ERR)
-                    tempComp = 0;
-                else
-                    tempComp = prevTempComp;
-            } else {
-                if(prevTempComp == TCXO_ERR)
-                    PID_clearIntegral();
-                prevTempComp = tempComp;
-            }
-        }
-
-        // update PPS tracking loop
-        if(ppsDelay != PPS_NOLOCK) {
-            // TODO get actual PPS error
-            int32_t ppsError = mult16s16s(ppsDelay, TIMER_NS);
-            ppsError += sysConf.ppsErrorOffset;
-            // Update PID tracking loop
-            pidComp = PID_update(ppsError);
-            // Update average error (63s EMA)
-            accAvgError -= accAvgError >> 5u;
-            accAvgError += ppsError << 16u;
-            // Update RMS error (63s EMA)
-            accRmsError -= accRmsError >> 5u;
-            accRmsError += (uint64_t)mult32s32s(ppsError, ppsError) << 16u;
-            // wait for loop to settle before updating temperature compensation
-            if(ppsError < -TEMP_PPS_TOL) allowTempUpdate = 0;
-            if(ppsError >  TEMP_PPS_TOL) allowTempUpdate = 0;
+    // get DCXO temperature
+    const int16_t tempC = DCXO_getTemp();
+    uint8_t allowTempUpdate = (tempC != DCXO_TMPS_ERR);
+    if(allowTempUpdate) {
+        // get temperature compensation
+        tempComp = TCXO_getCompensation(tempC);
+        if(tempComp == TCXO_ERR) {
+            if(prevTempComp == TCXO_ERR)
+                tempComp = 0;
+            else
+                tempComp = prevTempComp;
         } else {
-            allowTempUpdate = 0;
+            if(prevTempComp == TCXO_ERR)
+                PID_clearIntegral();
+            prevTempComp = tempComp;
         }
+    }
 
-        // combine compensation values
-        totalComp = pidComp + tempComp;
-        // apply frequency adjustment
-        DCXO_setOffset(totalComp);
+    // update PPS tracking loop
+    if(ppsDelay != PPS_NOLOCK) {
+        // TODO get actual PPS error
+        int32_t ppsError = mult16s16s(ppsDelay, TIMER_NS);
+        ppsError += sysConf.ppsErrorOffset;
+        // Update PID tracking loop
+        pidComp = PID_update(ppsError);
+        // Update average error (63s EMA)
+        accAvgError -= accAvgError >> 5u;
+        accAvgError += ppsError << 16u;
+        // Update RMS error (63s EMA)
+        accRmsError -= accRmsError >> 5u;
+        accRmsError += (uint64_t)mult32s32s(ppsError, ppsError) << 16u;
+        // wait for loop to settle before updating temperature compensation
+        if(ppsError < -TEMP_PPS_TOL) allowTempUpdate = 0;
+        if(ppsError >  TEMP_PPS_TOL) allowTempUpdate = 0;
+    } else {
+        allowTempUpdate = 0;
+    }
 
-        if(allowTempUpdate) {
-            // adjust temperature compensation
-            TCXO_updateCompensation(tempC, totalComp);
-        }
+    // combine compensation values
+    totalComp = pidComp + tempComp;
+    // apply frequency adjustment
+    DCXO_setOffset(totalComp);
 
-        // compute normalized dcxo offset in ppm (16.16 fixed-point)
-        ppmAdjust = mult32s32s(totalComp, PPM_SCALE) >> 32u;
-}
+    if(allowTempUpdate) {
+        // adjust temperature compensation
+        TCXO_updateCompensation(tempC, totalComp);
+    }
 
-void TempSens_init() {
-    // conf bytes
-    uint8_t conf[3] = { 0x01, 0x00, 0x60 };
-    // configure temp sensor
-    I2C_startWrite(TEMP_CSA);
-    I2C_write(conf, 3);
-    I2C_stop();
-}
-
-int16_t TempSens_read() {
-    // set register address
-    I2C_startWrite(TEMP_CSA);
-    I2C_write8(0x00);
-    // read measurement
-    I2C_startRead(TEMP_CSA);
-    int16_t result = I2C_read16b();
-    I2C_stop();
-    return result;
+    // compute normalized dcxo offset in ppm (16.16 fixed-point)
+    ppmAdjust = mult32s32s(totalComp, PPM_SCALE) >> 32u;
 }
 
 void SysBoot() {
