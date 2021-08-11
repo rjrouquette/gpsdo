@@ -3,6 +3,17 @@
 Documentation for GPSDO microntroller.
 
 ---
+## MSP430F5171
+
+Specifications:
+- CPU: MSP430
+- CLK: 25 MHz
+- Flash: 32 kB
+- SRAM: 2 kB
+- ADC: None
+- HW Mult: MPY32 (32-bit)
+
+---
 ## DCXO Feedback Loop
 
 The feedback loop combines the XO aging offset, temperature coefficient, and PPS PI controller to compute the frequency offset for the DCXO.
