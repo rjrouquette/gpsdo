@@ -203,7 +203,6 @@ void processGetStatus() {
     *(msg++) = ' ';
     toHex32(msg, tempComp);
     msg += 8;
-    msg += 8;
     // gps pid compensation offset
     *(msg++) = ' ';
     toHex32(msg, pidComp);
