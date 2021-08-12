@@ -190,16 +190,42 @@ void processRequest(uint8_t len) {
 }
 
 void processGetStatus() {
+    // assemble response
     char *msg = UART_getMessage();
-
+    // ack request
+    strcpy(msg, MSG_ACK);
+    msg += strlen(MSG_ACK);
+    // current temperature
+    *(msg++) = ' ';
+    toHex16(msg, curTempC);
+    msg += 4;
+    // temperature compensation offset
+    *(msg++) = ' ';
+    toHex32(msg, tempComp);
+    msg += 8;
+    msg += 8;
+    // gps pid compensation offset
+    *(msg++) = ' ';
+    toHex32(msg, pidComp);
+    msg += 8;
+    // average PPS offset error
+    *(msg++) = ' ';
+    toHex32(msg, accAvgError >> 16u);
+    msg += 8;
+    // RMS PPS offset error
+    *(msg++) = ' ';
+    toHex32(msg, sqrt64(accRmsError) >> 8u);
+    msg += 8;
+    // send response
+    msg[0] = 0;
     UART_send();
 }
 
 void processSetPpsOffset() {
-    char *data = UART_getMessage() + strlen(CMD_SET_PPS_OFFSET);
-
+    // locate pps offset in hex
+    const char *data = UART_getMessage() + strlen(CMD_SET_PPS_OFFSET);
+    // parse pps offset
     sysConf.ppsOffset = fromHex16(data);
-
     // acknowledge request
     strcpy(UART_getMessage(), MSG_ACK);
     UART_send();

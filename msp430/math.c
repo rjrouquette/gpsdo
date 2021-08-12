@@ -153,6 +153,11 @@ FLASH const uint8_t fromHex4[128] = {
     ['e'] = 0xE,
     ['f'] = 0xF
 };
+// integer to ASCII hex lookup table
+FLASH const char toHex4[16] = {
+    '0', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+};
 
 // hex conversion
 uint8_t fromHex8(const char *hex) {
@@ -175,4 +180,23 @@ uint32_t fromHex32(const char *hex) {
     res.word[1] = fromHex16(hex + 0);
     res.word[0] = fromHex16(hex + 4);
     return res.full;
+}
+
+// hex conversion
+void toHex8(char *hex, uint8_t value) {
+    hex[1] = toHex4[value & 0xFu];
+    value >>= 4u;
+    hex[0] = toHex4[value & 0xFu];
+}
+
+// hex conversion
+void toHex16(char *hex, uint16_t value) {
+    toHex8(hex + 0, ((union u16)value).byte[1]);
+    toHex8(hex + 2, ((union u16)value).byte[0]);
+}
+
+// hex conversion
+void toHex32(char *hex, uint32_t value) {
+    toHex16(hex + 0, ((union u32)value).word[1]);
+    toHex16(hex + 4, ((union u32)value).word[0]);
 }

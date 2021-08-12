@@ -24,4 +24,11 @@ uint16_t fromHex16(const char *hex);
 // hex conversion
 uint32_t fromHex32(const char *hex);
 
+// hex conversion
+void toHex8(char *hex, uint8_t value);
+// hex conversion
+void toHex16(char *hex, uint16_t value);
+// hex conversion
+void toHex32(char *hex, uint32_t value);
+
 #endif
