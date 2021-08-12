@@ -8,13 +8,25 @@ UART Interface
 #include <stdint.h>
 
 /**
- * Reset UART
+ * Initialize UART
  */
 void UART_init();
 
 /**
  * Poll UART interface
+ * @return length of message received
  */
-void UART_poll();
+uint8_t UART_poll();
+
+/**
+ * Access UART message buffer
+ * @return pointer to UART message buffer
+ */
+char * UART_getMessage();
+
+/**
+ * Send message in UART buffer
+ */
+void UART_send();
 
 #endif

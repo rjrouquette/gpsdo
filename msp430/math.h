@@ -17,4 +17,11 @@ int64_t mult32s32s(int32_t a, int32_t b) __attribute__ ((const));
 // integer square root
 uint32_t sqrt64(uint64_t num) __attribute__ ((const));
 
+// hex conversion
+uint8_t fromHex8(const char *hex);
+// hex conversion
+uint16_t fromHex16(const char *hex);
+// hex conversion
+uint32_t fromHex32(const char *hex);
+
 #endif

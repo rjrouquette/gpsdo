@@ -2,6 +2,11 @@
 #include <msp430.h>
 #include "math.h"
 
+union u16 {
+    uint8_t byte[2];
+    uint16_t full;
+};
+
 union i32 {
     uint16_t word[2];
     int32_t full;
@@ -116,4 +121,58 @@ uint32_t sqrt64(uint64_t num) {
         bit >>= 2u;
     }
     return res;
+}
+
+
+// Hex string lookup tables
+#define FLASH __attribute__ ((section(".text.const")))
+// ASCII hex to integer lookup table
+FLASH const uint8_t fromHex4[128] = {
+    ['0'] = 0x0,
+    ['1'] = 0x1,
+    ['2'] = 0x2,
+    ['3'] = 0x3,
+    ['4'] = 0x4,
+    ['5'] = 0x5,
+    ['6'] = 0x6,
+    ['7'] = 0x7,
+    ['8'] = 0x8,
+    ['9'] = 0x9,
+
+    ['A'] = 0xA,
+    ['B'] = 0xB,
+    ['C'] = 0xC,
+    ['D'] = 0xD,
+    ['E'] = 0xE,
+    ['F'] = 0xF,
+
+    ['a'] = 0xA,
+    ['b'] = 0xB,
+    ['c'] = 0xC,
+    ['d'] = 0xD,
+    ['e'] = 0xE,
+    ['f'] = 0xF
+};
+
+// hex conversion
+uint8_t fromHex8(const char *hex) {
+    uint8_t res = fromHex4[(uint8_t)hex[0]];
+    res <<= 4u;
+    return res | fromHex4[(uint8_t)hex[1]];
+}
+
+// hex conversion
+uint16_t fromHex16(const char *hex) {
+    union u16 res;
+    res.byte[1] = fromHex8(hex + 0);
+    res.byte[0] = fromHex8(hex + 2);
+    return res.full;
+}
+
+// hex conversion
+uint32_t fromHex32(const char *hex) {
+    union u32 res;
+    res.word[1] = fromHex16(hex + 0);
+    res.word[0] = fromHex16(hex + 4);
+    return res.full;
 }

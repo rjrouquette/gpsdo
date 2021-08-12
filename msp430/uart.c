@@ -2,14 +2,9 @@
 #include <msp430.h>
 #include "uart.h"
 
-#define FRAME_MAGIC (0x4ab7)
-
-volatile uint8_t rxHead = 0;
-volatile uint8_t rxTail = 0;
-volatile uint8_t rxBuff[256];
-volatile uint8_t txHead = 0;
-volatile uint8_t txTail = 0;
-volatile uint8_t txBuff[256];
+static volatile uint8_t isTX = 0;
+static volatile uint8_t length = 0;
+static volatile uint8_t buffer[256];
 
 void appendCRC(uint8_t *buff, uint16_t len);
 uint16_t verifyCRC(uint8_t *buff, uint16_t len);
@@ -39,46 +34,84 @@ void UART_init() {
 
 /**
  * Poll UART interface
+ * @return length of message received
  */
-void UART_poll() {
-
-}
-
-void appendCRC(uint8_t *buff, uint16_t len) {
-    // init CRC
-    CRCINIRES = 0xFFFFu;
-    uint8_t *end = buff + len;
-    while(buff < end) {
-        CRCDI_L = *(buff++);
+uint8_t UART_poll() {
+    // rx mode
+    if(UCA0IE & UCRXIE) {
+        // check if reception has begun
+        if(length == 0) return 0;
+        // check if reception is complete
+        if(buffer[length - 1] == 0) {
+            // disable RX interrupt
+            UCA0IE &= UCRXIE;
+            // return message length
+            return length - 1;
+        }
     }
-    end[0] = CRCINIRES_L;
-    end[1] = CRCINIRES_H;
-}
-
-uint16_t verifyCRC(uint8_t *buff, uint16_t len) {
-    // init CRC
-    CRCINIRES = 0xFFFFu;
-    uint8_t *end = buff + len;
-    while(buff < end) {
-        CRCDI_L = *(buff++);
+    // tx mode
+    else if(isTX) {
+        // check if transmission is complete
+        if(!(UCA0IE & UCTXIE)) {
+            // clear TX flag
+            isTX = 0;
+            // reset buffer pointer
+            length = 0;
+            // clear interrupt flag
+            UCA0IFG &= UCRXIFG;
+            // enable RX interrupt
+            UCA0IE |= UCRXIE;
+        }
     }
-    if(end[0] != CRCINIRES_L) return 1;
-    if(end[1] != CRCINIRES_H) return 1;
     return 0;
+}
+
+/**
+ * Access UART message buffer
+ * @return pointer to UART message buffer
+ */
+char * UART_getMessage() {
+    return (char *) buffer;
+}
+
+/**
+ * Send message in UART buffer
+ */
+void UART_send() {
+    // set TX flag
+    isTX = 1;
+    // set buffer pointer
+    length = 1;
+    // clear interrupt flag
+    UCA0IFG &= UCTXIFG;
+    // enable TX interrupt
+    UCA0IE |= UCTXIE;
+    // send first byte
+    UCA0TXBUF = buffer[0];
+}
+
+// RX on USCI_A0
+void USCI_A0_ISR_RX() {
+    buffer[length++] = UCA0RXBUF;
+}
+
+// TX on USCI_A0
+void USCI_A0_ISR_TX() {
+    uint8_t byte = buffer[length++];
+    UCA0TXBUF = byte;
+    if(byte == 0)
+        UCA0IE &= UCTXIE;
 }
 
 // RX/TX on USCI_A0
 __interrupt_vec(USCI_A0_VECTOR)
 void USCI_A0_ISR() {
     switch(UCA0IV) {
-        case UCRXIFG:
-            rxBuff[rxHead] = UCA0RXBUF;
-            ++rxHead;
-            break;
-        case UCTXIFG:
-            UCA0TXBUF = txBuff[txTail];
-            if(++txTail == txHead)
-                UCA0IE &= UCTXIE;
-            break;
+        case 0x02:
+            USCI_A0_ISR_RX();
+            return;
+        case 0x04:
+            USCI_A0_ISR_TX();
+            return;
     }
 }

@@ -1,4 +1,6 @@
 #include <msp430.h>
+#include <string.h>
+
 #include "config.h"
 #include "dcxo.h"
 #include "eeram.h"
@@ -8,6 +10,7 @@
 #include "pid.h"
 #include "pps.h"
 #include "tcxo.h"
+#include "uart.h"
 
 #define TIMER_NS (5) // 5 ns
 #define TEMP_PPS_TOL (250) // 250ns
@@ -26,7 +29,7 @@ void doTrackingUpdate(int16_t ppsDelay);
 
 void SysBoot();
 void SysClk();
-
+void processRequest(uint8_t len);
 
 int main() {
     // bootstrap MCU
@@ -53,6 +56,9 @@ int main() {
         WDTCTL |= WDTPW | WDTCNTCL;
         // poll GPS data
         GPS_poll();
+        // poll UART interface
+        uint8_t len = UART_poll();
+        if(len) processRequest(len);
         // check for PPS measurement
         int16_t ppsDelay = PPS_poll();
         if(ppsDelay != PPS_IDLE) {
@@ -85,7 +91,7 @@ void doTrackingUpdate(int16_t ppsDelay) {
     // update PPS tracking loop
     if(ppsDelay != PPS_NOLOCK) {
         // TODO get actual PPS error
-        int32_t ppsError = sysConf.ppsErrorOffset;
+        int32_t ppsError = sysConf.ppsOffset;
         ppsError += mult16s16s(ppsDelay, TIMER_NS);
         // Update PID tracking loop
         pidComp = PID_update(ppsError);
@@ -141,4 +147,60 @@ void SysClk() {
     I2C_prescaler(6250u);
     // configure watchdog with 1s interval
     WDTCTL = WDTPW | WDTHOLD | WDTSSEL__ACLK | WDTCNTCL | WDTIS__32K;
+}
+
+// UART request strings
+#define FLASH __attribute__ ((section(".text.const")))
+// Status request
+FLASH const char CMD_STATUS[] = "get status";
+// get pps offset
+FLASH const char CMD_GET_PPS_OFFSET[] = "get pps offset ";
+// set pps offset
+FLASH const char CMD_SET_PPS_OFFSET[] = "set pps offset ";
+
+// request invalid
+FLASH const char MSG_INVALID[] = "invalid";
+// request ok
+FLASH const char MSG_ACK[] = "ack";
+// request fail
+FLASH const char MSG_NACK[] = "nack";
+
+// request handlers
+void processGetStatus();
+void processSetPpsOffset();
+
+void processRequest(uint8_t len) {
+    const char *cmd = UART_getMessage();
+
+    if(strcmp(cmd, CMD_STATUS) == 0) {
+        processGetStatus();
+        return;
+    }
+
+    if(strncmp(cmd, CMD_SET_PPS_OFFSET, strlen(CMD_SET_PPS_OFFSET)) == 0) {
+        if(len == (strlen(CMD_SET_PPS_OFFSET) + 4)) {
+            processSetPpsOffset();
+            return;
+        }
+    }
+
+    // report use of invalid request
+    strcpy(UART_getMessage(), MSG_INVALID);
+    UART_send();
+}
+
+void processGetStatus() {
+    char *msg = UART_getMessage();
+
+    UART_send();
+}
+
+void processSetPpsOffset() {
+    char *data = UART_getMessage() + strlen(CMD_SET_PPS_OFFSET);
+
+    sysConf.ppsOffset = fromHex16(data);
+
+    // acknowledge request
+    strcpy(UART_getMessage(), MSG_ACK);
+    UART_send();
 }
