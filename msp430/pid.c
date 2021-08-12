@@ -13,11 +13,6 @@ union i64 {
     int64_t full;
 };
 
-// control loop coefficients
-int32_t D = 0;
-int32_t P = 0;
-int32_t I = 0;
-
 // integrator
 int32_t prevError = 0;
 int32_t acc = 0;
@@ -26,7 +21,8 @@ int32_t acc = 0;
  * Initialize the PID controller
 **/
 void PID_init() {
-    PID_setCoeff(sysConf.pidDeriv, sysConf.pidProp, sysConf.pidInteg);
+    acc = 0;
+    prevError = 0;
 }
 
 /**
@@ -39,8 +35,8 @@ int32_t PID_update(int32_t error) {
     MPY32CTL0 = MPYDLY32;
 
     // proportional term (HW MAC)
-    MPYS32L = ((union i32)P).word[0];
-    MPY32H = ((union i32)P).word[1];
+    MPYS32L = ((union i32)sysConf.pid.P).word[0];
+    MPYS32H = ((union i32)sysConf.pid.P).word[1];
     OP2L = ((union i32)error).word[0];
     OP2H = ((union i32)error).word[1];
     
@@ -48,8 +44,8 @@ int32_t PID_update(int32_t error) {
     int32_t delta = error - prevError;
 
     // derivative term (HW MAC)
-    MACS32L = ((union i32)D).word[0];
-    MACS32H = ((union i32)D).word[1];
+    MACS32L = ((union i32)sysConf.pid.D).word[0];
+    MACS32H = ((union i32)sysConf.pid.D).word[1];
     OP2L = ((union i32)delta).word[0];
     OP2H = ((union i32)delta).word[1];
 
@@ -57,8 +53,8 @@ int32_t PID_update(int32_t error) {
     prevError = error;
 
     // integral term (HW MAC)
-    MACS32L = ((union i32)I).word[0];
-    MACS32H = ((union i32)I).word[1];
+    MACS32L = ((union i32)sysConf.pid.I).word[0];
+    MACS32H = ((union i32)sysConf.pid.I).word[1];
     OP2L = ((union i32)acc).word[0];
     OP2H = ((union i32)acc).word[1];
 
@@ -76,17 +72,17 @@ int32_t PID_update(int32_t error) {
 
 /**
  * Set the PID coefficients to the given values
- * @param d - the derivative coefficient in 8.24 fixed point format
  * @param p - the proportional coefficient in 8.24 fixed point format
  * @param i - the integral coefficient in 8.24 fixed point format
+ * @param d - the derivative coefficient in 8.24 fixed point format
 **/
-void PID_setCoeff(int32_t d, int32_t p, int32_t i) {
+void PID_setCoeff(int32_t p, int32_t i, int32_t d) {
     // set coefficients
-    D = d;
-    P = p;
-    I = i;
+    sysConf.pid.P = p;
+    sysConf.pid.I = i;
+    sysConf.pid.D = d;
     // clear integrator
-    acc = 0;
+    PID_clearIntegral();
 }
 
 /**

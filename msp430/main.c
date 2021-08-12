@@ -91,7 +91,7 @@ void doTrackingUpdate(int16_t ppsDelay) {
     // update PPS tracking loop
     if(ppsDelay != PPS_NOLOCK) {
         // TODO get actual PPS error
-        int32_t ppsError = sysConf.ppsOffset;
+        int32_t ppsError = sysConf.pps.trim;
         ppsError += mult16s16s(ppsDelay, TIMER_NS);
         // Update PID tracking loop
         pidComp = PID_update(ppsError);
@@ -154,9 +154,13 @@ void SysClk() {
 // Status request
 FLASH const char CMD_STATUS[] = "get status";
 // get pps offset
-FLASH const char CMD_GET_PPS_OFFSET[] = "get pps offset ";
+FLASH const char CMD_GET_PPS_TRIM[] = "get pps trim";
 // set pps offset
-FLASH const char CMD_SET_PPS_OFFSET[] = "set pps offset ";
+FLASH const char CMD_SET_PPS_TRIM[] = "set pps trim ";
+// get pid
+FLASH const char CMD_GET_PID[] = "get pid";
+// set pid
+FLASH const char CMD_SET_PID[] = "set pid ";
 
 // request invalid
 FLASH const char MSG_INVALID[] = "invalid";
@@ -167,19 +171,44 @@ FLASH const char MSG_NACK[] = "nack";
 
 // request handlers
 void processGetStatus();
-void processSetPpsOffset();
+void processGetPpsTrim();
+void processSetPpsTrim();
+void processGetPid();
+void processSetPid();
 
 void processRequest(uint8_t len) {
     const char *cmd = UART_getMessage();
 
+    // check for "status" command
     if(strcmp(cmd, CMD_STATUS) == 0) {
         processGetStatus();
         return;
     }
 
-    if(strncmp(cmd, CMD_SET_PPS_OFFSET, strlen(CMD_SET_PPS_OFFSET)) == 0) {
-        if(len == (strlen(CMD_SET_PPS_OFFSET) + 4)) {
-            processSetPpsOffset();
+    // check for "get pps offset" command
+    if(strcmp(cmd, CMD_GET_PPS_TRIM) == 0) {
+        processGetPpsTrim();
+        return;
+    }
+
+    // check for "set pps offset" command
+    if(strncmp(cmd, CMD_SET_PPS_TRIM, strlen(CMD_SET_PPS_TRIM)) == 0) {
+        if(len == (strlen(CMD_SET_PPS_TRIM) + 4)) {
+            processSetPpsTrim();
+            return;
+        }
+    }
+
+    // check for "get pid" command
+    if(strcmp(cmd, CMD_GET_PID) == 0) {
+        processGetPid();
+        return;
+    }
+
+    // check for "set pid" command
+    if(strncmp(cmd, CMD_SET_PID, strlen(CMD_SET_PID)) == 0) {
+        if(len == (strlen(CMD_SET_PID) + 26)) {
+            processSetPid();
             return;
         }
     }
@@ -192,39 +221,106 @@ void processRequest(uint8_t len) {
 void processGetStatus() {
     // assemble response
     char *msg = UART_getMessage();
+
     // ack request
     strcpy(msg, MSG_ACK);
     msg += strlen(MSG_ACK);
+
     // current temperature
     *(msg++) = ' ';
     toHex16(msg, curTempC);
     msg += 4;
+
     // temperature compensation offset
     *(msg++) = ' ';
     toHex32(msg, tempComp);
     msg += 8;
+
     // gps pid compensation offset
     *(msg++) = ' ';
     toHex32(msg, pidComp);
     msg += 8;
+
     // average PPS offset error
     *(msg++) = ' ';
     toHex32(msg, accAvgError >> 16u);
     msg += 8;
+
     // RMS PPS offset error
     *(msg++) = ' ';
     toHex32(msg, sqrt64(accRmsError) >> 8u);
     msg += 8;
+
     // send response
     msg[0] = 0;
     UART_send();
 }
 
-void processSetPpsOffset() {
+void processGetPpsTrim() {
+    // assemble response
+    char *msg = UART_getMessage();
+
+    // ack request
+    strcpy(msg, MSG_ACK);
+    msg += strlen(MSG_ACK);
+
+    // current pps trim
+    *(msg++) = ' ';
+    toHex16(msg, sysConf.pps.trim);
+    msg += 4;
+
+    // send response
+    msg[0] = 0;
+    UART_send();
+}
+
+void processSetPpsTrim() {
     // locate pps offset in hex
-    const char *data = UART_getMessage() + strlen(CMD_SET_PPS_OFFSET);
-    // parse pps offset
-    sysConf.ppsOffset = fromHex16(data);
+    const char *data = UART_getMessage() + strlen(CMD_SET_PPS_TRIM);
+    // parse pps trim
+    sysConf.pps.trim = fromHex16(data);
+    // acknowledge request
+    strcpy(UART_getMessage(), MSG_ACK);
+    UART_send();
+}
+
+void processGetPid() {
+    // assemble response
+    char *msg = UART_getMessage();
+
+    // ack request
+    strcpy(msg, MSG_ACK);
+    msg += strlen(MSG_ACK);
+
+    // current pid coefficient P
+    *(msg++) = ' ';
+    toHex32(msg, sysConf.pid.P);
+    msg += 8;
+
+    // current pid coefficient I
+    *(msg++) = ' ';
+    toHex32(msg, sysConf.pid.I);
+    msg += 8;
+
+    // current pid coefficient D
+    *(msg++) = ' ';
+    toHex32(msg, sysConf.pid.D);
+    msg += 8;
+
+    // send response
+    msg[0] = 0;
+    UART_send();
+}
+
+void processSetPid() {
+    // locate pps offset in hex
+    const char *data = UART_getMessage() + strlen(CMD_SET_PID);
+    // parse PID coefficients
+    PID_setCoeff(
+        fromHex32(data +  0),
+        fromHex32(data +  9),
+        fromHex32(data + 18)
+    );
     // acknowledge request
     strcpy(UART_getMessage(), MSG_ACK);
     UART_send();

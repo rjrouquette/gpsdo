@@ -10,9 +10,13 @@ System Configuration
 
 struct SysConf {
     // PID loop coefficients
-    int32_t pidDeriv, pidProp, pidInteg;
+    struct {
+        int32_t P, I, D;
+    } pid;
     // PPS offset trimming
-    int16_t ppsOffset;
+    struct {
+        int16_t trim;
+    } pps;
 };
 
 // global system configuration
