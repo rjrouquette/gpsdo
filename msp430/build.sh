@@ -20,6 +20,7 @@ mv -v ./gpsdo ../dist
 
 cd ..
 rm -rf build
+msp430-elf-objcopy -vO ihex dist/gpsdo dist/gpsdo.hex
 
 echo "Build Successful"
 exit 0

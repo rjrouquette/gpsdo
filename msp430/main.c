@@ -42,8 +42,10 @@ int main() {
     // init code modules
     EERAM_init();
     SysConf_load();
+    GPS_reset();
     PPS_init();
     PID_init();
+    UART_init();
 
     // pet watchdog
     WDTCTL |= WDTPW | WDTCNTCL;

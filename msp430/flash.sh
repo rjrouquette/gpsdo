@@ -6,4 +6,5 @@
 # flash utility
 MSPFlasher=/opt/ti/MSPFlasher_1.3.20/MSP430Flasher
 
-${MSPFlasher} -i TIUSB
+# flash device
+${MSPFlasher} -i TIUSB -n MSP430F5171 -w dist/gpsdo.hex -e ERASE_ALL
