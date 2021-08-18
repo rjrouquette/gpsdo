@@ -87,8 +87,9 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     // require at least 64 samples before performing OLS fit
     if(currBin.norm < 0x200000u) return D >> 8;
 
-    // load XX cells
+    // load XX cell
     const int32_t A = getCell(XX); // 0.32
+    // load X1 cell
     union {
         int16_t word[2];
         int32_t full;

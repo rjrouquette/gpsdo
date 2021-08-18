@@ -5,7 +5,7 @@ Redesign of the [Radio Astronomy Master Clock](https://github.com/rjrouquette/ra
 - GPSDO
     - MSP430F5171
         - 16-bit high-resolution timer
-            - internall PLL provides 8x base clock (200 MHz)
+            - internal PLL provides 8x base clock (200 MHz)
             - provides 5 ns resolution for offset measurement
         - PPS generation
         - GPS PPS capture
