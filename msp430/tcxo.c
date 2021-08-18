@@ -83,42 +83,47 @@ int32_t TCXO_getCompensation(int16_t tempC) {
     if(currBin.norm == 0) return TCXO_ERR;
 
     // load Y1 cell (average offset)
-    const int32_t D = getCell(Y1); // 32.0
+    const int32_t D = getCell(Y1); // 24.8
     // require at least 64 samples before performing OLS fit
-    if(currBin.norm < 0x200000u) return D;
+    if(currBin.norm < 0x200000u) return D >> 8;
 
     // load XX cells
     const int32_t A = getCell(XX); // 0.32
-    const int32_t B = getCell(X1); // 16.16
-    // compute determinant
-    const int32_t Z = A - mult16s16s(B, B);
+    union {
+        int16_t word[2];
+        int32_t full;
+    } B;
+    B.word[1] = getCell(X1); // 0.16
+    B.word[0] = 0;
+    // compute determinant (0.32)
+    const int32_t Z = A - mult16s16s(B.word[1], B.word[1]);
     // must satisfy E(x^2) > E(x)^2
-    if(Z <= 0) return D;
+    if(Z <= 0) return D >> 8;
 
     // load YX cell
-    const int32_t C = getCell(YX); // 24.8
-    // C is not left shifted here because HW multipier only supports 32-bit operands
+    union {
+        int32_t word[2];
+        int64_t full;
+    } C;
+    C.word[1] = getCell(YX); // 24.8;
+    C.word[0] = 0;
 
-    // compute m
+    // compute m (24.8)
     const int32_t m = div64s32u(
-        // C is multiplied by 256 to correct alignment (equivalent to left shift of 8)
-        (mult32s32s(C, 256) - mult32s32s(B, D)) << 24u,
-        // divide by determinant of XX
+        C.full - mult32s32s(B.full, D),
         Z
     );
 
-    // compute b
+    // compute b (24.8)
     const int32_t b = div64s32u(
-        // B * C is left shifted by 8 to correct alignment
-        mult32s32s(A, D) - (mult32s32s(B, C) << 8u),
-        // divide by determinant of XX
+        mult32s32s(A, D) - mult32s32s(B.full, C.word[1]),
         Z
     );
 
     // get fractional part of temperature
     const int16_t x = getFracTemp(tempC);
     // apply coefficients
-    return (mult32s32s(m, x) >> 16u) + b;
+    return (mult32s32s(m, x) + mult32s32s(b, 256)) >> 16;
 }
 
 /**
@@ -130,13 +135,13 @@ void TCXO_updateCompensation(int16_t tempC, int32_t offset) {
     if(loadBin(tempC)) return;
 
     // get fractional part of temperature
-    const int16_t x = getFracTemp(tempC);
+    const int16_t x = getFracTemp(tempC) << 8;
     // update accumulators
     increment();
-    accumulate(XX, mult16s16s(x, x) << 16u);
-    accumulate(X1, x << 8u);
+    accumulate(XX, mult16s16s(x, x));
+    accumulate(X1, x);
     accumulate(YX, mult24s8s(offset, x));
-    accumulate(Y1, offset);
+    accumulate(Y1, offset << 8);
 
     // save results to EERAM
     uint16_t addr = currBinIdx;

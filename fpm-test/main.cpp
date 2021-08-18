@@ -115,7 +115,7 @@ struct FixedMath {
         accumulate(m[0], (fpart * fpart) << 16);
         accumulate(m[1], fpart << 8);
         accumulate(m[2], ippm * fpart);
-        accumulate(m[3], ippm);
+        accumulate(m[3], ippm << 8);
         increment(norm[tidx]);
         ++count[tidx];
     }
@@ -130,13 +130,13 @@ struct FixedMath {
         if(norm[tidx] == 0) return false;
 
         int64_t A = getCell(tidx, 0); // 0.32
-        int64_t B = getCell(tidx, 1); // 16.16
+        int64_t B = getCell(tidx, 1); // 0.16
         int64_t C = getCell(tidx, 2); // 24.8
-        int64_t D = getCell(tidx, 3); // 32.0
+        int64_t D = getCell(tidx, 3); // 24.8
         // adjust alignment
-        C <<= 8; // 24.16
+        C <<= 16; // 24.24
 
-        int32_t Z = A - (B * B);
+        int32_t Z = A - (B * B); // 0.32
         if(
             Z <= 0 ||               // bad data
             norm[tidx] < 0x200000u  // 64 samples
@@ -144,8 +144,8 @@ struct FixedMath {
             m = 0;
             b = D;
         } else {
-            m = div64s32u(((C * 1) - (B * D)) << 24, Z);
-            b = div64s32u((A * D) - (B * C), Z);
+            m = div64s32u(((C * 1) - (B * D)) << 16, Z);
+            b = div64s32u(((A * D) - (B * C)), Z);
         }
         return true;
     }
@@ -251,8 +251,8 @@ int main(int argc, char **argv) {
         int32_t im, ib;
         if(fixedMath.coeff(s.temp, im, ib)) {
             int8_t it = (int) s.temp;
-            int32_t ix = floorf((s.temp - it) * 256.0f) - 128;
-            auto iy = ((im * ix) >> 16) + ib;
+            int32_t ix = (int)((s.temp - it) * 256) - 128;
+            auto iy = (((int64_t)im * ix) + ((int64_t)ib << 8)) >> 16;
             double id = (iy * IPPM_PREC) - s.ppm;
             if(std::isfinite(id)) {
                 biasI += id;
@@ -312,12 +312,12 @@ int main(int argc, char **argv) {
         cout << setw(12) << fixedMath.getCell(i, 0) / 65536.0f / 65536.0f;
         cout << setw(12) << fixedMath.getCell(i, 1) / 65536.0f;
         cout << setw(12) << fixedMath.getCell(i, 2) * IPPM_PREC / 256.0f;
-        cout << setw(12) << fixedMath.getCell(i, 3) * IPPM_PREC;
+        cout << setw(12) << fixedMath.getCell(i, 3) * IPPM_PREC / 256.0f;
 
         int32_t m, b;
         fixedMath.coeff(i, m, b);
-        cout << setw(12) << (m * IPPM_PREC / 256.0f);
-        cout << setw(12) << (b * IPPM_PREC);
+        cout << setw(12) << (m * IPPM_PREC) / 256.0f;
+        cout << setw(12) << (b * IPPM_PREC) / 256.0f;
         cout << endl;
     }
     cout << endl;
