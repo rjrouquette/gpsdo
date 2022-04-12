@@ -2,6 +2,10 @@
 build/
 dist/
 
+# Jetbrains
+.idea/
+cmake-build-*/
+
 # VSCode
 .vscode/
 

@@ -12,6 +12,7 @@
 #include <string>
 #include <unistd.h>
 
+#define BINS (64)
 #define IPPM_PREC (0.0001164f)
 
 using namespace std;
@@ -39,20 +40,14 @@ struct Sample {
 };
 
 // A = A + ((B - A) / 2^16)
-static void increment(uint32_t &acc) {
-    acc -= acc >> 16u;
-    acc += 1u << 15u;
-}
-
-// A = A + ((B - A) / 2^16)
 static void accumulate(int64_t &acc, const int64_t value) {
-    acc -= acc >> 16u;
-    acc += value << 15u;
+    acc -= acc >> 8u;
+    acc += value << 24u;
 }
 
 // A = A + ((B - A) / 2^16)
-static void accumulate( double &acc, const double value) {
-    acc += (value - acc) / 65536.0;
+static void accumulate(float &acc, const float value) {
+    acc += (value - acc) / 256.0f;
 }
 
 union u32 {
@@ -96,9 +91,9 @@ int32_t div64s32u(int64_t rem, uint32_t div) {
 }
 
 struct FixedMath {
-    uint64_t count[256];
-    uint32_t norm[256];
-    int64_t mat[256][4];
+    uint64_t count[BINS];
+    int64_t mat[BINS][5];
+    uint8_t prev = 0;
 
     FixedMath() : count{}, mat{} {
         bzero(count, sizeof(count));
@@ -108,7 +103,7 @@ struct FixedMath {
     void update(const Sample &s) {
         int8_t ipart = (int) s.temp;
         int32_t fpart = floorf((s.temp - ipart) * 256.0f) - 128;
-        uint8_t tidx = ipart;
+        uint8_t tidx = ipart & (BINS-1);
         int32_t ippm = floorf(s.ppm / IPPM_PREC);
 
         auto &m = mat[tidx];
@@ -116,18 +111,21 @@ struct FixedMath {
         accumulate(m[1], fpart << 8);
         accumulate(m[2], ippm * fpart);
         accumulate(m[3], ippm << 8);
-        increment(norm[tidx]);
+        accumulate(m[4], 1);
         ++count[tidx];
     }
 
     int32_t getCell(uint8_t tidx, uint8_t cidx) {
-        return div64s32u(mat[tidx][cidx], norm[tidx]);
+        if(mat[tidx][4] < (1l << 32))
+            return div64s32u(mat[tidx][cidx], mat[tidx][4]);
+        else
+            return mat[tidx][cidx] >> 32;
     }
 
     bool coeff(const float temp, int32_t &m, int32_t &b) {
         int8_t ipart = (int) temp;
-        uint8_t tidx = ipart;
-        if(norm[tidx] == 0) return false;
+        uint8_t tidx = ipart & (BINS-1);
+        if(mat[tidx][4] == 0) return false;
 
         int64_t A = getCell(tidx, 0); // 0.32
         int64_t B = getCell(tidx, 1); // 0.16
@@ -137,10 +135,7 @@ struct FixedMath {
         C <<= 16; // 24.24
 
         int32_t Z = A - (B * B); // 0.32
-        if(
-            Z <= 0 ||               // bad data
-            norm[tidx] < 0x200000u  // 64 samples
-        ) {
+        if(Z <= 0 || count[tidx] < 64) {
             m = 0;
             b = D;
         } else {
@@ -152,9 +147,9 @@ struct FixedMath {
 } fixedMath;
 
 struct FloatMath {
-    uint64_t count[256];
-    double norm[256];
-    double mat[256][4];
+    uint64_t count[BINS];
+    float mat[BINS][5];
+    uint8_t prev = 0;
 
     FloatMath() : count{}, mat{} {
         bzero(count, sizeof(count));
@@ -163,35 +158,41 @@ struct FloatMath {
 
     void update(const Sample &s) {
         int8_t ipart = (int) s.temp;
-        double fpart  = (s.temp - ipart) - 0.5;
-        uint8_t tidx = ipart;
+        float fpart  = (s.temp - ipart) - 0.5f;
+        uint8_t tidx = ipart & (BINS-1);
 
         auto &m = mat[tidx];
+        // if(tidx != prev) {
+        //     if(m[4] == 0)
+        //         memcpy(m, mat[prev], sizeof(float) * 5);
+        // }
         accumulate(m[0], fpart * fpart);
         accumulate(m[1], fpart);
         accumulate(m[2], fpart * s.ppm);
         accumulate(m[3], s.ppm);
+        accumulate(m[4], 1.0);
 
-        accumulate(norm[tidx], 1.0);
         ++count[tidx];
+        prev = tidx;
     }
 
-    bool coeff(const float temp, double &m, double &b) {
-        uint8_t tidx = (uint8_t) ((int) temp);
-        if(norm[tidx] == 0) return false;
+    bool coeff(const float temp, float &m, float &b) {
+        uint8_t tidx = (uint8_t) ((int) temp) & (BINS-1);
 
         auto &mt = mat[tidx];
-        double A = mt[0] / norm[tidx];
-        double B = mt[1] / norm[tidx];
-        double C = mt[2] / norm[tidx];
-        double D = mt[3] / norm[tidx];
+        if(mt[4] == 0) return false;
+        float A = mt[0];
+        float B = mt[1];
+        float C = mt[2];
+        float D = mt[3];
+        float N = mt[4];
 
-        const double Z = A - (B * B);
+        const float Z = (A * N) - (B * B);
         if(Z <= 0 || count[tidx] < 64) {
             m = 0;
-            b = D;
+            b = D / N;
         } else {
-            m = ((C * 1) - (B * D)) / Z;
+            m = ((C * N) - (B * D)) / Z;
             b = ((A * D) - (B * C)) / Z;
         }
         return true;
@@ -230,6 +231,7 @@ int main(int argc, char **argv) {
         parser >> row.temp;
         parser >> row.ppm;
         parser >> row.error;
+        row.temp *= 1.0f;
         if(row.isValid())
             data.emplace_back(row);
         
@@ -240,9 +242,9 @@ int main(int argc, char **argv) {
     cout << "loaded " << data.size() << " data samples" << endl;
     cout << endl;
 
-    double biasI = 0, biasF = 0;
-    double maxI = 0, maxF = 0;
-    double rmseI = 0, rmseF = 0;
+    float biasI = 0, biasF = 0;
+    float maxI = 0, maxF = 0;
+    float rmseI = 0, rmseF = 0;
     size_t cntI = 0, cntF = 0;
     size_t errI = 0, errF = 0;
     for(auto s : data) {
@@ -253,7 +255,7 @@ int main(int argc, char **argv) {
             int8_t it = (int) s.temp;
             int32_t ix = (int)((s.temp - it) * 256) - 128;
             auto iy = (((int64_t)im * ix) + ((int64_t)ib << 8)) >> 16;
-            double id = (iy * IPPM_PREC) - s.ppm;
+            float id = (iy * IPPM_PREC) - s.ppm;
             if(std::isfinite(id)) {
                 biasI += id;
                 rmseI += id * id;
@@ -267,9 +269,9 @@ int main(int argc, char **argv) {
         }
         fixedMath.update(s);
 
-        double fm, fb;
+        float fm, fb;
         if(floatMath.coeff(s.temp, fm, fb)) {
-            auto fx = (s.temp - ((int)s.temp)) - 0.5;
+            auto fx = (s.temp - ((int)s.temp)) - 0.5f;
             auto fy = (fm * fx) + fb;
             auto fd = fy - s.ppm;
             if(std::isfinite(fd)) {
@@ -303,12 +305,11 @@ int main(int argc, char **argv) {
     cout << setw(12) << "b";
     cout << endl;
 
-    for(int i = 0; i < 256; i++) {
+    for(int i = 0; i < BINS; i++) {
         if(fixedMath.count[i] == 0) continue;
         cout << setw(3) << i << ": ";
         cout << setw(8) << fixedMath.count[i];
-        const auto &mt = fixedMath.mat[i];
-        cout << setw(12) << fixedMath.norm[i] / 65536.0f / 32768.0f;
+        cout << setw(12) << fixedMath.mat[i][4] / 65536.0f / 65536.0f;
         cout << setw(12) << fixedMath.getCell(i, 0) / 65536.0f / 65536.0f;
         cout << setw(12) << fixedMath.getCell(i, 1) / 65536.0f;
         cout << setw(12) << fixedMath.getCell(i, 2) * IPPM_PREC / 256.0f;
@@ -334,20 +335,25 @@ int main(int argc, char **argv) {
     cout << setw(12) << "b";
     cout << endl;
 
-    for(int i = 0; i < 256; i++) {
+    for(int i = 0; i < BINS; i++) {
         if(fixedMath.count[i] == 0) continue;
         cout << setw(3) << i << ": ";
         cout << setw(8) << floatMath.count[i];
-        cout << setw(12) << floatMath.norm[i];
-        for(auto m : floatMath.mat[i])
-            cout << setw(12) << (m / floatMath.norm[i]);
-        double m, b;
+        cout << setw(12) << floatMath.mat[i][4];
+        for(int j = 0; j < 4; j++)
+            cout << setw(12) << (floatMath.mat[i][j] / floatMath.mat[i][4]);
+        float m, b;
         floatMath.coeff(i, m, b);
         cout << setw(12) << m;
         cout << setw(12) << b;
         cout << endl;
     }
     cout << endl;
+
+    float z = 0;
+    for(int i = 0; i < 256; i++)
+        z += (1 - z) / 2048.0f;
+    cout << z << endl;
 
     return 0;
 }
