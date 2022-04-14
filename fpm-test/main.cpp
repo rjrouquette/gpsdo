@@ -93,7 +93,6 @@ int32_t div64s32u(int64_t rem, uint32_t div) {
 struct FixedMath {
     uint64_t count[BINS];
     int64_t mat[BINS][5];
-    uint8_t prev = 0;
 
     FixedMath() : count{}, mat{} {
         bzero(count, sizeof(count));
@@ -149,7 +148,6 @@ struct FixedMath {
 struct FloatMath {
     uint64_t count[BINS];
     float mat[BINS][5];
-    uint8_t prev = 0;
 
     FloatMath() : count{}, mat{} {
         bzero(count, sizeof(count));
@@ -162,10 +160,6 @@ struct FloatMath {
         uint8_t tidx = ipart & (BINS-1);
 
         auto &m = mat[tidx];
-        // if(tidx != prev) {
-        //     if(m[4] == 0)
-        //         memcpy(m, mat[prev], sizeof(float) * 5);
-        // }
         accumulate(m[0], fpart * fpart);
         accumulate(m[1], fpart);
         accumulate(m[2], fpart * s.ppm);
@@ -173,7 +167,6 @@ struct FloatMath {
         accumulate(m[4], 1.0);
 
         ++count[tidx];
-        prev = tidx;
     }
 
     bool coeff(const float temp, float &m, float &b) {
