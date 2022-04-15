@@ -5,11 +5,13 @@
  */
 
 #include "hw/gpio.h"
+#include "lib/clk.h"
 #include "lib/delay.h"
-#include "lib/epaper.h"
+#include "lib/epd.h"
 
 int main(void) {
-    EPAPER_init();
+    CLK_init();
+    EPD_init();
 
     RCGCGPIO.EN_PORTN = 1;
     delay_cycles_4();

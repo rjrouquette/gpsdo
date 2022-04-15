@@ -25,7 +25,7 @@ inline void delay_cycles_4(void) {
 }
 
 __attribute__((always_inline))
-inline void delay_loop(uint32_t cnt) { while(cnt) --cnt; }
+inline void delay_loop(volatile uint32_t cnt) { while(cnt) --cnt; }
 
 
 #endif //GPSDO_DELAY_H

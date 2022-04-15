@@ -13,7 +13,7 @@ extern int _etext;
 // .data, copied into RAM on boot
 extern int _data;
 extern int _edata;
-// .bss, unitialized variables
+// .bss, uninitialized variables
 extern int _bss;
 extern int _ebss;
 

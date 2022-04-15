@@ -36,51 +36,51 @@ struct QSSI_MAP {
     union {
         struct {
             enum SSI_DSS_e DSS: 4;
-            uint32_t FRF: 2;
-            uint32_t SPO: 1;
-            uint32_t SPH: 1;
-            uint32_t SCR: 8;
-            uint32_t DIR: 1;
+            unsigned FRF: 2;
+            unsigned SPO: 1;
+            unsigned SPH: 1;
+            unsigned SCR: 8;
+            unsigned DIR: 1;
         };
         uint32_t raw;
     } CR0;              // QSSI Control 0
 
     union {
         struct {
-            uint32_t LBM: 1;
-            uint32_t SSE: 1;
-            uint32_t MS: 1;
-            uint32_t _reserved: 3;
-            uint32_t MODE: 2;
-            uint32_t DIR: 1;
-            uint32_t HSCLKEN: 1;
-            uint32_t FSSHLDFRM: 1;
-            uint32_t EOM: 1;
+            unsigned LBM: 1;
+            unsigned SSE: 1;
+            unsigned MS: 1;
+            unsigned _reserved: 3;
+            unsigned MODE: 2;
+            unsigned DIR: 1;
+            unsigned HSCLKEN: 1;
+            unsigned FSSHLDFRM: 1;
+            unsigned EOM: 1;
         };
         uint32_t raw;
     } CR1;              // QSSI Control 1
 
     union {
         struct {
-            uint32_t DATA: 16;
+            unsigned DATA: 16;
         };
         uint32_t raw;
     } DR;               // QSSI Data
 
     union {
         struct {
-            uint32_t TFE: 1;
-            uint32_t TNF: 1;
-            uint32_t RNE: 1;
-            uint32_t RFF: 1;
-            uint32_t BSY: 1;
+            unsigned TFE: 1;
+            unsigned TNF: 1;
+            unsigned RNE: 1;
+            unsigned RFF: 1;
+            unsigned BSY: 1;
         };
         uint32_t raw;
     } SR;               // QSSI Status
 
     union {
         struct {
-            uint32_t CPSDVSR: 8;
+            unsigned CPSDVSR: 8;
         };
         uint32_t raw;
     } CPSR;             // QSSI Clock Prescale
