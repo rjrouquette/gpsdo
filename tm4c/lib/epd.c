@@ -6,6 +6,7 @@
 
 #include "../hw/ssi.h"
 #include "../lib/delay.h"
+#include "../lib/led.h"
 #include "epd.h"
 
 // Display resolution
@@ -67,6 +68,7 @@ int EPD_height() { return EPD_HEIGHT; }
 
 void EPD_init() {
     initSSI();
+    LED0_ON();
     initEPD();
 }
 
@@ -94,12 +96,16 @@ static void initSSI() {
     // configure SSI3
     SSI3.CR1.raw = 0;
     SSI3.CR0.raw = 0;
+    // hold CS line for entire transmission
+    SSI3.CR1.FSSHLDFRM = 1;
     // 8-bit data
     SSI3.CR0.DSS = SSI_DSS_8_BIT;
     // 8x prescaler
     SSI3.CPSR.CPSDVSR = 8;
     // use system clock
     SSI3.CC.CS = SSI_CLK_SYS;
+    // enable SSI
+    SSI3.CR1.SSE = 1;
 
     // configure extra control lines
     PORTK.LOCK = GPIO_LOCK_KEY;
@@ -206,10 +212,13 @@ static void SendCommand(uint8_t byte) {
     PORTK.DATA[0x01] = 0x00;
     // wait for room in FIFO
     while(!SSI3.SR.TNF);
+    LED0_OFF();
     // transmit data
     SSI3.DR.DATA = byte;
+    LED1_ON();
     // wait for transmission to complete
     while(SSI3.SR.BSY);
+    LED1_OFF();
 }
 
 static void SendByte(uint8_t byte) {

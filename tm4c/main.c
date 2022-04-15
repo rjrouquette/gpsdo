@@ -4,30 +4,19 @@
  * @date 2022-04-13
  */
 
-#include "hw/gpio.h"
 #include "lib/clk.h"
 #include "lib/delay.h"
 #include "lib/epd.h"
+#include "lib/led.h"
 
 int main(void) {
+    LED_init();
     CLK_init();
     EPD_init();
 
-    RCGCGPIO.EN_PORTN = 1;
-    delay_cycles_4();
-
-    PORTN.LOCK = GPIO_LOCK_KEY;
-    PORTN.CR = 0x01u;
-    PORTN.AMSEL = 0;
-    PORTN.PCTL = 0;
-    PORTN.AFSEL = 0;
-    PORTN.DR8R = 0x01u;
-    PORTN.DIR = 0x01u;
-    PORTN.DEN = 0x01u;
-    PORTN.DATA[0x01u] = 0x01u;
     for(;;) {
         delay_ms(500);
-        PORTN.DATA[0x01u] ^= 0x01u;
+        LED1_TGL();
     }
 }
 
