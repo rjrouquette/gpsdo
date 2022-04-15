@@ -18,8 +18,9 @@ add_executable(
 
         main.c
         hw/interrupts.c
-        lib/epd.c
         lib/clk.c
+        lib/delay.c
+        lib/epd.c
 )
 
 # split out debug symbols

@@ -21,7 +21,7 @@ void CLK_init() {
     RSCLKCFG.PLLSRC = 0x3;
 
     // Configure PLL
-    PLLFREQ1.N = 1;
+    PLLFREQ1.N = 0;
     PLLFREQ1.Q = 0;
     PLLFREQ0.MINT = 15;
     PLLFREQ0.MFRAC = 0;
@@ -43,7 +43,7 @@ void CLK_init() {
     RSCLKCFG.USEPLL = 1;
 
     // Configure SysTick Timer
-    STRELOAD.RELOAD = 0x00FFFFFFu;
+    STRELOAD.RELOAD = -1u;
     STCTRL.CLK_SRC = 1;
     STCTRL.INTEN = 0;
     STCTRL.ENABLE = 1;

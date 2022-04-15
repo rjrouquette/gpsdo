@@ -26,7 +26,7 @@ int main(void) {
     PORTN.DEN = 0x01u;
     PORTN.DATA[0x01u] = 0x01u;
     for(;;) {
-        delay_loop(1u << 20u);
+        delay_ms(500);
         PORTN.DATA[0x01u] ^= 0x01u;
     }
 }
