@@ -100,11 +100,6 @@ void ISR_PWM0Generator1(void);
 void ISR_PWM0Generator2(void);
 void ISR_PWM0Generator3(void);
 void ISR_PWM0Fault(void);
-void ISR_PWM1Generator0(void);
-void ISR_PWM1Generator1(void);
-void ISR_PWM1Generator2(void);
-void ISR_PWM1Generator3(void);
-void ISR_PWM1Fault(void);
 // Quadrature Encoder Interrupt
 void ISR_QEI0(void);
 // Analog Comparator Interrupts
@@ -137,19 +132,5 @@ void ISR_Timer6A(void);
 void ISR_Timer6B(void);
 void ISR_Timer7A(void);
 void ISR_Timer7B(void);
-// Wide Timer Interrupts
-void ISR_WideTimer0A(void);
-void ISR_WideTimer0B(void);
-void ISR_WideTimer1A(void);
-void ISR_WideTimer1B(void);
-void ISR_WideTimer2A(void);
-void ISR_WideTimer2B(void);
-void ISR_WideTimer3A(void);
-void ISR_WideTimer3B(void);
-void ISR_WideTimer4A(void);
-void ISR_WideTimer4B(void);
-void ISR_WideTimer5A(void);
-void ISR_WideTimer5B(void);
-
 
 #endif //TM4C_INTERRUPTS_H
