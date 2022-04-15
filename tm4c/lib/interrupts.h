@@ -23,7 +23,6 @@ void ISR_FlashCtrl(void);
 void ISR_FloatingPointException();
 void ISR_Hibernation(void);
 void ISR_SystemCtrl(void);
-void ISR_SystemException(void);
 void ISR_Tamper(void);
 void ISR_WatchDogTimer(void);
 void ISR_UDMASoftware(void);

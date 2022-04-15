@@ -204,7 +204,6 @@ void ISR_FlashCtrl(void) ISR_DEFAULT;
 void ISR_FloatingPointException() ISR_DEFAULT;
 void ISR_Hibernation(void) ISR_DEFAULT;
 void ISR_SystemCtrl(void) ISR_DEFAULT;
-void ISR_SystemException(void) ISR_DEFAULT;
 void ISR_Tamper(void) ISR_DEFAULT;
 void ISR_WatchDogTimer(void) ISR_DEFAULT;
 void ISR_UDMASoftware(void) ISR_DEFAULT;
