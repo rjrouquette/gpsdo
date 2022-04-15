@@ -1,6 +1,6 @@
 
-#include "lib/gpio.h"
-#include "lib/sys.h"
+#include "hw/gpio.h"
+#include "hw/sys.h"
 
 void delay() {
     volatile int delay = 1u<<20u;

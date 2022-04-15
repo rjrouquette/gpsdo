@@ -2,8 +2,8 @@
 // Created by robert on 4/14/22.
 //
 
-#ifndef GPSDO_SYS_H
-#define GPSDO_SYS_H
+#ifndef TM4C_SYS_H
+#define TM4C_SYS_H
 
 #include <stdint.h>
 
@@ -30,4 +30,4 @@ typedef union {
 
 #define RCGCGPIO (*(RCGCGPIO_t*)0x400FE608)
 
-#endif //GPSDO_SYS_H
+#endif //TM4C_SYS_H

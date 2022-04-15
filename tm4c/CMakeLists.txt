@@ -17,7 +17,7 @@ add_executable(
         gpsdo
 
         main.c
-        lib/interrupts.c
+        hw/interrupts.c
 )
 
 # split out debug symbols
