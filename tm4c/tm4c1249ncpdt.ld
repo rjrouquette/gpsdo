@@ -8,7 +8,7 @@ MEMORY
 
 SECTIONS
 {
-    PROVIDE( _stack_ptr = ORIGIN(RAM) + LENGTH(RAM));
+    PROVIDE( _stack_ptr = ORIGIN(SRAM) + LENGTH(SRAM));
 
     .text :
     {

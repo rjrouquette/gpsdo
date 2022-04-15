@@ -181,7 +181,7 @@ void ISR_Reset(void) {
 
 // Default ISR does nothing
 void ISR_Default(void) {
-    asm("nop");
+    __asm volatile("mov r0, r0");
 }
 
 #define ISR_DEFAULT __attribute__((weak, alias("ISR_Default")))
