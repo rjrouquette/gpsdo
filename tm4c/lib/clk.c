@@ -41,4 +41,10 @@ void CLK_init() {
     // Switch to PLL
     RSCLKCFG.PSYSDIV = 2;
     RSCLKCFG.USEPLL = 1;
+
+    // Configure SysTick Timer
+    STRELOAD.RELOAD = 0x00FFFFFFu;
+    STCTRL.CLK_SRC = 1;
+    STCTRL.INTEN = 0;
+    STCTRL.ENABLE = 1;
 }

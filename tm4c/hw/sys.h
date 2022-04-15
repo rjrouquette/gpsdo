@@ -9,6 +9,34 @@
 
 #include <stdint.h>
 
+union STCTRL_MAP{
+    struct {
+        unsigned ENABLE: 1;
+        unsigned INTEN: 1;
+        unsigned CLK_SRC: 1;
+        unsigned _reserved: 13;
+        unsigned COUNT: 1;
+    };
+    uint32_t raw;
+};
+#define STCTRL (*(volatile union STCTRL_MAP *)0xE000E010)
+
+union STRELOAD_MAP{
+    struct {
+        unsigned RELOAD: 24;
+    };
+    uint32_t raw;
+};
+#define STRELOAD (*(volatile union STRELOAD_MAP *)0xE000E014)
+
+union STCURRENT_MAP{
+    struct {
+        unsigned CURRENT: 24;
+    };
+    uint32_t raw;
+};
+#define STCURRENT (*(volatile union STCURRENT_MAP *)0xE000E018)
+
 union RIS_MAP{
     struct {
         unsigned _reserved_0: 1;
