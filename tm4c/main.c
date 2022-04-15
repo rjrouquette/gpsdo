@@ -1,5 +1,6 @@
 
 #include "lib/gpio.h"
+#include "lib/sys.h"
 
 void delay() {
     volatile int delay = 1u<<20u;
@@ -8,24 +9,24 @@ void delay() {
 }
 
 int main(void) {
-    *(uint32_t*)(0x400FE608) |= (1u << 12u);
+    RCGCGPIO.EN_PORTN = 1;
     __asm volatile("nop");
     __asm volatile("nop");
     __asm volatile("nop");
     __asm volatile("nop");
 
-    GPION.LOCK = 0x4C4F434B;
-    GPION.CR = 0x01u;
-    GPION.AMSEL = 0;
-    GPION.PCTL = 0;
-    GPION.AFSEL = 0;
-    GPION.DR8R = 0x01u;
-    GPION.DIR = 0x01u;
-    GPION.DEN = 0x01u;
-    GPION.DATA[0x01u] = 0x01u;
+    PORTN.LOCK = 0x4C4F434B;
+    PORTN.CR = 0x01u;
+    PORTN.AMSEL = 0;
+    PORTN.PCTL = 0;
+    PORTN.AFSEL = 0;
+    PORTN.DR8R = 0x01u;
+    PORTN.DIR = 0x01u;
+    PORTN.DEN = 0x01u;
+    PORTN.DATA[0x01u] = 0x01u;
     for(;;) {
         delay();
-        GPION.DATA[0x01u] ^= 0x01u;
+        PORTN.DATA[0x01u] ^= 0x01u;
     }
 }
 

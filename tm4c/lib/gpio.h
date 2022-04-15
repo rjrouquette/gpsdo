@@ -43,21 +43,21 @@ typedef struct {
     uint32_t WAKESTAT;  // GPIO Wake Status
 } GPIO_t;
 
-#define GPIOA   (*(volatile GPIO_t *) 0x40058000)
-#define GPIOB   (*(volatile GPIO_t *) 0x40059000)
-#define GPIOC   (*(volatile GPIO_t *) 0x4005A000)
-#define GPIOD   (*(volatile GPIO_t *) 0x4005B000)
-#define GPIOE   (*(volatile GPIO_t *) 0x4005C000)
-#define GPIOF   (*(volatile GPIO_t *) 0x4005D000)
-#define GPIOG   (*(volatile GPIO_t *) 0x4005E000)
-#define GPIOH   (*(volatile GPIO_t *) 0x4005F000)
-#define GPIOJ   (*(volatile GPIO_t *) 0x40060000)
-#define GPIOK   (*(volatile GPIO_t *) 0x40061000)
-#define GPIOL   (*(volatile GPIO_t *) 0x40062000)
-#define GPIOM   (*(volatile GPIO_t *) 0x40063000)
-#define GPION   (*(volatile GPIO_t *) 0x40064000)
-#define GPIOP   (*(volatile GPIO_t *) 0x40065000)
-#define GPIOQ   (*(volatile GPIO_t *) 0x40066000)
+#define PORTA   (*(volatile GPIO_t *) 0x40058000)
+#define PORTB   (*(volatile GPIO_t *) 0x40059000)
+#define PORTC   (*(volatile GPIO_t *) 0x4005A000)
+#define PORTD   (*(volatile GPIO_t *) 0x4005B000)
+#define PORTE   (*(volatile GPIO_t *) 0x4005C000)
+#define PORTF   (*(volatile GPIO_t *) 0x4005D000)
+#define PORTG   (*(volatile GPIO_t *) 0x4005E000)
+#define PORTH   (*(volatile GPIO_t *) 0x4005F000)
+#define PORTJ   (*(volatile GPIO_t *) 0x40060000)
+#define PORTK   (*(volatile GPIO_t *) 0x40061000)
+#define PORTL   (*(volatile GPIO_t *) 0x40062000)
+#define PORTM   (*(volatile GPIO_t *) 0x40063000)
+#define PORTN   (*(volatile GPIO_t *) 0x40064000)
+#define PORTP   (*(volatile GPIO_t *) 0x40065000)
+#define PORTQ   (*(volatile GPIO_t *) 0x40066000)
 
 #endif //GPSDO_GPIO_H
  /*
