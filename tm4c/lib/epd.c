@@ -57,6 +57,10 @@ static void initSSI();
 static void initEPD();
 
 static void Reset(void);
+static void SendCommand(uint8_t byte);
+static void SendByte(uint8_t byte);
+static void SendBytes(uint32_t len, const uint8_t *bytes);
+static void WaitUntilIdle();
 
 int EPD_width() { return EPD_WIDTH; }
 int EPD_height() { return EPD_HEIGHT; }
@@ -81,9 +85,8 @@ static void initSSI() {
     PORTQ.AMSEL = 0x0fu;
     PORTQ.PCTL = 0xEEEE;
     PORTQ.AFSEL = 0x00u;
-    PORTQ.DR2R = 0x0fu;
+    PORTQ.DR8R = 0x0fu;
     PORTQ.DEN = 0x0fu;
-
     // lock GPIO config
     PORTQ.CR = 0;
     PORTQ.LOCK = 0;
@@ -93,63 +96,77 @@ static void initSSI() {
     SSI3.CR0.raw = 0;
     // 8-bit data
     SSI3.CR0.DSS = SSI_DSS_8_BIT;
-    // 2x prescaler
-    SSI3.CPSR.CPSDVSR = 2;
+    // 8x prescaler
+    SSI3.CPSR.CPSDVSR = 8;
     // use system clock
     SSI3.CC.CS = SSI_CLK_SYS;
+
+    // configure extra control lines
+    PORTK.LOCK = GPIO_LOCK_KEY;
+    PORTK.CR = 0x07u;
+    PORTK.AMSEL = 0;
+    PORTK.PCTL = 0;
+    PORTK.AFSEL = 0;
+    PORTK.DR8R = 0x07u;
+    PORTK.DIR = 0x03u;
+    PORTK.DEN = 0x07u;
+    PORTK.DATA[0x03u] = 0x02u;
+    // lock GPIO config
+    PORTK.CR = 0;
+    PORTK.LOCK = 0;
 }
 
 static void initEPD() {
     Reset();
-//    SendCommand(POWER_SETTING);
-//    SendData(0x03);                  // VDS_EN, VDG_EN
-//    SendData(0x00);                  // VCOM_HV, VGHL_LV[1], VGHL_LV[0]
-//    SendData(0x2b);                  // VDH
-//    SendData(0x2b);                  // VDL
-//    SendData(0x09);                  // VDHR
-//    SendCommand(BOOSTER_SOFT_START);
-//    SendData(0x07);
-//    SendData(0x07);
-//    SendData(0x17);
-//    // Power optimization
-//    SendCommand(0xF8);
-//    SendData(0x60);
-//    SendData(0xA5);
-//    // Power optimization
-//    SendCommand(0xF8);
-//    SendData(0x89);
-//    SendData(0xA5);
-//    // Power optimization
-//    SendCommand(0xF8);
-//    SendData(0x90);
-//    SendData(0x00);
-//    // Power optimization
-//    SendCommand(0xF8);
-//    SendData(0x93);
-//    SendData(0x2A);
-//    // Power optimization
-//    SendCommand(0xF8);
-//    SendData(0xA0);
-//    SendData(0xA5);
-//    // Power optimization
-//    SendCommand(0xF8);
-//    SendData(0xA1);
-//    SendData(0x00);
-//    // Power optimization
-//    SendCommand(0xF8);
-//    SendData(0x73);
-//    SendData(0x41);
-//    SendCommand(PARTIAL_DISPLAY_REFRESH);
-//    SendData(0x00);
-//    SendCommand(POWER_ON);
-//    WaitUntilIdle();
-//
-//    SendCommand(PANEL_SETTING);
-//    SendData(0xAF);        //KW-BF   KWR-AF    BWROTP 0f
-//    SendCommand(PLL_CONTROL);
-//    SendData(0x3A);       //3A 100HZ   29 150Hz 39 200HZ    31 171HZ
-//    SendCommand(VCM_DC_SETTING_REGISTER);
-//    SendData(0x12);
+    SendCommand(POWER_SETTING);
+    SendByte(0x03);                  // VDS_EN, VDG_EN
+    SendByte(0x00);                  // VCOM_HV, VGHL_LV[1], VGHL_LV[0]
+    SendByte(0x2b);                  // VDH
+    SendByte(0x2b);                  // VDL
+    SendByte(0x09);                  // VDHR
+    SendCommand(BOOSTER_SOFT_START);
+    SendByte(0x07);
+    SendByte(0x07);
+    SendByte(0x17);
+    // Power optimization
+    SendCommand(0xF8);
+    SendByte(0x60);
+    SendByte(0xA5);
+    // Power optimization
+    SendCommand(0xF8);
+    SendByte(0x89);
+    SendByte(0xA5);
+    // Power optimization
+    SendCommand(0xF8);
+    SendByte(0x90);
+    SendByte(0x00);
+    // Power optimization
+    SendCommand(0xF8);
+    SendByte(0x93);
+    SendByte(0x2A);
+    // Power optimization
+    SendCommand(0xF8);
+    SendByte(0xA0);
+    SendByte(0xA5);
+    // Power optimization
+    SendCommand(0xF8);
+    SendByte(0xA1);
+    SendByte(0x00);
+    // Power optimization
+    SendCommand(0xF8);
+    SendByte(0x73);
+    SendByte(0x41);
+    SendCommand(PARTIAL_DISPLAY_REFRESH);
+    SendByte(0x00);
+    SendCommand(POWER_ON);
+    WaitUntilIdle();
+
+    SendCommand(PANEL_SETTING);
+    SendByte(0xAF);        //KW-BF   KWR-AF    BWROTP 0f
+    SendCommand(PLL_CONTROL);
+    SendByte(0x3A);       //3A 100HZ   29 150Hz 39 200HZ    31 171HZ
+    SendCommand(VCM_DC_SETTING_REGISTER);
+    SendByte(0x12);
 }
 
 void EPD_clear() {
@@ -158,29 +175,61 @@ void EPD_clear() {
 }
 
 void EPD_refresh() {
-
-//    SendCommand(DATA_START_TRANSMISSION_1);
-//    //DelayMs(2);
-//    for(int i = 0; i < width * height / 8; i++) {
-//        SendData(0xFF);
-//    }
-//    //DelayMs(2);
-//    SendCommand(DATA_START_TRANSMISSION_2);
-//    //DelayMs(2);
-//    for(int i = 0; i < width * height / 8; i++) {
-//        SendData(0xFF);
-//    }
-//    // DelayMs(2);
-//    SendCommand(DISPLAY_REFRESH);
-//    //DelayMs(200);
-//    WaitUntilIdle();
+    SendCommand(DATA_START_TRANSMISSION_1);
+    delay_ms(2);
+    for(int i = 0; i < sizeof(canvas) / 2; i++) {
+        SendByte(canvas[i]);
+    }
+    delay_ms(2);
+    SendCommand(DATA_START_TRANSMISSION_2);
+    delay_ms(2);
+    for(int i = sizeof(canvas) / 2; i < sizeof(canvas); i++) {
+        SendByte(canvas[i]);
+    }
+    delay_ms(2);
+    SendCommand(DISPLAY_REFRESH);
+    delay_ms(200);
+    WaitUntilIdle();
 }
 
 static void Reset(void) {
-//     DigitalWrite(reset_pin, HIGH);
-//     DelayMs(200);
-//     DigitalWrite(reset_pin, LOW);
-//     DelayMs(10);
-//     DigitalWrite(reset_pin, HIGH);
-//     DelayMs(200);
+    PORTK.DATA[0x02] = 0x02;
+    delay_ms(200);
+    PORTK.DATA[0x02] = 0x00;
+    delay_ms(10);
+    PORTK.DATA[0x02] = 0x02;
+    delay_ms(200);
+}
+
+static void SendCommand(uint8_t byte) {
+    // LO level indicates command
+    PORTK.DATA[0x01] = 0x00;
+    // wait for room in FIFO
+    while(!SSI3.SR.TNF);
+    // transmit data
+    SSI3.DR.DATA = byte;
+    // wait for transmission to complete
+    while(SSI3.SR.BSY);
+}
+
+static void SendByte(uint8_t byte) {
+    SendBytes(1, &byte);
+}
+
+static void SendBytes(uint32_t len, const uint8_t *bytes) {
+    // HI level indicates command
+    PORTK.DATA[0x01] = 0x01;
+    for(uint32_t i = 0; i < len; i++) {
+        // wait for room in FIFO
+        while(!SSI3.SR.TNF);
+        // transmit data
+        SSI3.DR.DATA = bytes[i];
+    }
+    // wait for transmission to complete
+    while(SSI3.SR.BSY);
+}
+
+static void WaitUntilIdle() {
+    // low level indicates unit is busy
+    while(PORTK.DATA[0x04] == 0);
 }
