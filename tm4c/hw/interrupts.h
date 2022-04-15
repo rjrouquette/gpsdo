@@ -1,6 +1,8 @@
-//
-// Created by robert on 4/13/22.
-//
+/**
+ * Interrupt Service Routines
+ * @author Robert J. Rouquette
+ * @date 2022-04-13
+ */
 
 #ifndef TM4C_INTERRUPTS_H
 #define TM4C_INTERRUPTS_H
@@ -77,11 +79,11 @@ void ISR_UART4(void);
 void ISR_UART5(void);
 void ISR_UART6(void);
 void ISR_UART7(void);
-// SPI Interrupts
-void ISR_SPI0(void);
-void ISR_SPI1(void);
-void ISR_SPI2(void);
-void ISR_SPI3(void);
+// SSI Interrupts
+void ISR_SSI0(void);
+void ISR_SSI1(void);
+void ISR_SSI2(void);
+void ISR_SSI3(void);
 // I2C Interupts
 void ISR_I2C0(void);
 void ISR_I2C1(void);

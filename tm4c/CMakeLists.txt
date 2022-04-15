@@ -18,6 +18,7 @@ add_executable(
 
         main.c
         hw/interrupts.c
+        lib/epaper.c
 )
 
 # split out debug symbols

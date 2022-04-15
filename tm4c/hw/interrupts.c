@@ -1,6 +1,8 @@
-//
-// Created by robert on 4/13/22.
-//
+/**
+ * Interrupt Service Routines
+ * @author Robert J. Rouquette
+ * @date 2022-04-13
+ */
 
 #include "interrupts.h"
 
@@ -53,7 +55,7 @@ void * volatile const isr_table[130] = {
         ISR_GPIOPortE,
         ISR_UART0,
         ISR_UART1,
-        ISR_SPI0,
+        ISR_SSI0,
         ISR_I2C0,
         ISR_PWM0Fault,
         ISR_PWM0Generator0,
@@ -80,7 +82,7 @@ void * volatile const isr_table[130] = {
         ISR_GPIOPortG,
         ISR_GPIOPortH,
         ISR_UART2,
-        ISR_SPI1,
+        ISR_SSI1,
         ISR_Timer3A,
         ISR_Timer3B,
         ISR_I2C1,
@@ -100,8 +102,8 @@ void * volatile const isr_table[130] = {
         ISR_GPIOPortJ,
         ISR_GPIOPortK,
         ISR_GPIOPortL,
-        ISR_SPI2,
-        ISR_SPI3,
+        ISR_SSI2,
+        ISR_SSI3,
         ISR_UART3,
         ISR_UART4,
         ISR_UART5,
@@ -258,11 +260,11 @@ void ISR_UART4(void) ISR_DEFAULT;
 void ISR_UART5(void) ISR_DEFAULT;
 void ISR_UART6(void) ISR_DEFAULT;
 void ISR_UART7(void) ISR_DEFAULT;
-// SPI Interrupts
-void ISR_SPI0(void) ISR_DEFAULT;
-void ISR_SPI1(void) ISR_DEFAULT;
-void ISR_SPI2(void) ISR_DEFAULT;
-void ISR_SPI3(void) ISR_DEFAULT;
+// SSI Interrupts
+void ISR_SSI0(void) ISR_DEFAULT;
+void ISR_SSI1(void) ISR_DEFAULT;
+void ISR_SSI2(void) ISR_DEFAULT;
+void ISR_SSI3(void) ISR_DEFAULT;
 // I2C Interupts
 void ISR_I2C0(void) ISR_DEFAULT;
 void ISR_I2C1(void) ISR_DEFAULT;

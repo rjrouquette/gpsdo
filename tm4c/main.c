@@ -1,21 +1,20 @@
+/**
+ * GPSDO with NTP and IEEE PTP
+ * @author Robert J. Rouquette
+ * @date 2022-04-13
+ */
 
 #include "hw/gpio.h"
-#include "hw/sys.h"
-
-void delay() {
-    volatile int delay = 1u<<20u;
-    while(delay)
-        --delay;
-}
+#include "lib/delay.h"
+#include "lib/epaper.h"
 
 int main(void) {
-    RCGCGPIO.EN_PORTN = 1;
-    __asm volatile("nop");
-    __asm volatile("nop");
-    __asm volatile("nop");
-    __asm volatile("nop");
+    EPAPER_init();
 
-    PORTN.LOCK = 0x4C4F434B;
+    RCGCGPIO.EN_PORTN = 1;
+    delay_cycles_4();
+
+    PORTN.LOCK = GPIO_LOCK_KEY;
     PORTN.CR = 0x01u;
     PORTN.AMSEL = 0;
     PORTN.PCTL = 0;
@@ -25,7 +24,7 @@ int main(void) {
     PORTN.DEN = 0x01u;
     PORTN.DATA[0x01u] = 0x01u;
     for(;;) {
-        delay();
+        delay_loop(1u << 20u);
         PORTN.DATA[0x01u] ^= 0x01u;
     }
 }

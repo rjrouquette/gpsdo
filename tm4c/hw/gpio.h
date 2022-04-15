@@ -1,11 +1,14 @@
-//
-// Created by robert on 4/14/22.
-//
+/**
+ * GPIO Port Register Mapping
+ * @author Robert J. Rouquette
+ * @date 2022-04-14
+ */
 
 #ifndef TM4C_GPIO_H
 #define TM4C_GPIO_H
 
 #include <stdint.h>
+#include "sys.h"
 
 struct GPIO_MAP {
     // offset 0x000
@@ -45,8 +48,8 @@ struct GPIO_MAP {
     // reserved space
     char _reserved_01[0xA74];
     // offset 0xFC0
-    uint32_t GPIOPP;  // GPIO Peripheral Property
-    uint32_t GPIOPC;  // GPIO Peripheral Configuration
+    uint32_t PP;  // GPIO Peripheral Property
+    uint32_t PC;  // GPIO Peripheral Configuration
     // reserved space
     char _reserved_02[0x8];
     // offset 0xFD0
@@ -63,7 +66,7 @@ struct GPIO_MAP {
     uint32_t PCellID2;
     uint32_t PCellID3;
 };
-_Static_assert(sizeof(struct GPIO_MAP) == 4096);
+_Static_assert(sizeof(struct GPIO_MAP) == 4096, "GPIO_MAP must be 4096 bytes");
 
 #define PORTA   (*(volatile struct GPIO_MAP *) 0x40058000)
 #define PORTB   (*(volatile struct GPIO_MAP *) 0x40059000)
@@ -80,5 +83,7 @@ _Static_assert(sizeof(struct GPIO_MAP) == 4096);
 #define PORTN   (*(volatile struct GPIO_MAP *) 0x40064000)
 #define PORTP   (*(volatile struct GPIO_MAP *) 0x40065000)
 #define PORTQ   (*(volatile struct GPIO_MAP *) 0x40066000)
+
+#define GPIO_LOCK_KEY (0x4C4F434B)
 
 #endif //TM4C_GPIO_H
