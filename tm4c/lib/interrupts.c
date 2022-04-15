@@ -21,8 +21,8 @@ void ISR_Reset(void);
 #define RESERVED (0)
 
 // ISR Vector Table
-__attribute__((section(".vector_table")))
-void * isr_table[130] = {
+__attribute__((section(".isr_vector")))
+void * volatile const isr_table[130] = {
         // Stack Starting Address (0)
         &_stack_ptr,
 
