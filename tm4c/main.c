@@ -13,6 +13,7 @@ int main(void) {
     LED_init();
     CLK_init();
     EPD_init();
+    LED0_ON();
 
     for(;;) {
         delay_ms(500);

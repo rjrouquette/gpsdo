@@ -13,82 +13,47 @@
 #define EPD_WIDTH       176
 #define EPD_HEIGHT      264
 
-// EPD2IN7 commands
-#define PANEL_SETTING                               0x00
-#define POWER_SETTING                               0x01
-#define POWER_OFF                                   0x02
-#define POWER_OFF_SEQUENCE_SETTING                  0x03
-#define POWER_ON                                    0x04
-#define POWER_ON_MEASURE                            0x05
-#define BOOSTER_SOFT_START                          0x06
-#define DEEP_SLEEP                                  0x07
-#define DATA_START_TRANSMISSION_1                   0x10
-#define DATA_STOP                                   0x11
-#define DISPLAY_REFRESH                             0x12
-#define DATA_START_TRANSMISSION_2                   0x13
-#define PARTIAL_DATA_START_TRANSMISSION_1           0x14
-#define PARTIAL_DATA_START_TRANSMISSION_2           0x15
-#define PARTIAL_DISPLAY_REFRESH                     0x16
-#define LUT_FOR_VCOM                                0x20
-#define LUT_WHITE_TO_WHITE                          0x21
-#define LUT_BLACK_TO_WHITE                          0x22
-#define LUT_WHITE_TO_BLACK                          0x23
-#define LUT_BLACK_TO_BLACK                          0x24
-#define PLL_CONTROL                                 0x30
-#define TEMPERATURE_SENSOR_COMMAND                  0x40
-#define TEMPERATURE_SENSOR_CALIBRATION              0x41
-#define TEMPERATURE_SENSOR_WRITE                    0x42
-#define TEMPERATURE_SENSOR_READ                     0x43
-#define VCOM_AND_DATA_INTERVAL_SETTING              0x50
-#define LOW_POWER_DETECTION                         0x51
-#define TCON_SETTING                                0x60
-#define TCON_RESOLUTION                             0x61
-#define SOURCE_AND_GATE_START_SETTING               0x62
-#define GET_STATUS                                  0x71
-#define AUTO_MEASURE_VCOM                           0x80
-#define VCOM_VALUE                                  0x81
-#define VCM_DC_SETTING_REGISTER                     0x82
-#define PROGRAM_MODE                                0xA0
-#define ACTIVE_PROGRAM                              0xA1
-#define READ_OTP_DATA                               0xA2
-
-static uint8_t canvas[(EPD_WIDTH * EPD_HEIGHT) / 4];
+static volatile uint8_t canvas[2][(EPD_WIDTH * EPD_HEIGHT) / 8];
 
 static void initSSI();
 static void initEPD();
+static void setLUT();
 
 static void Reset(void);
 static void SendCommand(uint8_t byte);
 static void SendByte(uint8_t byte);
-static void SendBytes(uint32_t len, const uint8_t *bytes);
-static void WaitUntilIdle();
+static void SendBytes(uint32_t len, const volatile uint8_t *bytes);
+static void WaitBusy();
 
 int EPD_width() { return EPD_WIDTH; }
 int EPD_height() { return EPD_HEIGHT; }
 
 void EPD_init() {
     initSSI();
-    LED0_ON();
     initEPD();
+    setLUT();
+
+    EPD_clear();
+    EPD_refresh();
 }
 
 static void initSSI() {
     // enable SSI3 module
     RCGCSSI.EN_SSI3 = 1;
-
-    // enable GPIO port Q
+    // enable GPIO ports
+    RCGCGPIO.EN_PORTK = 1;
     RCGCGPIO.EN_PORTQ = 1;
     delay_cycles_4();
 
-    // configure pins 0-3
+    // configure pins 0-2
     PORTQ.LOCK = GPIO_LOCK_KEY;
-    PORTQ.CR = 0x0fu;
-    PORTQ.AMSEL = 0x0fu;
-    PORTQ.PCTL = 0xEEEE;
-    PORTQ.AFSEL = 0x00u;
-    PORTQ.PUR = 0x02u;
-    PORTQ.DR8R = 0x0fu;
-    PORTQ.DEN = 0x0fu;
+    PORTQ.CR = 0x07u;
+    PORTQ.DIR = 0x07u;
+    PORTQ.DR8R = 0x07u;
+    PORTQ.AMSEL = 0x00;
+    PORTQ.AFSEL = 0x07u;
+    PORTQ.PCTL = 0x0EEE;
+    PORTQ.DEN = 0x07u;
     // lock GPIO config
     PORTQ.CR = 0;
     PORTQ.LOCK = 0;
@@ -96,12 +61,10 @@ static void initSSI() {
     // configure SSI3
     SSI3.CR1.raw = 0;
     SSI3.CR0.raw = 0;
-    // hold CS line for entire transmission
-    SSI3.CR1.FSSHLDFRM = 1;
     // 8-bit data
     SSI3.CR0.DSS = SSI_DSS_8_BIT;
     // 8x prescaler
-    SSI3.CPSR.CPSDVSR = 25;
+    SSI3.CPSR.CPSDVSR = 5;
     // use system clock
     SSI3.CC.CS = SSI_CLK_SYS;
     // enable SSI
@@ -114,9 +77,10 @@ static void initSSI() {
     PORTK.PCTL = 0;
     PORTK.AFSEL = 0;
     PORTK.DR8R = 0x07u;
+    //PORTK.PUR = 0x04u;
     PORTK.DIR = 0x03u;
-    PORTK.DEN = 0x07u;
     PORTK.DATA[0x03u] = 0x02u;
+    PORTK.DEN = 0x07u;
     // lock GPIO config
     PORTK.CR = 0;
     PORTK.LOCK = 0;
@@ -124,85 +88,111 @@ static void initSSI() {
 
 static void initEPD() {
     Reset();
-    SendCommand(POWER_SETTING);
-    SendByte(0x03);                  // VDS_EN, VDG_EN
-    SendByte(0x00);                  // VCOM_HV, VGHL_LV[1], VGHL_LV[0]
-    SendByte(0x2b);                  // VDH
-    SendByte(0x2b);                  // VDL
-    SendByte(0x09);                  // VDHR
-    SendCommand(BOOSTER_SOFT_START);
-    SendByte(0x07);
-    SendByte(0x07);
-    SendByte(0x17);
-    // Power optimization
-    SendCommand(0xF8);
-    SendByte(0x60);
-    SendByte(0xA5);
-    // Power optimization
-    SendCommand(0xF8);
-    SendByte(0x89);
-    SendByte(0xA5);
-    // Power optimization
-    SendCommand(0xF8);
-    SendByte(0x90);
-    SendByte(0x00);
-    // Power optimization
-    SendCommand(0xF8);
-    SendByte(0x93);
-    SendByte(0x2A);
-    // Power optimization
-    SendCommand(0xF8);
-    SendByte(0xA0);
-    SendByte(0xA5);
-    // Power optimization
-    SendCommand(0xF8);
-    SendByte(0xA1);
-    SendByte(0x00);
-    // Power optimization
-    SendCommand(0xF8);
-    SendByte(0x73);
-    SendByte(0x41);
-    SendCommand(PARTIAL_DISPLAY_REFRESH);
-    SendByte(0x00);
-    SendCommand(POWER_ON);
-    WaitUntilIdle();
+    SendCommand(0x01);			//POWER SETTING
+    SendByte (0x03);
+    SendByte (0x00);
+    SendByte (0x2b);
+    SendByte (0x2b);
 
-    SendCommand(PANEL_SETTING);
-    SendByte(0xAF);        //KW-BF   KWR-AF    BWROTP 0f
-    SendCommand(PLL_CONTROL);
-    SendByte(0x3A);       //3A 100HZ   29 150Hz 39 200HZ    31 171HZ
-    SendCommand(VCM_DC_SETTING_REGISTER);
-    SendByte(0x12);
+    SendCommand(0x06);         //booster soft start
+    SendByte (0x07);		//A
+    SendByte (0x07);		//B
+    SendByte (0x17);		//C
+
+    SendCommand(0xF8);         //boost??
+    SendByte (0x60);
+    SendByte (0xA5);
+
+    SendCommand(0xF8);         //boost??
+    SendByte (0x89);
+    SendByte (0xA5);
+
+    SendCommand(0xF8);         //boost??
+    SendByte (0x90);
+    SendByte (0x00);
+
+    SendCommand(0xF8);         //boost??
+    SendByte (0x93);
+    SendByte (0x2A);
+
+    SendCommand(0xF8);         //boost??
+    SendByte (0xa0);
+    SendByte (0xa5);
+
+    SendCommand(0xF8);         //boost??
+    SendByte (0xa1);
+    SendByte (0x00);
+
+    SendCommand(0xF8);         //boost??
+    SendByte (0x73);
+    SendByte (0x41);
+
+    SendCommand(0x16);
+    SendByte(0x00);
+
+    SendCommand(0x04);
+    WaitBusy();
+
+    SendCommand(0x00);			//panel setting
+    SendByte(0xbf);		//KW-BF   KWR-AF	BWROTP 0f
+
+    SendCommand(0x30);			//PLL setting
+    SendByte (0x90);      	//100hz
+
+    SendCommand(0x61);			//resolution setting
+    SendByte (0x00);		//176
+    SendByte (0xb0);
+    SendByte (0x01);		//264
+    SendByte (0x08);
+
+    SendCommand(0x82);			//vcom_DC setting
+    SendByte (0x12);
+
+    SendCommand(0X50);			//VCOM AND DATA INTERVAL SETTING
+    SendByte(0x97);
 }
 
 void EPD_clear() {
+    volatile uint8_t *ptr = canvas[0];
     for(int i = 0; i < sizeof(canvas); i++)
-        canvas[i] = 0xFF;
+        ptr[i] = 0xFF;
 }
 
 void EPD_refresh() {
-    SendCommand(DATA_START_TRANSMISSION_1);
-    delay_ms(2);
-    for(int i = 0; i < sizeof(canvas) / 2; i++) {
-        SendByte(canvas[i]);
-    }
-    delay_ms(2);
-    SendCommand(DATA_START_TRANSMISSION_2);
-    delay_ms(2);
-    for(int i = sizeof(canvas) / 2; i < sizeof(canvas); i++) {
-        SendByte(canvas[i]);
-    }
-    delay_ms(2);
-    SendCommand(DISPLAY_REFRESH);
-    delay_ms(200);
-    WaitUntilIdle();
+    SendCommand(0x10);
+    SendBytes(sizeof(canvas[0]), canvas[0]);
+    SendCommand(0x13);
+    SendBytes(sizeof(canvas[1]), canvas[1]);
+    SendCommand(0x12);
+    LED1_OFF();
+    WaitBusy();
+}
+
+void EPD_setPixel(uint32_t x, uint32_t y, uint8_t color) {
+    if (x > EPD_WIDTH) return;
+    if (y > EPD_HEIGHT) return;
+    uint32_t offset = x + (y * EPD_WIDTH);
+    uint32_t byte = offset >> 3u;
+    uint8_t mask = 0x80u >> (offset & 0x7u);
+
+    // Set/Clear MSB
+    if(color & 0x2u)
+        canvas[0][byte] |= mask;
+    else
+        canvas[0][byte] &= ~mask;
+
+    // Set/Clear LSB
+    if(color & 0x1u)
+        canvas[1][byte] |= mask;
+    else
+        canvas[1][byte] &= ~mask;
 }
 
 static void Reset(void) {
     PORTK.DATA[0x02] = 0x02;
     delay_ms(200);
     PORTK.DATA[0x02] = 0x00;
-    delay_ms(10);
+    delay_ms(2);
     PORTK.DATA[0x02] = 0x02;
     delay_ms(200);
 }
@@ -214,6 +204,8 @@ static void SendCommand(uint8_t byte) {
     while(!SSI3.SR.TNF);
     // transmit data
     SSI3.DR.DATA = byte;
+    // wait for FIFO to empty
+    while(!SSI3.SR.TFE);
     // wait for transmission to complete
     while(SSI3.SR.BSY);
 }
@@ -222,7 +214,7 @@ static void SendByte(uint8_t byte) {
     SendBytes(1, &byte);
 }
 
-static void SendBytes(uint32_t len, const uint8_t *bytes) {
+static void SendBytes(uint32_t len, const volatile uint8_t *bytes) {
     // HI level indicates command
     PORTK.DATA[0x01] = 0x01;
     for(uint32_t i = 0; i < len; i++) {
@@ -231,13 +223,89 @@ static void SendBytes(uint32_t len, const uint8_t *bytes) {
         // transmit data
         SSI3.DR.DATA = bytes[i];
     }
+    // wait for FIFO to empty
+    while(!SSI3.SR.TFE);
     // wait for transmission to complete
-    while(!SSI3.SR.BSY);
+    while(SSI3.SR.BSY);
 }
 
-static void WaitUntilIdle() {
-    // low level indicates unit is busy
-    LED1_ON();
-    while(PORTK.DATA[0x04] == 0);
-    LED1_OFF();
+static void WaitBusy() {
+    for(;;) {
+        SendCommand(0x71);
+        if(PORTK.DATA[0x04])
+            break;
+    }
+}
+
+//////////////////////////////////////full screen update LUT////////////////////////////////////////////
+//0~3 gray
+static const uint8_t EPD_2in7_gray_lut_vcom[] = {
+        0x00	,0x00,
+        0x00	,0x0A	,0x00	,0x00	,0x00	,0x01,
+        0x60	,0x14	,0x14	,0x00	,0x00	,0x01,
+        0x00	,0x14	,0x00	,0x00	,0x00	,0x01,
+        0x00	,0x13	,0x0A	,0x01	,0x00	,0x01,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+};
+//R21
+static const uint8_t EPD_2in7_gray_lut_ww[] = {
+        0x40	,0x0A	,0x00	,0x00	,0x00	,0x01,
+        0x90	,0x14	,0x14	,0x00	,0x00	,0x01,
+        0x10	,0x14	,0x0A	,0x00	,0x00	,0x01,
+        0xA0	,0x13	,0x01	,0x00	,0x00	,0x01,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+};
+//R22H	r
+static const uint8_t EPD_2in7_gray_lut_bw[] = {
+        0x40	,0x0A	,0x00	,0x00	,0x00	,0x01,
+        0x90	,0x14	,0x14	,0x00	,0x00	,0x01,
+        0x00	,0x14	,0x0A	,0x00	,0x00	,0x01,
+        0x99	,0x0C	,0x01	,0x03	,0x04	,0x01,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+};
+//R23H	w
+static const uint8_t EPD_2in7_gray_lut_wb[] = {
+        0x40	,0x0A	,0x00	,0x00	,0x00	,0x01,
+        0x90	,0x14	,0x14	,0x00	,0x00	,0x01,
+        0x00	,0x14	,0x0A	,0x00	,0x00	,0x01,
+        0x99	,0x0B	,0x04	,0x04	,0x01	,0x01,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+};
+//R24H	b
+static const uint8_t EPD_2in7_gray_lut_bb[] = {
+        0x80	,0x0A	,0x00	,0x00	,0x00	,0x01,
+        0x90	,0x14	,0x14	,0x00	,0x00	,0x01,
+        0x20	,0x14	,0x0A	,0x00	,0x00	,0x01,
+        0x50	,0x13	,0x01	,0x00	,0x00	,0x01,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+        0x00	,0x00	,0x00	,0x00	,0x00	,0x00,
+};
+
+static void setLUT() {
+    SendCommand(0x20);
+    SendBytes(sizeof(EPD_2in7_gray_lut_vcom), EPD_2in7_gray_lut_vcom);
+
+    SendCommand(0x21);
+    SendBytes(sizeof(EPD_2in7_gray_lut_ww), EPD_2in7_gray_lut_ww);
+
+    SendCommand(0x22);
+    SendBytes(sizeof(EPD_2in7_gray_lut_bw), EPD_2in7_gray_lut_bw);
+
+    SendCommand(0x23);
+    SendBytes(sizeof(EPD_2in7_gray_lut_wb), EPD_2in7_gray_lut_wb);
+
+    SendCommand(0x24);
+    SendBytes(sizeof(EPD_2in7_gray_lut_bb), EPD_2in7_gray_lut_bb);
+
+    SendCommand(0x25);             //vcom
+    SendBytes(sizeof(EPD_2in7_gray_lut_ww), EPD_2in7_gray_lut_ww);
 }
