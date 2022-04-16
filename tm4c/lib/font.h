@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-extern const volatile uint8_t *FONT_ascii_16[];
+extern const volatile uint8_t FONT_ASCII_16[];
 
 typedef void (*SetPixel)(int x, int y, uint8_t color);
 

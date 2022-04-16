@@ -19,4 +19,6 @@ mv gpsdo* ../dist
 cd ..
 rm -fr build
 
+gcc -o dist/ttf2bmp -I/usr/include/freetype2 ttf2bmp.c -lfreetype
+
 exit 0

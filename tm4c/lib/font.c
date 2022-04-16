@@ -11,7 +11,7 @@ void FONT_drawText(
 ) {
     uint16_t charWidth = font[0];
     uint16_t charHeight = font[1];
-    uint16_t stride = (charWidth * charHeight) / 8;
+    uint16_t stride = ((charWidth * charHeight) + 7) / 8;
     while(text[0] != 0) {
         const volatile uint8_t *glyph = font + 2 + (stride * (uint8_t)text[0]);
         ++text;
@@ -28,5 +28,6 @@ void FONT_drawText(
                 ++offset;
             }
         }
+        x += charWidth;
     }
 }

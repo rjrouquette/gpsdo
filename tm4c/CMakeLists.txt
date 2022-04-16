@@ -22,6 +22,7 @@ add_executable(
         lib/delay.c
         lib/epd.c
         lib/font.c
+        lib/fonts/ascii_16.c
         lib/led.c
 )
 
