@@ -43,7 +43,7 @@ void CLK_init() {
     RSCLKCFG.USEPLL = 1;
 
     // Configure SysTick Timer
-    STRELOAD.RELOAD = -1u;
+    STRELOAD.RELOAD = 0xFFFFFF;
     STCTRL.CLK_SRC = 1;
     STCTRL.INTEN = 0;
     STCTRL.ENABLE = 1;

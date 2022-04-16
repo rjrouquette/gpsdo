@@ -12,8 +12,8 @@ echo "Running build with $CORES threads."
 
 rm -fr ./*
 cmake ..
-make VERBOSE=1
-#make -j$CORES
+#make VERBOSE=1
+make -j$CORES
 mv gpsdo* ../dist
 
 cd ..

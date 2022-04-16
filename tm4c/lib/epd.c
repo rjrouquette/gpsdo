@@ -73,7 +73,6 @@ void EPD_init() {
 }
 
 static void initSSI() {
-    // configure SSI3 interface as SPI Master
     // enable SSI3 module
     RCGCSSI.EN_SSI3 = 1;
 
@@ -87,6 +86,7 @@ static void initSSI() {
     PORTQ.AMSEL = 0x0fu;
     PORTQ.PCTL = 0xEEEE;
     PORTQ.AFSEL = 0x00u;
+    PORTQ.PUR = 0x02u;
     PORTQ.DR8R = 0x0fu;
     PORTQ.DEN = 0x0fu;
     // lock GPIO config
@@ -101,7 +101,7 @@ static void initSSI() {
     // 8-bit data
     SSI3.CR0.DSS = SSI_DSS_8_BIT;
     // 8x prescaler
-    SSI3.CPSR.CPSDVSR = 8;
+    SSI3.CPSR.CPSDVSR = 25;
     // use system clock
     SSI3.CC.CS = SSI_CLK_SYS;
     // enable SSI
@@ -212,13 +212,10 @@ static void SendCommand(uint8_t byte) {
     PORTK.DATA[0x01] = 0x00;
     // wait for room in FIFO
     while(!SSI3.SR.TNF);
-    LED0_OFF();
     // transmit data
     SSI3.DR.DATA = byte;
-    LED1_ON();
     // wait for transmission to complete
     while(SSI3.SR.BSY);
-    LED1_OFF();
 }
 
 static void SendByte(uint8_t byte) {
@@ -235,10 +232,12 @@ static void SendBytes(uint32_t len, const uint8_t *bytes) {
         SSI3.DR.DATA = bytes[i];
     }
     // wait for transmission to complete
-    while(SSI3.SR.BSY);
+    while(!SSI3.SR.BSY);
 }
 
 static void WaitUntilIdle() {
     // low level indicates unit is busy
+    LED1_ON();
     while(PORTK.DATA[0x04] == 0);
+    LED1_OFF();
 }
