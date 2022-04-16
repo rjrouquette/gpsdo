@@ -21,7 +21,9 @@ add_executable(
         lib/clk.c
         lib/delay.c
         lib/epd.c
-        lib/led.h lib/led.c)
+        lib/font.c
+        lib/led.c
+)
 
 # split out debug symbols
 add_custom_command(

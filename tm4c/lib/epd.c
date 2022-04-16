@@ -77,7 +77,7 @@ static void initSSI() {
     PORTK.PCTL = 0;
     PORTK.AFSEL = 0;
     PORTK.DR8R = 0x07u;
-    //PORTK.PUR = 0x04u;
+    PORTK.PUR = 0x02u;
     PORTK.DIR = 0x03u;
     PORTK.DATA[0x03u] = 0x02u;
     PORTK.DEN = 0x07u;
@@ -168,9 +168,9 @@ void EPD_refresh() {
     WaitBusy();
 }
 
-void EPD_setPixel(uint32_t x, uint32_t y, uint8_t color) {
-    if (x > EPD_WIDTH) return;
-    if (y > EPD_HEIGHT) return;
+void EPD_setPixel(int x, int y, uint8_t color) {
+    if (x < 0 || x >= EPD_WIDTH) return;
+    if (y < 0 || y >= EPD_HEIGHT) return;
     uint32_t offset = x + (y * EPD_WIDTH);
     uint32_t byte = offset >> 3u;
     uint8_t mask = 0x80u >> (offset & 0x7u);
