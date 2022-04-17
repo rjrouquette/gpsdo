@@ -4,7 +4,6 @@
  * @date 2022-04-13
  */
 
-#include <string.h>
 #include "lib/clk.h"
 #include "lib/delay.h"
 #include "lib/epd.h"
@@ -28,7 +27,7 @@ int main(void) {
         LED1_TGL();
 
         if((refresh++ & 0x1fu) == 0) {
-            strcpy(temp, "0x");
+            temp[0] = '0'; temp[1] = 'x';
             toHex(refresh, 4, '0', temp+5);
             temp[6] = 0;
             FONT_drawText(2, 16, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
