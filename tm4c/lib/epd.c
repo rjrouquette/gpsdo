@@ -6,7 +6,6 @@
 
 #include "../hw/ssi.h"
 #include "../lib/delay.h"
-#include "../lib/led.h"
 #include "epd.h"
 
 // Display resolution
@@ -34,7 +33,6 @@ void EPD_init() {
     setLUT();
 
     EPD_clear();
-    EPD_refresh();
 }
 
 static void initSSI() {
@@ -159,13 +157,12 @@ void EPD_clear() {
 }
 
 void EPD_refresh() {
+    WaitBusy();
     SendCommand(0x10);
     SendBytes(sizeof(canvas[0]), canvas[0]);
     SendCommand(0x13);
     SendBytes(sizeof(canvas[1]), canvas[1]);
     SendCommand(0x12);
-    LED1_OFF();
-    WaitBusy();
 }
 
 void EPD_setPixel(int x, int y, uint8_t color) {

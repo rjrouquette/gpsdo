@@ -5,8 +5,9 @@ find_program(OBJCOPY arm-none-eabi-objcopy)
 set(CMAKE_C_COMPILER arm-none-eabi-gcc)
 set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -std=c17 -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=softfp -Os")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb -std=c++17 -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=softfp -Os")
+set(COMP_FLAGS "-ggdb -Os -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard")
+set(CMAKE_C_FLAGS "-std=c17 ${COMP_FLAGS}")
+set(CMAKE_CXX_FLAGS "-std=c++17 ${COMP_FLAGS}")
 
 set(CMAKE_LINKER arm-none-eabi-ld)
 set(LINKER_FLAGS "-T ${CMAKE_SOURCE_DIR}/tm4c1249ncpdt.ld --entry ISR_Reset")
@@ -23,6 +24,7 @@ add_executable(
         lib/epd.c
         lib/font.c
         lib/fonts/ascii_16.c
+        lib/format.c
         lib/led.c
 )
 
