@@ -7,26 +7,27 @@
 const char lut_base[16] = "0123456789ABCDEF";
 
 int toBase(unsigned value, char base, int width, char padding, char *origin) {
-    if(!width) {
-        if(value) {
-            unsigned temp = value;
-            while(temp) {
-                ++width;
-                temp /= base;
-            }
-        } else {
-            width = 1;
-        }
+    char digits[16];
+    int cnt = 0;
+    while(value) {
+        digits[cnt++] = lut_base[value % base];
+        value /= base;
+    }
+    if(cnt == 0) {
+        digits[0] = 0;
+        cnt = 1;
+    }
+
+    if(width <= 0) {
+        width = cnt;
         origin += width - 1;
     }
 
     for (int offset = 0; offset < width; offset++) {
-        if (value || !offset) {
-            origin[-offset] = lut_base[value % base];
-            value /= base;
-        } else {
+        if (offset < cnt)
+            origin[-offset] = digits[offset];
+        else
             origin[-offset] = padding;
-        }
     }
     return width;
 }
