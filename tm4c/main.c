@@ -43,8 +43,7 @@ int main(void) {
             temp[end] = 0;
             FONT_drawText(0, 32, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
-            int16_t tempSens = TEMP_get();
-            end = toHex(tempSens, 4, ' ', temp+2);
+            end = toTemp(TEMP_get(), temp);
             temp[end] = 0;
             FONT_drawText(0, 48, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 

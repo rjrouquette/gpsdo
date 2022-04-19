@@ -5,9 +5,13 @@
 #ifndef GPSDO_FORMAT_H
 #define GPSDO_FORMAT_H
 
-int toBin(unsigned value, int width, char padding, char *origin);
-int toOct(unsigned value, int width, char padding, char *origin);
-int toDec(unsigned value, int width, char padding, char *origin);
-int toHex(unsigned value, int width, char padding, char *origin);
+#include <stdint.h>
+
+int toBin(uint32_t value, int width, char padding, char *origin);
+int toOct(uint32_t value, int width, char padding, char *origin);
+int toDec(uint32_t value, int width, char padding, char *origin);
+int toHex(uint32_t value, int width, char padding, char *origin);
+
+int toTemp(int16_t value, char *origin);
 
 #endif //GPSDO_FORMAT_H

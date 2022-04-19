@@ -6,7 +6,7 @@
 
 const char lut_base[16] = "0123456789ABCDEF";
 
-int toBase(unsigned value, char base, int width, char padding, char *origin) {
+int toBase(uint32_t value, char base, int width, char padding, char *origin) {
     char digits[16];
     int cnt = 0;
     while(value > 0) {
@@ -34,18 +34,33 @@ int toBase(unsigned value, char base, int width, char padding, char *origin) {
     return width;
 }
 
-int toBin(unsigned value, int width, char padding, char *origin) {
+int toBin(uint32_t value, int width, char padding, char *origin) {
     return toBase(value, 2, width, padding, origin);
 }
 
-int toOct(unsigned value, int width, char padding, char *origin) {
+int toOct(uint32_t value, int width, char padding, char *origin) {
     return toBase(value, 8, width, padding, origin);
 }
 
-int toDec(unsigned value, int width, char padding, char *origin) {
+int toDec(uint32_t value, int width, char padding, char *origin) {
     return toBase(value, 10, width, padding, origin);
 }
 
-int toHex(unsigned value, int width, char padding, char *origin) {
+int toHex(uint32_t value, int width, char padding, char *origin) {
     return toBase(value, 16, width, padding, origin);
+}
+
+int toTemp(int16_t value, char *origin) {
+    if(value < 0) {
+        origin[0] = '-';
+        value = (int16_t) -value;
+    } else {
+        origin[0] = '+';
+    }
+    toDec(value >> 8u, 3, '0', origin + 1);
+    toDec((100 * (value & 0xFFu)) >> 8u, 2, '0', origin + 5);
+    origin[4] = '.';
+    origin[7] = 0xBA;
+    origin[8] = 'C';
+    return 9;
 }
