@@ -11,7 +11,6 @@
 #include "lib/format.h"
 #include "lib/led.h"
 #include "lib/temp.h"
-#include "hw/interrupts.h"
 
 int main(void) {
     // initialize status LEDs
