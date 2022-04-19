@@ -5,7 +5,6 @@
 #include "../hw/adc.h"
 #include "delay.h"
 #include "temp.h"
-#include "led.h"
 
 static volatile uint16_t adc_temp = 0;
 
