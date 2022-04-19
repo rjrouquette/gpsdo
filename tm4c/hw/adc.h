@@ -197,8 +197,44 @@ struct ADC_MAP {
         uint32_t raw;
     } ACTSS;                // ADC Active Sample Sequencer
     uint32_t RIS;           // ADC Raw Interrupt Status
-    uint32_t IM;            // ADC Interrupt Mask
-    uint32_t ISC;           // ADC Interrupt Status and Clear
+    union {
+        struct {
+            unsigned MASK0: 1;
+            unsigned MASK1: 1;
+            unsigned MASK2: 1;
+            unsigned MASK3: 1;
+            unsigned _reserved_00: 4;
+            unsigned DMAMASK0: 1;
+            unsigned DMAMASK1: 1;
+            unsigned DMAMASK2: 1;
+            unsigned DMAMASK3: 1;
+            unsigned _reserved_01: 4;
+            unsigned DCONSS0: 1;
+            unsigned DCONSS1: 1;
+            unsigned DCONSS2: 1;
+            unsigned DCONSS3: 1;
+        };
+        uint32_t raw;
+    } IM;                   // ADC Interrupt Mask
+    union {
+        struct {
+            unsigned IN0: 1;
+            unsigned IN1: 1;
+            unsigned IN2: 1;
+            unsigned IN3: 1;
+            unsigned _reserved_00: 4;
+            unsigned DMAIN0: 1;
+            unsigned DMAIN1: 1;
+            unsigned DMAIN2: 1;
+            unsigned DMAIN3: 1;
+            unsigned _reserved_01: 4;
+            unsigned DCINSS0: 1;
+            unsigned DCINSS1: 1;
+            unsigned DCINSS2: 1;
+            unsigned DCINSS3: 1;
+        };
+        uint32_t raw;
+    } ISC;           // ADC Interrupt Status and Clear
     uint32_t OSTAT;         // ADC Overflow Status
     union {
         struct {

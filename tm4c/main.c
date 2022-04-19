@@ -11,6 +11,7 @@
 #include "lib/format.h"
 #include "lib/led.h"
 #include "lib/temp.h"
+#include "hw/interrupts.h"
 
 int main(void) {
     // initialize status LEDs
@@ -23,6 +24,7 @@ int main(void) {
     EPD_refresh();
     // initialize temperature sensor
     TEMP_init();
+    TEMP_proc();
 
     LED0_ON();
 
@@ -43,16 +45,15 @@ int main(void) {
             temp[end] = 0;
             FONT_drawText(0, 32, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
-            end = toTemp(TEMP_get(), temp);
+            end = toTemp(TEMP_proc(), temp);
             temp[end] = 0;
             FONT_drawText(0, 48, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+
+            end = toHex(*((uint32_t *) 0xE000E100), 8, '0', temp);
+            temp[end] = 0;
+            FONT_drawText(0, 64, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
             EPD_refresh();
         }
     }
-}
-
-// ISR Test
-void ISR_Timer0A() {
-    __asm volatile("nop");
 }

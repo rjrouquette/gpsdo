@@ -4,6 +4,7 @@
  * @date 2022-04-13
  */
 
+#include <stdint.h>
 #include "interrupts.h"
 
 // stack pointer
@@ -23,8 +24,9 @@ void ISR_Reset(void);
 #define RESERVED (0)
 
 // ISR Vector Table
+#define ISR_VECTOR_COUNT (130)
 __attribute__((section(".isr_vector")))
-void * volatile const isr_table[130] = {
+void * volatile const isr_table[ISR_VECTOR_COUNT] = {
         // Stack Starting Address (0)
         &_stack_ptr,
 
@@ -164,6 +166,11 @@ void * volatile const isr_table[130] = {
         RESERVED, // Reserved (129)
 };
 
+// Default ISR does nothing
+void ISR_Default(void) {
+    __asm volatile("nop");
+}
+
 //main() of your program
 int main(void);
 // reset handler
@@ -177,13 +184,16 @@ void ISR_Reset(void) {
     for (int *dest = &_bss; dest < &_ebss; dest++)
         *dest = 0;
 
+    // enable registered interrupts
+    for(int i = 16; i < ISR_VECTOR_COUNT; i++) {
+        if(isr_table[i] == 0) continue;
+        if(isr_table[i] == ISR_Default) continue;
+        int id = i - 16;
+        ((uint32_t *) 0xE000E100)[(id >> 5u) & 0x3u] |= (1u << (id & 0x1Fu));
+    }
+
     // launch main application
     main();
-}
-
-// Default ISR does nothing
-void ISR_Default(void) {
-    __asm volatile("nop");
 }
 
 #define ISR_DEFAULT __attribute__((weak, alias("ISR_Default")))
@@ -314,3 +324,57 @@ void ISR_Timer6A(void) ISR_DEFAULT;
 void ISR_Timer6B(void) ISR_DEFAULT;
 void ISR_Timer7A(void) ISR_DEFAULT;
 void ISR_Timer7B(void) ISR_DEFAULT;
+
+static int id_isr(void(*isr)(void)) {
+    // verify that ISR is implemented
+    if(isr == 0) return -1;
+    if(isr == ISR_Default) return -1;
+    // locate ISR in vector table
+    for(int i = 0; i < ISR_VECTOR_COUNT; i++) {
+        if(isr_table[i] == isr) return i;
+    }
+    // ISR is not mapped in vector table
+    return -1;
+}
+
+// enable ISR
+int ISR_enable(void(*isr)(void)) {
+    int id = id_isr(isr);
+    // invalid ISR address
+    if(id < 0) return id;
+    // ISR is Fault handler
+    if(id < 16) return id;
+    // ISR is mapped and valid
+    int offset = id - 16;
+    ((uint32_t *) 0xE000E100)[(offset >> 5u) & 0x3u] |= (1u << (offset & 0x1Fu));
+    return id;
+}
+
+// disable ISR
+int ISR_disable(void(*isr)(void)) {
+    int id = id_isr(isr);
+    // invalid ISR address
+    if(id < 0) return id;
+    // ISR is Fault handler
+    if(id < 16) return id;
+    // ISR is mapped and valid
+    int offset = id - 16;
+    ((uint32_t *) 0xE000E180)[(offset >> 5u) & 0x3u] |= (1u << (offset & 0x1Fu));
+    return id;
+}
+
+// set ISR priority
+int ISR_priority(void(*isr)(void), uint8_t priority) {
+    int id = id_isr(isr);
+    // invalid ISR address
+    if(id < 0) return id;
+    // ISR is Fault handler
+    if(id < 16) return id;
+    // ISR is mapped and valid
+    int offset = id - 16;
+    uint32_t reg_pri = ((uint32_t *) 0xE000E400)[(offset >> 2u) & 0x1Fu];
+    reg_pri &= ~(0xF0u << (8u * (offset & 0x3u)));
+    reg_pri |= (0xF0u & (((uint32_t) priority) << 5u)) << (8u * (offset & 0x3u));
+    ((uint32_t *) 0xE000E400)[(offset >> 2u) & 0x1Fu] = reg_pri;
+    return id;
+}

@@ -6,6 +6,6 @@
 #define GPSDO_TEMP_H
 
 void TEMP_init();
-int16_t TEMP_get();
+int16_t TEMP_proc();
 
 #endif //GPSDO_TEMP_H

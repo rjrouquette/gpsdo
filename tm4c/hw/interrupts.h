@@ -134,4 +134,12 @@ void ISR_Timer6B(void);
 void ISR_Timer7A(void);
 void ISR_Timer7B(void);
 
+// enable ISR
+int ISR_enable(void(*isr)(void));
+// enable ISR
+int ISR_disable(void(*isr)(void));
+// set ISR priority
+int ISR_priority(void(*isr)(void), uint8_t priority);
+
+
 #endif //TM4C_INTERRUPTS_H
