@@ -29,8 +29,6 @@ void TEMP_init() {
 
 int16_t TEMP_proc() {
     ADC0.PSSI.SS3 = 1;
-//    while(ADC0.SS3.FSTAT.EMPTY)
-//        __asm volatile("nop");
     int32_t temp = adc_temp;
     temp *= 63360;
     temp = 154664960 - temp;
@@ -38,7 +36,8 @@ int16_t TEMP_proc() {
 }
 
 void ISR_ADC0Sequence3(void) {
+    // clear interrupt
     ADC0.ISC.IN3 = 1;
+    // store value
     adc_temp = ADC0.SS3.FIFO.DATA;
-    LED0_TGL();
 }
