@@ -102,7 +102,7 @@ struct ADC_SS_MAP {
             unsigned TPTR: 4;
             unsigned HPTR: 4;
             unsigned EMPTY: 1;
-            unsigned _reserved: 3;
+            unsigned : 3;
             unsigned FULL: 1;
         };
         uint32_t raw;
@@ -110,21 +110,21 @@ struct ADC_SS_MAP {
     union {
         struct {
             unsigned S0DCOP: 1;
-            unsigned _reserved_0: 3;
+            unsigned : 3;
             unsigned S1DCOP: 1;
-            unsigned _reserved_1: 3;
+            unsigned : 3;
             unsigned S2DCOP: 1;
-            unsigned _reserved_2: 3;
+            unsigned : 3;
             unsigned S3DCOP: 1;
-            unsigned _reserved_3: 3;
+            unsigned : 3;
             unsigned S4DCOP: 1;
-            unsigned _reserved_4: 3;
+            unsigned : 3;
             unsigned S5DCOP: 1;
-            unsigned _reserved_5: 3;
+            unsigned : 3;
             unsigned S6DCOP: 1;
-            unsigned _reserved_6: 3;
+            unsigned : 3;
             unsigned S7DCOP: 1;
-            unsigned _reserved_7: 3;
+            unsigned : 3;
         };
         uint32_t raw;
     } OP;           // ADC Sample Sequence Operation
@@ -144,21 +144,21 @@ struct ADC_SS_MAP {
     union {
         struct {
             unsigned EMUX0: 1;
-            unsigned _reserved_0: 3;
+            unsigned : 3;
             unsigned EMUX1: 1;
-            unsigned _reserved_1: 3;
+            unsigned : 3;
             unsigned EMUX2: 1;
-            unsigned _reserved_2: 3;
+            unsigned : 3;
             unsigned EMUX3: 1;
-            unsigned _reserved_3: 3;
+            unsigned : 3;
             unsigned EMUX4: 1;
-            unsigned _reserved_4: 3;
+            unsigned : 3;
             unsigned EMUX5: 1;
-            unsigned _reserved_5: 3;
+            unsigned : 3;
             unsigned EMUX6: 1;
-            unsigned _reserved_6: 3;
+            unsigned : 3;
             unsigned EMUX7: 1;
-            unsigned _reserved_7: 3;
+            unsigned : 3;
         };
         uint32_t raw;
     } EMUX;         // ADC Sample Sequence Extended Input Multiplexer Select
@@ -186,12 +186,12 @@ struct ADC_MAP {
             unsigned ASEN1: 1;
             unsigned ASEN2: 1;
             unsigned ASEN3: 1;
-            unsigned _reserved_00: 4;
+            unsigned : 4;
             unsigned ADEN0: 1;
             unsigned ADEN1: 1;
             unsigned ADEN2: 1;
             unsigned ADEN3: 1;
-            unsigned _reserved_01: 4;
+            unsigned : 4;
             unsigned BUSY: 1;
         };
         uint32_t raw;
@@ -203,12 +203,12 @@ struct ADC_MAP {
             unsigned MASK1: 1;
             unsigned MASK2: 1;
             unsigned MASK3: 1;
-            unsigned _reserved_00: 4;
+            unsigned : 4;
             unsigned DMAMASK0: 1;
             unsigned DMAMASK1: 1;
             unsigned DMAMASK2: 1;
             unsigned DMAMASK3: 1;
-            unsigned _reserved_01: 4;
+            unsigned : 4;
             unsigned DCONSS0: 1;
             unsigned DCONSS1: 1;
             unsigned DCONSS2: 1;
@@ -222,12 +222,12 @@ struct ADC_MAP {
             unsigned IN1: 1;
             unsigned IN2: 1;
             unsigned IN3: 1;
-            unsigned _reserved_00: 4;
+            unsigned : 4;
             unsigned DMAIN0: 1;
             unsigned DMAIN1: 1;
             unsigned DMAIN2: 1;
             unsigned DMAIN3: 1;
-            unsigned _reserved_01: 4;
+            unsigned : 4;
             unsigned DCINSS0: 1;
             unsigned DCINSS1: 1;
             unsigned DCINSS2: 1;
@@ -255,9 +255,9 @@ struct ADC_MAP {
             unsigned SS1: 1;
             unsigned SS2: 1;
             unsigned SS3: 1;
-            unsigned _reserved_0: 23;
+            unsigned : 23;
             unsigned SYNCWAIT: 1;
-            unsigned _reserved_1: 3;
+            unsigned : 3;
             unsigned GSYNC: 1;
         };
         uint32_t raw;

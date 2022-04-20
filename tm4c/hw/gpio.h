@@ -85,7 +85,7 @@ _Static_assert(sizeof(struct GPIO_MAP) == 4096, "GPIO_MAP must be 4096 bytes");
 
 #define GPIO_LOCK_KEY (0x4C4F434B)
 
-union RCGCGPIO_MAP{
+union RCGCGPIO_MAP {
     struct {
         unsigned EN_PORTA: 1;
         unsigned EN_PORTB: 1;

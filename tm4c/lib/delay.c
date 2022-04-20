@@ -22,6 +22,11 @@ void delay_ms(uint16_t delay) {
         delay -= 50;
         delay_us(50000);
     }
+    // moderate delay
+    while(delay > 7) {
+        delay -= 7;
+        delay_us(7000);
+    }
     // fine delay
     while(delay) {
         --delay;

@@ -27,32 +27,40 @@ int main(void) {
 
     LED0_ON();
 
-    uint16_t refresh = 0;
+    uint32_t next = 0;
     char temp[32];
     int end;
     for(;;) {
-        delay_ms(500);
-        LED1_TGL();
+        uint32_t now = CLK_MONOTONIC_INT();
+        if(now & 0x1u)
+            LED1_ON();
+        else
+            LED1_OFF();
 
-        if((refresh++ & 0x1fu) == 0) {
-            temp[0] = '0'; temp[1] = 'x';
-            end = toHex(refresh, 4, '0', temp+2);
-            temp[2 + end] = 0;
-            FONT_drawText(0, 16, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
-
-            end = toDec(refresh >> 5u, 22, ' ', temp);
-            temp[end] = 0;
-            FONT_drawText(0, 32, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+        int32_t diff = now - next;
+        if(diff >= 0) {
+            uint64_t mono = CLK_MONOTONIC();
 
             end = toTemp(TEMP_proc(), temp);
             temp[end] = 0;
+            FONT_drawText(0, 32, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+
+            end = toDec(now, 8, ' ', temp);
+            temp[8] = 0;
             FONT_drawText(0, 48, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
-            end = toHex(*((uint32_t *) 0xE000E100), 8, '0', temp);
-            temp[end] = 0;
+            end = toDec(mono >> 32u, 8, ' ', temp);
+            temp[8] = '.';
+            end = toDec((1000 * ((mono >> 16u) & 0xFFFFu)) >> 16u, 3, '0', temp+9);
+            temp[12] = 0;
             FONT_drawText(0, 64, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
+            end = toDec(diff&15, 8, ' ', temp);
+            temp[8] = 0;
+            FONT_drawText(0, 80, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+
             EPD_refresh();
+            next += 10;
         }
     }
 }

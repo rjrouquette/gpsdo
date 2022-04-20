@@ -124,7 +124,7 @@ _Static_assert(sizeof(struct QSSI_MAP) == 4096, "QSSI_MAP must be 4096 bytes");
 #define SSI2    (*(volatile struct QSSI_MAP *) 0x4000A000)
 #define SSI3    (*(volatile struct QSSI_MAP *) 0x4000B000)
 
-union RCGCSSI_MAP{
+union RCGCSSI_MAP {
     struct {
         unsigned EN_SSI0: 1;
         unsigned EN_SSI1: 1;

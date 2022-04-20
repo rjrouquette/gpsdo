@@ -24,10 +24,11 @@ void TEMP_init() {
     ADC0.SS3.TSH.TSH0 = ADC_TSH_256;
     ADC0.IM.MASK3 = 1;
     ADC0.ACTSS.ASEN3 = 1;
+    // trigger temperature measurement
+    ADC0.PSSI.SS3 = 1;
 }
 
 int16_t TEMP_proc() {
-    ADC0.PSSI.SS3 = 1;
     int32_t temp = adc_temp;
     temp *= 63360;
     temp = 154664960 - temp;
