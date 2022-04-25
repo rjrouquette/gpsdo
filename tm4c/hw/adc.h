@@ -1,6 +1,8 @@
-//
-// Created by robert on 4/17/22.
-//
+/**
+ * ADC Register Mapping
+ * @author Robert J. Rouquette
+ * @date 2022-04-17
+ */
 
 #ifndef TM4C_ADC_H
 #define TM4C_ADC_H
