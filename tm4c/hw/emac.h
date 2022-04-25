@@ -9,6 +9,30 @@
 
 #include <stdint.h>
 
+enum EMAC_PRELEN {
+    EMAC_PRELEN_7BYTES = 0x0,
+    EMAC_PRELEN_5BYTES = 0x1,
+    EMAC_PRELEN_3BYTES = 0x2
+};
+
+enum EMAC_BL {
+    EMAC_BL_10 = 0x0,
+    EMAC_BL_8 = 0x1,
+    EMAC_BL_4 = 0x2,
+    EMAC_BL_1 = 0x3,
+};
+
+enum EMAC_IFG {
+    EMAC_EFG_96BITS = 0x0,
+    EMAC_EFG_88BITS = 0x1,
+    EMAC_EFG_80BITS = 0x2,
+    EMAC_EFG_72BITS = 0x3,
+    EMAC_EFG_64BITS = 0x4,
+    EMAC_EFG_56BITS = 0x5,
+    EMAC_EFG_48BITS = 0x6,
+    EMAC_EFG_40BITS = 0x7
+};
+
 enum EMAC_SADDR {
     EMAC_SADDR_INS0 = 0x02,
     EMAC_SADDR_REP0 = 0x03,
@@ -20,11 +44,11 @@ struct EMAC_MAP {
     // offset 0x000
     union {
         struct {
-            unsigned PRELEN: 2;
+            enum EMAC_PRELEN PRELEN: 2;
             unsigned RE: 1;
             unsigned TE: 1;
             unsigned DC: 1;
-            unsigned BL: 2;
+            enum EMAC_BL BL: 2;
             unsigned ACS: 1;
             unsigned : 1;
             unsigned DR: 1;
@@ -35,7 +59,7 @@ struct EMAC_MAP {
             unsigned FES: 1;
             unsigned PS: 1;
             unsigned DISCRS: 1;
-            unsigned IFG: 1;
+            enum EMAC_IFG IFG: 3;
             unsigned JFEN: 1;
             unsigned : 1;
             unsigned JD: 1;
@@ -44,7 +68,7 @@ struct EMAC_MAP {
             unsigned CST: 1;
             unsigned : 1;
             unsigned TWOKPEN: 1;
-            unsigned SADDR: 1;
+            enum EMAC_SADDR SADDR: 3;
         };
         uint32_t raw;
     } CFG;
