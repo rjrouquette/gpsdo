@@ -251,6 +251,145 @@ PAGE_MAP (EMAC_MAP, {
         unsigned UCDBC: 1;
     }) MMCCTRL;
 
+    // offset 0x104
+    // Ethernet MAC MMC Receive Raw Interrupt Status
+    REGMAP_32 (, {
+        unsigned GBF: 1;
+        unsigned : 4;
+        unsigned CRCERR: 1;
+        unsigned ALGNERR: 1;
+        unsigned : 10;
+        unsigned UCGF : 1;
+    }) MMCRXRIS;
+
+    // offset 0x108
+    // Ethernet MAC MMC Transmit Raw Interrupt Status
+    REGMAP_32 (, {
+        unsigned : 1;
+        unsigned GBF: 1;
+        unsigned : 14;
+        unsigned SCOLLGF: 1;
+        unsigned MCOLLGF: 1;
+        unsigned : 4;
+        unsigned OCTCNT: 1;
+    }) MMCTXRIS;
+
+    // offset 0x10C
+    // Ethernet MAC MMC Receive Interrupt Mask
+    REGMAP_32 (, {
+        unsigned GBF: 1;
+        unsigned : 4;
+        unsigned CRCERR: 1;
+        unsigned ALGNERR: 1;
+        unsigned : 10;
+        unsigned UCGF: 1;
+    }) MMCRXIM;
+
+    // offset 0x110
+    // Ethernet MAC MMC Transmit Interrupt Mask
+    REGMAP_32 (, {
+        unsigned : 1;
+        unsigned GBF: 1;
+        unsigned : 14;
+        unsigned SCOLLGF: 1;
+        unsigned MCOLLGF: 1;
+        unsigned : 4;
+        unsigned OCTCNT: 1;
+    }) MMCTXIM;
+
+    // reserved space
+    char _reserved_4[0x004];
+
+    // offset 0x118
+    // Ethernet MAC Transmit Frame Count for Good and Bad Frames
+    uint32_t TXCNTGB;
+
+    // reserved space
+    char _reserved_5[0x030];
+
+    // offset 0x14C
+    // Ethernet MAC Transmit Frame Count for Frames Transmitted after Single Collision
+    uint32_t TXCNTSCOL;
+
+    // offset 0x150
+    // Ethernet MAC Transmit Frame Count for Frames Transmitted after Multiple Collisions
+    uint32_t TXCNTMCOL;
+
+    // reserved space
+    char _reserved_6[0x010];
+
+    // offset 0x164
+    // Ethernet MAC Transmit Octet Count Good
+    uint32_t TXOCTCNTG;
+
+    // reserved space
+    char _reserved_7[0x018];
+
+    // offset 0x180
+    // Ethernet MAC Receive Frame Count for Good and Bad Frames
+    uint32_t RXCNTGB;
+
+    // reserved space
+    char _reserved_8[0x010];
+
+    // offset 0x194
+    // Ethernet MAC Receive Frame Count for CRC Error Frames
+    uint32_t RXCNTCRCERR;
+
+    // offset 0x198
+    // Ethernet MAC Receive Frame Count for Alignment Error Frames
+    uint32_t RXCNTALGNERR;
+
+    // reserved space
+    char _reserved_9[0x028];
+
+    // offset 0x1C4
+    // Ethernet MAC Receive Frame Count for Good Unicast Frames
+    uint32_t RXCNTGUNI;
+
+    // reserved space
+    char _reserved_A[0x3BC];
+
+    // offset 0x584
+    // Ethernet MAC VLAN Tag Inclusion or Replacement
+    REGMAP_32 (, {
+        unsigned VLT: 16;
+        unsigned VLC: 2;
+        unsigned VLP: 1;
+        unsigned CSVL: 1;
+    }) VLNINCREP;
+
+    // offset 0x588
+    // Ethernet MAC VLAN Hash Table
+    REGMAP_32 (, {
+        unsigned VLHT: 16;
+    }) VLANHASH;
+
+    // reserved space
+    char _reserved_B[0x174];
+
+    // offset 0x700
+    // Ethernet MAC Timestamp Control
+    REGMAP_32 (, {
+        unsigned TSEN: 1;
+        unsigned TSFCUPDT: 1;
+        unsigned TSINIT: 1;
+        unsigned TSUPDT: 1;
+        unsigned INTTRIG: 1;
+        unsigned ADDREGUP: 1;
+        unsigned : 2;
+        unsigned ALLF: 1;
+        unsigned DGTLBIN: 1;
+        unsigned PTPVER2: 1;
+        unsigned PTPETH: 1;
+        unsigned PTPIPV6: 1;
+        unsigned PTPIPV4: 1;
+        unsigned TSEVNT: 1;
+        unsigned TSMAST: 1;
+        unsigned SELPTP: 1;
+        unsigned PTPFLTR: 1;
+    }) TIMSTCTRL;
+
     // offset 0xFC0
     // Ethernet MAC Peripheral Property Register
     REGMAP_32 (, {
