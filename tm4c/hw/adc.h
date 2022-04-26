@@ -45,7 +45,7 @@ enum ADC_CLK_SRC {
 struct ADC_SS_MAP {
     // offset 0x000
     // ADC Sample Sequence Input Multiplexer Select
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned MUX0: 4;
         unsigned MUX1: 4;
         unsigned MUX2: 4;
@@ -58,7 +58,7 @@ struct ADC_SS_MAP {
 
     // offset 0x004
     // ADC Sample Sequence Control
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned D0: 1;
         unsigned END0: 1;
         unsigned IE0: 1;
@@ -95,13 +95,13 @@ struct ADC_SS_MAP {
 
     // offset 0x008
     // ADC Sample Sequence Result FIFO
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned DATA: 12;
     }) FIFO;
 
     // offset 0x00C
     // ADC Sample Sequence FIFO Status
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned TPTR: 4;
         unsigned HPTR: 4;
         unsigned EMPTY: 1;
@@ -111,7 +111,7 @@ struct ADC_SS_MAP {
 
     // offset 0x010
     // ADC Sample Sequence Operation
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned S0DCOP: 1;
         unsigned : 3;
         unsigned S1DCOP: 1;
@@ -132,7 +132,7 @@ struct ADC_SS_MAP {
 
     // offset 0x014
     // ADC Sample Sequence Digital Comparator Select
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned S0DCSEL: 4;
         unsigned S1DCSEL: 4;
         unsigned S2DCSEL: 4;
@@ -145,7 +145,7 @@ struct ADC_SS_MAP {
 
     // offset 0x018
     // ADC Sample Sequence Extended Input Multiplexer Select
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned EMUX0: 1;
         unsigned : 3;
         unsigned EMUX1: 1;
@@ -166,7 +166,7 @@ struct ADC_SS_MAP {
 
     // offset 0x01C
     // ADC Sample Sequence Sample and Hold Time
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         enum ADC_TSH_WIDTH TSH0: 4;
         enum ADC_TSH_WIDTH TSH1: 4;
         enum ADC_TSH_WIDTH TSH2: 4;
@@ -179,10 +179,10 @@ struct ADC_SS_MAP {
 };
 _Static_assert(sizeof(struct ADC_SS_MAP) == 32, "ADC_SS_MAP must be 32 bytes");
 
-PERIPHERAL_MAP (ADC_MAP, {
+PAGE_MAP (ADC_MAP, {
     // offset 0x000
     // ADC Active Sample Sequencer
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned ASEN0: 1;
         unsigned ASEN1: 1;
         unsigned ASEN2: 1;
@@ -198,7 +198,7 @@ PERIPHERAL_MAP (ADC_MAP, {
 
     // offset 0x004
     // ADC Raw Interrupt Status
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned INR0: 1;
         unsigned INR1: 1;
         unsigned INR2: 1;
@@ -214,7 +214,7 @@ PERIPHERAL_MAP (ADC_MAP, {
 
     // offset 0x008
     // ADC Interrupt Mask
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned MASK0: 1;
         unsigned MASK1: 1;
         unsigned MASK2: 1;
@@ -233,7 +233,7 @@ PERIPHERAL_MAP (ADC_MAP, {
 
     // offset 0x00C
     // ADC Interrupt Status and Clear
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned IN0: 1;
         unsigned IN1: 1;
         unsigned IN2: 1;
@@ -252,7 +252,7 @@ PERIPHERAL_MAP (ADC_MAP, {
 
     // offset 0x010
     // ADC Overflow Status
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned OV0: 1;
         unsigned OV1: 1;
         unsigned OV2: 1;
@@ -261,7 +261,7 @@ PERIPHERAL_MAP (ADC_MAP, {
 
     // offset 0x014
     // ADC Event Multiplexer
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         enum ADC_SS_TRIGGER EM0: 4;
         enum ADC_SS_TRIGGER EM1: 4;
         enum ADC_SS_TRIGGER EM2: 4;
@@ -276,7 +276,7 @@ PERIPHERAL_MAP (ADC_MAP, {
 
     // offset 0x028
     // ADC Processor Sample Sequence Initiate
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned SS0: 1;
         unsigned SS1: 1;
         unsigned SS2: 1;
@@ -291,7 +291,7 @@ PERIPHERAL_MAP (ADC_MAP, {
 
     // offset 0x030
     // ADC Sample Averaging Control
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned AVG: 3;
     }) SAC;
     // offset 0x034
@@ -345,7 +345,7 @@ PERIPHERAL_MAP (ADC_MAP, {
 
     // offset 0xFC8
     // ADC Clock Configuration
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         enum ADC_CLK_SRC CS: 4;
         unsigned CLKDIV: 6;
     }) CC;
@@ -369,7 +369,7 @@ PERIPHERAL_MAP (ADC_MAP, {
 #define ADC0    (*(volatile struct ADC_MAP *) 0x40038000)
 #define ADC1    (*(volatile struct ADC_MAP *) 0x40039000)
 
-REGISTER_32 (RCGCADC_MAP, {
+REGMAP_32 (RCGCADC_MAP, {
     unsigned EN_ADC0: 1;
     unsigned EN_ADC1: 1;
 });

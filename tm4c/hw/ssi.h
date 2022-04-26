@@ -31,10 +31,10 @@ enum SSI_DSS_e {
     SSI_DSS_16_BIT = 15,
 };
 
-PERIPHERAL_MAP (QSSI_MAP, {
+PAGE_MAP (QSSI_MAP, {
     // offset 0x000
     // QSSI Control 0
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         enum SSI_DSS_e DSS: 4;
         unsigned FRF: 2;
         unsigned SPO: 1;
@@ -45,7 +45,7 @@ PERIPHERAL_MAP (QSSI_MAP, {
 
     // offset 0x004
     // QSSI Control 1
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned LBM: 1;
         unsigned SSE: 1;
         unsigned MS: 1;
@@ -59,13 +59,13 @@ PERIPHERAL_MAP (QSSI_MAP, {
 
     // offset 0x008
     // QSSI Data
-    REGISTER_32 (,{
+    REGMAP_32 (, {
             unsigned DATA: 16;
     }) DR;
 
     // offset 0x00C
     // QSSI Status
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned TFE: 1;
         unsigned TNF: 1;
         unsigned RNE: 1;
@@ -75,7 +75,7 @@ PERIPHERAL_MAP (QSSI_MAP, {
 
     // offset 0x010
     // QSSI Clock Prescale
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned CPSDVSR: 8;
     }) CPSR;
 
@@ -94,7 +94,7 @@ PERIPHERAL_MAP (QSSI_MAP, {
 
     // offset 0xFC8
     // QSSI Clock Configuration
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         enum SSI_CLK_SRC_e CS: 4;
     }) CC;
 
@@ -119,7 +119,7 @@ PERIPHERAL_MAP (QSSI_MAP, {
 #define SSI2    (*(volatile struct QSSI_MAP *) 0x4000A000)
 #define SSI3    (*(volatile struct QSSI_MAP *) 0x4000B000)
 
-REGISTER_32 (RCGCSSI_MAP, {
+REGMAP_32 (RCGCSSI_MAP, {
     unsigned EN_SSI0: 1;
     unsigned EN_SSI1: 1;
     unsigned EN_SSI2: 1;

@@ -7,8 +7,8 @@
 
 #include <stdint.h>
 
-#define REGISTER_32(type, fields) union type { struct fields; uint32_t raw; }
+#define REGMAP_32(type, fields) union type { struct fields; uint32_t raw; }
 
-#define PERIPHERAL_MAP(type, fields) struct type fields; _Static_assert(sizeof(struct type) == 4096, "PERIPHERAL_MAP must be 4096 bytes");
+#define PAGE_MAP(type, fields) struct type fields; _Static_assert(sizeof(struct type) == 4096, "PERIPHERAL_MAP must be 4096 bytes");
 
 #endif //GPSDO_REGISTER_H

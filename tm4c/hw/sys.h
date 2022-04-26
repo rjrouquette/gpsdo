@@ -9,7 +9,7 @@
 
 #include "register.h"
 
-REGISTER_32 (STCTRL_MAP, {
+REGMAP_32 (STCTRL_MAP, {
     unsigned ENABLE: 1;
     unsigned INTEN: 1;
     unsigned CLK_SRC: 1;
@@ -18,17 +18,17 @@ REGISTER_32 (STCTRL_MAP, {
 });
 #define STCTRL (*(volatile union STCTRL_MAP *)0xE000E010)
 
-REGISTER_32 (STRELOAD_MAP, {
+REGMAP_32 (STRELOAD_MAP, {
     unsigned RELOAD: 24;
 });
 #define STRELOAD (*(volatile union STRELOAD_MAP *)0xE000E014)
 
-REGISTER_32 (STCURRENT_MAP, {
+REGMAP_32 (STCURRENT_MAP, {
     unsigned CURRENT: 24;
 });
 #define STCURRENT (*(volatile union STCURRENT_MAP *)0xE000E018)
 
-REGISTER_32 (RIS_MAP, {
+REGMAP_32 (RIS_MAP, {
     unsigned : 1;
     unsigned BORRIS: 1;
     unsigned : 1;
@@ -40,7 +40,7 @@ REGISTER_32 (RIS_MAP, {
 });
 #define SYSRIS (*(volatile union RIS_MAP *)0x400FE050)
 
-REGISTER_32 (MOSCCTL_MAP, {
+REGMAP_32 (MOSCCTL_MAP, {
     unsigned CVAL: 1;
     unsigned MOSCIM: 1;
     unsigned NOXTAL: 1;
@@ -49,7 +49,7 @@ REGISTER_32 (MOSCCTL_MAP, {
 });
 #define MOSCCTL (*(volatile union MOSCCTL_MAP *)0x400FE07C)
 
-REGISTER_32 (RSCLKCFG_MAP, {
+REGMAP_32 (RSCLKCFG_MAP, {
     unsigned PSYSDIV: 10;
     unsigned OSYSDIV: 10;
     unsigned OSCSRC: 4;
@@ -61,7 +61,7 @@ REGISTER_32 (RSCLKCFG_MAP, {
 });
 #define RSCLKCFG (*(volatile union RSCLKCFG_MAP *)0x400FE0B0)
 
-REGISTER_32 (MEMTIM0_MAP, {
+REGMAP_32 (MEMTIM0_MAP, {
     unsigned FWS: 4;
     unsigned : 1;
     unsigned FBCE: 1;
@@ -74,7 +74,7 @@ REGISTER_32 (MEMTIM0_MAP, {
 });
 #define MEMTIM0 (*(volatile union MEMTIM0_MAP *)0x400FE0C0)
 
-REGISTER_32 (PLLFREQ0_MAP, {
+REGMAP_32 (PLLFREQ0_MAP, {
     unsigned MINT: 10;
     unsigned MFRAC: 10;
     unsigned : 3;
@@ -82,14 +82,14 @@ REGISTER_32 (PLLFREQ0_MAP, {
 });
 #define PLLFREQ0 (*(volatile union PLLFREQ0_MAP *)0x400FE160)
 
-REGISTER_32(PLLFREQ1_MAP, {
+REGMAP_32(PLLFREQ1_MAP, {
     unsigned N: 5;
     unsigned : 3;
     unsigned Q: 5;
 });
 #define PLLFREQ1 (*(volatile union PLLFREQ1_MAP *)0x400FE164)
 
-REGISTER_32 (PLLSTAT_MAP, {
+REGMAP_32 (PLLSTAT_MAP, {
     unsigned LOCK: 1;
 });
 #define PLLSTAT (*(volatile union PLLSTAT_MAP *)0x400FE168)

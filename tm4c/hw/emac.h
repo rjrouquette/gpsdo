@@ -40,10 +40,10 @@ enum EMAC_SADDR {
     EMAC_SADDR_REP1 = 0x07,
 };
 
-PERIPHERAL_MAP (EMAC_MAP, {
+PAGE_MAP (EMAC_MAP, {
     // offset 0x000
     // Ethernet MAC Configuration
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         enum EMAC_PRELEN PRELEN: 2;
         unsigned RE: 1;
         unsigned TE: 1;
@@ -73,7 +73,7 @@ PERIPHERAL_MAP (EMAC_MAP, {
 
     // offset 0x004
     // Ethernet MAC Frame Filter
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned PR: 1;
         unsigned HUC: 1;
         unsigned HMC: 1;
@@ -89,6 +89,30 @@ PERIPHERAL_MAP (EMAC_MAP, {
         unsigned : 14;
         unsigned RA: 1;
     }) FRAMEFLTR;
+
+    // offset 0x008
+    // Ethernet MAC Hash Table High
+    uint32_t HASHTBLH;
+
+    // offset 0x00C
+    // Ethernet MAC Hash Table Low
+    uint32_t HASHTBLL;
+
+    // offset 0x010
+    // Ethernet MAC MII Address
+    REGMAP_32 (, {
+        unsigned MIB: 1;
+        unsigned MIW: 1;
+        unsigned CR: 4;
+        unsigned MII: 5;
+        unsigned PLA: 5;
+    }) MIIADDR;
+
+    // offset 0x014
+    // Ethernet MAC MII Data Register
+    REGMAP_32 (, {
+        unsigned DATA: 16;
+    }) MIIDATA;
 
     // offset 0x400
     uint32_t DIR;       // GPIO Direction
@@ -124,9 +148,43 @@ PERIPHERAL_MAP (EMAC_MAP, {
     uint32_t WAKESTAT;  // GPIO Wake Status
     // reserved space
     char _reserved_01[0xA74];
+
     // offset 0xFC0
-    uint32_t PP;  // GPIO Peripheral Property
-    uint32_t PC;  // GPIO Peripheral Configuration
+    // Ethernet MAC Peripheral Property Register
+    REGMAP_32 (, {
+        unsigned PHYTYPE: 3;
+        unsigned : 5;
+        unsigned MACTYPE: 3;
+    }) PP;
+
+    // offset 0xFC4
+    // Ethernet MAC Peripheral Configuration Register
+    REGMAP_32(, {
+        unsigned PHYHOLD: 1;
+        unsigned ANMODE: 2;
+        unsigned ANEN: 1;
+        unsigned FASTANSEL: 2;
+        unsigned FASTEN: 1;
+        unsigned EXTFD: 1;
+        unsigned FASTLUPD: 1;
+        unsigned FASTRXDV: 1;
+        unsigned MDIXEN: 1;
+        unsigned FASTMDIX: 1;
+        unsigned RBSTMDIX: 1;
+        unsigned MDISWAP: 1;
+        unsigned POLSWAP: 1;
+        unsigned FASTLDMODE: 5;
+        unsigned TDRRUN: 1;
+        unsigned LRR: 1;
+        unsigned ISOMILL: 1;
+        unsigned RXERRIDLE: 1;
+        unsigned NIBDETDIS: 1;
+        unsigned DIGRESTART: 1;
+        unsigned : 2;
+        unsigned PINTFS: 3;
+        unsigned PHYEXT: 1;
+    }) PC;
+
     // reserved space
     char _reserved_02[0x8];
     // offset 0xFD0
@@ -143,5 +201,37 @@ PERIPHERAL_MAP (EMAC_MAP, {
     uint32_t PCellID2;
     uint32_t PCellID3;
 })
+
+#define EMAC0   (*(volatile struct ADC_MAP *) 0x400EC000)
+
+REGMAP_32 (RCGCEMAC_MAP, {
+    unsigned EN0: 1;
+});
+#define RCGCEMAC (*(volatile union RCGCEMAC_MAP *)0x400FE69C)
+
+REGMAP_32 (PCEMAC_MAP, {
+    unsigned EN0: 1;
+});
+#define PCEMAC (*(volatile union PCEMAC_MAP *)0x400FE99C)
+
+REGMAP_32 (PREMAC_MAP, {
+    unsigned RDY0: 1;
+});
+#define PREMAC (*(volatile union PREMAC_MAP *)0x400FEA9C)
+
+REGMAP_32 (RCGCEPHY_MAP, {
+    unsigned EN0: 1;
+});
+#define RCGCEPHY (*(volatile union RCGCEPHY_MAP *)0x400FE630)
+
+REGMAP_32 (PCEPHY_MAP, {
+    unsigned EN0: 1;
+});
+#define PCEPHY (*(volatile union PCEPHY_MAP *)0x400FE930)
+
+REGMAP_32 (PREPHY_MAP, {
+    unsigned RDY0: 1;
+});
+#define PREPHY (*(volatile union PREPHY_MAP *)0x400FEA30)
 
 #endif //TM4C_EMAC_H

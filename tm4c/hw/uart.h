@@ -8,10 +8,10 @@
 #include "register.h"
 #include "gpio.h"
 
-PERIPHERAL_MAP (UART_MAP, {
+PAGE_MAP (UART_MAP, {
     // offset 0x000
     // UART Data Register
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned DATA: 8;
         unsigned FE: 1;
         unsigned PE: 1;
@@ -21,7 +21,7 @@ PERIPHERAL_MAP (UART_MAP, {
 
     // offset 0x004
     // UART Error Clear
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned FE: 1;
         unsigned PE: 1;
         unsigned BE: 1;
@@ -32,7 +32,7 @@ PERIPHERAL_MAP (UART_MAP, {
 
     // offset 0x018
     // UART Flags
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned CTS: 1;
         unsigned DSR: 1;
         unsigned DCD: 1;
@@ -48,25 +48,25 @@ PERIPHERAL_MAP (UART_MAP, {
 
     // offset 0x020
     // UART IrDA Low-Power Register
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned ILPDVSR: 8;
     }) ILPR;
 
     // offset 0x024
     // UART Integer Baud-Rate Divisor
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned DIVINT: 16;
     }) IBRD;
 
     // offset 0x028
     // UART Fractional Baud-Rate Divisor
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned DIVFRAC: 6;
     }) FBRD;
 
     // offset 0x02C
     // UART Line Control
-    REGISTER_32 (,{
+    REGMAP_32 (, {
             unsigned BRK: 1;
             unsigned PEN: 1;
             unsigned EPS: 1;
@@ -88,7 +88,7 @@ PERIPHERAL_MAP (UART_MAP, {
 
     // offset 0xFC8
     // UART Clock Configuration
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         enum SSI_CLK_SRC CS: 4;
     }) CC;
 

@@ -7,7 +7,7 @@
 
 #include "register.h"
 
-REGISTER_32 (GPTM_MODE_MAP, {
+REGMAP_32 (GPTM_MODE_MAP, {
     unsigned MR: 2;
     unsigned CMR: 1;
     unsigned AMS: 1;
@@ -23,10 +23,10 @@ REGISTER_32 (GPTM_MODE_MAP, {
     unsigned TCACT: 3;
 });
 
-PERIPHERAL_MAP(GPTM_MAP, {
+PAGE_MAP(GPTM_MAP, {
     // offset 0x000
     // GPTM Configuration
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned GPTMCFG: 4;
     }) CFG;
 
@@ -35,7 +35,7 @@ PERIPHERAL_MAP(GPTM_MAP, {
 
     // offset 0x00C
     // GPTM Control
-    REGISTER_32 (,{
+    REGMAP_32 (, {
         unsigned TAEN: 1;
         unsigned TASTALL: 1;
         unsigned TAEVENT: 2;
@@ -56,7 +56,7 @@ PERIPHERAL_MAP(GPTM_MAP, {
 
     // offset 0x018
     // GPTM Interrupt Mask
-    REGISTER_32 (,{
+    REGMAP_32 (, {
             unsigned TATOIM: 1;
             unsigned CAMIM: 1;
             unsigned CAEIM: 1;
@@ -124,7 +124,7 @@ PERIPHERAL_MAP(GPTM_MAP, {
 #define GPTM6   (*(volatile struct GPTM_MAP *) 0x400E0000)
 #define GPTM7   (*(volatile struct GPTM_MAP *) 0x400E1000)
 
-REGISTER_32 (RCGCTIMER_MAP, {
+REGMAP_32 (RCGCTIMER_MAP, {
     unsigned EN_GPTM0: 1;
     unsigned EN_GPTM1: 1;
     unsigned EN_GPTM2: 1;
