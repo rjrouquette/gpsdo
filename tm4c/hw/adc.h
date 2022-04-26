@@ -181,95 +181,120 @@ _Static_assert(sizeof(struct ADC_SS_MAP) == 32, "ADC_SS_MAP must be 32 bytes");
 
 PERIPHERAL_MAP (ADC_MAP, {
     // offset 0x000
-    union {
-        struct {
-            unsigned ASEN0: 1;
-            unsigned ASEN1: 1;
-            unsigned ASEN2: 1;
-            unsigned ASEN3: 1;
-            unsigned : 4;
-            unsigned ADEN0: 1;
-            unsigned ADEN1: 1;
-            unsigned ADEN2: 1;
-            unsigned ADEN3: 1;
-            unsigned : 4;
-            unsigned BUSY: 1;
-        };
-        uint32_t raw;
-    } ACTSS;                // ADC Active Sample Sequencer
-    uint32_t RIS;           // ADC Raw Interrupt Status
-    union {
-        struct {
-            unsigned MASK0: 1;
-            unsigned MASK1: 1;
-            unsigned MASK2: 1;
-            unsigned MASK3: 1;
-            unsigned : 4;
-            unsigned DMAMASK0: 1;
-            unsigned DMAMASK1: 1;
-            unsigned DMAMASK2: 1;
-            unsigned DMAMASK3: 1;
-            unsigned : 4;
-            unsigned DCONSS0: 1;
-            unsigned DCONSS1: 1;
-            unsigned DCONSS2: 1;
-            unsigned DCONSS3: 1;
-        };
-        uint32_t raw;
-    } IM;                   // ADC Interrupt Mask
-    union {
-        struct {
-            unsigned IN0: 1;
-            unsigned IN1: 1;
-            unsigned IN2: 1;
-            unsigned IN3: 1;
-            unsigned : 4;
-            unsigned DMAIN0: 1;
-            unsigned DMAIN1: 1;
-            unsigned DMAIN2: 1;
-            unsigned DMAIN3: 1;
-            unsigned : 4;
-            unsigned DCINSS0: 1;
-            unsigned DCINSS1: 1;
-            unsigned DCINSS2: 1;
-            unsigned DCINSS3: 1;
-        };
-        uint32_t raw;
-    } ISC;           // ADC Interrupt Status and Clear
-    uint32_t OSTAT;         // ADC Overflow Status
-    union {
-        struct {
-            enum ADC_SS_TRIGGER EM0: 4;
-            enum ADC_SS_TRIGGER EM1: 4;
-            enum ADC_SS_TRIGGER EM2: 4;
-            enum ADC_SS_TRIGGER EM3: 4;
-        };
-        uint32_t raw;
-    } EMUX;                 // ADC Event Multiplexer
+    // ADC Active Sample Sequencer
+    REGISTER_32 (,{
+        unsigned ASEN0: 1;
+        unsigned ASEN1: 1;
+        unsigned ASEN2: 1;
+        unsigned ASEN3: 1;
+        unsigned : 4;
+        unsigned ADEN0: 1;
+        unsigned ADEN1: 1;
+        unsigned ADEN2: 1;
+        unsigned ADEN3: 1;
+        unsigned : 4;
+        unsigned BUSY: 1;
+    }) ACTSS;
+
+    // offset 0x004
+    // ADC Raw Interrupt Status
+    REGISTER_32 (,{
+        unsigned INR0: 1;
+        unsigned INR1: 1;
+        unsigned INR2: 1;
+        unsigned INR3: 1;
+        unsigned : 4;
+        unsigned DMAINR0: 1;
+        unsigned DMAINR1: 1;
+        unsigned DMAINR2: 1;
+        unsigned DMAINR3: 1;
+        unsigned : 4;
+        unsigned INRDC: 1;
+    }) RIS;
+
+    // offset 0x008
+    // ADC Interrupt Mask
+    REGISTER_32 (,{
+        unsigned MASK0: 1;
+        unsigned MASK1: 1;
+        unsigned MASK2: 1;
+        unsigned MASK3: 1;
+        unsigned : 4;
+        unsigned DMAMASK0: 1;
+        unsigned DMAMASK1: 1;
+        unsigned DMAMASK2: 1;
+        unsigned DMAMASK3: 1;
+        unsigned : 4;
+        unsigned DCONSS0: 1;
+        unsigned DCONSS1: 1;
+        unsigned DCONSS2: 1;
+        unsigned DCONSS3: 1;
+    }) IM;
+
+    // offset 0x00C
+    // ADC Interrupt Status and Clear
+    REGISTER_32 (,{
+        unsigned IN0: 1;
+        unsigned IN1: 1;
+        unsigned IN2: 1;
+        unsigned IN3: 1;
+        unsigned : 4;
+        unsigned DMAIN0: 1;
+        unsigned DMAIN1: 1;
+        unsigned DMAIN2: 1;
+        unsigned DMAIN3: 1;
+        unsigned : 4;
+        unsigned DCINSS0: 1;
+        unsigned DCINSS1: 1;
+        unsigned DCINSS2: 1;
+        unsigned DCINSS3: 1;
+    }) ISC;
+
+    // offset 0x010
+    // ADC Overflow Status
+    REGISTER_32 (,{
+        unsigned OV0: 1;
+        unsigned OV1: 1;
+        unsigned OV2: 1;
+        unsigned OV3: 1;
+    }) OSTAT;
+
+    // offset 0x014
+    // ADC Event Multiplexer
+    REGISTER_32 (,{
+        enum ADC_SS_TRIGGER EM0: 4;
+        enum ADC_SS_TRIGGER EM1: 4;
+        enum ADC_SS_TRIGGER EM2: 4;
+        enum ADC_SS_TRIGGER EM3: 4;
+    }) EMUX;
+
+    // offset 0x018
     uint32_t USTAT;         // ADC Underflow Status
     uint32_t TSSEL;         // ADC Trigger Source Select
     uint32_t SSPRI;         // ADC Sample Sequence Priority
     uint32_t SPC;           // ADC Sample Phase Control
-    union {
-        struct {
-            unsigned SS0: 1;
-            unsigned SS1: 1;
-            unsigned SS2: 1;
-            unsigned SS3: 1;
-            unsigned : 23;
-            unsigned SYNCWAIT: 1;
-            unsigned : 3;
-            unsigned GSYNC: 1;
-        };
-        uint32_t raw;
-    } PSSI;                 // ADC Processor Sample Sequence Initiate
+
+    // offset 0x028
+    // ADC Processor Sample Sequence Initiate
+    REGISTER_32 (,{
+        unsigned SS0: 1;
+        unsigned SS1: 1;
+        unsigned SS2: 1;
+        unsigned SS3: 1;
+        unsigned : 23;
+        unsigned SYNCWAIT: 1;
+        unsigned : 3;
+        unsigned GSYNC: 1;
+    }) PSSI;
+
     char _reserved_00[0x004];
-    union {
-        struct {
-            unsigned AVG: 3;
-        };
-        uint32_t raw;
-    } SAC;                  // ADC Sample Averaging Control
+
+    // offset 0x030
+    // ADC Sample Averaging Control
+    REGISTER_32 (,{
+        unsigned AVG: 3;
+    }) SAC;
+    // offset 0x034
     uint32_t DCISC;         // ADC Digital Comparator Interrupt Status and Clear
     uint32_t CTL;           // ADC Control
     char _reserved_01[0x004];
