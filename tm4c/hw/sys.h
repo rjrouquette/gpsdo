@@ -7,121 +7,91 @@
 #ifndef TM4C_SYS_H
 #define TM4C_SYS_H
 
-#include <stdint.h>
+#include "register.h"
 
-union STCTRL_MAP{
-    struct {
-        unsigned ENABLE: 1;
-        unsigned INTEN: 1;
-        unsigned CLK_SRC: 1;
-        unsigned _reserved: 13;
-        unsigned COUNT: 1;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (STCTRL_MAP, {
+    unsigned ENABLE: 1;
+    unsigned INTEN: 1;
+    unsigned CLK_SRC: 1;
+    unsigned : 13;
+    unsigned COUNT: 1;
+});
 #define STCTRL (*(volatile union STCTRL_MAP *)0xE000E010)
 
-union STRELOAD_MAP{
-    struct {
-        unsigned RELOAD: 24;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (STRELOAD_MAP, {
+    unsigned RELOAD: 24;
+});
 #define STRELOAD (*(volatile union STRELOAD_MAP *)0xE000E014)
 
-union STCURRENT_MAP{
-    struct {
-        unsigned CURRENT: 24;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (STCURRENT_MAP, {
+    unsigned CURRENT: 24;
+});
 #define STCURRENT (*(volatile union STCURRENT_MAP *)0xE000E018)
 
-union RIS_MAP{
-    struct {
-        unsigned _reserved_0: 1;
-        unsigned BORRIS: 1;
-        unsigned _reserved_1: 1;
-        unsigned MOFRIS: 1;
-        unsigned _reserved_2: 2;
-        unsigned PLLLRIS: 1;
-        unsigned _reserved_3: 1;
-        unsigned MOSCPUPRIS: 1;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (RIS_MAP, {
+    unsigned : 1;
+    unsigned BORRIS: 1;
+    unsigned : 1;
+    unsigned MOFRIS: 1;
+    unsigned : 2;
+    unsigned PLLLRIS: 1;
+    unsigned : 1;
+    unsigned MOSCPUPRIS: 1;
+});
 #define SYSRIS (*(volatile union RIS_MAP *)0x400FE050)
 
-union MOSCCTL_MAP{
-    struct {
-        unsigned CVAL: 1;
-        unsigned MOSCIM: 1;
-        unsigned NOXTAL: 1;
-        unsigned PWRDN: 1;
-        unsigned OSCRNG: 1;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (MOSCCTL_MAP, {
+    unsigned CVAL: 1;
+    unsigned MOSCIM: 1;
+    unsigned NOXTAL: 1;
+    unsigned PWRDN: 1;
+    unsigned OSCRNG: 1;
+});
 #define MOSCCTL (*(volatile union MOSCCTL_MAP *)0x400FE07C)
 
-union RSCLKCFG_MAP{
-    struct {
-        unsigned PSYSDIV: 10;
-        unsigned OSYSDIV: 10;
-        unsigned OSCSRC: 4;
-        unsigned PLLSRC: 4;
-        unsigned USEPLL: 1;
-        unsigned ACG: 1;
-        unsigned NEWFREQ: 1;
-        unsigned MEMTIMU: 1;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (RSCLKCFG_MAP, {
+    unsigned PSYSDIV: 10;
+    unsigned OSYSDIV: 10;
+    unsigned OSCSRC: 4;
+    unsigned PLLSRC: 4;
+    unsigned USEPLL: 1;
+    unsigned ACG: 1;
+    unsigned NEWFREQ: 1;
+    unsigned MEMTIMU: 1;
+});
 #define RSCLKCFG (*(volatile union RSCLKCFG_MAP *)0x400FE0B0)
 
-union MEMTIM0_MAP{
-    struct {
-        unsigned FWS: 4;
-        unsigned _reserved_0: 1;
-        unsigned FBCE: 1;
-        unsigned FBCHT: 4;
-        unsigned _reserved_1: 6;
-        unsigned EWS: 4;
-        unsigned _reserved_2: 1;
-        unsigned EBCE: 1;
-        unsigned EBCHT: 4;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (MEMTIM0_MAP, {
+    unsigned FWS: 4;
+    unsigned : 1;
+    unsigned FBCE: 1;
+    unsigned FBCHT: 4;
+    unsigned : 6;
+    unsigned EWS: 4;
+    unsigned : 1;
+    unsigned EBCE: 1;
+    unsigned EBCHT: 4;
+});
 #define MEMTIM0 (*(volatile union MEMTIM0_MAP *)0x400FE0C0)
 
-union PLLFREQ0_MAP{
-    struct {
-        unsigned MINT: 10;
-        unsigned MFRAC: 10;
-        unsigned _reserved: 3;
-        unsigned PLLPWR: 1;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (PLLFREQ0_MAP, {
+    unsigned MINT: 10;
+    unsigned MFRAC: 10;
+    unsigned : 3;
+    unsigned PLLPWR: 1;
+});
 #define PLLFREQ0 (*(volatile union PLLFREQ0_MAP *)0x400FE160)
 
-union PLLFREQ1_MAP{
-    struct {
-        unsigned N: 5;
-        unsigned _reserved: 3;
-        unsigned Q: 5;
-    };
-    uint32_t raw;
-};
+REGISTER_32(PLLFREQ1_MAP, {
+    unsigned N: 5;
+    unsigned : 3;
+    unsigned Q: 5;
+});
 #define PLLFREQ1 (*(volatile union PLLFREQ1_MAP *)0x400FE164)
 
-union PLLSTAT_MAP{
-    struct {
-        unsigned LOCK: 1;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (PLLSTAT_MAP, {
+    unsigned LOCK: 1;
+});
 #define PLLSTAT (*(volatile union PLLSTAT_MAP *)0x400FE168)
 
 #endif //TM4C_SYS_H

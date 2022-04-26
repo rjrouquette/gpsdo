@@ -26,6 +26,7 @@ add_executable(
         lib/fonts/ascii_16.c
         lib/format.c
         lib/led.c
+        lib/net.c
         lib/temp.c
 )
 

@@ -5,59 +5,58 @@
 #ifndef TM4C_TIMER_H
 #define TM4C_TIMER_H
 
-#include <stdint.h>
+#include "register.h"
 
-union GPTM_MODE_MAP {
-    struct {
-        unsigned MR: 2;
-        unsigned CMR: 1;
-        unsigned AMS: 1;
-        unsigned CDIR: 1;
-        unsigned MIE: 1;
-        unsigned WOT: 1;
-        unsigned SNAPS: 1;
-        unsigned ILD: 1;
-        unsigned WMIE: 1;
-        unsigned TAMRSU: 1;
-        unsigned PLO: 1;
-        unsigned CINTD: 1;
-        unsigned TCACT: 3;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (GPTM_MODE_MAP, {
+    unsigned MR: 2;
+    unsigned CMR: 1;
+    unsigned AMS: 1;
+    unsigned CDIR: 1;
+    unsigned MIE: 1;
+    unsigned WOT: 1;
+    unsigned SNAPS: 1;
+    unsigned ILD: 1;
+    unsigned WMIE: 1;
+    unsigned TAMRSU: 1;
+    unsigned PLO: 1;
+    unsigned CINTD: 1;
+    unsigned TCACT: 3;
+});
 
-struct GPTM_MAP {
+PERIPHERAL_MAP(GPTM_MAP, {
     // offset 0x000
-    union {
-        struct {
-            unsigned GPTMCFG: 4;
-        };
-        uint32_t raw;
-    } CFG;       // GPTM Configuration
+    // GPTM Configuration
+    REGISTER_32 (,{
+        unsigned GPTMCFG: 4;
+    }) CFG;
+
     union GPTM_MODE_MAP TAMR;      // GPTM Timer A Mode
     union GPTM_MODE_MAP TBMR;      // GPTM Timer B Mode
-    union {
-        struct {
-            unsigned TAEN: 1;
-            unsigned TASTALL: 1;
-            unsigned TAEVENT: 2;
-            unsigned RTCEN: 1;
-            unsigned TAOTE: 1;
-            unsigned TAPWML: 1;
-            unsigned : 1;
-            unsigned TBEN: 1;
-            unsigned TBSTALL: 1;
-            unsigned TBEVENT: 1;
-            unsigned : 1;
-            unsigned TBOTE: 1;
-            unsigned TBPWML: 1;
-        };
-        uint32_t raw;
-    } CTL;       // GPTM Control
+
+    // offset 0x00C
+    // GPTM Control
+    REGISTER_32 (,{
+        unsigned TAEN: 1;
+        unsigned TASTALL: 1;
+        unsigned TAEVENT: 2;
+        unsigned RTCEN: 1;
+        unsigned TAOTE: 1;
+        unsigned TAPWML: 1;
+        unsigned : 1;
+        unsigned TBEN: 1;
+        unsigned TBSTALL: 1;
+        unsigned TBEVENT: 1;
+        unsigned : 1;
+        unsigned TBOTE: 1;
+        unsigned TBPWML: 1;
+    }) CTL;
+
     uint32_t SYNC;      // GPTM Synchronize
     char _reserved_0[0x004];
-    union {
-        struct {
+
+    // offset 0x018
+    // GPTM Interrupt Mask
+    REGISTER_32 (,{
             unsigned TATOIM: 1;
             unsigned CAMIM: 1;
             unsigned CAEIM: 1;
@@ -72,9 +71,8 @@ struct GPTM_MAP {
             unsigned TBMIM: 1;
             unsigned DMABIM: 1;
             unsigned : 2;
-        };
-        uint32_t raw;
-    } IMR;       // GPTM Interrupt Mask
+    }) IMR;
+
     uint32_t RIS;       // GPTM Raw Interrupt Status
     uint32_t MIS;       // GPTM Masked Interrupt Status
     uint32_t ICR;       // GPTM Interrupt Clear
@@ -115,8 +113,7 @@ struct GPTM_MAP {
     uint32_t PCellID1;
     uint32_t PCellID2;
     uint32_t PCellID3;
-};
-_Static_assert(sizeof(struct GPTM_MAP) == 4096, "TIMER_MAP must be 4096 bytes");
+})
 
 #define GPTM0   (*(volatile struct GPTM_MAP *) 0x40030000)
 #define GPTM1   (*(volatile struct GPTM_MAP *) 0x40031000)
@@ -127,19 +124,16 @@ _Static_assert(sizeof(struct GPTM_MAP) == 4096, "TIMER_MAP must be 4096 bytes");
 #define GPTM6   (*(volatile struct GPTM_MAP *) 0x400E0000)
 #define GPTM7   (*(volatile struct GPTM_MAP *) 0x400E1000)
 
-union RCGCTIMER_MAP {
-    struct {
-        unsigned EN_GPTM0: 1;
-        unsigned EN_GPTM1: 1;
-        unsigned EN_GPTM2: 1;
-        unsigned EN_GPTM3: 1;
-        unsigned EN_GPTM4: 1;
-        unsigned EN_GPTM5: 1;
-        unsigned EN_GPTM6: 1;
-        unsigned EN_GPTM7: 1;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (RCGCTIMER_MAP, {
+    unsigned EN_GPTM0: 1;
+    unsigned EN_GPTM1: 1;
+    unsigned EN_GPTM2: 1;
+    unsigned EN_GPTM3: 1;
+    unsigned EN_GPTM4: 1;
+    unsigned EN_GPTM5: 1;
+    unsigned EN_GPTM6: 1;
+    unsigned EN_GPTM7: 1;
+});
 #define RCGCTIMER (*(volatile union RCGCTIMER_MAP *)0x400FE604)
 
 #endif //TM4C_TIMER_H

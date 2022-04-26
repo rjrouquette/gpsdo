@@ -7,7 +7,7 @@
 #ifndef TM4C_SSI_H
 #define TM4C_SSI_H
 
-#include <stdint.h>
+#include "register.h"
 #include "gpio.h"
 
 enum SSI_CLK_SRC_e {
@@ -31,59 +31,53 @@ enum SSI_DSS_e {
     SSI_DSS_16_BIT = 15,
 };
 
-struct QSSI_MAP {
+PERIPHERAL_MAP (QSSI_MAP, {
     // offset 0x000
-    union {
-        struct {
-            enum SSI_DSS_e DSS: 4;
-            unsigned FRF: 2;
-            unsigned SPO: 1;
-            unsigned SPH: 1;
-            unsigned SCR: 8;
-            unsigned DIR: 1;
-        };
-        uint32_t raw;
-    } CR0;              // QSSI Control 0
+    // QSSI Control 0
+    REGISTER_32 (,{
+        enum SSI_DSS_e DSS: 4;
+        unsigned FRF: 2;
+        unsigned SPO: 1;
+        unsigned SPH: 1;
+        unsigned SCR: 8;
+        unsigned DIR: 1;
+    }) CR0;
 
-    union {
-        struct {
-            unsigned LBM: 1;
-            unsigned SSE: 1;
-            unsigned MS: 1;
-            unsigned _reserved: 3;
-            unsigned MODE: 2;
-            unsigned DIR: 1;
-            unsigned HSCLKEN: 1;
-            unsigned FSSHLDFRM: 1;
-            unsigned EOM: 1;
-        };
-        uint32_t raw;
-    } CR1;              // QSSI Control 1
+    // offset 0x004
+    // QSSI Control 1
+    REGISTER_32 (,{
+        unsigned LBM: 1;
+        unsigned SSE: 1;
+        unsigned MS: 1;
+        unsigned _reserved: 3;
+        unsigned MODE: 2;
+        unsigned DIR: 1;
+        unsigned HSCLKEN: 1;
+        unsigned FSSHLDFRM: 1;
+        unsigned EOM: 1;
+    }) CR1;
 
-    union {
-        struct {
+    // offset 0x008
+    // QSSI Data
+    REGISTER_32 (,{
             unsigned DATA: 16;
-        };
-        uint32_t raw;
-    } DR;               // QSSI Data
+    }) DR;
 
-    union {
-        struct {
-            unsigned TFE: 1;
-            unsigned TNF: 1;
-            unsigned RNE: 1;
-            unsigned RFF: 1;
-            unsigned BSY: 1;
-        };
-        uint32_t raw;
-    } SR;               // QSSI Status
+    // offset 0x00C
+    // QSSI Status
+    REGISTER_32 (,{
+        unsigned TFE: 1;
+        unsigned TNF: 1;
+        unsigned RNE: 1;
+        unsigned RFF: 1;
+        unsigned BSY: 1;
+    }) SR;
 
-    union {
-        struct {
-            unsigned CPSDVSR: 8;
-        };
-        uint32_t raw;
-    } CPSR;             // QSSI Clock Prescale
+    // offset 0x010
+    // QSSI Clock Prescale
+    REGISTER_32 (,{
+        unsigned CPSDVSR: 8;
+    }) CPSR;
 
     uint32_t IM;        // QSSI Interrupt Mask
     uint32_t RIS;       // QSSI Raw Interrupt Status
@@ -91,16 +85,18 @@ struct QSSI_MAP {
     uint32_t ICR;       // QSSI Interrupt Clear
     uint32_t DMACTL;    // QSSI DMA Control
     char _reserved_00[0xF98];
+
     // offset 0xFC0
-    uint32_t PP;    // QSSI Peripheral Properties
+    // QSSI Peripheral Properties
+    uint32_t PP;
+
     char _reserved_01[4];
+
     // offset 0xFC8
-    union {
-        struct {
-            enum SSI_CLK_SRC_e CS: 4;
-        };
-        uint32_t raw;
-    } CC;               // QSSI Clock Configuration Configuration
+    // QSSI Clock Configuration
+    REGISTER_32 (,{
+        enum SSI_CLK_SRC_e CS: 4;
+    }) CC;
 
     char _reserved_02[4];
     // offset 0xFD0
@@ -116,23 +112,19 @@ struct QSSI_MAP {
     uint32_t PCellID1;
     uint32_t PCellID2;
     uint32_t PCellID3;
-};
-_Static_assert(sizeof(struct QSSI_MAP) == 4096, "QSSI_MAP must be 4096 bytes");
+})
 
 #define SSI0    (*(volatile struct QSSI_MAP *) 0x40008000)
 #define SSI1    (*(volatile struct QSSI_MAP *) 0x40009000)
 #define SSI2    (*(volatile struct QSSI_MAP *) 0x4000A000)
 #define SSI3    (*(volatile struct QSSI_MAP *) 0x4000B000)
 
-union RCGCSSI_MAP {
-    struct {
-        unsigned EN_SSI0: 1;
-        unsigned EN_SSI1: 1;
-        unsigned EN_SSI2: 1;
-        unsigned EN_SSI3: 1;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (RCGCSSI_MAP, {
+    unsigned EN_SSI0: 1;
+    unsigned EN_SSI1: 1;
+    unsigned EN_SSI2: 1;
+    unsigned EN_SSI3: 1;
+});
 #define RCGCSSI (*(volatile union RCGCSSI_MAP *)0x400FE61C)
 
 #endif //TM4C_SSI_H

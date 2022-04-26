@@ -7,7 +7,7 @@
 #ifndef TM4C_EMAC_H
 #define TM4C_EMAC_H
 
-#include <stdint.h>
+#include "register.h"
 
 enum EMAC_PRELEN {
     EMAC_PRELEN_7BYTES = 0x0,
@@ -40,38 +40,56 @@ enum EMAC_SADDR {
     EMAC_SADDR_REP1 = 0x07,
 };
 
-struct EMAC_MAP {
+PERIPHERAL_MAP (EMAC_MAP, {
     // offset 0x000
-    union {
-        struct {
-            enum EMAC_PRELEN PRELEN: 2;
-            unsigned RE: 1;
-            unsigned TE: 1;
-            unsigned DC: 1;
-            enum EMAC_BL BL: 2;
-            unsigned ACS: 1;
-            unsigned : 1;
-            unsigned DR: 1;
-            unsigned IPC: 1;
-            unsigned DUPM: 1;
-            unsigned LOOPBM: 1;
-            unsigned DRO: 1;
-            unsigned FES: 1;
-            unsigned PS: 1;
-            unsigned DISCRS: 1;
-            enum EMAC_IFG IFG: 3;
-            unsigned JFEN: 1;
-            unsigned : 1;
-            unsigned JD: 1;
-            unsigned WDDIS: 1;
-            unsigned : 1;
-            unsigned CST: 1;
-            unsigned : 1;
-            unsigned TWOKPEN: 1;
-            enum EMAC_SADDR SADDR: 3;
-        };
-        uint32_t raw;
-    } CFG;
+    // Ethernet MAC Configuration
+    REGISTER_32 (,{
+        enum EMAC_PRELEN PRELEN: 2;
+        unsigned RE: 1;
+        unsigned TE: 1;
+        unsigned DC: 1;
+        enum EMAC_BL BL: 2;
+        unsigned ACS: 1;
+        unsigned : 1;
+        unsigned DR: 1;
+        unsigned IPC: 1;
+        unsigned DUPM: 1;
+        unsigned LOOPBM: 1;
+        unsigned DRO: 1;
+        unsigned FES: 1;
+        unsigned PS: 1;
+        unsigned DISCRS: 1;
+        enum EMAC_IFG IFG: 3;
+        unsigned JFEN: 1;
+        unsigned : 1;
+        unsigned JD: 1;
+        unsigned WDDIS: 1;
+        unsigned : 1;
+        unsigned CST: 1;
+        unsigned : 1;
+        unsigned TWOKPEN: 1;
+        enum EMAC_SADDR SADDR: 3;
+    }) CFG;
+
+    // offset 0x004
+    // Ethernet MAC Frame Filter
+    REGISTER_32 (,{
+        unsigned PR: 1;
+        unsigned HUC: 1;
+        unsigned HMC: 1;
+        unsigned DAIF: 1;
+        unsigned PM: 1;
+        unsigned DBF: 1;
+        unsigned PCF: 2;
+        unsigned SAIF: 1;
+        unsigned SAF: 1;
+        unsigned HPF: 1;
+        unsigned : 5;
+        unsigned VTFE: 1;
+        unsigned : 14;
+        unsigned RA: 1;
+    }) FRAMEFLTR;
+
     // offset 0x400
     uint32_t DIR;       // GPIO Direction
     uint32_t IS;        // GPIO Interrupt Sense
@@ -124,7 +142,6 @@ struct EMAC_MAP {
     uint32_t PCellID1;
     uint32_t PCellID2;
     uint32_t PCellID3;
-};
-_Static_assert(sizeof(struct GPIO_MAP) == 4096, "GPIO_MAP must be 4096 bytes");
+})
 
 #endif //TM4C_EMAC_H

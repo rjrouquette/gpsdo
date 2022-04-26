@@ -7,7 +7,7 @@
 #ifndef TM4C_ADC_H
 #define TM4C_ADC_H
 
-#include <stdint.h>
+#include "register.h"
 #include "gpio.h"
 
 enum ADC_SS_TRIGGER {
@@ -43,144 +43,143 @@ enum ADC_CLK_SRC {
 };
 
 struct ADC_SS_MAP {
-    union {
-        struct {
-            unsigned MUX0: 4;
-            unsigned MUX1: 4;
-            unsigned MUX2: 4;
-            unsigned MUX3: 4;
-            unsigned MUX4: 4;
-            unsigned MUX5: 4;
-            unsigned MUX6: 4;
-            unsigned MUX7: 4;
-        };
-        uint32_t raw;
-    } MUX;          // ADC Sample Sequence Input Multiplexer Select
-    union {
-        struct {
-            unsigned D0: 1;
-            unsigned END0: 1;
-            unsigned IE0: 1;
-            unsigned TS0: 1;
-            unsigned D1: 1;
-            unsigned END1: 1;
-            unsigned IE1: 1;
-            unsigned TS1: 1;
-            unsigned D2: 1;
-            unsigned END2: 1;
-            unsigned IE2: 1;
-            unsigned TS2: 1;
-            unsigned D3: 1;
-            unsigned END3: 1;
-            unsigned IE3: 1;
-            unsigned TS3: 1;
-            unsigned D4: 1;
-            unsigned END4: 1;
-            unsigned IE4: 1;
-            unsigned TS4: 1;
-            unsigned D5: 1;
-            unsigned END5: 1;
-            unsigned IE5: 1;
-            unsigned TS5: 1;
-            unsigned D6: 1;
-            unsigned END6: 1;
-            unsigned IE6: 1;
-            unsigned TS6: 1;
-            unsigned D7: 1;
-            unsigned END7: 1;
-            unsigned IE7: 1;
-            unsigned TS7: 1;
-        };
-        uint32_t raw;
-    } CTL;          // ADC Sample Sequence Control
-    union {
-        struct {
-            unsigned DATA: 12;
-        };
-        uint32_t raw;
-    } FIFO;         // ADC Sample Sequence Result FIFO
-    union {
-        struct {
-            unsigned TPTR: 4;
-            unsigned HPTR: 4;
-            unsigned EMPTY: 1;
-            unsigned : 3;
-            unsigned FULL: 1;
-        };
-        uint32_t raw;
-    } FSTAT;        // ADC Sample Sequence FIFO Status
-    union {
-        struct {
-            unsigned S0DCOP: 1;
-            unsigned : 3;
-            unsigned S1DCOP: 1;
-            unsigned : 3;
-            unsigned S2DCOP: 1;
-            unsigned : 3;
-            unsigned S3DCOP: 1;
-            unsigned : 3;
-            unsigned S4DCOP: 1;
-            unsigned : 3;
-            unsigned S5DCOP: 1;
-            unsigned : 3;
-            unsigned S6DCOP: 1;
-            unsigned : 3;
-            unsigned S7DCOP: 1;
-            unsigned : 3;
-        };
-        uint32_t raw;
-    } OP;           // ADC Sample Sequence Operation
-    union {
-        struct {
-            unsigned S0DCSEL: 4;
-            unsigned S1DCSEL: 4;
-            unsigned S2DCSEL: 4;
-            unsigned S3DCSEL: 4;
-            unsigned S4DCSEL: 4;
-            unsigned S5DCSEL: 4;
-            unsigned S6DCSEL: 4;
-            unsigned S7DCSEL: 4;
-        };
-        uint32_t raw;
-    } DC;           // ADC Sample Sequence Digital Comparator Select
-    union {
-        struct {
-            unsigned EMUX0: 1;
-            unsigned : 3;
-            unsigned EMUX1: 1;
-            unsigned : 3;
-            unsigned EMUX2: 1;
-            unsigned : 3;
-            unsigned EMUX3: 1;
-            unsigned : 3;
-            unsigned EMUX4: 1;
-            unsigned : 3;
-            unsigned EMUX5: 1;
-            unsigned : 3;
-            unsigned EMUX6: 1;
-            unsigned : 3;
-            unsigned EMUX7: 1;
-            unsigned : 3;
-        };
-        uint32_t raw;
-    } EMUX;         // ADC Sample Sequence Extended Input Multiplexer Select
-    union {
-        struct {
-            enum ADC_TSH_WIDTH TSH0: 4;
-            enum ADC_TSH_WIDTH TSH1: 4;
-            enum ADC_TSH_WIDTH TSH2: 4;
-            enum ADC_TSH_WIDTH TSH3: 4;
-            enum ADC_TSH_WIDTH TSH4: 4;
-            enum ADC_TSH_WIDTH TSH5: 4;
-            enum ADC_TSH_WIDTH TSH6: 4;
-            enum ADC_TSH_WIDTH TSH7: 4;
-        };
-        uint32_t raw;
-    } TSH;          // ADC Sample Sequence Sample and Hold Time
+    // offset 0x000
+    // ADC Sample Sequence Input Multiplexer Select
+    REGISTER_32 (,{
+        unsigned MUX0: 4;
+        unsigned MUX1: 4;
+        unsigned MUX2: 4;
+        unsigned MUX3: 4;
+        unsigned MUX4: 4;
+        unsigned MUX5: 4;
+        unsigned MUX6: 4;
+        unsigned MUX7: 4;
+    }) MUX;
+
+    // offset 0x004
+    // ADC Sample Sequence Control
+    REGISTER_32 (,{
+        unsigned D0: 1;
+        unsigned END0: 1;
+        unsigned IE0: 1;
+        unsigned TS0: 1;
+        unsigned D1: 1;
+        unsigned END1: 1;
+        unsigned IE1: 1;
+        unsigned TS1: 1;
+        unsigned D2: 1;
+        unsigned END2: 1;
+        unsigned IE2: 1;
+        unsigned TS2: 1;
+        unsigned D3: 1;
+        unsigned END3: 1;
+        unsigned IE3: 1;
+        unsigned TS3: 1;
+        unsigned D4: 1;
+        unsigned END4: 1;
+        unsigned IE4: 1;
+        unsigned TS4: 1;
+        unsigned D5: 1;
+        unsigned END5: 1;
+        unsigned IE5: 1;
+        unsigned TS5: 1;
+        unsigned D6: 1;
+        unsigned END6: 1;
+        unsigned IE6: 1;
+        unsigned TS6: 1;
+        unsigned D7: 1;
+        unsigned END7: 1;
+        unsigned IE7: 1;
+        unsigned TS7: 1;
+    }) CTL;
+
+    // offset 0x008
+    // ADC Sample Sequence Result FIFO
+    REGISTER_32 (,{
+        unsigned DATA: 12;
+    }) FIFO;
+
+    // offset 0x00C
+    // ADC Sample Sequence FIFO Status
+    REGISTER_32 (,{
+        unsigned TPTR: 4;
+        unsigned HPTR: 4;
+        unsigned EMPTY: 1;
+        unsigned : 3;
+        unsigned FULL: 1;
+    }) FSTAT;
+
+    // offset 0x010
+    // ADC Sample Sequence Operation
+    REGISTER_32 (,{
+        unsigned S0DCOP: 1;
+        unsigned : 3;
+        unsigned S1DCOP: 1;
+        unsigned : 3;
+        unsigned S2DCOP: 1;
+        unsigned : 3;
+        unsigned S3DCOP: 1;
+        unsigned : 3;
+        unsigned S4DCOP: 1;
+        unsigned : 3;
+        unsigned S5DCOP: 1;
+        unsigned : 3;
+        unsigned S6DCOP: 1;
+        unsigned : 3;
+        unsigned S7DCOP: 1;
+        unsigned : 3;
+    }) OP;
+
+    // offset 0x014
+    // ADC Sample Sequence Digital Comparator Select
+    REGISTER_32 (,{
+        unsigned S0DCSEL: 4;
+        unsigned S1DCSEL: 4;
+        unsigned S2DCSEL: 4;
+        unsigned S3DCSEL: 4;
+        unsigned S4DCSEL: 4;
+        unsigned S5DCSEL: 4;
+        unsigned S6DCSEL: 4;
+        unsigned S7DCSEL: 4;
+    }) DC;
+
+    // offset 0x018
+    // ADC Sample Sequence Extended Input Multiplexer Select
+    REGISTER_32 (,{
+        unsigned EMUX0: 1;
+        unsigned : 3;
+        unsigned EMUX1: 1;
+        unsigned : 3;
+        unsigned EMUX2: 1;
+        unsigned : 3;
+        unsigned EMUX3: 1;
+        unsigned : 3;
+        unsigned EMUX4: 1;
+        unsigned : 3;
+        unsigned EMUX5: 1;
+        unsigned : 3;
+        unsigned EMUX6: 1;
+        unsigned : 3;
+        unsigned EMUX7: 1;
+        unsigned : 3;
+    }) EMUX;
+
+    // offset 0x01C
+    // ADC Sample Sequence Sample and Hold Time
+    REGISTER_32 (,{
+        enum ADC_TSH_WIDTH TSH0: 4;
+        enum ADC_TSH_WIDTH TSH1: 4;
+        enum ADC_TSH_WIDTH TSH2: 4;
+        enum ADC_TSH_WIDTH TSH3: 4;
+        enum ADC_TSH_WIDTH TSH4: 4;
+        enum ADC_TSH_WIDTH TSH5: 4;
+        enum ADC_TSH_WIDTH TSH6: 4;
+        enum ADC_TSH_WIDTH TSH7: 4;
+    }) TSH;
 };
 _Static_assert(sizeof(struct ADC_SS_MAP) == 32, "ADC_SS_MAP must be 32 bytes");
 
-struct ADC_MAP {
+PERIPHERAL_MAP (ADC_MAP, {
     // offset 0x000
     union {
         struct {
@@ -274,14 +273,23 @@ struct ADC_MAP {
     uint32_t DCISC;         // ADC Digital Comparator Interrupt Status and Clear
     uint32_t CTL;           // ADC Control
     char _reserved_01[0x004];
+
     // offset 0x040
-    struct ADC_SS_MAP SS0;  // ADC Sample Sequence 0
+    // ADC Sample Sequence 0
+    struct ADC_SS_MAP SS0;
+
     // offset 0x060
-    struct ADC_SS_MAP SS1;  // ADC Sample Sequence 1
+    // ADC Sample Sequence 1
+    struct ADC_SS_MAP SS1;
+
     // offset 0x080
-    struct ADC_SS_MAP SS2;  // ADC Sample Sequence 2
+    // ADC Sample Sequence 2
+    struct ADC_SS_MAP SS2;
+
     // offset 0x0A0
-    struct ADC_SS_MAP SS3;  // ADC Sample Sequence 3
+    // ADC Sample Sequence 3
+    struct ADC_SS_MAP SS3;
+
     char _reserved_02[0xC40];
     // offset 0xD00
     uint32_t DCRIC;         // ADC Digital Comparator Reset Initial Conditions
@@ -309,13 +317,14 @@ struct ADC_MAP {
     // offset 0xFC0
     uint32_t PP;            // ADC Peripheral Properties
     uint32_t PC;            // ADC Peripheral Configuration
-    union {
-        struct {
-            enum ADC_CLK_SRC CS: 4;
-            unsigned CLKDIV: 6;
-        };
-        uint32_t raw;
-    } CC;                   // ADC Clock Configuration
+
+    // offset 0xFC8
+    // ADC Clock Configuration
+    REGISTER_32 (,{
+        enum ADC_CLK_SRC CS: 4;
+        unsigned CLKDIV: 6;
+    }) CC;
+
     char _reserved_06[0x004];
     // offset 0xFD0
     uint32_t PeriphID4;
@@ -330,19 +339,15 @@ struct ADC_MAP {
     uint32_t PCellID1;
     uint32_t PCellID2;
     uint32_t PCellID3;
-};
-_Static_assert(sizeof(struct ADC_MAP) == 4096, "ADC_MAP must be 4096 bytes");
+})
 
 #define ADC0    (*(volatile struct ADC_MAP *) 0x40038000)
 #define ADC1    (*(volatile struct ADC_MAP *) 0x40039000)
 
-union RCGCADC_MAP {
-    struct {
-        unsigned EN_ADC0: 1;
-        unsigned EN_ADC1: 1;
-    };
-    uint32_t raw;
-};
+REGISTER_32 (RCGCADC_MAP, {
+    unsigned EN_ADC0: 1;
+    unsigned EN_ADC1: 1;
+});
 #define RCGCADC (*(volatile union RCGCADC_MAP *)0x400FE638)
 
 #endif //TM4C_ADC_H

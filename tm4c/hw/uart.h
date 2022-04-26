@@ -5,74 +5,68 @@
 #ifndef TM4C_UART_H
 #define TM4C_UART_H
 
-#include <stdint.h>
+#include "register.h"
 #include "gpio.h"
 
-struct UART_MAP {
+PERIPHERAL_MAP (UART_MAP, {
     // offset 0x000
-    union {
-        struct {
-            unsigned DATA: 8;
-            unsigned FE: 1;
-            unsigned PE: 1;
-            unsigned BE: 1;
-            unsigned OE: 1;
-        };
-        uint32_t raw;
-    } DR;               // UART Data Register
+    // UART Data Register
+    REGISTER_32 (,{
+        unsigned DATA: 8;
+        unsigned FE: 1;
+        unsigned PE: 1;
+        unsigned BE: 1;
+        unsigned OE: 1;
+    }) DR;
 
-    union {
-        struct {
-            unsigned FE: 1;
-            unsigned PE: 1;
-            unsigned BE: 1;
-            unsigned OE: 1;
-        };
-        uint32_t raw;
-    } ECR;              // UART Error Clear
+    // offset 0x004
+    // UART Error Clear
+    REGISTER_32 (,{
+        unsigned FE: 1;
+        unsigned PE: 1;
+        unsigned BE: 1;
+        unsigned OE: 1;
+    }) ECR;
 
     char _reserved_00[0x010];
+
     // offset 0x018
-    union {
-        struct {
-            unsigned CTS: 1;
-            unsigned DSR: 1;
-            unsigned DCD: 1;
-            unsigned BUSY: 1;
-            unsigned RXFE: 1;
-            unsigned TXFF: 1;
-            unsigned RXFF: 1;
-            unsigned TXFE: 1;
-            unsigned RI: 1;
-        };
-        uint32_t raw;
-    } FR;               // UART Flags
+    // UART Flags
+    REGISTER_32 (,{
+        unsigned CTS: 1;
+        unsigned DSR: 1;
+        unsigned DCD: 1;
+        unsigned BUSY: 1;
+        unsigned RXFE: 1;
+        unsigned TXFF: 1;
+        unsigned RXFF: 1;
+        unsigned TXFE: 1;
+        unsigned RI: 1;
+    }) FR;
 
     char _reserved_01[0x004];
+
     // offset 0x020
-    union {
-        struct {
-            unsigned ILPDVSR: 8;
-        };
-        uint32_t raw;
-    } ILPR;             // UART IrDA Low-Power Register
+    // UART IrDA Low-Power Register
+    REGISTER_32 (,{
+        unsigned ILPDVSR: 8;
+    }) ILPR;
 
-    union {
-        struct {
-            unsigned DIVINT: 16;
-        };
-        uint32_t raw;
-    } IBRD;             // UART Integer Baud-Rate Divisor
+    // offset 0x024
+    // UART Integer Baud-Rate Divisor
+    REGISTER_32 (,{
+        unsigned DIVINT: 16;
+    }) IBRD;
 
-    union {
-        struct {
-            unsigned DIVFRAC: 6;
-        };
-        uint32_t raw;
-    } FBRD;             // UART Fractional Baud-Rate Divisor
+    // offset 0x028
+    // UART Fractional Baud-Rate Divisor
+    REGISTER_32 (,{
+        unsigned DIVFRAC: 6;
+    }) FBRD;
 
-    union {
-        struct {
+    // offset 0x02C
+    // UART Line Control
+    REGISTER_32 (,{
             unsigned BRK: 1;
             unsigned PEN: 1;
             unsigned EPS: 1;
@@ -80,9 +74,7 @@ struct UART_MAP {
             unsigned FEN: 1;
             unsigned WLEN: 2;
             unsigned SPS: 1;
-        };
-        uint32_t raw;
-    } UARTLCRH;         // UART UART Line Control
+    }) UARTLCRH;
 
     uint32_t IM;        // UART Interrupt Mask
     uint32_t RIS;       // UART Raw Interrupt Status
@@ -93,13 +85,12 @@ struct UART_MAP {
     // offset 0xFC0
     uint32_t PP;    // UART Peripheral Properties
     char _reserved_01[4];
+
     // offset 0xFC8
-    union {
-        struct {
-            enum SSI_CLK_SRC_e CS: 4;
-        };
-        uint32_t raw;
-    } CC;               // UART Clock Configuration Configuration
+    // UART Clock Configuration
+    REGISTER_32 (,{
+        enum SSI_CLK_SRC CS: 4;
+    }) CC;
 
     char _reserved_02[4];
     // offset 0xFD0
@@ -115,8 +106,7 @@ struct UART_MAP {
     uint32_t PCellID1;
     uint32_t PCellID2;
     uint32_t PCellID3;
-};
-_Static_assert(sizeof(struct UART_MAP) == 4096, "UART_MAP must be 4096 bytes");
+})
 
 #define UART0    (*(volatile struct UART_MAP *) 0x4000C000)
 #define UART1    (*(volatile struct UART_MAP *) 0x4000D000)
