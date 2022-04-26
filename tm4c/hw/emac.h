@@ -40,6 +40,18 @@ enum EMAC_SADDR {
     EMAC_SADDR_REP1 = 0x07,
 };
 
+struct EMAC_MACADDR {
+    REGMAP_32 (, {
+        unsigned ADDR: 16;
+        unsigned : 8;
+        unsigned MBC: 6;
+        unsigned SA: 1;
+        unsigned AE: 1;
+    }) HI;
+    uint32_t LO;
+};
+_Static_assert(sizeof(struct EMAC_MACADDR) == 8, "EMAC_MACADDR must be 8 bytes");
+
 PAGE_MAP (EMAC_MAP, {
     // offset 0x000
     // Ethernet MAC Configuration
@@ -138,7 +150,7 @@ PAGE_MAP (EMAC_MAP, {
     }) VLANTG;
 
     // reserved space
-    char _reserved_0[0x08];
+    char _reserved_0[0x008];
 
     // offset 0x024
     // Ethernet MAC Status
@@ -182,40 +194,62 @@ PAGE_MAP (EMAC_MAP, {
         unsigned WUPFRRST: 1;
     }) PMTCTLSTAT;
 
-    // offset 0x400
-    uint32_t DIR;       // GPIO Direction
-    uint32_t IS;        // GPIO Interrupt Sense
-    uint32_t IBE;       // GPIO Interrupt Both Edges
-    uint32_t IEV;       // GPIO Interrupt Event
-    uint32_t IM;        // GPIO Interrupt Mask
-    uint32_t RIS;       // GPIO Masked Interrupt Status
-    uint32_t MIS;       // GPIO Masked Interrupt Status
-    uint32_t ICR;       // GPIO Interrupt Clear
-    uint32_t AFSEL;     // GPIO Alternate Function Select
     // reserved space
-    char _reserved_00[0xDC];
-    // offset 0x500
-    uint32_t DR2R;      // GPIO 2-mA Drive Select
-    uint32_t DR4R;      // GPIO 4-mA Drive Select
-    uint32_t DR8R;      // GPIO 8-mA Drive Select
-    uint32_t ODR;       // GPIO Open Drain Select
-    uint32_t PUR;       // GPIO Pull-Up Select
-    uint32_t PDR;       // GPIO Pull-Down Select
-    uint32_t SLR;       // GPIO Slew Rate Control Select
-    uint32_t DEN;       // GPIO Digital Enable
-    uint32_t LOCK;      // GPIO Lock
-    uint32_t CR;        // GPIO Commit
-    uint32_t AMSEL;     // GPIO Analog Mode Select
-    uint32_t PCTL;      // GPIO Port Control
-    uint32_t ADCCTL;    // GPIO ADC Control
-    uint32_t DMACTL;    // GPIO DMA Control
-    uint32_t SI;        // GPIO Select Interrupt
-    uint32_t DR12R;     // GPIO 12-mA Drive Select
-    uint32_t WAKEPEN;   // GPIO Wake Pin Enable
-    uint32_t WAKELVL;   // GPIO Wake Level
-    uint32_t WAKESTAT;  // GPIO Wake Status
+    char _reserved_1[0x008];
+
+    // offset 0x038
+    // Ethernet MAC Raw Interrupt Status
+    REGMAP_32 (, {
+        unsigned : 3;
+        unsigned PMT: 1;
+        unsigned MMC: 1;
+        unsigned MMCRX: 1;
+        unsigned MMCTX: 1;
+        unsigned : 2;
+        unsigned TS : 1;
+    }) RIS;
+
+    // offset 0x03C
+    // Ethernet MAC Interrupt Mask
+    REGMAP_32 (, {
+        unsigned : 3;
+        unsigned PMT: 1;
+        unsigned : 5;
+        unsigned TS : 1;
+    }) IM;
+
+    // offset 0x040
+    struct EMAC_MACADDR ADDR0;
+    struct EMAC_MACADDR ADDR1;
+    struct EMAC_MACADDR ADDR2;
+    struct EMAC_MACADDR ADDR3;
+
     // reserved space
-    char _reserved_01[0xA74];
+    char _reserved_2[0x07C];
+
+    // offset 0x0DC
+    // Ethernet MAC Watchdog Timeout
+    REGMAP_32 (, {
+        unsigned WTO: 14;
+        unsigned : 2;
+        unsigned PWE: 1;
+    }) WDOGTO;
+
+    // reserved space
+    char _reserved_3[0x010];
+
+    // offset 0x100
+    // Ethernet MAC MMC Control
+    REGMAP_32 (, {
+        unsigned CNTRST: 1;
+        unsigned CNTSTPRO: 1;
+        unsigned RSTONRD: 1;
+        unsigned CNTFREEZ: 1;
+        unsigned CNTPRST: 1;
+        unsigned CNTPRSTLVL: 1;
+        unsigned : 2;
+        unsigned UCDBC: 1;
+    }) MMCCTRL;
 
     // offset 0xFC0
     // Ethernet MAC Peripheral Property Register
