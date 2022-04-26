@@ -114,6 +114,74 @@ PAGE_MAP (EMAC_MAP, {
         unsigned DATA: 16;
     }) MIIDATA;
 
+    // offset 0x018
+    // Ethernet MAC Flow Control
+    REGMAP_32 (, {
+        unsigned FCBBPA: 1;
+        unsigned TFE: 1;
+        unsigned RFE: 1;
+        unsigned UP: 1;
+        unsigned : 3;
+        unsigned DZQP: 1;
+        unsigned : 8;
+        unsigned PT: 16;
+    }) FLOWCTL;
+
+    // offset 0x01C
+    // Ethernet MAC VLAN Tag
+    REGMAP_32 (, {
+        unsigned VL: 16;
+        unsigned ETV: 1;
+        unsigned VTIM: 1;
+        unsigned ESVL: 1;
+        unsigned VTHM: 1;
+    }) VLANTG;
+
+    // reserved space
+    char _reserved_0[0x08];
+
+    // offset 0x024
+    // Ethernet MAC Status
+    REGMAP_32 (, {
+        unsigned RPE: 1;
+        unsigned RFCFC: 2;
+        unsigned : 1;
+        unsigned RWC: 1;
+        unsigned RRC: 2;
+        unsigned : 1;
+        unsigned RXF: 1;
+        unsigned : 6;
+        unsigned TPE: 1;
+        unsigned TFC: 2;
+        unsigned TXPAUSED: 1;
+        unsigned TRC: 2;
+        unsigned TWC: 1;
+        unsigned : 1;
+        unsigned TXFE: 1;
+        unsigned TXFF: 1;
+    }) STATUS;
+
+    // offset 0x028
+    // Ethernet MAC Remote Wake-Up Frame Filter
+    uint32_t RWUFF;
+
+    // offset 0x02C
+    // Ethernet MAC PMT Control and Status Register
+    REGMAP_32 (, {
+        unsigned PWRDWN: 1;
+        unsigned MGKPKTEN: 1;
+        unsigned WUPFREN: 1;
+        unsigned : 2;
+        unsigned MGKPRX: 1;
+        unsigned WUPRX: 1;
+        unsigned : 2;
+        unsigned GLBLUCAST: 1;
+        unsigned : 14;
+        unsigned RWKPTR: 3;
+        unsigned : 4;
+        unsigned WUPFRRST: 1;
+    }) PMTCTLSTAT;
+
     // offset 0x400
     uint32_t DIR;       // GPIO Direction
     uint32_t IS;        // GPIO Interrupt Sense
