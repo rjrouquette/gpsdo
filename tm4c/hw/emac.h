@@ -150,7 +150,7 @@ PAGE_MAP (EMAC_MAP, {
     }) VLANTG;
 
     // reserved space
-    char _reserved_0[0x008];
+    char _reserved_0[0x004];
 
     // offset 0x024
     // Ethernet MAC Status
@@ -225,7 +225,7 @@ PAGE_MAP (EMAC_MAP, {
     struct EMAC_MACADDR ADDR3;
 
     // reserved space
-    char _reserved_2[0x07C];
+    char _reserved_2[0x08C];
 
     // offset 0x0DC
     // Ethernet MAC Watchdog Timeout
@@ -390,6 +390,9 @@ PAGE_MAP (EMAC_MAP, {
         unsigned PTPFLTR: 1;
     }) TIMSTCTRL;
 
+    // reserved space
+    char _reserved_C[0x8BC];
+
     // offset 0xFC0
     // Ethernet MAC Peripheral Property Register
     REGMAP_32 (, {
@@ -425,6 +428,16 @@ PAGE_MAP (EMAC_MAP, {
         unsigned PINTFS: 3;
         unsigned PHYEXT: 1;
     }) PC;
+
+    // offset 0xFC8
+    // Ethernet MAC Clock Configuration Register
+    REGMAP_32(, {
+        unsigned : 17;
+        unsigned POL: 1;
+        unsigned PTPCEN: 1;
+    }) CC;
+
+    char _reserved_E[0x034];
 
 })
 

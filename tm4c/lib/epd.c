@@ -49,8 +49,8 @@ static void initSSI() {
     PORTQ.DIR = 0x07u;
     PORTQ.DR8R = 0x07u;
     PORTQ.AMSEL = 0x00;
-    PORTQ.AFSEL = 0x07u;
-    PORTQ.PCTL = 0x0EEE;
+    PORTQ.AFSEL.raw = 0x07u;
+    PORTQ.PCTL.raw = 0x0EEE;
     PORTQ.DEN = 0x07u;
     // lock GPIO config
     PORTQ.CR = 0;
@@ -72,8 +72,8 @@ static void initSSI() {
     PORTK.LOCK = GPIO_LOCK_KEY;
     PORTK.CR = 0x07u;
     PORTK.AMSEL = 0;
-    PORTK.PCTL = 0;
-    PORTK.AFSEL = 0;
+    PORTK.PCTL.raw = 0;
+    PORTK.AFSEL.raw = 0;
     PORTK.DR8R = 0x07u;
     PORTK.PUR = 0x02u;
     PORTK.DIR = 0x03u;

@@ -14,9 +14,6 @@ void LED_init() {
     PORTN.LOCK = GPIO_LOCK_KEY;
     PORTN.CR = 0x03u;
     // configure port
-    PORTN.AMSEL = 0;
-    PORTN.PCTL = 0;
-    PORTN.AFSEL = 0;
     PORTN.DR8R = 0x03u;
     PORTN.DIR = 0x03u;
     PORTN.DEN = 0x03u;

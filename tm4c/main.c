@@ -10,9 +10,12 @@
 #include "lib/font.h"
 #include "lib/format.h"
 #include "lib/led.h"
+#include "lib/net.h"
 #include "lib/temp.h"
 
 int main(void) {
+    char temp[32];
+
     // initialize status LEDs
     LED_init();
     // initialize system clock
@@ -24,11 +27,14 @@ int main(void) {
     // initialize temperature sensor
     TEMP_init();
     TEMP_proc();
+    // initialize networking
+    NET_init();
+    NET_getMacAddress(temp);
+    FONT_drawText(16, 248, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
     LED0_ON();
 
     uint32_t next = 0;
-    char temp[32];
     int end;
     for(;;) {
         uint32_t now = CLK_MONOTONIC_INT();

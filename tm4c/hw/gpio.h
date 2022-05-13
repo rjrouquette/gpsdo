@@ -7,9 +7,9 @@
 #ifndef TM4C_GPIO_H
 #define TM4C_GPIO_H
 
-#include <stdint.h>
+#include "register.h"
 
-struct GPIO_MAP {
+PAGE_MAP(GPIO_MAP, {
     // offset 0x000
     uint32_t DATA[256];
     // offset 0x400
@@ -21,7 +21,19 @@ struct GPIO_MAP {
     uint32_t RIS;       // GPIO Masked Interrupt Status
     uint32_t MIS;       // GPIO Masked Interrupt Status
     uint32_t ICR;       // GPIO Interrupt Clear
-    uint32_t AFSEL;     // GPIO Alternate Function Select
+
+    // GPIO Alternate Function Select
+    REGMAP_32(, {
+        unsigned ALT0: 1;
+        unsigned ALT1: 1;
+        unsigned ALT2: 1;
+        unsigned ALT3: 1;
+        unsigned ALT4: 1;
+        unsigned ALT5: 1;
+        unsigned ALT6: 1;
+        unsigned ALT7: 1;
+    }) AFSEL;
+
     // reserved space
     char _reserved_00[0xDC];
     // offset 0x500
@@ -36,7 +48,19 @@ struct GPIO_MAP {
     uint32_t LOCK;      // GPIO Lock
     uint32_t CR;        // GPIO Commit
     uint32_t AMSEL;     // GPIO Analog Mode Select
-    uint32_t PCTL;      // GPIO Port Control
+
+    // GPIO Port Control
+    REGMAP_32(, {
+        unsigned PMC0: 4;
+        unsigned PMC1: 4;
+        unsigned PMC2: 4;
+        unsigned PMC3: 4;
+        unsigned PMC4: 4;
+        unsigned PMC5: 4;
+        unsigned PMC6: 4;
+        unsigned PMC7: 4;
+    }) PCTL;
+
     uint32_t ADCCTL;    // GPIO ADC Control
     uint32_t DMACTL;    // GPIO DMA Control
     uint32_t SI;        // GPIO Select Interrupt
@@ -64,8 +88,7 @@ struct GPIO_MAP {
     uint32_t PCellID1;
     uint32_t PCellID2;
     uint32_t PCellID3;
-};
-_Static_assert(sizeof(struct GPIO_MAP) == 4096, "GPIO_MAP must be 4096 bytes");
+})
 
 #define PORTA   (*(volatile struct GPIO_MAP *) 0x40058000)
 #define PORTB   (*(volatile struct GPIO_MAP *) 0x40059000)

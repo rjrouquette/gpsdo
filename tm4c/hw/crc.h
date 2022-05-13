@@ -60,4 +60,14 @@ PAGE_MAP (CRC_MAP, {
 
 #define CRC (*(volatile struct CRC_MAP *)0x44030000)
 
+REGMAP_32 (RCGCCRC_MAP, {
+    unsigned EN: 1;
+});
+#define RCGCCCM (*(volatile union RCGCCRC_MAP *)0x400FE674)
+
+REGMAP_32 (PRCCM_MAP, {
+    unsigned RDY: 1;
+});
+#define PRCCM (*(volatile union PRCCM_MAP *)0x400FE674)
+
 #endif //GPSDO_CRC_H

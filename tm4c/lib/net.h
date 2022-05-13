@@ -6,5 +6,6 @@
 #define GPSDO_NET_H
 
 void NET_init();
+void NET_getMacAddress(char *strAddr);
 
 #endif //GPSDO_NET_H
