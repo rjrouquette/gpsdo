@@ -41,13 +41,13 @@ struct Sample {
 
 // A = A + ((B - A) / 2^16)
 static void accumulate(int64_t &acc, const int64_t value) {
-    acc -= acc >> 8u;
-    acc += value << 24u;
+    acc -= acc >> 12u;
+    acc += value << 20u;
 }
 
 // A = A + ((B - A) / 2^16)
 static void accumulate(float &acc, const float value) {
-    acc += (value - acc) / 256.0f;
+    acc += (value - acc) / 4096.0f;
 }
 
 union u32 {
@@ -155,18 +155,21 @@ struct FloatMath {
     }
 
     void update(const Sample &s) {
-        int8_t ipart = (int) s.temp;
-        float fpart  = (s.temp - ipart) - 0.5f;
-        uint8_t tidx = ipart & (BINS-1);
+        int8_t ibase = (int) s.temp;
+        for(int8_t step = -1; step <= 1; step++) {
+            int8_t ipart = ibase + step;
+            float fpart  = (s.temp - ipart) - 0.5f;
+            uint8_t tidx = ipart & (BINS-1);
 
-        auto &m = mat[tidx];
-        accumulate(m[0], fpart * fpart);
-        accumulate(m[1], fpart);
-        accumulate(m[2], fpart * s.ppm);
-        accumulate(m[3], s.ppm);
-        accumulate(m[4], 1.0);
+            auto &m = mat[tidx];
+            accumulate(m[0], fpart * fpart);
+            accumulate(m[1], fpart);
+            accumulate(m[2], fpart * s.ppm);
+            accumulate(m[3], s.ppm);
+            accumulate(m[4], 1.0);
 
-        ++count[tidx];
+            ++count[tidx];
+        }
     }
 
     bool coeff(const float temp, float &m, float &b) {
@@ -181,7 +184,7 @@ struct FloatMath {
         float N = mt[4];
 
         const float Z = (A * N) - (B * B);
-        if(Z <= 0 || count[tidx] < 64) {
+        if(Z <= 0 || N < 0.117517f) {
             m = 0;
             b = D / N;
         } else {
@@ -225,6 +228,7 @@ int main(int argc, char **argv) {
         parser >> row.ppm;
         parser >> row.error;
         row.temp *= 1.0f;
+        row.ppm *= 2.1639109f;
         if(row.isValid())
             data.emplace_back(row);
         
@@ -344,8 +348,8 @@ int main(int argc, char **argv) {
     cout << endl;
 
     float z = 0;
-    for(int i = 0; i < 256; i++)
-        z += (1 - z) / 2048.0f;
+    for(int i = 0; i < 512; i++)
+        z += (1 - z) / 4096.0f;
     cout << z << endl;
 
     return 0;

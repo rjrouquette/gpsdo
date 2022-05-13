@@ -94,4 +94,9 @@ REGMAP_32 (PLLSTAT_MAP, {
 });
 #define PLLSTAT (*(volatile union PLLSTAT_MAP *)0x400FE168)
 
+struct UNIQUEID_BLOCK {
+    uint32_t WORD[4];
+};
+#define UNIQUEID (*(volatile struct UNIQUEID_BLOCK *)0x400FEF20)
+
 #endif //TM4C_SYS_H

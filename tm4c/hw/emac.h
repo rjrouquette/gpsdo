@@ -426,24 +426,9 @@ PAGE_MAP (EMAC_MAP, {
         unsigned PHYEXT: 1;
     }) PC;
 
-    // reserved space
-    char _reserved_02[0x8];
-    // offset 0xFD0
-    uint32_t PeriphID4;
-    uint32_t PeriphID5;
-    uint32_t PeriphID6;
-    uint32_t PeriphID7;
-    uint32_t PeriphID0;
-    uint32_t PeriphID1;
-    uint32_t PeriphID2;
-    uint32_t PeriphID3;
-    uint32_t PCellID0;
-    uint32_t PCellID1;
-    uint32_t PCellID2;
-    uint32_t PCellID3;
 })
 
-#define EMAC0   (*(volatile struct ADC_MAP *) 0x400EC000)
+#define EMAC0   (*(volatile struct EMAC_MAP *)0x400EC000)
 
 REGMAP_32 (RCGCEMAC_MAP, {
     unsigned EN0: 1;

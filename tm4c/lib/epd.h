@@ -8,8 +8,8 @@
 #define GPSDO_EPD_H
 
 void EPD_init();
-int EPG_width();
-int EPG_height();
+int EPD_width();
+int EPD_height();
 void EPD_clear();
 void EPD_refresh();
 void EPD_setPixel(int x, int y, uint8_t color);
