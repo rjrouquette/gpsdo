@@ -150,7 +150,7 @@ PAGE_MAP (EMAC_MAP, {
     }) VLANTG;
 
     // reserved space
-    char _reserved_0[0x004];
+    char _reserved_00[0x004];
 
     // offset 0x024
     // Ethernet MAC Status
@@ -195,7 +195,7 @@ PAGE_MAP (EMAC_MAP, {
     }) PMTCTLSTAT;
 
     // reserved space
-    char _reserved_1[0x008];
+    char _reserved_01[0x008];
 
     // offset 0x038
     // Ethernet MAC Raw Interrupt Status
@@ -225,7 +225,7 @@ PAGE_MAP (EMAC_MAP, {
     struct EMAC_MACADDR ADDR3;
 
     // reserved space
-    char _reserved_2[0x08C];
+    char _reserved_02[0x08C];
 
     // offset 0x0DC
     // Ethernet MAC Watchdog Timeout
@@ -236,7 +236,7 @@ PAGE_MAP (EMAC_MAP, {
     }) WDOGTO;
 
     // reserved space
-    char _reserved_3[0x010];
+    char _reserved_03[0x010];
 
     // offset 0x100
     // Ethernet MAC MMC Control
@@ -298,14 +298,14 @@ PAGE_MAP (EMAC_MAP, {
     }) MMCTXIM;
 
     // reserved space
-    char _reserved_4[0x004];
+    char _reserved_04[0x004];
 
     // offset 0x118
     // Ethernet MAC Transmit Frame Count for Good and Bad Frames
     uint32_t TXCNTGB;
 
     // reserved space
-    char _reserved_5[0x030];
+    char _reserved_05[0x030];
 
     // offset 0x14C
     // Ethernet MAC Transmit Frame Count for Frames Transmitted after Single Collision
@@ -316,21 +316,21 @@ PAGE_MAP (EMAC_MAP, {
     uint32_t TXCNTMCOL;
 
     // reserved space
-    char _reserved_6[0x010];
+    char _reserved_06[0x010];
 
     // offset 0x164
     // Ethernet MAC Transmit Octet Count Good
     uint32_t TXOCTCNTG;
 
     // reserved space
-    char _reserved_7[0x018];
+    char _reserved_07[0x018];
 
     // offset 0x180
     // Ethernet MAC Receive Frame Count for Good and Bad Frames
     uint32_t RXCNTGB;
 
     // reserved space
-    char _reserved_8[0x010];
+    char _reserved_08[0x010];
 
     // offset 0x194
     // Ethernet MAC Receive Frame Count for CRC Error Frames
@@ -341,14 +341,14 @@ PAGE_MAP (EMAC_MAP, {
     uint32_t RXCNTALGNERR;
 
     // reserved space
-    char _reserved_9[0x028];
+    char _reserved_09[0x028];
 
     // offset 0x1C4
     // Ethernet MAC Receive Frame Count for Good Unicast Frames
     uint32_t RXCNTGUNI;
 
     // reserved space
-    char _reserved_A[0x3BC];
+    char _reserved_0A[0x3BC];
 
     // offset 0x584
     // Ethernet MAC VLAN Tag Inclusion or Replacement
@@ -366,7 +366,7 @@ PAGE_MAP (EMAC_MAP, {
     }) VLANHASH;
 
     // reserved space
-    char _reserved_B[0x174];
+    char _reserved_0B[0x174];
 
     // offset 0x700
     // Ethernet MAC Timestamp Control
@@ -390,8 +390,63 @@ PAGE_MAP (EMAC_MAP, {
         unsigned PTPFLTR: 1;
     }) TIMSTCTRL;
 
+    // offset 0x704
+    // Ethernet MAC Sub-Second Increment
+    REGMAP_32(, {
+        unsigned SSINC: 8;
+    }) SUBSECINC;
+
+    // offset 0x708
+    // Ethernet MAC System Time - Seconds
+    uint32_t TIMSEC;
+
+    // offset 0x70C
+    // Ethernet MAC System Time - Nanoseconds
+    uint32_t TIMNANO;
+
+    // offset 0x710
+    // Ethernet MAC System Time - Seconds Update
+    uint32_t TIMSECU;
+
+    // offset 0x714
+    // Ethernet MAC System Time - Nanoseconds Update
+    uint32_t TIMNANOU;
+
+    // offset 0x718
+    // Ethernet MAC Timestamp Addend
+    uint32_t TIMADD;
+
+    // offset 0x71C
+    // Ethernet MAC Target Time Seconds
+    uint32_t TARGSEC;
+
+    // offset 0x720
+    // Ethernet MAC Target Time Nanoseconds
+    uint32_t TARGNANO;
+
+    // offset 0x724
+    // Ethernet MAC System Time-Higher Word Seconds
+    REGMAP_32(, {
+        unsigned TSHWR: 16;
+    }) HWORDSEC;
+
+    // offset 0x728
+    // Ethernet MAC Timestamp Status
+    REGMAP_32(, {
+        unsigned TSSOVF: 1;
+        unsigned TSTARGT: 1;
+    }) TIMSTAT;
+
+    // offset 0x72C
+    // Ethernet MAC PPS Control
+    REGMAP_32(, {
+        unsigned PPSCTRL: 4;
+        unsigned PPSEN0: 1;
+        unsigned TRGMODS0: 1;
+    }) PPSCTRL;
+
     // reserved space
-    char _reserved_C[0x8BC];
+    char _reserved_C[0x890];
 
     // offset 0xFC0
     // Ethernet MAC Peripheral Property Register
@@ -437,8 +492,29 @@ PAGE_MAP (EMAC_MAP, {
         unsigned PTPCEN: 1;
     }) CC;
 
-    char _reserved_E[0x034];
+    char _reserved_E[0x004];
 
+    struct {
+        // offset 0xFD0
+        // Ethernet PHY Raw Interrupt Status
+        REGMAP_32(, {
+            unsigned INT: 1;
+        }) RIS;
+
+        // offset 0xFD4
+        // Ethernet PHY Interrupt Mask
+        REGMAP_32(, {
+            unsigned INT: 1;
+        }) IM;
+
+        // offset 0xFD8
+        // Ethernet PHY Masked Interrupt Status and Clear
+        REGMAP_32(, {
+            unsigned INT: 1;
+        }) MIS;
+    } PHY;
+
+    char _reserved_F[0x024];
 })
 
 #define EMAC0   (*(volatile struct EMAC_MAP *)0x400EC000)
