@@ -457,7 +457,30 @@ PAGE_MAP (EMAC_MAP, {
     uint32_t PPS0WIDTH;
 
     // reserved space
-    char _reserved_0D[0x858];
+    char _reserved_0D[0x498];
+
+    // offset 0xC00
+    // Ethernet MAC DMA Bus Mode
+    REGMAP_32(, {
+        unsigned SWR: 1;
+        unsigned DA: 1;
+        unsigned DSL: 5;
+        unsigned ATDS: 1;
+        unsigned PBL: 6;
+        unsigned PR: 2;
+        unsigned FB: 1;
+        unsigned RPBL: 6;
+        unsigned USP: 1;
+        unsigned PBLx8: 1;
+        unsigned AAL: 1;
+        unsigned MB: 1;
+        unsigned TXPR: 1;
+        unsigned : 3;
+        unsigned RIB: 1;
+    }) DMABUSMOD;
+
+    // reserved space
+    char _reserved_0E[0x3BC];
 
     // offset 0xFC0
     // Ethernet MAC Peripheral Property Register
@@ -503,7 +526,7 @@ PAGE_MAP (EMAC_MAP, {
         unsigned PTPCEN: 1;
     }) CC;
 
-    char _reserved_0E[0x004];
+    char _reserved_0F[0x004];
 
     struct {
         // offset 0xFD0
@@ -525,7 +548,7 @@ PAGE_MAP (EMAC_MAP, {
         }) MIS;
     } PHY;
 
-    char _reserved_0F[0x024];
+    char _reserved_10[0x024];
 })
 
 #define EMAC0   (*(volatile struct EMAC_MAP *)0x400EC000)
