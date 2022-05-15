@@ -446,7 +446,18 @@ PAGE_MAP (EMAC_MAP, {
     }) PPSCTRL;
 
     // reserved space
-    char _reserved_C[0x890];
+    char _reserved_0C[0x030];
+
+    // offset 0x760
+    // Ethernet MAC PPS0 Interval
+    uint32_t PPS0INTVL;
+
+    // offset 0x764
+    // Ethernet MAC PPS0 Interval
+    uint32_t PPS0WIDTH;
+
+    // reserved space
+    char _reserved_0D[0x858];
 
     // offset 0xFC0
     // Ethernet MAC Peripheral Property Register
@@ -492,7 +503,7 @@ PAGE_MAP (EMAC_MAP, {
         unsigned PTPCEN: 1;
     }) CC;
 
-    char _reserved_E[0x004];
+    char _reserved_0E[0x004];
 
     struct {
         // offset 0xFD0
@@ -514,7 +525,7 @@ PAGE_MAP (EMAC_MAP, {
         }) MIS;
     } PHY;
 
-    char _reserved_F[0x024];
+    char _reserved_0F[0x024];
 })
 
 #define EMAC0   (*(volatile struct EMAC_MAP *)0x400EC000)
