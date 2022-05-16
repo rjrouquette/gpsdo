@@ -479,8 +479,129 @@ PAGE_MAP (EMAC_MAP, {
         unsigned RIB: 1;
     }) DMABUSMOD;
 
+    // offset 0xC04
+    // Ethernet MAC Transmit Poll Demand
+    uint32_t TXPOLLD;
+
+    // offset 0xC08
+    // Ethernet MAC Receive Poll Demand
+    uint32_t RXPOLLD;
+
+    // offset 0xC0C
+    // Ethernet MAC Receive Descriptor List Address
+    uint32_t RXDLADDR;
+
+    // offset 0xC10
+    // Ethernet MAC Transmit Descriptor List Address
+    uint32_t TXDLADDR;
+
+    // offset 0xC14
+    // Ethernet MAC DMA Interrupt Status
+    REGMAP_32(, {
+        unsigned TI: 1;
+        unsigned TPS: 1;
+        unsigned TU: 1;
+        unsigned TJT: 1;
+        unsigned OVF: 1;
+        unsigned UNF: 1;
+        unsigned RI: 1;
+        unsigned RU: 1;
+        unsigned RPS: 1;
+        unsigned RWT: 1;
+        unsigned ETI: 1;
+        unsigned : 2;
+        unsigned FBI: 1;
+        unsigned ERI: 1;
+        unsigned AIS: 1;
+        unsigned NIS: 1;
+        unsigned RS: 3;
+        unsigned TS: 3;
+        unsigned AE: 3;
+        unsigned : 2;
+        unsigned MMC: 1;
+        unsigned PMT: 1;
+        unsigned TT;
+    }) DMARIS;
+
+    // offset 0xC18
+    // Ethernet MAC DMA Operation Mode
+    REGMAP_32(, {
+        unsigned : 1;
+        unsigned SR: 1;
+        unsigned OSF: 1;
+        unsigned RTC: 2;
+        unsigned DGF: 1;
+        unsigned FUF: 1;
+        unsigned FEF: 1;
+        unsigned : 5;
+        unsigned ST: 1;
+        unsigned TTC: 3;
+        unsigned : 3;
+        unsigned FTF: 1;
+        unsigned TSF: 1;
+        unsigned : 2;
+        unsigned DFF: 1;
+        unsigned RSF: 1;
+        unsigned DT: 1;
+    }) DMAOPMODE;
+
+    // offset 0xC1C
+    // Ethernet MAC DMA Interrupt Mask Register
+    REGMAP_32(, {
+        unsigned TIE: 1;
+        unsigned TSE: 1;
+        unsigned TUE: 1;
+        unsigned TJE: 1;
+        unsigned OVE: 1;
+        unsigned UNE: 1;
+        unsigned RIE: 1;
+        unsigned RUE: 1;
+        unsigned RSE: 1;
+        unsigned RWE: 1;
+        unsigned ETE: 1;
+        unsigned : 2;
+        unsigned FBE: 1;
+        unsigned ERE: 1;
+        unsigned AIE: 1;
+        unsigned NIE: 1;
+    }) DMAIM;
+
+    // offset 0xC20
+    // Ethernet MAC Missed Frame and Buffer
+    REGMAP_32(, {
+        unsigned MISFRMCNT: 16;
+        unsigned MISCNTOVF: 1;
+        unsigned OVFFRMCNT: 11;
+        unsigned OVFCNTOVF: 1;
+    }) MFBOC;
+
+    // offset 0xC24
+    // Ethernet MAC Receive Interrupt Watchdog Timer
+    REGMAP_32(, {
+        unsigned RIWT: 8;
+    }) RXINTWDT;
+
     // reserved space
-    char _reserved_0E[0x3BC];
+    char _reserved_0E[0x01C];
+
+    // offset 0xC48
+    // Ethernet MAC Current Host Transmit Descriptor
+    uint32_t HOSTXDESC;
+
+    // offset 0xC4C
+    // Ethernet MAC Current Host Receive Descriptor
+    uint32_t HOSRXDESC;
+
+    // offset 0xC50
+    // Ethernet MAC Current Host Transmit Buffer Address
+    uint32_t HOSTXBA;
+
+    // offset 0xC54
+    // Ethernet MAC Current Host Receive Buffer Address
+    uint32_t HOSRXBA;
+
+    // reserved space
+    char _reserved_0F[0x368];
 
     // offset 0xFC0
     // Ethernet MAC Peripheral Property Register
@@ -526,7 +647,7 @@ PAGE_MAP (EMAC_MAP, {
         unsigned PTPCEN: 1;
     }) CC;
 
-    char _reserved_0F[0x004];
+    char _reserved_10[0x004];
 
     struct {
         // offset 0xFD0
@@ -548,7 +669,7 @@ PAGE_MAP (EMAC_MAP, {
         }) MIS;
     } PHY;
 
-    char _reserved_10[0x024];
+    char _reserved_11[0x024];
 })
 
 #define EMAC0   (*(volatile struct EMAC_MAP *)0x400EC000)
@@ -585,7 +706,25 @@ REGMAP_32 (PREPHY_MAP, {
 
 struct EMAC_RX_DESC {
     REGMAP_32(, {
-
+        unsigned ESA: 1;
+        unsigned CE: 1;
+        unsigned DE: 1;
+        unsigned RE: 1;
+        unsigned RWT: 1;
+        unsigned FT: 1;
+        unsigned LC: 1;
+        unsigned TAGF: 1;
+        unsigned LS: 1;
+        unsigned FS: 1;
+        unsigned VLAN: 1;
+        unsigned OE: 1;
+        unsigned LE: 1;
+        unsigned SAF: 1;
+        unsigned TRUNC: 1;
+        unsigned ES: 1;
+        unsigned FL: 14;
+        unsigned AFM: 1;
+        unsigned OWN: 1;
     }) RDES0;
 
     REGMAP_32(, {
@@ -600,7 +739,18 @@ struct EMAC_RX_DESC {
 
     uint32_t BUFF1;
     uint32_t BUFF2;
-    uint32_t RDES4;
+    REGMAP_32(, {
+        unsigned IPPT: 3;
+        unsigned IPHE: 1;
+        unsigned IPPE: 1;
+        unsigned IPCB: 1;
+        unsigned IPv4: 1;
+        unsigned IPv6: 1;
+        unsigned PTPMT: 4;
+        unsigned PTPFT: 1;
+        unsigned PTPv2: 1;
+        unsigned TD: 1;
+    }) RDES4;
     uint32_t RDES5;
     uint32_t RTSL;
     uint32_t RTSH;

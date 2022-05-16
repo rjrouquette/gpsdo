@@ -11,7 +11,7 @@
 #include "net.h"
 
 volatile struct EMAC_RX_DESC rxDesc[16];
-volatile uint8_t rxBuffer[16][1524];
+volatile uint8_t rxBuffer[16][1600];
 
 volatile struct EMAC_TX_DESC txDesc[4];
 volatile uint8_t txBuffer[4][1524];
@@ -110,6 +110,10 @@ void initMAC() {
     CRC.DIN = UNIQUEID.WORD[2];
     CRC.DIN = UNIQUEID.WORD[3];
     EMAC0.ADDR0.LO |= CRC.SEED & 0xFFFFFFu;
+
+    // configure DMA
+    EMAC0.TXDLADDR = (uint32_t) txDesc;
+    EMAC0.RXDLADDR = (uint32_t) rxDesc;
 
     EMAC0.CFG.SADDR = EMAC_SADDR_INS0;
     EMAC0.CFG.RE = 1;
