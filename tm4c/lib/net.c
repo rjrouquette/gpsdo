@@ -4,17 +4,21 @@
 
 #include "../hw/crc.h"
 #include "../hw/emac.h"
+#include "../hw/interrupts.h"
 #include "../hw/gpio.h"
 #include "../hw/sys.h"
 #include "../lib/delay.h"
 #include "../lib/format.h"
 #include "net.h"
 
+volatile uint8_t rxPtr = 0;
+volatile uint16_t phyStatus = 0;
+
 volatile struct EMAC_RX_DESC rxDesc[16];
 volatile uint8_t rxBuffer[16][1600];
 
 volatile struct EMAC_TX_DESC txDesc[4];
-volatile uint8_t txBuffer[4][1524];
+volatile uint8_t txBuffer[4][1600];
 
 void initPHY() {
     // configure LEDs
@@ -44,9 +48,16 @@ void initPHY() {
     PCEPHY.EN0 = 1;
     while(!PREPHY.RDY0);
 
+    // enable PHY interrupt for relevant link changes
+    uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYMISR1);
+    temp |= 0x3Cu;
+    EMAC_MII_Write(&EMAC0, MII_ADDR_EPHYMISR1, temp);
+    // enable PHY interrupt
+    EMAC0.PHY.IM.INT = 1;
+
     // complete configuration
     EMAC0.PC.PHYHOLD = 0;
-    uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYCFG1);
+    temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYCFG1);
     temp |= 1u << 15u;
     EMAC_MII_Write(&EMAC0, MII_ADDR_EPHYCFG1, temp);
 }
@@ -111,11 +122,35 @@ void initMAC() {
     CRC.DIN = UNIQUEID.WORD[3];
     EMAC0.ADDR0.LO |= CRC.SEED & 0xFFFFFFu;
 
+    // init receive descriptors
+    for(int i = 0; i < 16; i++) {
+        rxDesc[i].BUFF1 = (uint32_t) rxBuffer[i];
+        rxDesc[i].BUFF2 = 0;
+        rxDesc[i].RDES1.RBS1 = sizeof(rxBuffer[i]);
+        rxDesc[i].RDES1.RBS2 = 0;
+        rxDesc[i].RDES1.RER = 0;
+        rxDesc[i].RDES0.OWN = 1;
+    }
+    rxDesc[15].RDES1.RER = 0;
+
+    // init transmit descriptors
+    for(int i = 0; i < 4; i++) {
+        txDesc[i].BUFF1 = (uint32_t) txBuffer[i];
+        txDesc[i].BUFF2 = 0;
+        txDesc[i].TDES1.TBS1 = sizeof(txBuffer[i]);
+        txDesc[i].TDES1.TBS2 = 0;
+        txDesc[i].TDES0.TER = 0;
+    }
+    txDesc[3].TDES0.TER = 0;
+
     // configure DMA
     EMAC0.TXDLADDR = (uint32_t) txDesc;
     EMAC0.RXDLADDR = (uint32_t) rxDesc;
+    EMAC0.DMAOPMODE.ST = 1;
+    EMAC0.DMAOPMODE.SR = 1;
 
-    EMAC0.CFG.SADDR = EMAC_SADDR_INS0;
+    EMAC0.CFG.DRO = 1;
+    EMAC0.CFG.SADDR = EMAC_SADDR_REP0;
     EMAC0.CFG.RE = 1;
     EMAC0.CFG.TE = 1;
 
@@ -140,4 +175,24 @@ void NET_getMacAddress(char *strAddr) {
     *(strAddr++) = ':';
     strAddr += toHex((EMAC0.ADDR0.LO >> 0u) & 0xFFu, 2, '0', strAddr);
     *strAddr = 0;
+}
+
+int NET_readyPacket() {
+    return !rxDesc[rxPtr].RDES0.OWN;
+}
+
+void ISR_EthernetMAC(void) {
+    // process link status changes
+    if(EMAC0.PHY.MIS.INT) {
+        // clear interrupt
+        EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYMISR1);
+        EMAC0.PHY.MIS.INT = 1;
+        // fetch status
+        phyStatus = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYSTS);
+        phyStatus ^= 0x0002;
+        // set speed
+        EMAC0.CFG.FES = (phyStatus >> 1u) & 1u;
+        // set duplex
+        EMAC0.CFG.DUPM = (phyStatus >> 2u) & 1u;
+    }
 }
