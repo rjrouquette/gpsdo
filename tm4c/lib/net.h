@@ -5,10 +5,9 @@
 #ifndef GPSDO_NET_H
 #define GPSDO_NET_H
 
-volatile uint16_t phyStatus;
-
 void NET_init();
 void NET_getMacAddress(char *strAddr);
+void NET_getLinkStatus(char *strStatus);
 int NET_readyPacket();
 
 #endif //GPSDO_NET_H

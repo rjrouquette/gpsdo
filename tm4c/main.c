@@ -52,26 +52,21 @@ int main(void) {
             FONT_drawText(0, 32, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
             end = toDec(now, 8, ' ', temp);
-            temp[8] = 0;
+            temp[end] = 0;
             FONT_drawText(0, 48, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
             end = toDec(mono >> 32u, 8, ' ', temp);
-            temp[8] = '.';
+            temp[end] = '.';
             end = toDec((1000 * ((mono >> 16u) & 0xFFFFu)) >> 16u, 3, '0', temp+9);
-            temp[12] = 0;
+            temp[9+end] = 0;
             FONT_drawText(0, 64, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
-
-            end = toDec(diff&15, 8, ' ', temp);
-            temp[end] = 0;
-            FONT_drawText(0, 80, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
-
-            end = toBin(phyStatus, 8, '0', temp);
-            temp[end] = 0;
-            FONT_drawText(0, 96, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
             end = toBin(NET_readyPacket(), 8, '0', temp);
             temp[end] = 0;
-            FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+            FONT_drawText(0, 96, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+
+            NET_getLinkStatus(temp);
+            FONT_drawText(0, 216, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
             EPD_refresh();
             next += 10;

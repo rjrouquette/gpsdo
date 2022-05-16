@@ -174,6 +174,17 @@ void NET_getMacAddress(char *strAddr) {
     *strAddr = 0;
 }
 
+void NET_getLinkStatus(char *strStatus) {
+    const char *speed = (phyStatus & 0x2) ? "100" : " 10";
+    const char *duplx = (phyStatus & 0x3) ? " FDX" : " HDX";
+
+    while(speed[0] != 0)
+        *(strStatus++) = *(speed++);
+    while(duplx[0] != 0)
+        *(strStatus++) = *(duplx++);
+    strStatus[0] = 0;
+}
+
 int NET_readyPacket() {
     return !rxDesc[rxPtr].RDES0.OWN;
 }
