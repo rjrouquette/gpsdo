@@ -583,4 +583,40 @@ REGMAP_32 (PREPHY_MAP, {
 });
 #define PREPHY (*(volatile union PREPHY_MAP *)0x400FEA30)
 
+
+#define MII_ADDR_EPHYBMCR     (0x00u)   // Ethernet PHY Basic Mode Control - MR0
+#define MII_ADDR_EPHYBMSR     (0x01u)   // Ethernet PHY Basic Mode Status - MR1
+#define MII_ADDR_EPHYID1      (0x02u)   // Ethernet PHY Identifier Register 1 - MR2
+#define MII_ADDR_EPHYID2      (0x03u)   // Ethernet PHY Identifier Register 2 - MR3
+#define MII_ADDR_EPHYANA      (0x04u)   // Ethernet PHY Auto-Negotiation Advertisement - MR4
+#define MII_ADDR_EPHYANLPA    (0x05u)   // Ethernet PHY Auto-Negotiation Link Partner Ability - MR5
+#define MII_ADDR_EPHYANER     (0x06u)   // Ethernet PHY Auto-Negotiation Expansion - MR6
+#define MII_ADDR_EPHYANNPTR   (0x07u)   // Ethernet PHY Auto-Negotiation Next Page TX - MR7
+#define MII_ADDR_EPHYANLNPTR  (0x08u)   // Ethernet PHY Auto-Negotiation Link Partner Ability Next Page - MR8
+#define MII_ADDR_EPHYCFG1     (0x09u)   // Ethernet PHY Configuration 1 - MR9
+#define MII_ADDR_EPHYCFG2     (0x0Au)   // Ethernet PHY Configuration 2 - MR10
+#define MII_ADDR_EPHYCFG3     (0x0Bu)   // Ethernet PHY Configuration 3 - MR11
+#define MII_ADDR_EPHYREGCTL   (0x0Du)   // Ethernet PHY Register Control - MR13
+#define MII_ADDR_EPHYADDAR    (0x0Eu)   // Ethernet PHY Address or Data - MR14
+#define MII_ADDR_EPHYSTS      (0x10u)   // Ethernet PHY Status - MR16
+#define MII_ADDR_EPHYSCR      (0x11u)   // Ethernet PHY Specific Control- MR17
+#define MII_ADDR_EPHYMISR1    (0x12u)   // Ethernet PHY MII Interrupt Status 1 - MR18
+#define MII_ADDR_EPHYMISR2    (0x13u)   // Ethernet PHY MII Interrupt Status 2 - MR19
+#define MII_ADDR_EPHYFCSCR    (0x14u)   // Ethernet PHY False Carrier Sense Counter - MR20
+#define MII_ADDR_EPHYRXERCNT  (0x15u)   // Ethernet PHY Receive Error Count - MR21
+#define MII_ADDR_EPHYBISTCR   (0x16u)   // Ethernet PHY BIST Control - MR22
+#define MII_ADDR_EPHYLEDCR    (0x18u)   // Ethernet PHY LED Control - MR24
+#define MII_ADDR_EPHYCTL      (0x19u)   // Ethernet PHY Control - MR25
+#define MII_ADDR_EPHY10BTSC   (0x1Au)   // Ethernet PHY 10Base-T Status/Control - MR26
+#define MII_ADDR_EPHYBICSR1   (0x1Bu)   // Ethernet PHY BIST Control and Status 1 - MR27
+#define MII_ADDR_EPHYBICSR2   (0x1Cu)   // Ethernet PHY BIST Control and Status 2 - MR28
+#define MII_ADDR_EPHYCDCR     (0x1Eu)   // Ethernet PHY BIST Control and Status 2 - MR28
+#define MII_ADDR_EPHYCDCR     (0x1Eu)   // Ethernet PHY Cable Diagnostic Control - MR30
+#define MII_ADDR_EPHYRCR      (0x1Fu)   // Ethernet PHY Reset Control - MR31
+#define MII_ADDR_EPHYLEDCFG   (0x25u)   // Ethernet PHY LED Configuration - MR37
+
+uint16_t EMAC_MII_Read(volatile struct EMAC_MAP *emac, uint8_t address);
+
+void EMAC_MII_Write(volatile struct EMAC_MAP *emac, uint8_t address, uint16_t value);
+
 #endif //TM4C_EMAC_H

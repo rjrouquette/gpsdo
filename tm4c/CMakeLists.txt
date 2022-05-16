@@ -18,6 +18,7 @@ add_executable(
         gpsdo
 
         main.c
+        hw/emac.c
         hw/interrupts.c
         lib/clk.c
         lib/delay.c

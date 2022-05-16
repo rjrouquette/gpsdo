@@ -10,9 +10,6 @@
 #include "../lib/format.h"
 #include "net.h"
 
-void writePHY(uint8_t address, uint16_t value);
-uint16_t readPHY(uint8_t address);
-
 void initPHY() {
     // configure LEDs
     RCGCGPIO.EN_PORTF = 1;
@@ -43,9 +40,9 @@ void initPHY() {
 
     // complete configuration
     EMAC0.PC.PHYHOLD = 0;
-    uint16_t temp = readPHY(0x09);
+    uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYCFG1);
     temp |= 1u << 15u;
-    writePHY(0x09, temp);
+    EMAC_MII_Write(&EMAC0, MII_ADDR_EPHYCFG1, temp);
 }
 
 void initPPS() {
@@ -133,25 +130,4 @@ void NET_getMacAddress(char *strAddr) {
     *(strAddr++) = ':';
     strAddr += toHex((EMAC0.ADDR0.LO >> 0u) & 0xFFu, 2, '0', strAddr);
     *strAddr = 0;
-}
-
-void writePHY(uint8_t address, uint16_t value) {
-    // wait for MII to be ready
-    while(EMAC0.MIIADDR.MIB);
-    EMAC0.MIIDATA.DATA = value;
-    EMAC0.MIIADDR.MII = address;
-    EMAC0.MIIADDR.MIW = 1;
-    EMAC0.MIIADDR.MIB = 1;
-}
-
-uint16_t readPHY(uint8_t address) {
-    // wait for MII to be ready
-    while(EMAC0.MIIADDR.MIB);
-    EMAC0.MIIADDR.MII = address;
-    EMAC0.MIIADDR.MIW = 0;
-    EMAC0.MIIADDR.MIB = 1;
-    // wait for MII to be ready
-    while(EMAC0.MIIADDR.MIB);
-    // return value
-    return EMAC0.MIIDATA.DATA;
 }
