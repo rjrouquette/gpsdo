@@ -153,9 +153,6 @@ void initMAC() {
     EMAC0.CFG.SADDR = EMAC_SADDR_REP0;
     EMAC0.CFG.RE = 1;
     EMAC0.CFG.TE = 1;
-
-    // LED on when high
-    EMAC0.CC.POL = 0;
 }
 
 void NET_init() {
