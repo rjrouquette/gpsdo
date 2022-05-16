@@ -10,6 +10,12 @@
 #include "../lib/format.h"
 #include "net.h"
 
+volatile struct EMAC_RX_DESC rxDesc[16];
+volatile uint8_t rxBuffer[16][1524];
+
+volatile struct EMAC_TX_DESC txDesc[4];
+volatile uint8_t txBuffer[4][1524];
+
 void initPHY() {
     // configure LEDs
     RCGCGPIO.EN_PORTF = 1;

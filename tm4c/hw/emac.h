@@ -583,6 +583,76 @@ REGMAP_32 (PREPHY_MAP, {
 });
 #define PREPHY (*(volatile union PREPHY_MAP *)0x400FEA30)
 
+struct EMAC_RX_DESC {
+    REGMAP_32(, {
+
+    }) RDES0;
+
+    REGMAP_32(, {
+        unsigned RBS1: 13;
+        unsigned : 1;
+        unsigned RCH: 1;
+        unsigned RER: 1;
+        unsigned RBS2: 13;
+        unsigned : 2;
+        unsigned DIC: 1;
+    }) RDES1;
+
+    uint32_t BUFF1;
+    uint32_t BUFF2;
+    uint32_t RDES4;
+    uint32_t RDES5;
+    uint32_t RTSL;
+    uint32_t RTSH;
+};
+_Static_assert(sizeof(struct EMAC_RX_DESC) == 32, "EMAC_RX_DESC must be 32 bytes");
+
+struct EMAC_TX_DESC {
+    REGMAP_32(, {
+        unsigned DB: 1;
+        unsigned UF: 1;
+        unsigned ED: 1;
+        unsigned CC: 4;
+        unsigned VF: 1;
+        unsigned ECOL: 1;
+        unsigned LCOL: 1;
+        unsigned NCAR: 1;
+        unsigned LCAR: 1;
+        unsigned IPE: 1;
+        unsigned FF: 1;
+        unsigned JT: 1;
+        unsigned ES: 1;
+        unsigned IHE: 1;
+        unsigned TTSS: 1;
+        unsigned VLIC: 2;
+        unsigned TCH: 1;
+        unsigned TER: 1;
+        unsigned CIC: 2;
+        unsigned CRCR: 1;
+        unsigned TTSE: 1;
+        unsigned DP: 1;
+        unsigned DC: 1;
+        unsigned FS: 1;
+        unsigned LS: 1;
+        unsigned IC: 1;
+        unsigned OWN: 1;
+    }) TDES0;
+
+    REGMAP_32(, {
+        unsigned TBS1: 13;
+        unsigned : 3;
+        unsigned TBS2: 13;
+        unsigned SAIC: 3;
+    }) TDES1;
+
+    uint32_t BUFF1;
+    uint32_t BUFF2;
+    uint32_t TDES4;
+    uint32_t TDES5;
+    uint32_t TTSL;
+    uint32_t TTSH;
+};
+_Static_assert(sizeof(struct EMAC_TX_DESC) == 32, "EMAC_TX_DESC must be 32 bytes");
 
 #define MII_ADDR_EPHYBMCR     (0x00u)   // Ethernet PHY Basic Mode Control - MR0
 #define MII_ADDR_EPHYBMSR     (0x01u)   // Ethernet PHY Basic Mode Status - MR1
