@@ -10,6 +10,9 @@
 #include "../lib/format.h"
 #include "net.h"
 
+void writePHY(uint8_t address, uint16_t value);
+uint16_t readPHY(uint8_t address);
+
 void initPHY() {
     // configure LEDs
     RCGCGPIO.EN_PORTF = 1;
@@ -37,8 +40,44 @@ void initPHY() {
     // enable power
     PCEPHY.EN0 = 1;
     while(!PREPHY.RDY0);
-    // enable transmissions
+
+    // complete configuration
     EMAC0.PC.PHYHOLD = 0;
+    uint16_t temp = readPHY(0x09);
+    temp |= 1u << 15u;
+    writePHY(0x09, temp);
+}
+
+void initPPS() {
+    // configure PPS
+    RCGCGPIO.EN_PORTG = 1;
+    delay_cycles_4();
+    // unlock GPIO config
+    PORTG.LOCK = GPIO_LOCK_KEY;
+    PORTG.CR = 0x01u;
+    // configure pins
+    PORTG.DIR = 0x01u;
+    PORTG.DR8R = 0x01u;
+    PORTG.PCTL.PMC0 = 0x5;
+    PORTG.AFSEL.ALT0 = 1;
+    PORTG.DEN = 0x01u;
+    // lock GPIO config
+    PORTG.CR = 0;
+    PORTG.LOCK = 0;
+
+    // configure PTP
+    EMAC0.TIMSTCTRL.TSMAST = 1;
+    EMAC0.TIMSTCTRL.PTPIPV4 = 1;
+    EMAC0.TIMSTCTRL.PTPIPV6 = 1;
+    EMAC0.TIMSTCTRL.PTPVER2 = 1;
+    EMAC0.TIMSTCTRL.ALLF = 1;
+    EMAC0.TIMSTCTRL.DGTLBIN = 1;
+    EMAC0.TIMSTCTRL.TSEN = 1;
+    // 25MHz = 40ns
+    EMAC0.SUBSECINC.SSINC = 40;
+
+    // PTP clock enabled
+    EMAC0.CC.PTPCEN = 1;
 }
 
 void initMAC() {
@@ -51,8 +90,11 @@ void initMAC() {
     // enable power
     PCEMAC.EN0 = 1;
     while(!PREMAC.RDY0);
+    // set MII clock
+    EMAC0.MIIADDR.CR = 1;
     // initialize PHY
     initPHY();
+    initPPS();
 
     // set upper 24 bits of MAC address
     EMAC0.ADDR0.HI.ADDR = 0x5455u;
@@ -72,8 +114,6 @@ void initMAC() {
 
     // LED on when high
     EMAC0.CC.POL = 0;
-    // PTP clock enabled
-    EMAC0.CC.PTPCEN = 1;
 }
 
 void NET_init() {
@@ -93,4 +133,25 @@ void NET_getMacAddress(char *strAddr) {
     *(strAddr++) = ':';
     strAddr += toHex((EMAC0.ADDR0.LO >> 0u) & 0xFFu, 2, '0', strAddr);
     *strAddr = 0;
+}
+
+void writePHY(uint8_t address, uint16_t value) {
+    // wait for MII to be ready
+    while(EMAC0.MIIADDR.MIB);
+    EMAC0.MIIDATA.DATA = value;
+    EMAC0.MIIADDR.MII = address;
+    EMAC0.MIIADDR.MIW = 1;
+    EMAC0.MIIADDR.MIB = 1;
+}
+
+uint16_t readPHY(uint8_t address) {
+    // wait for MII to be ready
+    while(EMAC0.MIIADDR.MIB);
+    EMAC0.MIIADDR.MII = address;
+    EMAC0.MIIADDR.MIW = 0;
+    EMAC0.MIIADDR.MIB = 1;
+    // wait for MII to be ready
+    while(EMAC0.MIIADDR.MIB);
+    // return value
+    return EMAC0.MIIDATA.DATA;
 }
