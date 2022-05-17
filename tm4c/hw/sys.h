@@ -28,6 +28,18 @@ REGMAP_32 (STCURRENT_MAP, {
 });
 #define STCURRENT (*(volatile union STCURRENT_MAP *)0xE000E018)
 
+REGMAP_32(FLASHCONF_MAP, {
+    unsigned : 16;
+    unsigned FPFOFF: 1;
+    unsigned FPFON: 1;
+    unsigned : 2;
+    unsigned CLRTV: 1;
+    unsigned : 8;
+    unsigned SPFE: 1;
+    unsigned FMME: 1;
+});
+#define FLASHCONF (*(volatile union FLASHCONF_MAP *)0x400FDFC8)
+
 REGMAP_32 (RIS_MAP, {
     unsigned : 1;
     unsigned BORRIS: 1;

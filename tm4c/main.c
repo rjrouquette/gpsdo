@@ -72,6 +72,10 @@ int main(void) {
             temp[end] = 0;
             FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
+            end = toHex(EMAC0.HOSRXDESC, 8, '0', temp);
+            temp[end] = 0;
+            FONT_drawText(0, 128, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+
             NET_getLinkStatus(temp);
             FONT_drawText(0, 216, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
