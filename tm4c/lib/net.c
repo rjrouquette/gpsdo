@@ -10,6 +10,7 @@
 #include "../lib/delay.h"
 #include "../lib/format.h"
 #include "net.h"
+#include "net/arp.h"
 
 volatile uint8_t rxPtr = 0;
 volatile uint16_t phyStatus = 0;
@@ -19,6 +20,9 @@ volatile uint8_t rxBuffer[16][1600];
 
 volatile struct EMAC_TX_DESC txDesc[4];
 volatile uint8_t txBuffer[4][1600];
+
+volatile uint32_t cntPacketsRX = 0;
+volatile uint32_t cntPacketsTX = 0;
 
 void initPHY() {
     // configure LEDs
@@ -149,14 +153,43 @@ void initMAC() {
     EMAC0.DMAOPMODE.ST = 1;
     EMAC0.DMAOPMODE.SR = 1;
 
+    EMAC0.FRAMEFLTR.RA = 1;
+    EMAC0.RXINTWDT.RIWT = 8;
     EMAC0.CFG.DRO = 1;
     EMAC0.CFG.SADDR = EMAC_SADDR_REP0;
     EMAC0.CFG.RE = 1;
     EMAC0.CFG.TE = 1;
 }
 
+void ISR_EthernetMAC(void) {
+    // process link status changes
+    if(EMAC0.PHY.MIS.INT) {
+        // clear interrupt
+        EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYMISR1);
+        EMAC0.PHY.MIS.INT = 1;
+        // fetch status
+        phyStatus = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYSTS);
+        phyStatus ^= 0x0002;
+        // set speed
+        EMAC0.CFG.FES = (phyStatus >> 1u) & 1u;
+        // set duplex
+        EMAC0.CFG.DUPM = (phyStatus >> 2u) & 1u;
+    }
+}
+
 void NET_init() {
     initMAC();
+}
+
+void NET_getLinkStatus(char *strStatus) {
+    const char *speed = (phyStatus & 0x2) ? "100" : " 10";
+    const char *duplx = (phyStatus & 0x3) ? " FDX" : " HDX";
+
+    while(speed[0] != 0)
+        *(strStatus++) = *(speed++);
+    while(duplx[0] != 0)
+        *(strStatus++) = *(duplx++);
+    strStatus[0] = 0;
 }
 
 void NET_getMacAddress(char *strAddr) {
@@ -174,33 +207,23 @@ void NET_getMacAddress(char *strAddr) {
     *strAddr = 0;
 }
 
-void NET_getLinkStatus(char *strStatus) {
-    const char *speed = (phyStatus & 0x2) ? "100" : " 10";
-    const char *duplx = (phyStatus & 0x3) ? " FDX" : " HDX";
+void NET_poll() {
+    if(!rxDesc[rxPtr].RDES0.OWN) {
+        if(!rxDesc[rxPtr].RDES0.ES) {
 
-    while(speed[0] != 0)
-        *(strStatus++) = *(speed++);
-    while(duplx[0] != 0)
-        *(strStatus++) = *(duplx++);
-    strStatus[0] = 0;
-}
-
-int NET_readyPacket() {
-    return !rxDesc[rxPtr].RDES0.OWN;
-}
-
-void ISR_EthernetMAC(void) {
-    // process link status changes
-    if(EMAC0.PHY.MIS.INT) {
-        // clear interrupt
-        EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYMISR1);
-        EMAC0.PHY.MIS.INT = 1;
-        // fetch status
-        phyStatus = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYSTS);
-        phyStatus ^= 0x0002;
-        // set speed
-        EMAC0.CFG.FES = (phyStatus >> 1u) & 1u;
-        // set duplex
-        EMAC0.CFG.DUPM = (phyStatus >> 2u) & 1u;
+        }
+        ++cntPacketsRX;
+        rxDesc[rxPtr].RDES0.OWN = 1;
+        rxPtr = (rxPtr + 1) & 0xF;
     }
+
+    ARP_poll();
+}
+
+uint32_t NET_packetsRX() {
+    return cntPacketsRX;
+}
+
+uint32_t NET_packetsTX() {
+    return cntPacketsTX;
 }

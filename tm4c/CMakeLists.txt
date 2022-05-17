@@ -28,6 +28,9 @@ add_executable(
         lib/format.c
         lib/led.c
         lib/net.c
+        lib/net/arp.c
+        lib/net/eth.c
+        lib/net/ip.c
         lib/temp.c
 )
 

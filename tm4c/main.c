@@ -12,6 +12,7 @@
 #include "lib/led.h"
 #include "lib/net.h"
 #include "lib/temp.h"
+#include "hw/emac.h"
 
 int main(void) {
     char temp[32];
@@ -37,6 +38,8 @@ int main(void) {
     uint32_t next = 0;
     int end;
     for(;;) {
+        NET_poll();
+
         uint32_t now = CLK_MONOTONIC_INT();
         if(now & 0x1u)
             LED1_ON();
@@ -61,12 +64,19 @@ int main(void) {
             temp[9+end] = 0;
             FONT_drawText(0, 64, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
-            end = toBin(NET_readyPacket(), 8, '0', temp);
+            end = toDec(EMAC0.RXCNTGB, 8, ' ', temp);
             temp[end] = 0;
             FONT_drawText(0, 96, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
+            end = toDec(EMAC0.TXCNTGB, 8, ' ', temp);
+            temp[end] = 0;
+            FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+
             NET_getLinkStatus(temp);
             FONT_drawText(0, 216, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+
+            NET_getIpAddress(temp);
+            FONT_drawText(16, 232, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
             EPD_refresh();
             next += 10;

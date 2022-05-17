@@ -6,8 +6,12 @@
 #define GPSDO_NET_H
 
 void NET_init();
-void NET_getMacAddress(char *strAddr);
 void NET_getLinkStatus(char *strStatus);
-int NET_readyPacket();
+void NET_getMacAddress(char *strAddr);
+void NET_getIpAddress(char *strAddr);
+void NET_poll();
+
+uint32_t NET_packetsRX();
+uint32_t NET_packetsTX();
 
 #endif //GPSDO_NET_H
