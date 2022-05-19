@@ -38,7 +38,7 @@ int main(void) {
     NET_getMacAddress(temp);
     FONT_drawText(16, 248, temp, FONT_ASCII_16, 0, 3);
 
-    PLOT_setRect(0, 0, EPD_width()-1, 15, 3);
+    PLOT_setRect(0, 0, EPD_width()-1, 15, 2);
     PLOT_setLine(0, 15, EPD_width()-1, 15, 1);
     PLOT_setLine(0, 215, EPD_width()-1, 215, 1);
 
@@ -61,11 +61,11 @@ int main(void) {
 
             end = toHMS(now, temp);
             temp[end] = 0;
-            FONT_drawText(0, 0, temp, FONT_ASCII_16, 0, 3);
+            FONT_drawText(0, 0, temp, FONT_ASCII_16, 0, 2);
 
             end = toTemp(TEMP_proc(), temp);
             temp[end] = 0;
-            FONT_drawText(EPD_width()-73, 0, temp, FONT_ASCII_16, 0, 3);
+            FONT_drawText(EPD_width()-73, 0, temp, FONT_ASCII_16, 0, 2);
 
             end = toDec(EMAC0.RXCNTGB, 8, ' ', temp);
             temp[end] = 0;
