@@ -5,4 +5,9 @@
 #ifndef GPSDO_ICMP_H
 #define GPSDO_ICMP_H
 
+#include <stdint.h>
+
+void ICMP_process(uint8_t *frame, int flen);
+
+
 #endif //GPSDO_ICMP_H

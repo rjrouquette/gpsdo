@@ -15,6 +15,7 @@
 #include "lib/temp.h"
 #include "hw/emac.h"
 #include "hw/sys.h"
+#include "lib/net/ip.h"
 
 int main(void) {
     char temp[32];
@@ -71,15 +72,15 @@ int main(void) {
             temp[end] = 0;
             FONT_drawText(0, 96, temp, FONT_ASCII_16, 0, 3);
 
-            end = toDec(EMAC0.MFBOC.raw, 8, ' ', temp);
+            end = toDec(EMAC0.TXCNTGB, 8, ' ', temp);
             temp[end] = 0;
             FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(EMAC0.HOSRXDESC, 8, '0', temp);
+            end = toHex(0, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 128, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(EMAC0.CFG.raw, 8, '0', temp);
+            end = toHex(ipGateway, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
 
@@ -95,4 +96,31 @@ int main(void) {
             next += 10;
         }
     }
+}
+
+void debugBlink(int cnt) {
+    LED1_OFF();
+    delay_ms(2000);
+    while(cnt--) {
+        LED1_TGL();
+        delay_ms(250);
+        LED1_TGL();
+        delay_ms(250);
+    }
+}
+
+void Fault_Hard() {
+    debugBlink(2);
+}
+
+void Fault_Memory() {
+    debugBlink(3);
+}
+
+void Fault_Bus() {
+    debugBlink(4);
+}
+
+void Fault_Usage() {
+    debugBlink(5);
 }

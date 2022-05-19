@@ -12,6 +12,7 @@
 #include "net.h"
 #include "net/arp.h"
 #include "net/eth.h"
+#include "net/ip.h"
 
 #define RX_RING_SIZE (16)
 #define RX_BUFF_SIZE (1600)
@@ -32,9 +33,41 @@ static volatile uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 static volatile uint32_t cntPacketsRX = 0;
 static volatile uint32_t cntPacketsTX = 0;
 
-uint8_t macAddress[6];
+static void initDescriptors() {
+    // init receive descriptors
+    for(int i = 0; i < RX_RING_SIZE; i++) {
+        rxDesc[i].BUFF1 = (uint32_t) rxBuffer[i];
+        rxDesc[i].BUFF2 = 0;
+        rxDesc[i].RDES1.RBS1 = RX_BUFF_SIZE;
+        rxDesc[i].RDES1.RBS2 = 0;
+        rxDesc[i].RDES1.RER = 0;
+        rxDesc[i].RDES0.OWN = 1;
+    }
+    rxDesc[RX_RING_SIZE-1].RDES1.RER = 1;
 
-void initPHY() {
+    // init transmit descriptors
+    for(int i = 0; i < TX_RING_SIZE; i++) {
+        txDesc[i].BUFF1 = (uint32_t) txBuffer[i];
+        txDesc[i].BUFF2 = 0;
+        txDesc[i].TDES1.TBS1 = 0;
+        txDesc[i].TDES1.TBS2 = 0;
+        txDesc[i].TDES0.TER = 0;
+        txDesc[i].TDES0.OWN = 0;
+        // each descriptor is one frame
+        txDesc[i].TDES0.FS = 1;
+        txDesc[i].TDES0.LS = 1;
+        // capture timestamp
+        txDesc[i].TDES0.TTSE = 1;
+        // compute and replace frame CRC
+        txDesc[i].TDES0.DC = 1;
+        txDesc[i].TDES0.CRCR = 1;
+        // insert ICMP/TCP/UDP CRC
+        txDesc[i].TDES0.CIC = 1;
+    }
+    txDesc[TX_RING_SIZE-1].TDES0.TER = 1;
+}
+
+static void initPHY() {
     // configure LEDs
     RCGCGPIO.EN_PORTF = 1;
     delay_cycles_4();
@@ -76,7 +109,7 @@ void initPHY() {
     EMAC_MII_Write(&EMAC0, MII_ADDR_EPHYCFG1, temp);
 }
 
-void initPPS() {
+static void initPPS() {
     // configure PPS
     RCGCGPIO.EN_PORTG = 1;
     delay_cycles_4();
@@ -108,38 +141,7 @@ void initPPS() {
     EMAC0.CC.PTPCEN = 1;
 }
 
-void initMAC() {
-    // init receive descriptors
-    for(int i = 0; i < RX_RING_SIZE; i++) {
-        rxDesc[i].BUFF1 = (uint32_t) rxBuffer[i];
-        rxDesc[i].BUFF2 = 0;
-        rxDesc[i].RDES1.RBS1 = RX_BUFF_SIZE;
-        rxDesc[i].RDES1.RBS2 = 0;
-        rxDesc[i].RDES1.RER = 0;
-        rxDesc[i].RDES0.OWN = 1;
-    }
-    rxDesc[RX_RING_SIZE-1].RDES1.RER = 1;
-
-    // init transmit descriptors
-    for(int i = 0; i < 8; i++) {
-        txDesc[i].BUFF1 = (uint32_t) txBuffer[i];
-        txDesc[i].BUFF2 = 0;
-        txDesc[i].TDES1.TBS1 = 0;
-        txDesc[i].TDES1.TBS2 = 0;
-        txDesc[i].TDES0.TER = 0;
-        txDesc[i].TDES0.OWN = 0;
-        // each descriptor is one frame
-        txDesc[i].TDES0.FS = 1;
-        txDesc[i].TDES0.LS = 1;
-        // capture timestamp
-        txDesc[i].TDES0.TTSE = 1;
-        // compute and replace frame CRC
-        txDesc[i].TDES0.CRCR = 1;
-        // insert ICMP/TCP/UDP CRC
-        txDesc[i].TDES0.CIC = 1;
-    }
-    txDesc[TX_RING_SIZE-1].TDES0.TER = 1;
-
+static void initMAC() {
     // disable flash prefetch per errata
     FLASHCONF.FPFOFF = 1;
     // enable CRC module
@@ -155,15 +157,16 @@ void initMAC() {
 
     initPPS();
 
-    // set upper 16 bits of MAC address
-    EMAC0.ADDR0.HI.ADDR = 0x5455u;
-    // set lower 32 bits of MAC address
+    // compute MAC address
     CRC.CTRL.TYPE = CRC_TYPE_04C11DB7;
     CRC.CTRL.INIT = CRC_INIT_ZERO;
     CRC.DIN = UNIQUEID.WORD[0];
     CRC.DIN = UNIQUEID.WORD[1];
     CRC.DIN = UNIQUEID.WORD[2];
     CRC.DIN = UNIQUEID.WORD[3];
+    // set upper 16 bits of MAC address
+    EMAC0.ADDR0.HI.ADDR = 0x5455u;
+    // set lower 32 bits of MAC address
     EMAC0.ADDR0.LO = (0x58u << 24u) | (CRC.SEED & 0xFFFFFFu);
 
     // configure DMA
@@ -206,11 +209,17 @@ void ISR_EthernetMAC(void) {
         // link status bit in EPHYSTS is buggy, but EPHYBMSR works
         uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYBMSR);
         if(temp & 4) phyStatus |= 1;
+        return;
     }
 }
 
 void NET_init() {
+    initDescriptors();
     initMAC();
+
+    // debug zero conf
+    ipAddress = 0x1003A8C0;
+    ipSubnet = 0x00FFFFFF;
 }
 
 void NET_getLinkStatus(char *strStatus) {
@@ -245,17 +254,12 @@ void NET_getMacAddress(char *strAddr) {
 void NET_poll() {
     while(!rxDesc[ptrRX].RDES0.OWN) {
         if(!rxDesc[ptrRX].RDES0.ES) {
-            if(rxDesc[ptrRX].RDES0.VLAN) {
-                struct HEADER_ETH_VLAN *header = rxBuffer[ptrRX];
-                if(ETH_isARP(header->ethType)) {
-                    ARP_process(rxBuffer[ptrRX] + sizeof(struct HEADER_ETH_VLAN));
-                }
+            uint8_t *buffer = (uint8_t *) rxDesc[ptrRX].BUFF1;
+            if(ETH_isARP(((struct HEADER_ETH *) buffer)->ethType)) {
+                ARP_process(buffer, rxDesc[ptrRX].RDES0.FL);
             }
-            else {
-                struct HEADER_ETH *header = rxBuffer[ptrRX];
-                if(ETH_isARP(header->ethType)) {
-                    ARP_process(rxBuffer[ptrRX] + sizeof(struct HEADER_ETH));
-                }
+            else if(ETH_isIPv4(((struct HEADER_ETH *) buffer)->ethType)) {
+                IPv4_process(buffer, rxDesc[ptrRX].RDES0.FL);
             }
         }
         ++cntPacketsRX;
@@ -281,11 +285,13 @@ uint8_t * NET_getTxBuff(int desc) {
 
 void NET_transmit(int desc, int len) {
     // set transmission length size
-    if(len < 0) len = 0;
+    if(len < 64) len = 64;
     if(len > TX_BUFF_SIZE) len = TX_BUFF_SIZE;
     txDesc[desc & (TX_RING_SIZE-1)].TDES1.TBS1 = len;
     // release descriptor
     txDesc[desc & (TX_RING_SIZE-1)].TDES0.OWN = 1;
+    // wake TX DMA
+    EMAC0.TXPOLLD = 1;
 }
 
 uint32_t NET_packetsRX() {

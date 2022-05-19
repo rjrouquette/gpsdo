@@ -33,7 +33,9 @@ add_executable(
         lib/net.c
         lib/net/arp.c
         lib/net/eth.c
+        lib/net/icmp.c
         lib/net/ip.c
+        lib/net/util.c
         lib/temp.c
 )
 
