@@ -10,12 +10,17 @@
 #include "lib/font.h"
 #include "lib/format.h"
 #include "lib/led.h"
+#include "lib/plot.h"
 #include "lib/net.h"
 #include "lib/temp.h"
 #include "hw/emac.h"
+#include "hw/sys.h"
 
 int main(void) {
     char temp[32];
+    // enable FPU
+    CPAC.CP10 = 3;
+    CPAC.CP11 = 3;
 
     // initialize status LEDs
     LED_init();
@@ -23,7 +28,7 @@ int main(void) {
     CLK_init();
     // initialize display
     EPD_init();
-    FONT_drawText(0, 0, "Display Configured", FONT_ASCII_16, 0, 3, EPD_setPixel);
+    FONT_drawText(0, 0, "Display Configured", FONT_ASCII_16, 0, 3);
     EPD_refresh();
     // initialize temperature sensor
     TEMP_init();
@@ -31,7 +36,9 @@ int main(void) {
     // initialize networking
     NET_init();
     NET_getMacAddress(temp);
-    FONT_drawText(16, 248, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+    FONT_drawText(16, 248, temp, FONT_ASCII_16, 0, 3);
+
+    PLOT_setLine(0, 215, EPD_width()-1, 215, 1);
 
     LED0_ON();
 
@@ -52,39 +59,39 @@ int main(void) {
 
             end = toTemp(TEMP_proc(), temp);
             temp[end] = 0;
-            FONT_drawText(0, 32, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+            FONT_drawText(0, 32, temp, FONT_ASCII_16, 0, 3);
 
             end = toDec(now, 8, ' ', temp);
             temp[end] = 0;
-            FONT_drawText(0, 48, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+            FONT_drawText(0, 48, temp, FONT_ASCII_16, 0, 3);
 
             end = toDec(mono >> 32u, 8, ' ', temp);
             temp[end] = '.';
             end = toDec((1000 * ((mono >> 16u) & 0xFFFFu)) >> 16u, 3, '0', temp+9);
             temp[9+end] = 0;
-            FONT_drawText(0, 64, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+            FONT_drawText(0, 64, temp, FONT_ASCII_16, 0, 3);
 
             end = toDec(EMAC0.RXCNTGB, 8, ' ', temp);
             temp[end] = 0;
-            FONT_drawText(0, 96, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+            FONT_drawText(0, 96, temp, FONT_ASCII_16, 0, 3);
 
             end = toDec(EMAC0.MFBOC.raw, 8, ' ', temp);
             temp[end] = 0;
-            FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+            FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3);
 
             end = toHex(EMAC0.HOSRXDESC, 8, '0', temp);
             temp[end] = 0;
-            FONT_drawText(0, 128, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+            FONT_drawText(0, 128, temp, FONT_ASCII_16, 0, 3);
 
             end = toHex(EMAC0.CFG.raw, 8, '0', temp);
             temp[end] = 0;
-            FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+            FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
 
             NET_getLinkStatus(temp);
-            FONT_drawText(0, 216, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+            FONT_drawText(0, 216, temp, FONT_ASCII_16, 0, 3);
 
             NET_getIpAddress(temp);
-            FONT_drawText(16, 232, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+            FONT_drawText(16, 232, temp, FONT_ASCII_16, 0, 3);
 
             EPD_refresh();
             next += 10;

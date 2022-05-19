@@ -210,7 +210,7 @@ static void SendByte(uint8_t byte) {
 }
 
 static void SendBytes(uint32_t len, const volatile uint8_t *bytes) {
-    // HI level indicates command
+    // HI level indicates data
     PORTK.DATA[0x01] = 0x01;
     for(uint32_t i = 0; i < len; i++) {
         // wait for room in FIFO

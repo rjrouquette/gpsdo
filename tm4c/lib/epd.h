@@ -7,6 +7,8 @@
 #ifndef GPSDO_EPD_H
 #define GPSDO_EPD_H
 
+#include <stdint.h>
+
 void EPD_init();
 int EPD_width();
 int EPD_height();

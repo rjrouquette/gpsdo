@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(gpsdo)
 find_program(OBJCOPY arm-none-eabi-objcopy)
+find_program(OBJDUMP arm-none-eabi-objdump)
 
 set(CMAKE_C_COMPILER arm-none-eabi-gcc)
 set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
@@ -10,7 +11,8 @@ set(CMAKE_C_FLAGS "-std=c17 ${COMP_FLAGS}")
 set(CMAKE_CXX_FLAGS "-std=c++17 ${COMP_FLAGS}")
 
 set(CMAKE_LINKER arm-none-eabi-ld)
-set(LINKER_FLAGS "-T ${CMAKE_SOURCE_DIR}/tm4c1249ncpdt.ld --entry ISR_Reset")
+set(LINKER_FLAGS "-T ${CMAKE_SOURCE_DIR}/tm4c1249ncpdt.ld --entry ISR_Reset --gc-sections")
+set(LINKER_FLAGS "${LINKER_FLAGS} -L/usr/lib/arm-none-eabi/lib/thumb/v7e-m+fp/hard")
 set(CMAKE_C_LINK_EXECUTABLE "<CMAKE_LINKER> ${LINKER_FLAGS} <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
 set(CMAKE_CXX_LINK_EXECUTABLE "<CMAKE_LINKER> ${LINKER_FLAGS} <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
 
@@ -27,11 +29,19 @@ add_executable(
         lib/fonts/ascii_16.c
         lib/format.c
         lib/led.c
+        lib/plot.c
         lib/net.c
         lib/net/arp.c
         lib/net/eth.c
         lib/net/ip.c
         lib/temp.c
+)
+
+target_link_libraries(
+        gpsdo
+        -static
+        -lc
+        -lm
 )
 
 # split out debug symbols
@@ -46,4 +56,8 @@ add_custom_command(
 add_custom_command(
         TARGET gpsdo POST_BUILD
         COMMAND ${OBJCOPY} --output-target binary $<TARGET_FILE:gpsdo> $<TARGET_FILE:gpsdo>.bin
+)
+add_custom_command(
+        TARGET gpsdo POST_BUILD
+        COMMAND ${OBJDUMP} -h -S $<TARGET_FILE:gpsdo> > $<TARGET_FILE:gpsdo>.lst
 )

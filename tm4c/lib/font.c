@@ -2,12 +2,13 @@
 // Created by robert on 4/16/22.
 //
 
+#include "epd.h"
 #include "font.h"
 
 
 void FONT_drawText(
         int x, int y, char *text, const volatile uint8_t *font,
-        uint8_t foreground, uint8_t background, SetPixel callback
+        uint8_t foreground, uint8_t background
 ) {
     uint16_t charWidth = font[0];
     uint16_t charHeight = font[1];
@@ -24,7 +25,7 @@ void FONT_drawText(
                 else
                     color = background;
                 // set pixel
-                (*callback)(x + j, y + i, color);
+                EPD_setPixel(x + j, y + i, color);
                 ++offset;
             }
         }
