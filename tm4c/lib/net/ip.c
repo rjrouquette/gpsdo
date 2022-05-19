@@ -13,12 +13,12 @@ volatile uint32_t ipGateway = 0;
 
 
 void NET_getIpAddress(char *strAddr) {
-    strAddr += toHex((ipAddress >> 0u) & 0xFFu, 0, '0', strAddr);
+    strAddr += toDec((ipAddress >> 0u) & 0xFFu, 0, '0', strAddr);
     *(strAddr++) = '.';
-    strAddr += toHex((ipAddress >> 8u) & 0xFFu, 0, '0', strAddr);
+    strAddr += toDec((ipAddress >> 8u) & 0xFFu, 0, '0', strAddr);
     *(strAddr++) = '.';
-    strAddr += toHex((ipAddress >> 16u) & 0xFFu, 0, '0', strAddr);
+    strAddr += toDec((ipAddress >> 16u) & 0xFFu, 0, '0', strAddr);
     *(strAddr++) = '.';
-    strAddr += toHex((ipAddress >> 24u) & 0xFFu, 0, '0', strAddr);
+    strAddr += toDec((ipAddress >> 24u) & 0xFFu, 0, '0', strAddr);
     *strAddr = 0;
 }

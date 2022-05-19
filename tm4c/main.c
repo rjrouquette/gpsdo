@@ -36,7 +36,7 @@ int main(void) {
     // initialize networking
     NET_init();
     NET_getMacAddress(temp);
-    FONT_drawText(16, 248, temp, FONT_ASCII_16, 0, 3);
+    FONT_drawText(18, 248, temp, FONT_ASCII_16, 0, 3);
 
     PLOT_setRect(0, 0, EPD_width()-1, 15, 3);
     PLOT_setLine(0, 15, EPD_width()-1, 15, 1);
@@ -84,10 +84,11 @@ int main(void) {
             FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
 
             NET_getLinkStatus(temp);
-            FONT_drawText(0, 216, temp, FONT_ASCII_16, 0, 3);
+            FONT_drawText(0, 216, "LINK:", FONT_ASCII_16, 0, 3);
+            FONT_drawText(48, 216, temp, FONT_ASCII_16, 0, 3);
 
             NET_getIpAddress(temp);
-            FONT_drawText(16, 232, temp, FONT_ASCII_16, 0, 3);
+            FONT_drawText(18, 232, temp, FONT_ASCII_16, 0, 3);
 
             EPD_refresh();
             next += 10;

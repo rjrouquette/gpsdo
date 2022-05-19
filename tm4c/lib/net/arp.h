@@ -8,6 +8,6 @@
 #include <stdint.h>
 
 void ARP_poll();
-void APR_process(uint8_t *packet);
+void ARP_process(uint8_t *packet);
 
 #endif //GPSDO_ARP_H

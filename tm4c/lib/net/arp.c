@@ -61,9 +61,8 @@ void ARP_poll() {
 
 }
 
-void APR_process(uint8_t *packet) {
-    struct HEADER_ETH *header = (struct HEADER_ETH *) packet;
-    packet += sizeof(struct HEADER_ETH);
+extern volatile uint32_t ipAddress;
+void ARP_process(uint8_t *packet) {
     struct PAYLOAD_ARP_IP4 *payload = (struct PAYLOAD_ARP_IP4 *) packet;
     if(payload->HTYPE[0] != 0x00) return;
     if(payload->HTYPE[1] != 0x01) return;
@@ -73,9 +72,17 @@ void APR_process(uint8_t *packet) {
     if(payload->PLEN != 4) return;
     if(payload->OPER[0] != 0) return;
     if(payload->OPER[1] == ARP_OP_REQUEST) {
-        // TODO process request
+        uint8_t *addr = (uint8_t *) &ipAddress;
+        addr[0] = payload->SPA[0];
+        addr[1] = payload->SPA[1];
+        addr[2] = payload->SPA[2];
+        addr[3] = payload->SPA[3];
     }
     else if(payload->OPER[1] == ARP_OP_REPLY) {
-        // TODO process reply
+        uint8_t *addr = (uint8_t *) &ipAddress;
+        addr[0] = payload->SPA[0];
+        addr[1] = payload->SPA[1];
+        addr[2] = payload->SPA[2];
+        addr[3] = payload->SPA[3];
     }
 }

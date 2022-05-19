@@ -28,4 +28,6 @@ void ETH_initHeader(struct HEADER_ETH *header);
 void ETH_initHeaderVlan(struct HEADER_ETH_VLAN *header, uint16_t vlan);
 void ETH_broadcastMAC(uint8_t *mac);
 
+int ETH_isARP(const uint8_t *ethType);
+
 #endif //GPSDO_ETH_H

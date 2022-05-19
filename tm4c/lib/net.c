@@ -11,10 +11,12 @@
 #include "../lib/format.h"
 #include "net.h"
 #include "net/arp.h"
+#include "net/eth.h"
 
 #define RX_BUFF_SIZE (1600)
 
 volatile uint8_t rxPtr = 0;
+volatile uint16_t phyStatus = 0;
 
 volatile struct EMAC_RX_DESC rxDesc[16];
 volatile uint8_t rxBuffer[16][RX_BUFF_SIZE];
@@ -178,12 +180,15 @@ void ISR_EthernetMAC(void) {
         EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYMISR1);
         EMAC0.PHY.MIS.INT = 1;
         // fetch status
-        uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYSTS);
-        temp ^= 0x0002;
+        phyStatus = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYSTS);
+        phyStatus ^= 0x0002;
         // set speed
-        EMAC0.CFG.FES = (temp >> 1u) & 1u;
+        EMAC0.CFG.FES = (phyStatus >> 1u) & 1u;
         // set duplex
-        EMAC0.CFG.DUPM = (temp >> 2u) & 1u;
+        EMAC0.CFG.DUPM = (phyStatus >> 2u) & 1u;
+        // link status bit in EPHYSTS is buggy, but EPHYBMSR works
+        uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYBMSR);
+        if(temp & 4) phyStatus |= 1;
     }
 }
 
@@ -192,13 +197,16 @@ void NET_init() {
 }
 
 void NET_getLinkStatus(char *strStatus) {
-    const char *speed = (EMAC0.CFG.FES) ? "100" : " 10";
-    const char *duplx = (EMAC0.CFG.DUPM) ? " FDX" : " HDX";
+    const char *speed = (phyStatus & 2) ? "100M" : " 10M";
+    const char *duplx = (phyStatus & 4) ? " FDX" : " HDX";
+    const char *link = (phyStatus & 1) ? " ^" : " !";
 
     while(speed[0] != 0)
         *(strStatus++) = *(speed++);
     while(duplx[0] != 0)
         *(strStatus++) = *(duplx++);
+    while(link[0] != 0)
+        *(strStatus++) = *(link++);
     strStatus[0] = 0;
 }
 
@@ -218,9 +226,20 @@ void NET_getMacAddress(char *strAddr) {
 }
 
 void NET_poll() {
-    if(!rxDesc[rxPtr].RDES0.OWN) {
+    while(!rxDesc[rxPtr].RDES0.OWN) {
         if(!rxDesc[rxPtr].RDES0.ES) {
-
+            if(rxDesc[rxPtr].RDES0.VLAN) {
+                struct HEADER_ETH_VLAN *header = rxBuffer[rxPtr];
+                if(ETH_isARP(header->ethType)) {
+                    ARP_process(rxBuffer[rxPtr] + sizeof(struct HEADER_ETH_VLAN));
+                }
+            }
+            else {
+                struct HEADER_ETH *header = rxBuffer[rxPtr];
+                if(ETH_isARP(header->ethType)) {
+                    ARP_process(rxBuffer[rxPtr] + sizeof(struct HEADER_ETH));
+                }
+            }
         }
         ++cntPacketsRX;
         rxDesc[rxPtr].RDES0.OWN = 1;

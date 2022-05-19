@@ -29,3 +29,7 @@ void ETH_broadcastMAC(uint8_t *mac) {
     mac[4] = 0xFF;
     mac[5] = 0xFF;
 }
+
+int ETH_isARP(const uint8_t *ethType) {
+    return ethType[0] == 0x08 && ethType[1] == 0x06;
+}
