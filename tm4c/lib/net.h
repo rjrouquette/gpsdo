@@ -11,6 +11,10 @@ void NET_getMacAddress(char *strAddr);
 void NET_getIpAddress(char *strAddr);
 void NET_poll();
 
+int NET_getTxDesc();
+uint8_t * NET_getTxBuff(int desc);
+void NET_transmit(int desc, int len);
+
 uint32_t NET_packetsRX();
 uint32_t NET_packetsTX();
 

@@ -2,8 +2,13 @@
 // Created by robert on 5/16/22.
 //
 
+#include <memory.h>
+#include <strings.h>
+
 #include "arp.h"
 #include "eth.h"
+#include "ip.h"
+#include "../net.h"
 
 #define ARP_OP_REQUEST (1)
 #define ARP_OP_REPLY (2)
@@ -19,6 +24,16 @@ struct PACKED PAYLOAD_ARP_IP4 {
     uint8_t THA[6];
     uint8_t TPA[4];
 };
+
+#define ARP_FRAME_LEN (sizeof(struct HEADER_ETH) + sizeof(struct PAYLOAD_ARP_IP4) + 4)
+
+#define MAX_REQUESTS (16)
+volatile struct {
+    uint32_t requestIp;
+    CallbackARP requestCallback;
+} requests[MAX_REQUESTS];
+
+extern uint8_t *macAddress;
 
 void makeArpIp4(
         uint8_t *packet,
@@ -45,23 +60,16 @@ void makeArpIp4(
     payload->PLEN = 4;
     payload->OPER[0] = 0x00;
     payload->OPER[1] = op;
-
-    for(int i = 0; i < 6; i++) {
-        payload->SHA[i] = macSrc[i];
-        payload->THA[i] = macTrg[i];
-    }
-
-    for(int i = 0; i < 4; i++) {
-        payload->SPA[i] = ipSrc[i];
-        payload->TPA[i] = ipTrg[i];
-    }
+    memcpy(payload->SHA, macSrc, 6);
+    memcpy(payload->SPA, ipSrc, 4);
+    memcpy(payload->THA, macTrg, 6);
+    memcpy(payload->TPA, ipTrg, 4);
 }
 
 void ARP_poll() {
 
 }
 
-extern volatile uint32_t ipAddress;
 void ARP_process(uint8_t *packet) {
     struct PAYLOAD_ARP_IP4 *payload = (struct PAYLOAD_ARP_IP4 *) packet;
     if(payload->HTYPE[0] != 0x00) return;
@@ -72,17 +80,37 @@ void ARP_process(uint8_t *packet) {
     if(payload->PLEN != 4) return;
     if(payload->OPER[0] != 0) return;
     if(payload->OPER[1] == ARP_OP_REQUEST) {
-        uint8_t *addr = (uint8_t *) &ipAddress;
-        addr[0] = payload->SPA[0];
-        addr[1] = payload->SPA[1];
-        addr[2] = payload->SPA[2];
-        addr[3] = payload->SPA[3];
+        if(ipAddress) {
+            uint32_t addr;
+            memcpy(&addr, payload->TPA, 4);
+            if (ipAddress == addr) {
+                int txDesc = NET_getTxDesc();
+                if(txDesc >= 0) {
+                    uint8_t *packetTX = NET_getTxBuff(txDesc);
+                    makeArpIp4(
+                            packetTX, ARP_OP_REPLY,
+                            macAddress, (uint8_t *) &ipAddress,
+                            payload->SHA, payload->SPA
+                    );
+                    memcpy(((struct HEADER_ETH *)packetTX)->macDst, payload->SHA, 6);
+                    NET_transmit(txDesc, ARP_FRAME_LEN);
+                }
+            }
+        }
     }
     else if(payload->OPER[1] == ARP_OP_REPLY) {
-        uint8_t *addr = (uint8_t *) &ipAddress;
-        addr[0] = payload->SPA[0];
-        addr[1] = payload->SPA[1];
-        addr[2] = payload->SPA[2];
-        addr[3] = payload->SPA[3];
+        uint32_t addr;
+        memcpy(&addr, payload->SPA, 4);
+        if(addr != 0) {
+            for(int i = 0; i < MAX_REQUESTS; i++) {
+                if(requests[i].requestIp == addr) {
+                    (*requests[i].requestCallback)(addr, payload->SHA);
+                }
+            }
+        }
     }
+}
+
+void ARP_broadcastIP() {
+
 }
