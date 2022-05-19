@@ -2,9 +2,6 @@
 // Created by robert on 5/16/22.
 //
 
-#include <memory.h>
-#include <strings.h>
-
 #include "arp.h"
 #include "eth.h"
 #include "ip.h"
@@ -37,13 +34,9 @@ volatile struct {
 void makeArpIp4(
         void *packet,
         const uint8_t op,
-        const volatile void *macSrc,
-        const volatile void *ipSrc,
         const volatile void *macTrg,
         const volatile void *ipTrg
 ) {
-//    memset(packet, 0, ARP_FRAME_LEN);
-
     struct HEADER_ETH *header = (struct HEADER_ETH *) packet;
     struct PAYLOAD_ARP_IP4 *payload = (struct PAYLOAD_ARP_IP4 *) (header + 1);
 
@@ -60,8 +53,8 @@ void makeArpIp4(
     payload->PLEN = 4;
     payload->OPER[0] = 0x00;
     payload->OPER[1] = op;
-    copyMAC(payload->SHA, macSrc);
-    copyIPv4(payload->SPA, ipSrc);
+    getMAC(payload->SHA);
+    copyIPv4(payload->SPA, &ipAddress);
     copyMAC(payload->THA, macTrg);
     copyIPv4(payload->TPA, ipTrg);
 }
@@ -70,6 +63,7 @@ void ARP_poll() {
 
 }
 
+volatile uint8_t debugMac[6];
 void ARP_process(uint8_t *frame, int flen) {
     // reject if packet is incorrect size
     if(flen != ARP_FRAME_LEN) return;
@@ -91,14 +85,11 @@ void ARP_process(uint8_t *frame, int flen) {
             uint32_t addr;
             copyIPv4(&addr, payload->TPA);
             if (ipAddress == addr) {
-                uint8_t myMac[6];
-                getMAC(myMac);
                 int txDesc = NET_getTxDesc();
                 if(txDesc >= 0) {
                     uint8_t *packetTX = NET_getTxBuff(txDesc);
                     makeArpIp4(
                             packetTX, ARP_OP_REPLY,
-                            myMac, &ipAddress,
                             payload->SHA, payload->SPA
                     );
                     copyMAC(((struct HEADER_ETH *)packetTX)->macDst, header->macSrc);
@@ -130,13 +121,10 @@ int ARP_request(uint32_t remoteAddress, CallbackARP callback) {
         int txDesc = NET_getTxDesc();
         if(txDesc < 0) return -1;
         // create request frame
-        uint8_t myMac[6];
-        getMAC(myMac);
         uint8_t wildCard[6] = { 0, 0, 0, 0, 0, 0 };
         uint8_t *packetTX = NET_getTxBuff(txDesc);
         makeArpIp4(
                 packetTX, ARP_OP_REQUEST,
-                myMac, (uint8_t *) &ipAddress,
                 wildCard, (uint8_t *) &remoteAddress
         );
         broadcastMAC(((struct HEADER_ETH *)packetTX)->macDst);

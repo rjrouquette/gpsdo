@@ -17,6 +17,8 @@
 #include "hw/sys.h"
 #include "lib/net/ip.h"
 
+volatile uint8_t debugMac[6];
+
 int main(void) {
     char temp[32];
     // enable FPU
@@ -58,8 +60,6 @@ int main(void) {
 
         int32_t diff = now - next;
         if(diff >= 0) {
-            uint64_t mono = CLK_MONOTONIC();
-
             end = toHMS(now, temp);
             temp[end] = 0;
             FONT_drawText(0, 0, temp, FONT_ASCII_16, 0, 2);
@@ -67,6 +67,12 @@ int main(void) {
             end = toTemp(TEMP_proc(), temp);
             temp[end] = 0;
             FONT_drawText(EPD_width()-73, 0, temp, FONT_ASCII_16, 0, 2);
+
+            for(int i = 0; i < 6; i++) {
+                toHex(debugMac[i], 2, '0', temp);
+                temp[2] = 0;
+                FONT_drawText(i * 20, 16, temp, FONT_ASCII_16, 0, 3);
+            }
 
             end = toDec(EMAC0.RXCNTGB, 8, ' ', temp);
             temp[end] = 0;

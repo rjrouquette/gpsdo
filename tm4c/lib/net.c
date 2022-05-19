@@ -30,9 +30,6 @@ static volatile uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 static volatile struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
 static volatile uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
-static volatile uint32_t cntPacketsRX = 0;
-static volatile uint32_t cntPacketsTX = 0;
-
 static void initDescriptors() {
     // init receive descriptors
     for(int i = 0; i < RX_RING_SIZE; i++) {
@@ -61,8 +58,9 @@ static void initDescriptors() {
         // compute and replace frame CRC
         txDesc[i].TDES0.DC = 1;
         txDesc[i].TDES0.CRCR = 1;
-        // insert ICMP/TCP/UDP CRC
-        txDesc[i].TDES0.CIC = 1;
+        txDesc[i].TDES0.DP = 1;
+//        // insert ICMP/TCP/UDP CRC
+//        txDesc[i].TDES0.CIC = 1;
     }
     txDesc[TX_RING_SIZE-1].TDES0.TER = 1;
 }
@@ -262,7 +260,6 @@ void NET_poll() {
                 IPv4_process(buffer, rxDesc[ptrRX].RDES0.FL);
             }
         }
-        ++cntPacketsRX;
         rxDesc[ptrRX].RDES0.OWN = 1;
         ptrRX = (ptrRX + 1) & (RX_RING_SIZE-1);
     }
@@ -292,12 +289,4 @@ void NET_transmit(int desc, int len) {
     txDesc[desc & (TX_RING_SIZE-1)].TDES0.OWN = 1;
     // wake TX DMA
     EMAC0.TXPOLLD = 1;
-}
-
-uint32_t NET_packetsRX() {
-    return cntPacketsRX;
-}
-
-uint32_t NET_packetsTX() {
-    return cntPacketsTX;
 }
