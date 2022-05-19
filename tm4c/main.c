@@ -88,6 +88,7 @@ int main(void) {
             FONT_drawText(48, 216, temp, FONT_ASCII_16, 0, 3);
 
             NET_getIpAddress(temp);
+            PLOT_setRect(0, 232, EPD_width()-1, 232, 3);
             FONT_drawText(16, 232, temp, FONT_ASCII_16, 0, 3);
 
             EPD_refresh();
