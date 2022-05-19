@@ -12,14 +12,15 @@
 #include "net.h"
 #include "net/arp.h"
 
+#define RX_BUFF_SIZE (1600)
+
 volatile uint8_t rxPtr = 0;
 volatile uint16_t phyStatus = 0;
 
 volatile struct EMAC_RX_DESC rxDesc[16];
-volatile uint8_t rxBuffer[16][1600];
+volatile uint8_t rxBuffer[16][RX_BUFF_SIZE];
 
 volatile struct EMAC_TX_DESC txDesc[4];
-volatile uint8_t txBuffer[4][1600];
 
 volatile uint32_t cntPacketsRX = 0;
 volatile uint32_t cntPacketsTX = 0;
@@ -99,15 +100,34 @@ void initPPS() {
 }
 
 void initMAC() {
+    // init receive descriptors
+    for(int i = 0; i < 16; i++) {
+        rxDesc[i].BUFF1 = (uint32_t) rxBuffer[i];
+        rxDesc[i].BUFF2 = 0;
+        rxDesc[i].RDES1.RBS1 = RX_BUFF_SIZE;
+        rxDesc[i].RDES1.RBS2 = 0;
+        rxDesc[i].RDES1.RER = 0;
+        rxDesc[i].RDES0.OWN = 1;
+    }
+    rxDesc[15].RDES1.RER = 1;
+
+    // init transmit descriptors
+    for(int i = 0; i < 4; i++) {
+        txDesc[i].BUFF1 = 0;
+        txDesc[i].BUFF2 = 0;
+        txDesc[i].TDES1.TBS1 = 0;
+        txDesc[i].TDES1.TBS2 = 0;
+        txDesc[i].TDES0.TER = 0;
+        txDesc[i].TDES0.OWN = 0;
+    }
+    txDesc[3].TDES0.TER = 1;
+
     FLASHCONF.FPFOFF = 1;
     // enable CRC module
     RCGCCCM.EN = 1;
     while(!PRCCM.RDY);
     // enable clock
     RCGCEMAC.EN0 = 1;
-    while(!PREMAC.RDY0);
-    // enable power
-    PCEMAC.EN0 = 1;
     while(!PREMAC.RDY0);
     // this resets the entire EMAC, so it must happen first
     EMAC0.DMABUSMOD.ATDS = 1;
@@ -129,34 +149,15 @@ void initMAC() {
     CRC.DIN = UNIQUEID.WORD[3];
     EMAC0.ADDR0.LO |= CRC.SEED & 0xFFFFFFu;
 
-    // init receive descriptors
-    for(int i = 0; i < 16; i++) {
-        rxDesc[i].BUFF1 = (uint32_t) rxBuffer[i];
-        rxDesc[i].BUFF2 = 0;
-        rxDesc[i].RDES1.RBS1 = 1600;
-        rxDesc[i].RDES1.RBS2 = 0;
-        rxDesc[i].RDES1.RER = 0;
-        rxDesc[i].RDES0.OWN = 1;
-    }
-    rxDesc[15].RDES1.RER = 1;
-
-    // init transmit descriptors
-    for(int i = 0; i < 4; i++) {
-        txDesc[i].BUFF1 = (uint32_t) txBuffer[i];
-        txDesc[i].BUFF2 = 0;
-        txDesc[i].TDES1.TBS1 = 1600;
-        txDesc[i].TDES1.TBS2 = 0;
-        txDesc[i].TDES0.TER = 0;
-        txDesc[i].TDES0.OWN = 0;
-    }
-    txDesc[3].TDES0.TER = 1;
-
     // configure DMA
-    EMAC0.TXDLADDR = (uint32_t) txDesc;
     EMAC0.RXDLADDR = (uint32_t) rxDesc;
+    EMAC0.TXDLADDR = (uint32_t) txDesc;
     EMAC0.DMAOPMODE.ST = 1;
     EMAC0.DMAOPMODE.SR = 1;
 
+    EMAC0.FRAMEFLTR.PM = 1;
+    EMAC0.FRAMEFLTR.VTFE = 1;
+    EMAC0.FRAMEFLTR.PCF = 1;
     EMAC0.FRAMEFLTR.RA = 1;
     EMAC0.RXINTWDT.RIWT = 8;
     EMAC0.CFG.IPC = 1;

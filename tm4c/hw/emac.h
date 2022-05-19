@@ -520,7 +520,7 @@ PAGE_MAP (EMAC_MAP, {
         unsigned : 2;
         unsigned MMC: 1;
         unsigned PMT: 1;
-        unsigned TT;
+        unsigned TT: 1;
     }) DMARIS;
 
     // offset 0xC18
@@ -582,7 +582,7 @@ PAGE_MAP (EMAC_MAP, {
     }) RXINTWDT;
 
     // reserved space
-    char _reserved_0E[0x01C];
+    char _reserved_0E[0x020];
 
     // offset 0xC48
     // Ethernet MAC Current Host Transmit Descriptor
