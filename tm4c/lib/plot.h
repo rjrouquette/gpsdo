@@ -8,5 +8,6 @@
 #include <stdint.h>
 
 void PLOT_setLine(int x1, int y1, int x2, int y2, uint8_t color);
+void PLOT_setRect(int x1, int y1, int x2, int y2, uint8_t color);
 
 #endif //GPSDO_PLOT_H

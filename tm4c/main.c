@@ -38,6 +38,8 @@ int main(void) {
     NET_getMacAddress(temp);
     FONT_drawText(16, 248, temp, FONT_ASCII_16, 0, 3);
 
+    PLOT_setRect(0, 0, EPD_width()-1, 15, 3);
+    PLOT_setLine(0, 15, EPD_width()-1, 15, 1);
     PLOT_setLine(0, 215, EPD_width()-1, 215, 1);
 
     LED0_ON();
@@ -57,19 +59,13 @@ int main(void) {
         if(diff >= 0) {
             uint64_t mono = CLK_MONOTONIC();
 
+            end = toHMS(now, temp);
+            temp[end] = 0;
+            FONT_drawText(0, 0, temp, FONT_ASCII_16, 0, 3);
+
             end = toTemp(TEMP_proc(), temp);
             temp[end] = 0;
-            FONT_drawText(0, 32, temp, FONT_ASCII_16, 0, 3);
-
-            end = toDec(now, 8, ' ', temp);
-            temp[end] = 0;
-            FONT_drawText(0, 48, temp, FONT_ASCII_16, 0, 3);
-
-            end = toDec(mono >> 32u, 8, ' ', temp);
-            temp[end] = '.';
-            end = toDec((1000 * ((mono >> 16u) & 0xFFFFu)) >> 16u, 3, '0', temp+9);
-            temp[9+end] = 0;
-            FONT_drawText(0, 64, temp, FONT_ASCII_16, 0, 3);
+            FONT_drawText(EPD_width()-73, 0, temp, FONT_ASCII_16, 0, 3);
 
             end = toDec(EMAC0.RXCNTGB, 8, ' ', temp);
             temp[end] = 0;

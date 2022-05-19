@@ -14,4 +14,6 @@ int toHex(uint32_t value, int width, char padding, char *origin);
 
 int toTemp(int16_t value, char *origin);
 
+int toHMS(uint32_t value, char *origin);
+
 #endif //GPSDO_FORMAT_H
