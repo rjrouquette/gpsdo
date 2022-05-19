@@ -167,14 +167,14 @@ struct ADC_SS_MAP {
     // offset 0x01C
     // ADC Sample Sequence Sample and Hold Time
     REGMAP_32 (, {
-        enum ADC_TSH_WIDTH TSH0: 4;
-        enum ADC_TSH_WIDTH TSH1: 4;
-        enum ADC_TSH_WIDTH TSH2: 4;
-        enum ADC_TSH_WIDTH TSH3: 4;
-        enum ADC_TSH_WIDTH TSH4: 4;
-        enum ADC_TSH_WIDTH TSH5: 4;
-        enum ADC_TSH_WIDTH TSH6: 4;
-        enum ADC_TSH_WIDTH TSH7: 4;
+        unsigned TSH0: 4;
+        unsigned TSH1: 4;
+        unsigned TSH2: 4;
+        unsigned TSH3: 4;
+        unsigned TSH4: 4;
+        unsigned TSH5: 4;
+        unsigned TSH6: 4;
+        unsigned TSH7: 4;
     }) TSH;
 };
 _Static_assert(sizeof(struct ADC_SS_MAP) == 32, "ADC_SS_MAP must be 32 bytes");
@@ -262,10 +262,10 @@ PAGE_MAP (ADC_MAP, {
     // offset 0x014
     // ADC Event Multiplexer
     REGMAP_32 (, {
-        enum ADC_SS_TRIGGER EM0: 4;
-        enum ADC_SS_TRIGGER EM1: 4;
-        enum ADC_SS_TRIGGER EM2: 4;
-        enum ADC_SS_TRIGGER EM3: 4;
+        unsigned EM0: 4;
+        unsigned EM1: 4;
+        unsigned EM2: 4;
+        unsigned EM3: 4;
     }) EMUX;
 
     // offset 0x018
@@ -346,7 +346,7 @@ PAGE_MAP (ADC_MAP, {
     // offset 0xFC8
     // ADC Clock Configuration
     REGMAP_32 (, {
-        enum ADC_CLK_SRC CS: 4;
+        unsigned CS: 4;
         unsigned CLKDIV: 6;
     }) CC;
 

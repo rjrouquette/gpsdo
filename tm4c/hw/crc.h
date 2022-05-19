@@ -35,15 +35,15 @@ PAGE_MAP (CRC_MAP, {
 
     // offset 0x400
     REGMAP_32(, {
-        enum CRC_TYPE TYPE: 4;
-        enum CRC_ENDIAN ENDIAN: 2;
+        unsigned TYPE: 4;
+        unsigned ENDIAN: 2;
         unsigned : 1;
         unsigned BR: 1;
         unsigned OBR: 1;
         unsigned RESINV: 1;
         unsigned : 2;
         unsigned SIZE: 1;
-        enum CRC_INIT INIT: 2;
+        unsigned INIT: 2;
     }) CTRL;
 
     char reserved_1[0x00C];

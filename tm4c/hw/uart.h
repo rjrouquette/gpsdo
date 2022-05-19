@@ -89,7 +89,7 @@ PAGE_MAP (UART_MAP, {
     // offset 0xFC8
     // UART Clock Configuration
     REGMAP_32 (, {
-        enum SSI_CLK_SRC CS: 4;
+        unsigned CS: 4;
     }) CC;
 
     char _reserved_02[4];

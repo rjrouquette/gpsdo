@@ -57,12 +57,10 @@ static void initSSI() {
     PORTQ.LOCK = 0;
 
     // configure SSI3
-    SSI3.CR1.raw = 0;
-    SSI3.CR0.raw = 0;
     // 8-bit data
     SSI3.CR0.DSS = SSI_DSS_8_BIT;
-    // 8x prescaler
-    SSI3.CPSR.CPSDVSR = 5;
+    // 16x prescaler
+    SSI3.CPSR.CPSDVSR = 16;
     // use system clock
     SSI3.CC.CS = SSI_CLK_SYS;
     // enable SSI

@@ -68,13 +68,17 @@ int main(void) {
             temp[end] = 0;
             FONT_drawText(0, 96, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
-            end = toDec(EMAC0.TXCNTGB, 8, ' ', temp);
+            end = toDec(EMAC0.MFBOC.raw, 8, ' ', temp);
             temp[end] = 0;
             FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
             end = toHex(EMAC0.HOSRXDESC, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 128, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
+
+            end = toHex(EMAC0.CFG.raw, 8, '0', temp);
+            temp[end] = 0;
+            FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);
 
             NET_getLinkStatus(temp);
             FONT_drawText(0, 216, temp, FONT_ASCII_16, 0, 3, EPD_setPixel);

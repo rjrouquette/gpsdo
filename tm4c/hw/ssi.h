@@ -35,12 +35,11 @@ PAGE_MAP (QSSI_MAP, {
     // offset 0x000
     // QSSI Control 0
     REGMAP_32 (, {
-        enum SSI_DSS_e DSS: 4;
+        unsigned DSS: 4;
         unsigned FRF: 2;
         unsigned SPO: 1;
         unsigned SPH: 1;
         unsigned SCR: 8;
-        unsigned DIR: 1;
     }) CR0;
 
     // offset 0x004
@@ -49,7 +48,7 @@ PAGE_MAP (QSSI_MAP, {
         unsigned LBM: 1;
         unsigned SSE: 1;
         unsigned MS: 1;
-        unsigned _reserved: 3;
+        unsigned : 3;
         unsigned MODE: 2;
         unsigned DIR: 1;
         unsigned HSCLKEN: 1;
@@ -95,7 +94,7 @@ PAGE_MAP (QSSI_MAP, {
     // offset 0xFC8
     // QSSI Clock Configuration
     REGMAP_32 (, {
-        enum SSI_CLK_SRC_e CS: 4;
+        unsigned CS: 4;
     }) CC;
 
     char _reserved_02[4];

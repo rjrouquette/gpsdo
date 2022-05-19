@@ -15,7 +15,6 @@
 #define RX_BUFF_SIZE (1600)
 
 volatile uint8_t rxPtr = 0;
-volatile uint16_t phyStatus = 0;
 
 volatile struct EMAC_RX_DESC rxDesc[16];
 volatile uint8_t rxBuffer[16][RX_BUFF_SIZE];
@@ -122,6 +121,7 @@ void initMAC() {
     }
     txDesc[3].TDES0.TER = 1;
 
+    // disable flash prefetch per errata
     FLASHCONF.FPFOFF = 1;
     // enable CRC module
     RCGCCCM.EN = 1;
@@ -129,27 +129,26 @@ void initMAC() {
     // enable clock
     RCGCEMAC.EN0 = 1;
     while(!PREMAC.RDY0);
-    // this resets the entire EMAC, so it must happen first
-    EMAC0.DMABUSMOD.ATDS = 1;
-    // set MII clock
-    EMAC0.MIIADDR.CR = 1;
     // initialize PHY
     initPHY();
+    // wait for DMA reset to complete
+    while(EMAC0.DMABUSMOD.SWR);
+
     initPPS();
 
-    // set upper 24 bits of MAC address
+    // set upper 16 bits of MAC address
     EMAC0.ADDR0.HI.ADDR = 0x5455u;
-    EMAC0.ADDR0.LO = 0x58000000u;
-    // set lower 24 bits of MAC address
+    // set lower 32 bits of MAC address
     CRC.CTRL.TYPE = CRC_TYPE_04C11DB7;
     CRC.CTRL.INIT = CRC_INIT_ZERO;
     CRC.DIN = UNIQUEID.WORD[0];
     CRC.DIN = UNIQUEID.WORD[1];
     CRC.DIN = UNIQUEID.WORD[2];
     CRC.DIN = UNIQUEID.WORD[3];
-    EMAC0.ADDR0.LO |= CRC.SEED & 0xFFFFFFu;
+    EMAC0.ADDR0.LO = (0x58u << 24u) | (CRC.SEED & 0xFFFFFFu);
 
     // configure DMA
+    EMAC0.DMABUSMOD.ATDS = 1;
     EMAC0.RXDLADDR = (uint32_t) rxDesc;
     EMAC0.TXDLADDR = (uint32_t) txDesc;
     EMAC0.DMAOPMODE.ST = 1;
@@ -159,13 +158,16 @@ void initMAC() {
     EMAC0.FRAMEFLTR.VTFE = 1;
     EMAC0.FRAMEFLTR.PCF = 1;
     EMAC0.FRAMEFLTR.RA = 1;
-    EMAC0.RXINTWDT.RIWT = 8;
     EMAC0.CFG.IPC = 1;
     EMAC0.CFG.DRO = 1;
     EMAC0.CFG.SADDR = EMAC_SADDR_REP0;
-    EMAC0.CFG.RE = 1;
-    EMAC0.CFG.TE = 1;
 
+    // start transmitter
+    EMAC0.CFG.TE = 1;
+    // start receiver
+    EMAC0.CFG.RE = 1;
+
+    // re-enable flash prefetch per errata
     FLASHCONF.FPFOFF = 0;
 }
 
@@ -176,12 +178,12 @@ void ISR_EthernetMAC(void) {
         EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYMISR1);
         EMAC0.PHY.MIS.INT = 1;
         // fetch status
-        phyStatus = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYSTS);
-        phyStatus ^= 0x0002;
+        uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYSTS);
+        temp ^= 0x0002;
         // set speed
-        EMAC0.CFG.FES = (phyStatus >> 1u) & 1u;
+        EMAC0.CFG.FES = (temp >> 1u) & 1u;
         // set duplex
-        EMAC0.CFG.DUPM = (phyStatus >> 2u) & 1u;
+        EMAC0.CFG.DUPM = (temp >> 2u) & 1u;
     }
 }
 
@@ -190,8 +192,8 @@ void NET_init() {
 }
 
 void NET_getLinkStatus(char *strStatus) {
-    const char *speed = (phyStatus & 0x2) ? "100" : " 10";
-    const char *duplx = (phyStatus & 0x3) ? " FDX" : " HDX";
+    const char *speed = (EMAC0.CFG.FES) ? "100" : " 10";
+    const char *duplx = (EMAC0.CFG.DUPM) ? " FDX" : " HDX";
 
     while(speed[0] != 0)
         *(strStatus++) = *(speed++);
