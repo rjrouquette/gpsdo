@@ -44,4 +44,6 @@ extern volatile uint32_t ipDNS;
 
 void IPv4_process(uint8_t *frame, int flen);
 
+void IPv4_checksum(volatile const void *buffer, int len, volatile void *result);
+
 #endif //GPSDO_IP_H

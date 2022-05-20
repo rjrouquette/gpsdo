@@ -79,8 +79,7 @@ void ARP_process(uint8_t *frame, int flen) {
                             payload->SHA, payload->SPA
                     );
                     copyMAC(((struct FRAME_ETH *)packetTX)->macDst, header->macSrc);
-                    getMAC(((struct FRAME_ETH *)packetTX)->macSrc);
-                    NET_transmit(txDesc, ARP_FRAME_LEN);
+                    NET_transmit(txDesc, ARP_FRAME_LEN-4);
                 }
             }
         }
@@ -115,12 +114,11 @@ int ARP_request(uint32_t remoteAddress, CallbackARP callback) {
                 wildCard, (uint8_t *) &remoteAddress
         );
         broadcastMAC(((struct FRAME_ETH *)packetTX)->macDst);
-        getMAC(((struct FRAME_ETH *)packetTX)->macSrc);
         // register callback
         requests[i].callback = callback;
         requests[i].remoteAddress = remoteAddress;
         // transmit frame
-        NET_transmit(txDesc, ARP_FRAME_LEN);
+        NET_transmit(txDesc, ARP_FRAME_LEN-4);
         return 0;
     }
     return -1;

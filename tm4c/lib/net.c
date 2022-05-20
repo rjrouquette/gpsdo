@@ -16,10 +16,10 @@
 #include "net/util.h"
 
 #define RX_RING_SIZE (16)
-#define RX_BUFF_SIZE (1600)
+#define RX_BUFF_SIZE (1524)
 
 #define TX_RING_SIZE (4)
-#define TX_BUFF_SIZE (1600)
+#define TX_BUFF_SIZE (1524)
 
 static volatile uint8_t ptrRX = 0;
 static volatile uint8_t ptrTX = 0;
@@ -60,12 +60,6 @@ static void initDescriptors() {
         txDesc[i].TDES0.LS = 1;
         // capture timestamp
         txDesc[i].TDES0.TTSE = 1;
-//        // compute and replace frame CRC
-//        txDesc[i].TDES0.DC = 1;
-//        txDesc[i].TDES0.CRCR = 1;
-//        txDesc[i].TDES0.DP = 1;
-//        // insert ICMP/TCP/UDP CRC
-        txDesc[i].TDES0.CIC = 3;
     }
     txDesc[TX_RING_SIZE-1].TDES0.TER = 1;
 }
@@ -278,10 +272,10 @@ uint8_t * NET_getTxBuff(int desc) {
 }
 
 void NET_transmit(int desc, int len) {
-    // set transmission length size
-    if(len < 64) len = 64;
-    len -= 4;
+    // restrict transmission length
+    if(len < 60) len = 60;
     if(len > TX_BUFF_SIZE) len = TX_BUFF_SIZE;
+    // set transmission size
     txDesc[desc & (TX_RING_SIZE-1)].TDES1.TBS1 = len;
     // release descriptor
     txDesc[desc & (TX_RING_SIZE-1)].TDES0.OWN = 1;

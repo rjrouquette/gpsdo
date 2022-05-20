@@ -50,3 +50,18 @@ void IPv4_process(uint8_t *frame, int flen) {
         ICMP_process(frame, flen);
     }
 }
+
+void IPv4_checksum(volatile const void *buffer, int len, volatile void *result) {
+    uint16_t *ptr = (uint16_t *) buffer;
+    uint16_t *end = ptr + (len >> 1);
+    uint32_t sum = 0;
+    while(ptr < end) {
+        sum += *(ptr++);
+    }
+    if(len & 1)
+        sum += *(uint8_t *)ptr;
+    while (sum >> 16)
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    // store result
+    *((uint16_t *)result) = ~sum;
+}
