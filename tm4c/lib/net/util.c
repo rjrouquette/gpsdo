@@ -7,12 +7,12 @@
 
 void getMAC(volatile void *_mac) {
     uint8_t *mac = (uint8_t *)_mac;
-    mac[0] = (EMAC0.ADDR0.HI.ADDR >> 8) & 0xFF;;
-    mac[1] = (EMAC0.ADDR0.HI.ADDR >> 0) & 0xFF;;
-    mac[2] = (EMAC0.ADDR0.LO >> 24) & 0xFF;
-    mac[3] = (EMAC0.ADDR0.LO >> 16) & 0xFF;
-    mac[4] = (EMAC0.ADDR0.LO >> 8) & 0xFF;
-    mac[5] = (EMAC0.ADDR0.LO >> 0) & 0xFF;
+    mac[5] = (EMAC0.ADDR0.HI.ADDR >> 8) & 0xFF;;
+    mac[4] = (EMAC0.ADDR0.HI.ADDR >> 0) & 0xFF;;
+    mac[3] = (EMAC0.ADDR0.LO >> 24) & 0xFF;
+    mac[2] = (EMAC0.ADDR0.LO >> 16) & 0xFF;
+    mac[1] = (EMAC0.ADDR0.LO >> 8) & 0xFF;
+    mac[0] = (EMAC0.ADDR0.LO >> 0) & 0xFF;
 }
 
 void broadcastMAC(volatile void *_mac) {

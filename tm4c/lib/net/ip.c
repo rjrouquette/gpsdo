@@ -29,11 +29,13 @@ void NET_getIpAddress(char *strAddr) {
 }
 
 
+extern volatile uint8_t debugMac[6];
+
 void IPv4_process(uint8_t *frame, int flen) {
-    // discard malformed packets
+    // discard malformed frames
     if(flen < 64) return;
 
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct HEADER_ETH));
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct FRAME_ETH));
     // must be version 4
     if(headerIPv4->head.VER != 4) return;
     // must standard 5 word header

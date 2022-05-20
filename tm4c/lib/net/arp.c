@@ -2,28 +2,12 @@
 // Created by robert on 5/16/22.
 //
 
+#include <strings.h>
 #include "arp.h"
 #include "eth.h"
 #include "ip.h"
 #include "../net.h"
 #include "util.h"
-
-#define ARP_OP_REQUEST (1)
-#define ARP_OP_REPLY (2)
-
-struct PACKED PAYLOAD_ARP_IP4 {
-    uint8_t HTYPE[2];
-    uint8_t PTYPE[2];
-    uint8_t HLEN;
-    uint8_t PLEN;
-    uint8_t OPER[2];
-    uint8_t SHA[6];
-    uint8_t SPA[4];
-    uint8_t THA[6];
-    uint8_t TPA[4];
-};
-
-#define ARP_FRAME_LEN (64)
 
 #define MAX_REQUESTS (16)
 volatile struct {
@@ -37,7 +21,9 @@ void makeArpIp4(
         const volatile void *macTrg,
         const volatile void *ipTrg
 ) {
-    struct HEADER_ETH *header = (struct HEADER_ETH *) packet;
+    bzero(packet, ARP_FRAME_LEN);
+
+    struct FRAME_ETH *header = (struct FRAME_ETH *) packet;
     struct PAYLOAD_ARP_IP4 *payload = (struct PAYLOAD_ARP_IP4 *) (header + 1);
 
     // ARP frame type
@@ -68,7 +54,7 @@ void ARP_process(uint8_t *frame, int flen) {
     // reject if packet is incorrect size
     if(flen != ARP_FRAME_LEN) return;
     // map header and payload
-    struct HEADER_ETH *header = (struct HEADER_ETH *) frame;
+    struct FRAME_ETH *header = (struct FRAME_ETH *) frame;
     struct PAYLOAD_ARP_IP4 *payload = (struct PAYLOAD_ARP_IP4 *) (header + 1);
     // verify payload fields
     if(payload->HTYPE[0] != 0x00) return;
@@ -92,7 +78,8 @@ void ARP_process(uint8_t *frame, int flen) {
                             packetTX, ARP_OP_REPLY,
                             payload->SHA, payload->SPA
                     );
-                    copyMAC(((struct HEADER_ETH *)packetTX)->macDst, header->macSrc);
+                    copyMAC(((struct FRAME_ETH *)packetTX)->macDst, header->macSrc);
+                    getMAC(((struct FRAME_ETH *)packetTX)->macSrc);
                     NET_transmit(txDesc, ARP_FRAME_LEN);
                 }
             }
@@ -127,7 +114,8 @@ int ARP_request(uint32_t remoteAddress, CallbackARP callback) {
                 packetTX, ARP_OP_REQUEST,
                 wildCard, (uint8_t *) &remoteAddress
         );
-        broadcastMAC(((struct HEADER_ETH *)packetTX)->macDst);
+        broadcastMAC(((struct FRAME_ETH *)packetTX)->macDst);
+        getMAC(((struct FRAME_ETH *)packetTX)->macSrc);
         // register callback
         requests[i].callback = callback;
         requests[i].remoteAddress = remoteAddress;

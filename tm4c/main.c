@@ -19,6 +19,8 @@
 
 volatile uint8_t debugMac[6];
 
+#define TX_DESC (* (struct EMAC_TX_DESC *) EMAC0.TXDLADDR)
+
 int main(void) {
     char temp[32];
     // enable FPU
@@ -58,7 +60,7 @@ int main(void) {
         else
             LED1_OFF();
 
-        int32_t diff = now - next;
+        int32_t diff = (int32_t) (now - next);
         if(diff >= 0) {
             end = toHMS(now, temp);
             temp[end] = 0;
@@ -82,13 +84,17 @@ int main(void) {
             temp[end] = 0;
             FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(0, 8, '0', temp);
+            end = toHex(TX_DESC.TDES0.raw, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 128, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(ipGateway, 8, '0', temp);
+            end = toHex(TX_DESC.TDES1.raw, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
+
+            end = toHex(ipGateway, 8, '0', temp);
+            temp[end] = 0;
+            FONT_drawText(0, 160, temp, FONT_ASCII_16, 0, 3);
 
             NET_getLinkStatus(temp);
             FONT_drawText(0, 216, "LINK:", FONT_ASCII_16, 0, 3);

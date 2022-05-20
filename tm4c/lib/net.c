@@ -13,6 +13,7 @@
 #include "net/arp.h"
 #include "net/eth.h"
 #include "net/ip.h"
+#include "net/util.h"
 
 #define RX_RING_SIZE (16)
 #define RX_BUFF_SIZE (1600)
@@ -48,19 +49,23 @@ static void initDescriptors() {
         txDesc[i].BUFF2 = 0;
         txDesc[i].TDES1.TBS1 = 0;
         txDesc[i].TDES1.TBS2 = 0;
+        // replace source address
+        txDesc[i].TDES1.SAIC = EMAC_SADDR_REP0;
+        // not end-of-ring
         txDesc[i].TDES0.TER = 0;
+        // mark descriptor as incomplete
         txDesc[i].TDES0.OWN = 0;
         // each descriptor is one frame
         txDesc[i].TDES0.FS = 1;
         txDesc[i].TDES0.LS = 1;
         // capture timestamp
         txDesc[i].TDES0.TTSE = 1;
-        // compute and replace frame CRC
-        txDesc[i].TDES0.DC = 1;
-        txDesc[i].TDES0.CRCR = 1;
-        txDesc[i].TDES0.DP = 1;
+//        // compute and replace frame CRC
+//        txDesc[i].TDES0.DC = 1;
+//        txDesc[i].TDES0.CRCR = 1;
+//        txDesc[i].TDES0.DP = 1;
 //        // insert ICMP/TCP/UDP CRC
-//        txDesc[i].TDES0.CIC = 1;
+        txDesc[i].TDES0.CIC = 3;
     }
     txDesc[TX_RING_SIZE-1].TDES0.TER = 1;
 }
@@ -162,10 +167,9 @@ static void initMAC() {
     CRC.DIN = UNIQUEID.WORD[1];
     CRC.DIN = UNIQUEID.WORD[2];
     CRC.DIN = UNIQUEID.WORD[3];
-    // set upper 16 bits of MAC address
-    EMAC0.ADDR0.HI.ADDR = 0x5455u;
-    // set lower 32 bits of MAC address
-    EMAC0.ADDR0.LO = (0x58u << 24u) | (CRC.SEED & 0xFFFFFFu);
+    // set MAC address (byte-order is reversed)
+    EMAC0.ADDR0.HI.ADDR = ((CRC.SEED & 0xFF) << 8) | ((CRC.SEED  >> 8) & 0xFF);
+    EMAC0.ADDR0.LO = (((CRC.SEED >> 16) & 0xFF) << 24) | 0x585554;
 
     // configure DMA
     EMAC0.DMABUSMOD.ATDS = 1;
@@ -176,8 +180,6 @@ static void initMAC() {
 
     EMAC0.FRAMEFLTR.PM = 1;
     EMAC0.FRAMEFLTR.VTFE = 1;
-    EMAC0.FRAMEFLTR.PCF = 1;
-    EMAC0.FRAMEFLTR.RA = 1;
     EMAC0.CFG.IPC = 1;
     EMAC0.CFG.DRO = 1;
     EMAC0.CFG.SADDR = EMAC_SADDR_REP0;
@@ -235,28 +237,23 @@ void NET_getLinkStatus(char *strStatus) {
 }
 
 void NET_getMacAddress(char *strAddr) {
-    strAddr += toHex((EMAC0.ADDR0.HI.ADDR >> 8u) & 0xFFu, 2, '0', strAddr);
-    *(strAddr++) = ':';
-    strAddr += toHex((EMAC0.ADDR0.HI.ADDR >> 0u) & 0xFFu, 2, '0', strAddr);
-    *(strAddr++) = ':';
-    strAddr += toHex((EMAC0.ADDR0.LO >> 24u) & 0xFFu, 2, '0', strAddr);
-    *(strAddr++) = ':';
-    strAddr += toHex((EMAC0.ADDR0.LO >> 16u) & 0xFFu, 2, '0', strAddr);
-    *(strAddr++) = ':';
-    strAddr += toHex((EMAC0.ADDR0.LO >> 8u) & 0xFFu, 2, '0', strAddr);
-    *(strAddr++) = ':';
-    strAddr += toHex((EMAC0.ADDR0.LO >> 0u) & 0xFFu, 2, '0', strAddr);
-    *strAddr = 0;
+    uint8_t mac[6];
+    getMAC(mac);
+    for(int i = 0; i < 6; i++) {
+        strAddr += toHex(mac[i], 2, '0', strAddr);
+        *(strAddr++) = ':';
+    }
+    strAddr[-1] = 0;
 }
 
 void NET_poll() {
     while(!rxDesc[ptrRX].RDES0.OWN) {
         if(!rxDesc[ptrRX].RDES0.ES) {
             uint8_t *buffer = (uint8_t *) rxDesc[ptrRX].BUFF1;
-            if(ETH_isARP(((struct HEADER_ETH *) buffer)->ethType)) {
+            if(ETH_isARP(((struct FRAME_ETH *) buffer)->ethType)) {
                 ARP_process(buffer, rxDesc[ptrRX].RDES0.FL);
             }
-            else if(ETH_isIPv4(((struct HEADER_ETH *) buffer)->ethType)) {
+            else if(ETH_isIPv4(((struct FRAME_ETH *) buffer)->ethType)) {
                 IPv4_process(buffer, rxDesc[ptrRX].RDES0.FL);
             }
         }
@@ -283,6 +280,7 @@ uint8_t * NET_getTxBuff(int desc) {
 void NET_transmit(int desc, int len) {
     // set transmission length size
     if(len < 64) len = 64;
+    len -= 4;
     if(len > TX_BUFF_SIZE) len = TX_BUFF_SIZE;
     txDesc[desc & (TX_RING_SIZE-1)].TDES1.TBS1 = len;
     // release descriptor
