@@ -4,12 +4,13 @@
 
 #include <memory.h>
 
-#include "arp.h"
-#include "eth.h"
-#include "ip.h"
 #include "../format.h"
-#include "util.h"
+#include "eth.h"
 #include "icmp.h"
+#include "ip.h"
+#include "tcp.h"
+#include "udp.h"
+#include "util.h"
 
 volatile uint32_t ipAddress = 0;
 volatile uint32_t ipSubnet = -1;
@@ -48,10 +49,21 @@ void IPv4_process(uint8_t *frame, int flen) {
     // process ICMP frame
     if(headerIPv4->proto == IP_PROTO_ICMP) {
         ICMP_process(frame, flen);
+        return;
+    }
+    // process TCP frame
+    if(headerIPv4->proto == IP_PROTO_TCP) {
+        TCP_process(frame, flen);
+        return;
+    }
+    // process UDP frame
+    if(headerIPv4->proto == IP_PROTO_UDP) {
+        UDP_process(frame, flen);
+        return;
     }
 }
 
-void IPv4_checksum(volatile const void *buffer, int len, volatile void *result) {
+void RFC1071_checksum(volatile const void *buffer, int len, volatile void *result) {
     uint16_t *ptr = (uint16_t *) buffer;
     uint16_t *end = ptr + (len >> 1);
     uint32_t sum = 0;

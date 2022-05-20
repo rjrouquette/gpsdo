@@ -32,9 +32,12 @@ add_executable(
         lib/plot.c
         lib/net.c
         lib/net/arp.c
+        lib/net/dhcp.c
         lib/net/eth.c
         lib/net/icmp.c
         lib/net/ip.c
+        lib/net/tcp.c
+        lib/net/udp.c
         lib/net/util.c
         lib/temp.c
 )

@@ -14,7 +14,6 @@ static void sendPingResponse(uint8_t *frame, int flen);
 void ICMP_process(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < 42) return;
-    if(flen > 128) return;
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
@@ -47,7 +46,7 @@ static void sendPingResponse(uint8_t *frame, int flen) {
     copyIPv4(headerIPv4->src, &ipAddress);
     headerIPv4->chksum[0] = 0;
     headerIPv4->chksum[1] = 0;
-    IPv4_checksum(headerIPv4, sizeof(struct HEADER_IPv4), headerIPv4->chksum);
+    RFC1071_checksum(headerIPv4, sizeof(struct HEADER_IPv4), headerIPv4->chksum);
 
     // modify ethernet frame header
     copyMAC(headerEth->macDst, headerEth->macSrc);

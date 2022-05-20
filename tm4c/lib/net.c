@@ -11,8 +11,10 @@
 #include "../lib/format.h"
 #include "net.h"
 #include "net/arp.h"
+#include "net/dhcp.h"
 #include "net/eth.h"
 #include "net/ip.h"
+#include "net/udp.h"
 #include "net/util.h"
 
 #define RX_RING_SIZE (16)
@@ -211,9 +213,8 @@ void NET_init() {
     initDescriptors();
     initMAC();
 
-    // debug zero conf
-    ipAddress = 0x1003A8C0;
-    ipSubnet = 0x00FFFFFF;
+    // register DHCP client port
+    UDP_register(68, DHCP_process);
 }
 
 void NET_getLinkStatus(char *strStatus) {
@@ -256,6 +257,7 @@ void NET_poll() {
     }
 
     ARP_poll();
+    DHCP_poll();
 }
 
 int NET_getTxDesc() {
