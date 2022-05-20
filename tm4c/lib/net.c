@@ -209,12 +209,15 @@ void ISR_EthernetMAC(void) {
     }
 }
 
+extern volatile uint16_t ipID;
 void NET_init() {
     initDescriptors();
     initMAC();
 
+    // unique IP identifier seed
+    ipID = EMAC0.ADDR0.HI.ADDR;
     // register DHCP client port
-    UDP_register(68, DHCP_process);
+    UDP_register(DHCP_PORT_CLI, DHCP_process);
 }
 
 void NET_getLinkStatus(char *strStatus) {

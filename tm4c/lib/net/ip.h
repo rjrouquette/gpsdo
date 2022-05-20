@@ -33,7 +33,7 @@ struct PACKED HEADER_IPv4 {
     uint8_t proto;
     uint8_t chksum[2];
     uint8_t src[4];
-    uint8_t dest[4];
+    uint8_t dst[4];
 };
 _Static_assert(sizeof(struct HEADER_IPv4) == 20, "HEADER_IPv4 must be 20 bytes");
 
@@ -43,6 +43,8 @@ extern volatile uint32_t ipGateway;
 extern volatile uint32_t ipDNS;
 
 void IPv4_process(uint8_t *frame, int flen);
+void IPv4_init(uint8_t *frame);
+void IPv4_finalize(uint8_t *frame, int flen);
 
 void RFC1071_checksum(volatile const void *buffer, int len, volatile void *result);
 

@@ -30,6 +30,43 @@ void UDP_process(uint8_t *frame, int flen) {
     }
 }
 
+void UDP_finalize(uint8_t *frame, int flen) {
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct FRAME_ETH));
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+
+    // compute UDP length
+    flen -= sizeof(struct FRAME_ETH);
+    flen -= sizeof(struct HEADER_IPv4);
+    // set UDP length
+    headerUDP->length[0] = (flen >> 8) & 0xFF;
+    headerUDP->length[1] = (flen >> 0) & 0xFF;
+
+    // partial checksum header and data
+    RFC1071_checksum(headerUDP, flen, headerUDP->chksum);
+
+    // append pseudo header to checksum
+    uint8_t chkbuf[] = {
+            // partial checksum
+            ~headerUDP->chksum[0], ~headerUDP->chksum[1],
+            // source address
+            headerIPv4->src[0], headerIPv4->src[1], headerIPv4->src[2], headerIPv4->src[3],
+            // destination address
+            headerIPv4->dst[0], headerIPv4->dst[1], headerIPv4->dst[2], headerIPv4->dst[3],
+            // protocol
+            0, headerIPv4->proto,
+            // udp length
+            headerUDP->length[0], headerUDP->length[1]
+    };
+    // validate buffer size
+    _Static_assert(sizeof(chkbuf) == 14, "pseudo header checksum buffer must be 14 bytes");
+
+    // finalize checksum calculation
+    RFC1071_checksum(chkbuf, sizeof(chkbuf), headerUDP->chksum);
+
+    // finalize IPv4 header
+    IPv4_finalize(frame, flen);
+}
+
 int UDP_register(uint16_t port, CallbackUDP callback) {
     for(int i = 0; i < MAX_ENTRIES; i++) {
         if(registryPort[i] == port)

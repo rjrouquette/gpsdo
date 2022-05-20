@@ -43,7 +43,7 @@ void IPv4_process(uint8_t *frame, int flen) {
     if(headerIPv4->head.IHL != 5) return;
     // verify destination
     uint32_t dest;
-    copyIPv4(&dest, headerIPv4->dest);
+    copyIPv4(&dest, headerIPv4->dst);
     if(dest != ipAddress) return;
 
     // process ICMP frame
@@ -61,6 +61,26 @@ void IPv4_process(uint8_t *frame, int flen) {
         UDP_process(frame, flen);
         return;
     }
+}
+
+volatile uint16_t ipID = 0x1234;
+void IPv4_init(uint8_t *frame) {
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct FRAME_ETH));
+    headerIPv4->head.VER = 4;
+    headerIPv4->head.IHL = 5;
+    headerIPv4->id[0] = (ipID >> 8) & 0xFF;
+    headerIPv4->id[1] = (ipID >> 0) & 0xFF;
+    headerIPv4->flags = 0x40;
+    headerIPv4->ttl = 32;
+    ++ipID;
+}
+
+void IPv4_finalize(uint8_t *frame, int flen) {
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct FRAME_ETH));
+    flen -= sizeof(struct FRAME_ETH);
+    headerIPv4->len[0] = (flen >> 8) & 0xFF;
+    headerIPv4->len[1] = (flen >> 0) & 0xFF;
+    RFC1071_checksum(headerIPv4, sizeof(struct HEADER_IPv4), headerIPv4->chksum);
 }
 
 void RFC1071_checksum(volatile const void *buffer, int len, volatile void *result) {

@@ -42,7 +42,7 @@ static void sendPingResponse(uint8_t *frame, int flen) {
     headerICMP->chksum[0] += 0x08;
 
     // modify IP header
-    copyIPv4(headerIPv4->dest, headerIPv4->src);
+    copyIPv4(headerIPv4->dst, headerIPv4->src);
     copyIPv4(headerIPv4->src, &ipAddress);
     headerIPv4->chksum[0] = 0;
     headerIPv4->chksum[1] = 0;
