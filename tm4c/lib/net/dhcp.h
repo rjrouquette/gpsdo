@@ -10,7 +10,6 @@
 
 void DHCP_poll();
 void DHCP_renew();
-void DHCP_release();
 
 // handler for server responses
 void DHCP_process(uint8_t *frame, int flen);
