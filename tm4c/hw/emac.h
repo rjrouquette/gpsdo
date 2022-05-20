@@ -56,11 +56,11 @@ PAGE_MAP (EMAC_MAP, {
     // offset 0x000
     // Ethernet MAC Configuration
     REGMAP_32 (, {
-        enum EMAC_PRELEN PRELEN: 2;
+        unsigned PRELEN: 2;
         unsigned RE: 1;
         unsigned TE: 1;
         unsigned DC: 1;
-        enum EMAC_BL BL: 2;
+        unsigned BL: 2;
         unsigned ACS: 1;
         unsigned : 1;
         unsigned DR: 1;
@@ -71,7 +71,7 @@ PAGE_MAP (EMAC_MAP, {
         unsigned FES: 1;
         unsigned PS: 1;
         unsigned DISCRS: 1;
-        enum EMAC_IFG IFG: 3;
+        unsigned IFG: 3;
         unsigned JFEN: 1;
         unsigned : 1;
         unsigned JD: 1;
@@ -80,7 +80,8 @@ PAGE_MAP (EMAC_MAP, {
         unsigned CST: 1;
         unsigned : 1;
         unsigned TWOKPEN: 1;
-        enum EMAC_SADDR SADDR: 3;
+        unsigned SADDR: 3;
+        unsigned : 1;
     }) CFG;
 
     // offset 0x004
@@ -520,7 +521,7 @@ PAGE_MAP (EMAC_MAP, {
         unsigned : 2;
         unsigned MMC: 1;
         unsigned PMT: 1;
-        unsigned TT;
+        unsigned TT: 1;
     }) DMARIS;
 
     // offset 0xC18
@@ -582,7 +583,7 @@ PAGE_MAP (EMAC_MAP, {
     }) RXINTWDT;
 
     // reserved space
-    char _reserved_0E[0x01C];
+    char _reserved_0E[0x020];
 
     // offset 0xC48
     // Ethernet MAC Current Host Transmit Descriptor

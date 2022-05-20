@@ -28,6 +28,13 @@ REGMAP_32 (STCURRENT_MAP, {
 });
 #define STCURRENT (*(volatile union STCURRENT_MAP *)0xE000E018)
 
+REGMAP_32 (CPAC_MAP, {
+    unsigned : 20;
+    unsigned CP10: 2;
+    unsigned CP11: 2;
+});
+#define CPAC (*(volatile union CPAC_MAP *)0xE000ED88)
+
 REGMAP_32(FLASHCONF_MAP, {
     unsigned : 16;
     unsigned FPFOFF: 1;

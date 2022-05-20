@@ -55,12 +55,23 @@ int toTemp(int16_t value, char *origin) {
         origin[0] = '-';
         value = (int16_t) -value;
     } else {
-        origin[0] = '+';
+        origin[0] = ' ';
     }
-    toDec(value >> 8u, 3, '0', origin + 1);
-    toDec((10 * (value & 0xFFu)) >> 8u, 1, '0', origin + 5);
+    toDec(value >> 8u, 3, ' ', origin + 1);
+    toDec((100 * (value & 0xFFu)) >> 8u, 2, '0', origin + 5);
     origin[4] = '.';
-    origin[6] = 0xBA;
-    origin[7] = 'C';
+    origin[7] = 0xBA;
+    origin[8] = 'C';
+    return 9;
+}
+
+int toHMS(uint32_t value, char *origin) {
+    toDec(value % 60, 2, '0', origin + 6);
+    value /= 60;
+    toDec(value % 60, 2, '0', origin + 3);
+    value /= 60;
+    toDec(value % 24, 2, '0', origin);
+    origin[2] = ':';
+    origin[5] = ':';
     return 8;
 }

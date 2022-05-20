@@ -11,21 +11,14 @@
 #define PACKED __attribute__((packed))
 #endif
 
-struct PACKED HEADER_ETH {
+struct PACKED FRAME_ETH {
     uint8_t macDst[6];
     uint8_t macSrc[6];
     uint8_t ethType[2];
 };
+_Static_assert(sizeof(struct FRAME_ETH) == 14, "FRAME_ETH must be 14 bytes");
 
-struct PACKED HEADER_ETH_VLAN {
-    uint8_t macDst[6];
-    uint8_t macSrc[6];
-    uint8_t vlanTag[4];
-    uint8_t ethType[2];
-};
-
-void ETH_initHeader(struct HEADER_ETH *header);
-void ETH_initHeaderVlan(struct HEADER_ETH_VLAN *header, uint16_t vlan);
-void ETH_broadcastMAC(uint8_t *mac);
+int ETH_isARP(const uint8_t *ethType);
+int ETH_isIPv4(const uint8_t *ethType);
 
 #endif //GPSDO_ETH_H

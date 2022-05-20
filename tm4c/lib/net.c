@@ -11,20 +11,60 @@
 #include "../lib/format.h"
 #include "net.h"
 #include "net/arp.h"
+#include "net/eth.h"
+#include "net/ip.h"
+#include "net/util.h"
 
-volatile uint8_t rxPtr = 0;
-volatile uint16_t phyStatus = 0;
+#define RX_RING_SIZE (16)
+#define RX_BUFF_SIZE (1524)
 
-volatile struct EMAC_RX_DESC rxDesc[16];
-volatile uint8_t rxBuffer[16][1600];
+#define TX_RING_SIZE (4)
+#define TX_BUFF_SIZE (1524)
 
-volatile struct EMAC_TX_DESC txDesc[4];
-volatile uint8_t txBuffer[4][1600];
+static volatile uint8_t ptrRX = 0;
+static volatile uint8_t ptrTX = 0;
+static volatile uint16_t phyStatus = 0;
 
-volatile uint32_t cntPacketsRX = 0;
-volatile uint32_t cntPacketsTX = 0;
+static volatile struct EMAC_RX_DESC rxDesc[RX_RING_SIZE];
+static volatile uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 
-void initPHY() {
+static volatile struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
+static volatile uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
+
+static void initDescriptors() {
+    // init receive descriptors
+    for(int i = 0; i < RX_RING_SIZE; i++) {
+        rxDesc[i].BUFF1 = (uint32_t) rxBuffer[i];
+        rxDesc[i].BUFF2 = 0;
+        rxDesc[i].RDES1.RBS1 = RX_BUFF_SIZE;
+        rxDesc[i].RDES1.RBS2 = 0;
+        rxDesc[i].RDES1.RER = 0;
+        rxDesc[i].RDES0.OWN = 1;
+    }
+    rxDesc[RX_RING_SIZE-1].RDES1.RER = 1;
+
+    // init transmit descriptors
+    for(int i = 0; i < TX_RING_SIZE; i++) {
+        txDesc[i].BUFF1 = (uint32_t) txBuffer[i];
+        txDesc[i].BUFF2 = 0;
+        txDesc[i].TDES1.TBS1 = 0;
+        txDesc[i].TDES1.TBS2 = 0;
+        // replace source address
+        txDesc[i].TDES1.SAIC = EMAC_SADDR_REP0;
+        // not end-of-ring
+        txDesc[i].TDES0.TER = 0;
+        // mark descriptor as incomplete
+        txDesc[i].TDES0.OWN = 0;
+        // each descriptor is one frame
+        txDesc[i].TDES0.FS = 1;
+        txDesc[i].TDES0.LS = 1;
+        // capture timestamp
+        txDesc[i].TDES0.TTSE = 1;
+    }
+    txDesc[TX_RING_SIZE-1].TDES0.TER = 1;
+}
+
+static void initPHY() {
     // configure LEDs
     RCGCGPIO.EN_PORTF = 1;
     delay_cycles_4();
@@ -66,7 +106,7 @@ void initPHY() {
     EMAC_MII_Write(&EMAC0, MII_ADDR_EPHYCFG1, temp);
 }
 
-void initPPS() {
+static void initPPS() {
     // configure PPS
     RCGCGPIO.EN_PORTG = 1;
     delay_cycles_4();
@@ -98,7 +138,8 @@ void initPPS() {
     EMAC0.CC.PTPCEN = 1;
 }
 
-void initMAC() {
+static void initMAC() {
+    // disable flash prefetch per errata
     FLASHCONF.FPFOFF = 1;
     // enable CRC module
     RCGCCCM.EN = 1;
@@ -106,65 +147,43 @@ void initMAC() {
     // enable clock
     RCGCEMAC.EN0 = 1;
     while(!PREMAC.RDY0);
-    // enable power
-    PCEMAC.EN0 = 1;
-    while(!PREMAC.RDY0);
-    // this resets the entire EMAC, so it must happen first
-    EMAC0.DMABUSMOD.ATDS = 1;
-    // set MII clock
-    EMAC0.MIIADDR.CR = 1;
     // initialize PHY
     initPHY();
+    // wait for DMA reset to complete
+    while(EMAC0.DMABUSMOD.SWR);
+
     initPPS();
 
-    // set upper 24 bits of MAC address
-    EMAC0.ADDR0.HI.ADDR = 0x5455u;
-    EMAC0.ADDR0.LO = 0x58000000u;
-    // set lower 24 bits of MAC address
+    // compute MAC address
     CRC.CTRL.TYPE = CRC_TYPE_04C11DB7;
     CRC.CTRL.INIT = CRC_INIT_ZERO;
     CRC.DIN = UNIQUEID.WORD[0];
     CRC.DIN = UNIQUEID.WORD[1];
     CRC.DIN = UNIQUEID.WORD[2];
     CRC.DIN = UNIQUEID.WORD[3];
-    EMAC0.ADDR0.LO |= CRC.SEED & 0xFFFFFFu;
-
-    // init receive descriptors
-    for(int i = 0; i < 16; i++) {
-        rxDesc[i].BUFF1 = (uint32_t) rxBuffer[i];
-        rxDesc[i].BUFF2 = 0;
-        rxDesc[i].RDES1.RBS1 = 1600;
-        rxDesc[i].RDES1.RBS2 = 0;
-        rxDesc[i].RDES1.RER = 0;
-        rxDesc[i].RDES0.OWN = 1;
-    }
-    rxDesc[15].RDES1.RER = 1;
-
-    // init transmit descriptors
-    for(int i = 0; i < 4; i++) {
-        txDesc[i].BUFF1 = (uint32_t) txBuffer[i];
-        txDesc[i].BUFF2 = 0;
-        txDesc[i].TDES1.TBS1 = 1600;
-        txDesc[i].TDES1.TBS2 = 0;
-        txDesc[i].TDES0.TER = 0;
-        txDesc[i].TDES0.OWN = 0;
-    }
-    txDesc[3].TDES0.TER = 1;
+    // set MAC address (byte-order is reversed)
+    EMAC0.ADDR0.HI.ADDR = ((CRC.SEED & 0xFF) << 8) | ((CRC.SEED  >> 8) & 0xFF);
+    EMAC0.ADDR0.LO = (((CRC.SEED >> 16) & 0xFF) << 24) | 0x585554;
 
     // configure DMA
-    EMAC0.TXDLADDR = (uint32_t) txDesc;
+    EMAC0.DMABUSMOD.ATDS = 1;
     EMAC0.RXDLADDR = (uint32_t) rxDesc;
+    EMAC0.TXDLADDR = (uint32_t) txDesc;
     EMAC0.DMAOPMODE.ST = 1;
     EMAC0.DMAOPMODE.SR = 1;
 
-    EMAC0.FRAMEFLTR.RA = 1;
-    EMAC0.RXINTWDT.RIWT = 8;
+    EMAC0.FRAMEFLTR.PM = 1;
+    EMAC0.FRAMEFLTR.VTFE = 1;
     EMAC0.CFG.IPC = 1;
     EMAC0.CFG.DRO = 1;
     EMAC0.CFG.SADDR = EMAC_SADDR_REP0;
-    EMAC0.CFG.RE = 1;
-    EMAC0.CFG.TE = 1;
 
+    // start transmitter
+    EMAC0.CFG.TE = 1;
+    // start receiver
+    EMAC0.CFG.RE = 1;
+
+    // re-enable flash prefetch per errata
     FLASHCONF.FPFOFF = 0;
 }
 
@@ -181,56 +200,85 @@ void ISR_EthernetMAC(void) {
         EMAC0.CFG.FES = (phyStatus >> 1u) & 1u;
         // set duplex
         EMAC0.CFG.DUPM = (phyStatus >> 2u) & 1u;
+        // link status bit in EPHYSTS is buggy, but EPHYBMSR works
+        uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYBMSR);
+        if(temp & 4) phyStatus |= 1;
+        return;
     }
 }
 
 void NET_init() {
+    initDescriptors();
     initMAC();
+
+    // debug zero conf
+    ipAddress = 0x1003A8C0;
+    ipSubnet = 0x00FFFFFF;
 }
 
 void NET_getLinkStatus(char *strStatus) {
-    const char *speed = (phyStatus & 0x2) ? "100" : " 10";
-    const char *duplx = (phyStatus & 0x3) ? " FDX" : " HDX";
+    const char *speed = (phyStatus & 2) ? "100M" : " 10M";
+    const char *duplx = (phyStatus & 4) ? " FDX" : " HDX";
+    const char *link = (phyStatus & 1) ? " ^" : " !";
 
     while(speed[0] != 0)
         *(strStatus++) = *(speed++);
     while(duplx[0] != 0)
         *(strStatus++) = *(duplx++);
+    while(link[0] != 0)
+        *(strStatus++) = *(link++);
     strStatus[0] = 0;
 }
 
 void NET_getMacAddress(char *strAddr) {
-    strAddr += toHex((EMAC0.ADDR0.HI.ADDR >> 8u) & 0xFFu, 2, '0', strAddr);
-    *(strAddr++) = ':';
-    strAddr += toHex((EMAC0.ADDR0.HI.ADDR >> 0u) & 0xFFu, 2, '0', strAddr);
-    *(strAddr++) = ':';
-    strAddr += toHex((EMAC0.ADDR0.LO >> 24u) & 0xFFu, 2, '0', strAddr);
-    *(strAddr++) = ':';
-    strAddr += toHex((EMAC0.ADDR0.LO >> 16u) & 0xFFu, 2, '0', strAddr);
-    *(strAddr++) = ':';
-    strAddr += toHex((EMAC0.ADDR0.LO >> 8u) & 0xFFu, 2, '0', strAddr);
-    *(strAddr++) = ':';
-    strAddr += toHex((EMAC0.ADDR0.LO >> 0u) & 0xFFu, 2, '0', strAddr);
-    *strAddr = 0;
+    uint8_t mac[6];
+    getMAC(mac);
+    for(int i = 0; i < 6; i++) {
+        strAddr += toHex(mac[i], 2, '0', strAddr);
+        *(strAddr++) = ':';
+    }
+    strAddr[-1] = 0;
 }
 
 void NET_poll() {
-    if(!rxDesc[rxPtr].RDES0.OWN) {
-        if(!rxDesc[rxPtr].RDES0.ES) {
-
+    while(!rxDesc[ptrRX].RDES0.OWN) {
+        if(!rxDesc[ptrRX].RDES0.ES) {
+            uint8_t *buffer = (uint8_t *) rxDesc[ptrRX].BUFF1;
+            if(ETH_isARP(((struct FRAME_ETH *) buffer)->ethType)) {
+                ARP_process(buffer, rxDesc[ptrRX].RDES0.FL);
+            }
+            else if(ETH_isIPv4(((struct FRAME_ETH *) buffer)->ethType)) {
+                IPv4_process(buffer, rxDesc[ptrRX].RDES0.FL);
+            }
         }
-        ++cntPacketsRX;
-        rxDesc[rxPtr].RDES0.OWN = 1;
-        rxPtr = (rxPtr + 1) & 0xF;
+        rxDesc[ptrRX].RDES0.OWN = 1;
+        ptrRX = (ptrRX + 1) & (RX_RING_SIZE-1);
     }
 
     ARP_poll();
 }
 
-uint32_t NET_packetsRX() {
-    return cntPacketsRX;
+int NET_getTxDesc() {
+    if(txDesc[ptrTX].TDES0.OWN)
+        return -1;
+
+    int temp = ptrTX;
+    ptrTX = (ptrTX + 1) & (TX_RING_SIZE-1);
+    return temp;
 }
 
-uint32_t NET_packetsTX() {
-    return cntPacketsTX;
+uint8_t * NET_getTxBuff(int desc) {
+    return (uint8_t *) txDesc[desc & (TX_RING_SIZE-1)].BUFF1;
+}
+
+void NET_transmit(int desc, int len) {
+    // restrict transmission length
+    if(len < 60) len = 60;
+    if(len > TX_BUFF_SIZE) len = TX_BUFF_SIZE;
+    // set transmission size
+    txDesc[desc & (TX_RING_SIZE-1)].TDES1.TBS1 = len;
+    // release descriptor
+    txDesc[desc & (TX_RING_SIZE-1)].TDES0.OWN = 1;
+    // wake TX DMA
+    EMAC0.TXPOLLD = 1;
 }

@@ -12,7 +12,9 @@
 #include <string>
 #include <unistd.h>
 
-#define BINS (64)
+#define TEMP_SPAN (8)
+#define TEMP_PREC (0.125f)
+#define BINS (256)
 #define IPPM_PREC (0.0001164f)
 
 using namespace std;
@@ -43,11 +45,6 @@ struct Sample {
 static void accumulate(int64_t &acc, const int64_t value) {
     acc -= acc >> 12u;
     acc += value << 20u;
-}
-
-// A = A + ((B - A) / 2^16)
-static void accumulate(float &acc, const float value) {
-    acc += (value - acc) / 4096.0f;
 }
 
 union u32 {
@@ -146,52 +143,111 @@ struct FixedMath {
 } fixedMath;
 
 struct FloatMath {
-    uint64_t count[BINS];
-    float mat[BINS][5];
+    float steps[BINS];
 
-    FloatMath() : count{}, mat{} {
-        bzero(count, sizeof(count));
-        bzero(mat, sizeof(mat));
+    FloatMath() : steps{} {
+        bzero(steps, sizeof(steps));
     }
 
     void update(const Sample &s) {
-        int8_t ibase = (int) s.temp;
-        for(int8_t step = -1; step <= 1; step++) {
-            int8_t ipart = ibase + step;
-            float fpart  = (s.temp - ipart) - 0.5f;
-            uint8_t tidx = ipart & (BINS-1);
-
-            auto &m = mat[tidx];
-            accumulate(m[0], fpart * fpart);
-            accumulate(m[1], fpart);
-            accumulate(m[2], fpart * s.ppm);
-            accumulate(m[3], s.ppm);
-            accumulate(m[4], 1.0);
-
-            ++count[tidx];
+        auto ibase = (int) (s.temp / TEMP_PREC);
+        auto &step = steps[ibase & (BINS-1)];
+        if(step == 0) {
+            step = s.ppm;
+        } else {
+            step += (s.ppm - step) / 256;
         }
     }
 
-    bool coeff(const float temp, float &m, float &b) {
-        uint8_t tidx = (uint8_t) ((int) temp) & (BINS-1);
+    bool coeff(const float temp, float &m, float &b, float &o) {
+        const int ibase = (int) (temp / TEMP_PREC);
+        if(steps[ibase & (BINS-1)] == 0)
+            return false;
 
-        auto &mt = mat[tidx];
-        if(mt[4] == 0) return false;
-        float A = mt[0];
-        float B = mt[1];
-        float C = mt[2];
-        float D = mt[3];
-        float N = mt[4];
+        o = (ibase + 0.5f) * TEMP_PREC;
+        b = steps[ibase & (BINS-1)];
+        m = 0;
 
-        const float Z = (A * N) - (B * B);
-        if(Z <= 0 || N < 0.117517f) {
-            m = 0;
-            b = D / N;
-        } else {
-            m = ((C * N) - (B * D)) / Z;
-            b = ((A * D) - (B * C)) / Z;
+        int cnt = 0;
+        float scratch[TEMP_SPAN * 2];
+        for(int i = -TEMP_SPAN; i <= (TEMP_SPAN-1); i++) {
+            float l = steps[(ibase + i) & (BINS-1)];
+            float u = steps[(ibase + i + 1) & (BINS-1)];
+            if(l != 0 && u != 0) {
+                scratch[cnt++] = u - l;
+            }
+        }
+        if(cnt == 0)
+            return true;
+
+        float mean = 0;
+        for(int i = 0; i < cnt; i++)
+            mean += scratch[i];
+        mean /= cnt;
+
+        float stddev = 0;
+        for(int i = 0; i < cnt; i++) {
+            auto diff = scratch[i] - mean;
+            stddev += diff * diff;
+        }
+        stddev = sqrtf(stddev / cnt);
+
+        int n = 0;
+        for(int i = 0; i < cnt; i++) {
+            auto diff = scratch[i] - mean;
+            if(fabsf(diff) <= stddev) {
+                m += scratch[i];
+                ++n;
+            }
+        }
+        if(n > 0) {
+            m /= n;
+            m /= TEMP_PREC;
         }
         return true;
+
+        // const int ibase = (int) (temp / TEMP_PREC);
+        // float norm = 0;
+        // for(int i = -(TEMP_SPAN-1); i <= (TEMP_SPAN-1); i++) {
+        //     int n = (i < 0) ? (TEMP_SPAN + i) : (TEMP_SPAN - i);
+        //     float step = steps[(ibase + i) & (BINS-1)];
+        //     if(step != 0) {
+        //         o += (ibase + i) * n;
+        //         b += n * step;
+        //         norm += n;
+        //     }
+        // }
+        // if(norm == 0)
+        //     return false;
+        // b /= norm;
+        // o /= norm;
+        // o = TEMP_PREC * (o + 0.5f);
+
+        // norm = 0;
+        // for(int i = 0; i <= (TEMP_SPAN-1); i++) {
+        //     int n = (i < 0) ? (TEMP_SPAN + i) : (TEMP_SPAN - i);
+        //     {
+        //         float l = steps[(ibase + i) & (BINS-1)];
+        //         float u = steps[(ibase + i + 1) & (BINS-1)];
+        //         if(l != 0 && u < l) {
+        //             m += n * (u - l);
+        //             norm += n;
+        //         }
+        //     }
+        //     {
+        //         float u = steps[(ibase - i) & (BINS-1)];
+        //         float l = steps[(ibase - i - 1) & (BINS-1)];
+        //         if(l != 0 && u < l) {
+        //             m += n * (u - l);
+        //             norm += n;
+        //         }
+        //     }
+        // }
+        // m /= norm;
+        // m /= TEMP_PREC;
+        // if(norm == 0)
+        //     m = 0;
+        // return true;
     }
 } floatMath;
 
@@ -266,9 +322,10 @@ int main(int argc, char **argv) {
         }
         fixedMath.update(s);
 
-        float fm, fb;
-        if(floatMath.coeff(s.temp, fm, fb)) {
-            auto fx = (s.temp - ((int)s.temp)) - 0.5f;
+        float fm, fb, fo;
+        if(floatMath.coeff(s.temp, fm, fb, fo)) {
+            int ibase = (int) (s.temp / TEMP_PREC);
+            auto fx = s.temp - fo;
             auto fy = (fm * fx) + fb;
             auto fd = fy - s.ppm;
             if(std::isfinite(fd)) {
@@ -322,25 +379,15 @@ int main(int argc, char **argv) {
 
     cout << "floating point math:" << endl;
     cout << "Temp.";
-    cout << setw(8) << "Count";
-    cout << setw(12) << "Norm";
-    cout << setw(12) << "X * X";
-    cout << setw(12) << "X * 1";
-    cout << setw(12) << "Y * X";
-    cout << setw(12) << "Y * 1";
     cout << setw(12) << "m";
     cout << setw(12) << "b";
     cout << endl;
 
+    float m, b, o;
     for(int i = 0; i < BINS; i++) {
         if(fixedMath.count[i] == 0) continue;
         cout << setw(3) << i << ": ";
-        cout << setw(8) << floatMath.count[i];
-        cout << setw(12) << floatMath.mat[i][4];
-        for(int j = 0; j < 4; j++)
-            cout << setw(12) << (floatMath.mat[i][j] / floatMath.mat[i][4]);
-        float m, b;
-        floatMath.coeff(i, m, b);
+        floatMath.coeff(i, m, b, o);
         cout << setw(12) << m;
         cout << setw(12) << b;
         cout << endl;
