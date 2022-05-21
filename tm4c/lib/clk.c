@@ -68,6 +68,7 @@ void CLK_init() {
     GPTM0.CTL.TAEN = 1;
 }
 
+// second boundary comparison
 void ISR_Timer0A() {
     // clear interrupt flag
     GPTM0.ICR = GPTM0.MIS;
@@ -81,15 +82,18 @@ void ISR_Timer0A() {
     ADC0.PSSI.SS3 = 1;
 }
 
+// return integer part of current time
 uint32_t CLK_MONOTONIC_INT() {
     return cntMonotonic;
 }
 
+// return current time as 32.32 fixed point value
 uint64_t CLK_MONOTONIC() {
     // capture current time
     volatile uint32_t snapI = cntMonotonic;
     volatile uint32_t snapF = GPTM0.TAV;
 
+    // split fractional time in to base(2) and base(5) parts
     union {
         struct {
             uint32_t fpart;
@@ -100,13 +104,16 @@ uint64_t CLK_MONOTONIC() {
             .ipart = snapF / 1953125,
             .fpart = snapF % 1953125
     };
+    // convert base(5) part into base(2)
     uint32_t twiddle = scratch.fpart;
     twiddle *= 45421;
     twiddle /= 1953125;
     scratch.fpart *= 2199;
     scratch.fpart += twiddle;
+    // restore correct bit alignment
     scratch.raw >>= 6u;
 
+    // merge with full integer count
     scratch.ipart ^= snapI;
     scratch.ipart &= 0x1u;
     scratch.ipart += snapI;

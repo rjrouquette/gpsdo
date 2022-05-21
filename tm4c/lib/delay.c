@@ -5,6 +5,7 @@
 #include "../hw/sys.h"
 #include "delay.h"
 
+#define CLK_KHZ (125000)
 #define CLK_MHZ (125)
 
 void delay_us(uint16_t delay) {
@@ -17,19 +18,20 @@ void delay_us(uint16_t delay) {
 }
 
 void delay_ms(uint16_t delay) {
+    // get current time
+    uint32_t target = STCURRENT.CURRENT;
     // coarse delay
-    while(delay > 50) {
-        delay -= 50;
-        delay_us(50000);
+    while(delay > 64) {
+        // compute target count for delay
+        delay -= 64;
+        target -= 64 * CLK_KHZ;
+        // wait for timer to cross target
+        while ((target - STCURRENT.CURRENT) & (1u << 23u));
     }
-    // moderate delay
-    while(delay > 7) {
-        delay -= 7;
-        delay_us(7000);
-    }
-    // fine delay
-    while(delay) {
-        --delay;
-        delay_us(1000);
+    // final delay
+    if(delay) {
+        target -= delay * CLK_KHZ;
+        // wait for timer to cross target
+        while ((target - STCURRENT.CURRENT) & (1u << 23u));
     }
 }
