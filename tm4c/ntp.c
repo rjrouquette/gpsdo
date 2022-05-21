@@ -11,7 +11,6 @@
 #include "lib/net/ip.h"
 #include "lib/net/udp.h"
 #include "lib/net/util.h"
-#include "lib/led.h"
 
 struct PACKED FRAME_NTPv3 {
     union PACKED {
@@ -63,7 +62,6 @@ void NTP_process(uint8_t *frame, int flen) {
     // ignore non-client frames
     copyIPv4(debugMac, frameNTP);
     if(frameNTP->flags.mode != 0x03) return;
-    LED0_TGL();
     // modify ethernet frame header
     copyMAC(headerEth->macDst, headerEth->macSrc);
     // modify IP header
