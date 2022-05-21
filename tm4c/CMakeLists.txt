@@ -21,6 +21,7 @@ add_executable(
 
         main.c
         ntp.c
+        http.c
         hw/emac.c
         hw/interrupts.c
         lib/clk.c

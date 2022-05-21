@@ -16,7 +16,9 @@
 #include "hw/emac.h"
 #include "hw/sys.h"
 #include "lib/net/ip.h"
+
 #include "ntp.h"
+#include "http.h"
 
 volatile uint8_t debugMac[6];
 
@@ -47,12 +49,14 @@ int main(void) {
     PLOT_setLine(0, 215, EPD_width()-1, 215, 1);
 
     NTP_init();
+    HTTP_init();
     LED0_ON();
 
     uint32_t next = 0;
     int end;
     for(;;) {
         NET_poll();
+        HTTP_poll();
 
         uint32_t now = CLK_MONOTONIC_INT();
         if(now & 0x1u)
