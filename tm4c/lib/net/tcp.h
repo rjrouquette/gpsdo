@@ -24,7 +24,13 @@ struct PACKED HEADER_TCP {
 };
 _Static_assert(sizeof(struct HEADER_TCP) == 20, "HEADER_TCP must be 20 bytes");
 
+typedef void (*CallbackTCP)(uint8_t *frame, int flen);
+
 
 void TCP_process(uint8_t *frame, int flen);
+void TCP_finalize(uint8_t *frame, int flen);
+
+int TCP_register(uint16_t port, CallbackTCP callback);
+int TCP_deregister(uint16_t port);
 
 #endif //GPSDO_TCP_H

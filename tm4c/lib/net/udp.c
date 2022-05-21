@@ -12,6 +12,7 @@
 static volatile uint16_t registryPort[MAX_ENTRIES];
 static volatile CallbackUDP registryCallback[MAX_ENTRIES];
 
+
 void UDP_process(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < 42) return;
