@@ -13,6 +13,7 @@
 #include "util.h"
 #include "../net.h"
 #include "../../hw/sys.h"
+#include "../led.h"
 
 
 struct PACKED HEADER_DHCP {
@@ -28,22 +29,22 @@ struct PACKED HEADER_DHCP {
     uint8_t SIADDR[4];
     uint8_t GIADDR[4];
     uint8_t CHADDR[16];
-    uint8_t BOOTP[192];
+    uint8_t SNAME[64];
+    uint8_t FILE[128];
     uint8_t MAGIC[4];
 };
 _Static_assert(sizeof(struct HEADER_DHCP) == 240, "HEADER_DHCP must be 240 bytes");
 
-static const uint32_t DHCP_MAGIC = 0x63825363;
-static uint32_t dhcpXID;
-static uint32_t dhcpLeaseExpire = 0;
+static const uint8_t DHCP_MAGIC[] = { 0x63, 0x82, 0x53, 0x63 };
+uint32_t dhcpXID = 0;
+uint32_t dhcpLeaseExpire = 0;
 
 static const uint8_t DHCP_OPT_DISCOVER[] = { 0x35, 0x01, 0x01 };
-static const uint8_t DHCP_OPT_OFFER[] = { 0x35, 0x01, 0x02 };
 static const uint8_t DHCP_OPT_REQUEST[] = { 0x35, 0x01, 0x03 };
-static const uint8_t DHCP_OPT_ACK[] = { 0x35, 0x01, 0x05 };
-static const uint8_t DHCP_OPT_NAK[] = { 0x35, 0x01, 0x06 };
-
 static const uint8_t DHCP_OPT_PARAM_REQ[] = { 0x37, 0x03, 0x01, 0x03, 0x06 };
+
+
+static void sendReply(struct HEADER_DHCP *response);
 
 static void initPacket(void *frame) {
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
@@ -75,12 +76,12 @@ static void initPacket(void *frame) {
     headerDHCP->HLEN = 6;
     memcpy(headerDHCP->XID, &dhcpXID, sizeof(dhcpXID));
     getMAC(headerDHCP->CHADDR);
-    memcpy(headerDHCP->MAGIC, &DHCP_MAGIC, sizeof(DHCP_MAGIC));
+    memcpy(headerDHCP->MAGIC, DHCP_MAGIC, sizeof(DHCP_MAGIC));
 }
 
 void DHCP_poll() {
-    uint32_t now = CLK_MONOTONIC_INT();
-    if((dhcpLeaseExpire - now) < 0) {
+    const uint32_t now = CLK_MONOTONIC_INT();
+    if(((int32_t)(dhcpLeaseExpire - now)) <= 0) {
         // re-attempt in 5 minutes if renewal fails
         dhcpLeaseExpire = now + 300;
         DHCP_renew();
@@ -91,7 +92,7 @@ void DHCP_renew() {
     // compute new transaction ID
     dhcpXID = CLK_MONOTONIC_RAW();
     for(int i = 0; i < 4; i++)
-        dhcpXID += UNIQUEID.WORD[1];
+        dhcpXID += UNIQUEID.WORD[i];
 
     // get TX descriptor
     int txDesc = NET_getTxDesc();
@@ -125,18 +126,21 @@ void DHCP_renew() {
         copyIPv4(headerIPv4->src, &ipAddress);
         copyIPv4(headerDHCP->CIADDR, &ipAddress);
         // DHCPREQUEST
-        memcpy(frame + flen, DHCP_OPT_DISCOVER, sizeof(DHCP_OPT_DISCOVER));
-        flen += sizeof(DHCP_OPT_DISCOVER);
+        memcpy(frame + flen, DHCP_OPT_REQUEST, sizeof(DHCP_OPT_REQUEST));
+        flen += sizeof(DHCP_OPT_REQUEST);
         // end mark
         frame[flen++] = 0xFF;
     }
 
     // transmit frame
     UDP_finalize(frame, flen);
+    IPv4_finalize(frame, flen);
     NET_transmit(txDesc, flen);
 }
 
+extern volatile uint8_t debugMac[6];
 void DHCP_process(uint8_t *frame, int flen) {
+    copyMAC(debugMac, frame);
     // discard malformed packets
     if(flen < 282) return;
     // map headers
@@ -148,10 +152,12 @@ void DHCP_process(uint8_t *frame, int flen) {
     if(headerUDP->portSrc[0] != 0 || headerUDP->portSrc[1] != DHCP_PORT_SRV)
         return;
     // discard if not a server response
-    if(headerDHCP->OP != 2)
-        return;
+    if(headerDHCP->OP != 2) return;
+    // discard if incorrect address type
+    if(headerDHCP->HTYPE != 1) return;
+    if(headerDHCP->HLEN != 6) return;
     // discard if MAGIC is incorrect
-    if(memcmp(headerDHCP->MAGIC, &DHCP_MAGIC, sizeof(DHCP_MAGIC)) != 0)
+    if(memcmp(headerDHCP->MAGIC, DHCP_MAGIC, sizeof(DHCP_MAGIC)) != 0)
         return;
     // discard if XID is incorrect
     if(memcmp(headerDHCP->XID, &dhcpXID, sizeof(dhcpXID)) != 0)
@@ -201,8 +207,13 @@ void DHCP_process(uint8_t *frame, int flen) {
         if(key == 53)
             optMsgType = ptr[0];
         // lease time
-        if(key == 51 && len == 4)
-            memcpy(&optLease, ptr, 4);
+        if(key == 51 && len == 4) {
+            uint8_t *temp = (uint8_t *) &optLease;
+            temp[3] = ptr[0];
+            temp[2] = ptr[1];
+            temp[1] = ptr[2];
+            temp[0] = ptr[3];
+        }
         // dhcp server
         if(key == 54 && len == 4)
             copyIPv4(&optDHCP, ptr);
@@ -213,12 +224,63 @@ void DHCP_process(uint8_t *frame, int flen) {
 
     // process DHCPOFFER
     if(optMsgType == 2) {
-
+        sendReply(headerDHCP);
         return;
     }
     // process DHCPACK
     if(optMsgType == 5) {
-
+        copyIPv4(&ipAddress, headerDHCP->YIADDR);
+        ipSubnet = optSubnet;
+        ipGateway = optRouter;
+        ipDNS = optDNS;
+        // set time of expiration (10% early)
+        dhcpLeaseExpire = optLease;
+        dhcpLeaseExpire -= optLease / 10;
+        if(dhcpLeaseExpire > 86400) dhcpLeaseExpire = 86400;
+        dhcpLeaseExpire += CLK_MONOTONIC_INT();
         return;
     }
+}
+
+static void sendReply(struct HEADER_DHCP *response) {
+    // get TX descriptor
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    // initialize frame
+    uint8_t *frame = NET_getTxBuff(txDesc);
+    initPacket(frame);
+    int flen = sizeof(struct FRAME_ETH);
+    flen += sizeof(struct HEADER_IPv4);
+    flen += sizeof(struct HEADER_UDP);
+    flen += sizeof(struct HEADER_DHCP);
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    struct HEADER_DHCP *headerDHCP = (struct HEADER_DHCP *) (headerUDP + 1);
+    // request proposed lease
+    copyIPv4(headerDHCP->CIADDR, response->YIADDR);
+    copyIPv4(headerDHCP->SIADDR, response->SIADDR);
+    // DHCPREQUEST
+    memcpy(frame + flen, DHCP_OPT_REQUEST, sizeof(DHCP_OPT_REQUEST));
+    flen += sizeof(DHCP_OPT_REQUEST);
+    // parameter request
+    memcpy(frame + flen, DHCP_OPT_PARAM_REQ, sizeof(DHCP_OPT_PARAM_REQ));
+    flen += sizeof(DHCP_OPT_PARAM_REQ);
+    // requested IP
+    frame[flen++] = 50;
+    frame[flen++] = 4;
+    copyIPv4(frame + flen, response->YIADDR);
+    flen += 4;
+    // DHCP IP
+    frame[flen++] = 54;
+    frame[flen++] = 4;
+    copyIPv4(frame + flen, response->SIADDR);
+    flen += 4;
+    // end mark
+    frame[flen++] = 0xFF;
+    // transmit frame
+    UDP_finalize(frame, flen);
+    IPv4_finalize(frame, flen);
+    NET_transmit(txDesc, flen);
 }

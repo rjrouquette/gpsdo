@@ -259,8 +259,11 @@ void NET_poll() {
         ptrRX = (ptrRX + 1) & (RX_RING_SIZE-1);
     }
 
-    ARP_poll();
-    DHCP_poll();
+    // if link is up, poll ARP and DHCP state
+    if(phyStatus & 1) {
+        ARP_poll();
+        DHCP_poll();
+    }
 }
 
 int NET_getTxDesc() {

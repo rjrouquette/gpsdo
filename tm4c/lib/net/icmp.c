@@ -19,6 +19,11 @@ void ICMP_process(uint8_t *frame, int flen) {
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     struct HEADER_ICMPv4 *headerICMP = (struct HEADER_ICMPv4 *) (headerIPv4 + 1);
 
+    // verify destination
+    uint32_t dest;
+    copyIPv4(&dest, headerIPv4->dst);
+    if(dest != ipAddress) return;
+
     switch (headerICMP->type) {
         // echo request
         case 8:

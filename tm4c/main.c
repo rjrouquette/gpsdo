@@ -19,7 +19,8 @@
 
 volatile uint8_t debugMac[6];
 
-#define TX_DESC (* (struct EMAC_TX_DESC *) EMAC0.TXDLADDR)
+extern uint32_t dhcpXID;
+extern uint32_t dhcpLeaseExpire;
 
 int main(void) {
     char temp[32];
@@ -84,11 +85,11 @@ int main(void) {
             temp[end] = 0;
             FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(TX_DESC.TDES0.raw, 8, '0', temp);
+            end = toHex(dhcpLeaseExpire, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 128, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(TX_DESC.TDES1.raw, 8, '0', temp);
+            end = toHex(dhcpXID, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
 

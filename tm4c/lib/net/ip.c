@@ -41,10 +41,6 @@ void IPv4_process(uint8_t *frame, int flen) {
     if(headerIPv4->head.VER != 4) return;
     // must standard 5 word header
     if(headerIPv4->head.IHL != 5) return;
-    // verify destination
-    uint32_t dest;
-    copyIPv4(&dest, headerIPv4->dst);
-    if(dest != ipAddress) return;
 
     // process ICMP frame
     if(headerIPv4->proto == IP_PROTO_ICMP) {
@@ -77,9 +73,15 @@ void IPv4_init(uint8_t *frame) {
 
 void IPv4_finalize(uint8_t *frame, int flen) {
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct FRAME_ETH));
+    // compute IPv4 length
     flen -= sizeof(struct FRAME_ETH);
+    // set IPv4 length
     headerIPv4->len[0] = (flen >> 8) & 0xFF;
     headerIPv4->len[1] = (flen >> 0) & 0xFF;
+    // clear checksum
+    headerIPv4->chksum[0] = 0;
+    headerIPv4->chksum[1] = 0;
+    // compute checksum
     RFC1071_checksum(headerIPv4, sizeof(struct HEADER_IPv4), headerIPv4->chksum);
 }
 

@@ -11,9 +11,9 @@
 #define PACKED __attribute__((packed))
 #endif
 
-#define IP_PROTO_ICMP   (0x01)
-#define IP_PROTO_TCP    (0x06)
-#define IP_PROTO_UDP    (0x11)
+#define IP_PROTO_ICMP   (1)
+#define IP_PROTO_TCP    (6)
+#define IP_PROTO_UDP    (17)
 
 struct PACKED HEADER_IPv4 {
     union PACKED {
