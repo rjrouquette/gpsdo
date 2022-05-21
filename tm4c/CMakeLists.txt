@@ -20,6 +20,7 @@ add_executable(
         gpsdo
 
         main.c
+        ntp.c
         hw/emac.c
         hw/interrupts.c
         lib/clk.c

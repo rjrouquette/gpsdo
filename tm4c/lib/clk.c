@@ -100,9 +100,11 @@ uint64_t CLK_MONOTONIC() {
             .ipart = snapF / 1953125,
             .fpart = snapF % 1953125
     };
-    scratch.fpart <<= 11u;
-    scratch.fpart /= 1953125;
-    scratch.fpart <<= 21u;
+    uint32_t twiddle = scratch.fpart;
+    twiddle *= 45421;
+    twiddle /= 1953125;
+    scratch.fpart *= 2199;
+    scratch.fpart += twiddle;
     scratch.raw >>= 6u;
 
     scratch.ipart ^= snapI;

@@ -16,11 +16,9 @@
 #include "hw/emac.h"
 #include "hw/sys.h"
 #include "lib/net/ip.h"
+#include "ntp.h"
 
 volatile uint8_t debugMac[6];
-
-extern uint32_t dhcpXID;
-extern uint32_t dhcpLeaseExpire;
 
 int main(void) {
     char temp[32];
@@ -48,6 +46,7 @@ int main(void) {
     PLOT_setLine(0, 15, EPD_width()-1, 15, 1);
     PLOT_setLine(0, 215, EPD_width()-1, 215, 1);
 
+    NTP_init();
     LED0_ON();
 
     uint32_t next = 0;
