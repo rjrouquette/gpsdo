@@ -8,12 +8,18 @@
 #include "ip.h"
 #include "../net.h"
 #include "util.h"
+#include "../clk.h"
 
+#define ANNOUNCE_INTERVAL (60)
 #define MAX_REQUESTS (16)
+
 volatile struct {
     uint32_t remoteAddress;
     CallbackARP callback;
 } requests[MAX_REQUESTS];
+
+static uint32_t nextAnnounce = 0;
+
 
 void makeArpIp4(
         void *packet,
@@ -46,7 +52,11 @@ void makeArpIp4(
 }
 
 void ARP_poll() {
-
+    const uint32_t now = CLK_MONOTONIC_INT();
+    if(((int32_t)(nextAnnounce - now)) <= 0) {
+        nextAnnounce = now + ANNOUNCE_INTERVAL;
+        ARP_announce();
+    }
 }
 
 volatile uint8_t debugMac[6];
@@ -124,6 +134,20 @@ int ARP_request(uint32_t remoteAddress, CallbackARP callback) {
     return -1;
 }
 
-void ARP_broadcastIP() {
-
+void ARP_announce() {
+    // our IP address must be valid
+    if(ipAddress == 0) return;
+    // get TX descriptor
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    // create request frame
+    uint8_t wildCard[6] = { 0, 0, 0, 0, 0, 0 };
+    uint8_t *packetTX = NET_getTxBuff(txDesc);
+    makeArpIp4(
+            packetTX, ARP_OP_REQUEST,
+            wildCard, (uint8_t *) &ipAddress
+    );
+    broadcastMAC(((struct FRAME_ETH *)packetTX)->macDst);
+    // transmit frame
+    NET_transmit(txDesc, ARP_FRAME_LEN-4);
 }

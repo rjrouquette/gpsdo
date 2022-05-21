@@ -31,6 +31,7 @@ _Static_assert(sizeof(struct PAYLOAD_ARP_IP4) == 28, "PAYLOAD_ARP_IP4 must be 28
 
 typedef void (*CallbackARP)(uint32_t ipAddress, uint8_t *macAddress);
 
+void ARP_announce();
 void ARP_poll();
 void ARP_process(uint8_t *frame, int flen);
 int ARP_request(uint32_t remoteAddress, CallbackARP callback);
