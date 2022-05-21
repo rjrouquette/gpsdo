@@ -98,7 +98,10 @@ int TCP_deregister(uint16_t port) {
     return -1;
 }
 
-int TCP_delegate(uint8_t *frame, int flen, struct TCP_CONN *tcpConn, int cntConn) {
+
+void TCP_CONN_recv(struct TCP_CONN *tcpConn, int cid, void *frame, int flen);
+
+void TCP_delegate(uint8_t *frame, int flen, struct TCP_CONN *tcpConn, int cntConn) {
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
@@ -117,23 +120,39 @@ int TCP_delegate(uint8_t *frame, int flen, struct TCP_CONN *tcpConn, int cntConn
     ((uint8_t *) &srcPort)[1] = headerTCP->portSrc[0];
     ((uint8_t *) &srcPort)[0] = headerTCP->portSrc[1];
 
-    int target = -1;
+    // search for connection instance
+    int cid = -1;
     for(int i = 0; i < cntConn; i++) {
-        if(tcpConn->state.active) {
+        if(tcpConn[i].state.inuse) {
             // check for matching connection
             if(
-                    (tcpConn->addrLocal.ip4 == dstIP && tcpConn->addrLocal.port == dstPort) &&
-                    (tcpConn->addrRemote.ip4 == srcIP && tcpConn->addrRemote.port == srcPort)
+                    (tcpConn[i].addrLocal.ip4 == dstIP && tcpConn[i].addrLocal.port == dstPort) &&
+                    (tcpConn[i].addrRemote.ip4 == srcIP && tcpConn[i].addrRemote.port == srcPort)
             ) {
-                target = i;
+                cid = i;
                 break;
             }
         }
-        else if(target < 0) {
+        else if(headerTCP->flags.SYN && cid < 0) {
             // track first available
-            target = i;
+            cid = i;
         }
     }
+    if(cid < 0) {
+        // no descriptors available
+        if(headerTCP->flags.SYN) {
+            // reset connection
 
-    return -target;
+        }
+        return;
+    }
+    TCP_CONN_recv(tcpConn + cid, cid, frame, flen);
+}
+
+void TCP_CONN_recv(struct TCP_CONN *tcpConn, int cid, void *frame, int flen) {
+
+}
+
+int TCP_CONN_send(struct TCP_CONN *tcpConn, void *data, int len) {
+    return -1;
 }
