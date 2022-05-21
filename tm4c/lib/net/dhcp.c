@@ -13,7 +13,6 @@
 #include "util.h"
 #include "../net.h"
 #include "../../hw/sys.h"
-#include "../led.h"
 
 
 struct PACKED HEADER_DHCP {
@@ -82,8 +81,8 @@ static void initPacket(void *frame) {
 void DHCP_poll() {
     const uint32_t now = CLK_MONOTONIC_INT();
     if(((int32_t)(dhcpLeaseExpire - now)) <= 0) {
-        // re-attempt in 5 minutes if renewal fails
-        dhcpLeaseExpire = now + 300;
+        // re-attempt in 60 seconds if renewal fails
+        dhcpLeaseExpire = now + 60;
         DHCP_renew();
     }
 }
@@ -138,9 +137,7 @@ void DHCP_renew() {
     NET_transmit(txDesc, flen);
 }
 
-extern volatile uint8_t debugMac[6];
 void DHCP_process(uint8_t *frame, int flen) {
-    copyMAC(debugMac, frame);
     // discard malformed packets
     if(flen < 282) return;
     // map headers

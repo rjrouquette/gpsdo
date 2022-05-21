@@ -85,15 +85,15 @@ int main(void) {
             temp[end] = 0;
             FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(dhcpLeaseExpire, 8, '0', temp);
+            end = toHex(ipSubnet, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 128, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(dhcpXID, 8, '0', temp);
+            end = toHex(ipGateway, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(ipGateway, 8, '0', temp);
+            end = toHex(ipDNS, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 160, temp, FONT_ASCII_16, 0, 3);
 
