@@ -5,5 +5,6 @@
 #include "tcp.h"
 
 void TCP_process(uint8_t *frame, int flen) {
-
+    // discard malformed frames
+    if(flen < 62) return;
 }

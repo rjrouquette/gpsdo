@@ -27,7 +27,7 @@ struct PACKED PAYLOAD_ARP_IP4 {
 };
 _Static_assert(sizeof(struct PAYLOAD_ARP_IP4) == 28, "PAYLOAD_ARP_IP4 must be 28 bytes");
 
-#define ARP_FRAME_LEN (64)
+#define ARP_FRAME_LEN (60)
 
 typedef void (*CallbackARP)(uint32_t ipAddress, uint8_t *macAddress);
 

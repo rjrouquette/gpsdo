@@ -124,12 +124,12 @@ void NTP_process(uint8_t *frame, int flen) {
     frameNTP->txTime[7] = ((uint8_t *) &txTime)[0];
 
     // send packet
-    UDP_finalize(frame, flen-4);
-    IPv4_finalize(frame, flen-4);
+    UDP_finalize(frame, flen);
+    IPv4_finalize(frame, flen);
     // get TX descriptor
     int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
     // transmit response
-    memcpy(NET_getTxBuff(txDesc), frame, flen-4);
-    NET_transmit(txDesc, flen-4);
+    memcpy(NET_getTxBuff(txDesc), frame, flen);
+    NET_transmit(txDesc, flen);
 }

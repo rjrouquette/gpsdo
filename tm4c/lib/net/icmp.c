@@ -61,5 +61,5 @@ static void sendPingResponse(uint8_t *frame, int flen) {
     if(txDesc < 0) return;
     // transmit response
     memcpy(NET_getTxBuff(txDesc), frame, flen);
-    NET_transmit(txDesc, flen-4);
+    NET_transmit(txDesc, flen);
 }

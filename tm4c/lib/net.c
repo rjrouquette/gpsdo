@@ -176,8 +176,13 @@ static void initMAC() {
 
     EMAC0.FRAMEFLTR.PM = 1;
     EMAC0.FRAMEFLTR.VTFE = 1;
+    // verify all checksum
     EMAC0.CFG.IPC = 1;
+    // prevent loopback of data in half-duplex mode
     EMAC0.CFG.DRO = 1;
+    // strip checksum from received frames
+    EMAC0.CFG.CST = 1;
+    // replace source MAC address in transmissions
     EMAC0.CFG.SADDR = EMAC_SADDR_REP0;
 
     // start transmitter
