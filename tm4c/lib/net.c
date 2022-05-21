@@ -18,10 +18,10 @@
 #include "net/util.h"
 
 #define RX_RING_SIZE (16)
-#define RX_BUFF_SIZE (1524)
+#define RX_BUFF_SIZE (1520)
 
 #define TX_RING_SIZE (4)
-#define TX_BUFF_SIZE (1524)
+#define TX_BUFF_SIZE (1520)
 
 static volatile uint8_t ptrRX = 0;
 static volatile uint8_t ptrTX = 0;
