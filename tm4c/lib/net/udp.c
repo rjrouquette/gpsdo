@@ -49,28 +49,28 @@ void UDP_finalize(uint8_t *frame, int flen) {
     // clear checksum field
     headerUDP->chksum[0] = 0;
     headerUDP->chksum[1] = 0;
-//
-//    // partial checksum of header and data
-//    RFC1071_checksum(headerUDP, flen, headerUDP->chksum);
-//
-//    // append pseudo header to checksum
-//    uint8_t chkbuf[] = {
-//            // partial checksum
-//            ~headerUDP->chksum[0], ~headerUDP->chksum[1],
-//            // source address
-//            headerIPv4->src[0], headerIPv4->src[1], headerIPv4->src[2], headerIPv4->src[3],
-//            // destination address
-//            headerIPv4->dst[0], headerIPv4->dst[1], headerIPv4->dst[2], headerIPv4->dst[3],
-//            // protocol
-//            0, headerIPv4->proto,
-//            // udp length
-//            headerUDP->length[0], headerUDP->length[1]
-//    };
-//    // validate buffer size
-//    _Static_assert(sizeof(chkbuf) == 14, "pseudo header checksum buffer must be 14 bytes");
-//
-//    // finalize checksum calculation
-//    RFC1071_checksum(chkbuf, sizeof(chkbuf), headerUDP->chksum);
+
+    // partial checksum of header and data
+    RFC1071_checksum(headerUDP, flen, headerUDP->chksum);
+
+    // append pseudo header to checksum
+    uint8_t chkbuf[] = {
+            // partial checksum
+            ~headerUDP->chksum[0], ~headerUDP->chksum[1],
+            // source address
+            headerIPv4->src[0], headerIPv4->src[1], headerIPv4->src[2], headerIPv4->src[3],
+            // destination address
+            headerIPv4->dst[0], headerIPv4->dst[1], headerIPv4->dst[2], headerIPv4->dst[3],
+            // protocol
+            0, headerIPv4->proto,
+            // udp length
+            headerUDP->length[0], headerUDP->length[1]
+    };
+    // validate buffer size
+    _Static_assert(sizeof(chkbuf) == 14, "pseudo header checksum buffer must be 14 bytes");
+
+    // finalize checksum calculation
+    RFC1071_checksum(chkbuf, sizeof(chkbuf), headerUDP->chksum);
 }
 
 int UDP_register(uint16_t port, CallbackUDP callback) {
