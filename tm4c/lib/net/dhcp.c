@@ -81,8 +81,8 @@ static void initPacket(void *frame) {
 void DHCP_poll() {
     const uint32_t now = CLK_MONOTONIC_INT();
     if(((int32_t)(dhcpLeaseExpire - now)) <= 0) {
-        // re-attempt in 60 seconds if renewal fails
-        dhcpLeaseExpire = now + 60;
+        // re-attempt in 10 seconds if renewal fails
+        dhcpLeaseExpire = now + 10;
         DHCP_renew();
     }
 }
