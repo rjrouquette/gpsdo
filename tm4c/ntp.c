@@ -42,7 +42,6 @@ void NTP_init() {
     UDP_register(123, NTP_process);
 }
 
-extern volatile uint8_t debugMac[6];
 void NTP_process(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < 90) return;
@@ -60,7 +59,6 @@ void NTP_process(uint8_t *frame, int flen) {
     uint64_t rxTime = CLK_MONOTONIC() + ntpTimeOffset;
 
     // ignore non-client frames
-    copyIPv4(debugMac, frameNTP);
     if(frameNTP->flags.mode != 0x03) return;
     // modify ethernet frame header
     copyMAC(headerEth->macDst, headerEth->macSrc);
@@ -75,7 +73,7 @@ void NTP_process(uint8_t *frame, int flen) {
     // set type to server response
     frameNTP->flags.mode = 4;
     // indicate that the time is not currently set
-    frameNTP->flags.status = 0;
+    frameNTP->flags.status = 3;
     // set other header fields
     frameNTP->stratum = 1;
     frameNTP->precision = -24;
