@@ -100,16 +100,15 @@ uint64_t CLK_MONOTONIC() {
             uint32_t ipart;
         };
         uint64_t raw;
-    } scratch = {
-            .ipart = snapF / 1953125,
-            .fpart = snapF % 1953125
-    };
+    } scratch = { .ipart = snapF, .fpart = snapF };
+    scratch.ipart /= 1953125u;
+    scratch.fpart -= 1953125u * scratch.ipart;
+
     // convert base(5) part into base(2)
     uint32_t twiddle = scratch.fpart;
-    twiddle *= 45421;
-    twiddle /= 1953125;
-    scratch.fpart *= 2199;
-    scratch.fpart += twiddle;
+    twiddle *= 1524u;
+    scratch.fpart *= 2199u;
+    scratch.fpart += (twiddle >> 16);
     // restore correct bit alignment
     scratch.raw >>= 6u;
 
