@@ -253,10 +253,10 @@ void NET_poll() {
     while(!rxDesc[ptrRX].RDES0.OWN) {
         if(!rxDesc[ptrRX].RDES0.ES) {
             uint8_t *buffer = (uint8_t *) rxDesc[ptrRX].BUFF1;
-            if(ETH_isARP(((struct FRAME_ETH *) buffer)->ethType)) {
+            if(((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_ARP) {
                 ARP_process(buffer, rxDesc[ptrRX].RDES0.FL);
             }
-            else if(ETH_isIPv4(((struct FRAME_ETH *) buffer)->ethType)) {
+            else if(((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_IPv4) {
                 IPv4_process(buffer, rxDesc[ptrRX].RDES0.FL);
             }
         }

@@ -37,9 +37,7 @@ void HTTP_process(uint8_t *frame, int flen) {
     struct HEADER_TCP *headerTCP = (struct HEADER_TCP *) (headerIPv4 + 1);
 
     // verify destination
-    uint32_t destIP;
-    copyIPv4(&destIP, headerIPv4->dst);
-    if(destIP != ipAddress) return;
+    if(headerIPv4->dst != ipAddress) return;
 
     // delegate processing to connection instance
     TCP_delegate(frame, flen, tcpConn, MAX_CONNS);

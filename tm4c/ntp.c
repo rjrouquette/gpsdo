@@ -52,9 +52,7 @@ void NTP_process(uint8_t *frame, int flen) {
     struct FRAME_NTPv3 *frameNTP = (struct FRAME_NTPv3 *) (headerUDP + 1);
 
     // verify destination
-    uint32_t dest;
-    copyIPv4(&dest, headerIPv4->dst);
-    if(dest != ipAddress) return;
+    if(headerIPv4->dst != ipAddress) return;
 
     uint64_t rxTime = CLK_MONOTONIC() + ntpTimeOffset;
 
@@ -63,13 +61,11 @@ void NTP_process(uint8_t *frame, int flen) {
     // modify ethernet frame header
     copyMAC(headerEth->macDst, headerEth->macSrc);
     // modify IP header
-    copyIPv4(headerIPv4->dst, headerIPv4->src);
-    copyIPv4(headerIPv4->src, &ipAddress);
+    headerIPv4->dst = headerIPv4->src;
+    headerIPv4->src = ipAddress;
     // modify UDP header
-    headerUDP->portDst[0] = headerUDP->portSrc[0];
-    headerUDP->portDst[1] = headerUDP->portSrc[1];
-    headerUDP->portSrc[0] = 0;
-    headerUDP->portSrc[1] = 123;
+    headerUDP->portDst = headerUDP->portSrc;
+    headerUDP->portSrc = __builtin_bswap16(123);
     // set type to server response
     frameNTP->flags.mode = 4;
     // indicate that the time is not currently set

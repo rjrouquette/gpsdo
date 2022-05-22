@@ -20,21 +20,21 @@ struct PACKED HEADER_DHCP {
     uint8_t HTYPE;
     uint8_t HLEN;
     uint8_t HOPS;
-    uint8_t XID[4];
-    uint8_t SECS[2];
-    uint8_t FLAGS[2];
-    uint8_t CIADDR[4];
-    uint8_t YIADDR[4];
-    uint8_t SIADDR[4];
-    uint8_t GIADDR[4];
+    uint32_t XID;
+    uint16_t SECS;
+    uint16_t FLAGS;
+    uint32_t CIADDR;
+    uint32_t YIADDR;
+    uint32_t SIADDR;
+    uint32_t GIADDR;
     uint8_t CHADDR[16];
     uint8_t SNAME[64];
     uint8_t FILE[128];
-    uint8_t MAGIC[4];
+    uint32_t MAGIC;
 };
 _Static_assert(sizeof(struct HEADER_DHCP) == 240, "HEADER_DHCP must be 240 bytes");
 
-static const uint8_t DHCP_MAGIC[] = { 0x63, 0x82, 0x53, 0x63 };
+#define DHCP_MAGIC (0x63538263)
 uint32_t dhcpXID = 0;
 uint32_t dhcpLeaseExpire = 0;
 
@@ -60,22 +60,21 @@ static void initPacket(void *frame) {
     // broadcast MAC address
     broadcastMAC(headerEth->macDst);
     // EtherType = IPv4
-    headerEth->ethType[0] = 0x08;
-    headerEth->ethType[1] = 0x00;
+    headerEth->ethType = ETHTYPE_IPv4;
     // IPv4 Header
     IPv4_init(frame);
-    memset(headerIPv4->dst, 0xFF, 4);
+    headerIPv4->dst = 0xFFFFFFFF;
     headerIPv4->proto = IP_PROTO_UDP;
     // UDP Header
-    headerUDP->portSrc[1] = DHCP_PORT_CLI;
-    headerUDP->portDst[1] = DHCP_PORT_SRV;
+    headerUDP->portSrc = __builtin_bswap16(DHCP_PORT_CLI);
+    headerUDP->portDst = __builtin_bswap16(DHCP_PORT_SRV);
     // DHCP Header
     headerDHCP->OP = 1;
     headerDHCP->HTYPE = 1;
     headerDHCP->HLEN = 6;
-    memcpy(headerDHCP->XID, &dhcpXID, sizeof(dhcpXID));
+    headerDHCP->XID = dhcpXID;
     getMAC(headerDHCP->CHADDR);
-    memcpy(headerDHCP->MAGIC, DHCP_MAGIC, sizeof(DHCP_MAGIC));
+    headerDHCP->MAGIC = DHCP_MAGIC;
 }
 
 void DHCP_poll() {
@@ -122,8 +121,8 @@ void DHCP_renew() {
         frame[flen++] = 0xFF;
     } else {
         // renew existing lease
-        copyIPv4(headerIPv4->src, &ipAddress);
-        copyIPv4(headerDHCP->CIADDR, &ipAddress);
+        headerIPv4->src = ipAddress;
+        headerDHCP->CIADDR = ipAddress;
         // DHCPREQUEST
         memcpy(frame + flen, DHCP_OPT_REQUEST, sizeof(DHCP_OPT_REQUEST));
         flen += sizeof(DHCP_OPT_REQUEST);
@@ -146,7 +145,7 @@ void DHCP_process(uint8_t *frame, int flen) {
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct HEADER_DHCP *headerDHCP = (struct HEADER_DHCP *) (headerUDP + 1);
     // discard if not from a server
-    if(headerUDP->portSrc[0] != 0 || headerUDP->portSrc[1] != DHCP_PORT_SRV)
+    if(headerUDP->portSrc != __builtin_bswap16(DHCP_PORT_SRV))
         return;
     // discard if not a server response
     if(headerDHCP->OP != 2) return;
@@ -154,10 +153,10 @@ void DHCP_process(uint8_t *frame, int flen) {
     if(headerDHCP->HTYPE != 1) return;
     if(headerDHCP->HLEN != 6) return;
     // discard if MAGIC is incorrect
-    if(memcmp(headerDHCP->MAGIC, DHCP_MAGIC, sizeof(DHCP_MAGIC)) != 0)
+    if(headerDHCP->MAGIC != DHCP_MAGIC)
         return;
     // discard if XID is incorrect
-    if(memcmp(headerDHCP->XID, &dhcpXID, sizeof(dhcpXID)) != 0)
+    if(headerDHCP->XID != dhcpXID)
         return;
 
     // relevant options
@@ -193,13 +192,13 @@ void DHCP_process(uint8_t *frame, int flen) {
 
         // subnet mask
         if(key == 1 && len == 4)
-            copyIPv4(&optSubnet, ptr);
+            memcpy(&optSubnet, ptr, 4);
         // router address
         if(key == 3 && len >= 4)
-            copyIPv4(&optRouter, ptr);
+            memcpy(&optRouter, ptr, 4);
         // DNS server address
         if(key == 6 && len >= 4)
-            copyIPv4(&optDNS, ptr);
+            memcpy(&optDNS, ptr, 4);
         // message type
         if(key == 53)
             optMsgType = ptr[0];
@@ -213,7 +212,7 @@ void DHCP_process(uint8_t *frame, int flen) {
         }
         // dhcp server
         if(key == 54 && len == 4)
-            copyIPv4(&optDHCP, ptr);
+            memcpy(&optDHCP, ptr, 4);
 
         // advance pointer
         ptr += len;
@@ -226,7 +225,7 @@ void DHCP_process(uint8_t *frame, int flen) {
     }
     // process DHCPACK
     if(optMsgType == 5) {
-        copyIPv4(&ipAddress, headerDHCP->YIADDR);
+        ipAddress = headerDHCP->YIADDR;
         ipSubnet = optSubnet;
         ipGateway = optRouter;
         ipDNS = optDNS;
@@ -256,8 +255,8 @@ static void sendReply(struct HEADER_DHCP *response) {
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct HEADER_DHCP *headerDHCP = (struct HEADER_DHCP *) (headerUDP + 1);
     // request proposed lease
-    copyIPv4(headerDHCP->CIADDR, response->YIADDR);
-    copyIPv4(headerDHCP->SIADDR, response->SIADDR);
+    headerDHCP->CIADDR = response->YIADDR;
+    headerDHCP->SIADDR = response->SIADDR;
     // DHCPREQUEST
     memcpy(frame + flen, DHCP_OPT_REQUEST, sizeof(DHCP_OPT_REQUEST));
     flen += sizeof(DHCP_OPT_REQUEST);
@@ -267,12 +266,12 @@ static void sendReply(struct HEADER_DHCP *response) {
     // requested IP
     frame[flen++] = 50;
     frame[flen++] = 4;
-    copyIPv4(frame + flen, response->YIADDR);
+    memcpy(frame + flen, &response->YIADDR, 4);
     flen += 4;
     // DHCP IP
     frame[flen++] = 54;
     frame[flen++] = 4;
-    copyIPv4(frame + flen, response->SIADDR);
+    memcpy(frame + flen, &response->SIADDR, 4);
     flen += 4;
     // end mark
     frame[flen++] = 0xFF;

@@ -2,15 +2,12 @@
 // Created by robert on 5/16/22.
 //
 
-#include <memory.h>
-
 #include "../format.h"
 #include "eth.h"
 #include "icmp.h"
 #include "ip.h"
 #include "tcp.h"
 #include "udp.h"
-#include "util.h"
 
 volatile uint32_t ipAddress = 0;
 volatile uint32_t ipSubnet = -1;
@@ -34,7 +31,7 @@ extern volatile uint8_t debugMac[6];
 
 void IPv4_process(uint8_t *frame, int flen) {
     // discard malformed frames
-    if(flen < 64) return;
+    if(flen < 60) return;
 
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct FRAME_ETH));
     // must be version 4
@@ -64,8 +61,7 @@ void IPv4_init(uint8_t *frame) {
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct FRAME_ETH));
     headerIPv4->head.VER = 4;
     headerIPv4->head.IHL = 5;
-    headerIPv4->id[0] = (ipID >> 8) & 0xFF;
-    headerIPv4->id[1] = (ipID >> 0) & 0xFF;
+    headerIPv4->id = __builtin_bswap16(ipID);
     headerIPv4->flags = 0x40;
     headerIPv4->ttl = 32;
     ++ipID;
@@ -76,16 +72,14 @@ void IPv4_finalize(uint8_t *frame, int flen) {
     // compute IPv4 length
     flen -= sizeof(struct FRAME_ETH);
     // set IPv4 length
-    headerIPv4->len[0] = (flen >> 8) & 0xFF;
-    headerIPv4->len[1] = (flen >> 0) & 0xFF;
+    headerIPv4->len = __builtin_bswap16(flen);
     // clear checksum
-    headerIPv4->chksum[0] = 0;
-    headerIPv4->chksum[1] = 0;
+    headerIPv4->chksum = 0;
     // compute checksum
-    RFC1071_checksum(headerIPv4, sizeof(struct HEADER_IPv4), headerIPv4->chksum);
+    headerIPv4->chksum = RFC1071_checksum(headerIPv4, sizeof(struct HEADER_IPv4));
 }
 
-void RFC1071_checksum(volatile const void *buffer, int len, volatile void *result) {
+uint16_t RFC1071_checksum(volatile const void *buffer, int len) {
     uint16_t *ptr = (uint16_t *) buffer;
     uint16_t *end = ptr + (len >> 1);
     uint32_t sum = 0;
@@ -96,6 +90,5 @@ void RFC1071_checksum(volatile const void *buffer, int len, volatile void *resul
         sum += *(uint8_t *)ptr;
     while (sum >> 16)
         sum = (sum & 0xFFFF) + (sum >> 16);
-    // store result
-    *((uint16_t *)result) = ~sum;
+    return ~sum;
 }

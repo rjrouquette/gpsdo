@@ -12,10 +12,10 @@
 #endif
 
 struct PACKED HEADER_TCP {
-    uint8_t portSrc[2];
-    uint8_t portDst[2];
-    uint8_t seq[4];
-    uint8_t ack[4];
+    uint16_t portSrc;
+    uint16_t portDst;
+    uint32_t seq;
+    uint32_t ack;
     union PACKED {
         struct PACKED {
             unsigned NS: 1;
@@ -32,9 +32,9 @@ struct PACKED HEADER_TCP {
         };
         uint16_t bits;
     } flags;
-    uint8_t window[2];
-    uint8_t chksum[2];
-    uint8_t urgent[2];
+    uint16_t window;
+    uint16_t chksum;
+    uint16_t urgent;
 };
 _Static_assert(sizeof(struct HEADER_TCP) == 20, "HEADER_TCP must be 20 bytes");
 

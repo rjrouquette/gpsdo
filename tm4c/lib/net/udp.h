@@ -12,10 +12,10 @@
 #endif
 
 struct PACKED HEADER_UDP {
-    uint8_t portSrc[2];
-    uint8_t portDst[2];
-    uint8_t length[2];
-    uint8_t chksum[2];
+    uint16_t portSrc;
+    uint16_t portDst;
+    uint16_t length;
+    uint16_t chksum;
 };
 _Static_assert(sizeof(struct HEADER_UDP) == 8, "HEADER_UDP must be 8 bytes");
 

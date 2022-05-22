@@ -14,17 +14,13 @@ static volatile CallbackUDP registryCallback[MAX_ENTRIES];
 
 
 void UDP_process(uint8_t *frame, int flen) {
-    // discard malformed packets
-    if(flen < 42) return;
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
 
     // load port number
-    uint16_t port;
-    ((uint8_t *) &port)[1] = headerUDP->portDst[0];
-    ((uint8_t *) &port)[0] = headerUDP->portDst[1];
+    uint16_t port = __builtin_bswap16(headerUDP->portDst);
     // discard if port is invalid
     if(port == 0) return;
 
@@ -45,33 +41,37 @@ void UDP_finalize(uint8_t *frame, int flen) {
     flen -= sizeof(struct FRAME_ETH);
     flen -= sizeof(struct HEADER_IPv4);
     // set UDP length
-    headerUDP->length[0] = (flen >> 8) & 0xFF;
-    headerUDP->length[1] = (flen >> 0) & 0xFF;
+    headerUDP->length = __builtin_bswap16(flen);
     // clear checksum field
-    headerUDP->chksum[0] = 0;
-    headerUDP->chksum[1] = 0;
-
+    headerUDP->chksum = 0;
     // partial checksum of header and data
-    RFC1071_checksum(headerUDP, flen, headerUDP->chksum);
+    uint16_t partial = RFC1071_checksum(headerUDP, flen);
 
     // append pseudo header to checksum
-    uint8_t chkbuf[] = {
-            // partial checksum
-            ~headerUDP->chksum[0], ~headerUDP->chksum[1],
+    struct PACKED {
+        uint32_t addrSrc;
+        uint32_t addrDst;
+        uint16_t length;
+        uint16_t chksum;
+        uint8_t zero;
+        uint8_t proto;
+    } chkbuf = {
             // source address
-            headerIPv4->src[0], headerIPv4->src[1], headerIPv4->src[2], headerIPv4->src[3],
+            .addrSrc = headerIPv4->src,
             // destination address
-            headerIPv4->dst[0], headerIPv4->dst[1], headerIPv4->dst[2], headerIPv4->dst[3],
-            // protocol
-            0, headerIPv4->proto,
+            .addrDst = headerIPv4->dst,
             // udp length
-            headerUDP->length[0], headerUDP->length[1]
+            .length = headerUDP->length,
+            // partial checksum
+            .chksum = ~partial,
+            // protocol
+            .zero = 0, .proto = headerIPv4->proto
     };
     // validate buffer size
     _Static_assert(sizeof(chkbuf) == 14, "pseudo header checksum buffer must be 14 bytes");
 
     // finalize checksum calculation
-    RFC1071_checksum(chkbuf, sizeof(chkbuf), headerUDP->chksum);
+    headerUDP->chksum = RFC1071_checksum(&chkbuf, sizeof(chkbuf));
 }
 
 int UDP_register(uint16_t port, CallbackUDP callback) {

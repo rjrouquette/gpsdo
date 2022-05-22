@@ -35,12 +35,3 @@ void copyMAC(volatile void *_dst, volatile const void *_src) {
     dst[4] = src[4];
     dst[5] = src[5];
 }
-
-void copyIPv4(volatile void *_dst, volatile const void *_src) {
-    uint8_t *dst = (uint8_t *)_dst;
-    uint8_t *src = (uint8_t *)_src;
-    dst[0] = src[0];
-    dst[1] = src[1];
-    dst[2] = src[2];
-    dst[3] = src[3];
-}

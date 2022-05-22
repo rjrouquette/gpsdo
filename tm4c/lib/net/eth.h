@@ -14,11 +14,11 @@
 struct PACKED FRAME_ETH {
     uint8_t macDst[6];
     uint8_t macSrc[6];
-    uint8_t ethType[2];
+    uint16_t ethType;
 };
 _Static_assert(sizeof(struct FRAME_ETH) == 14, "FRAME_ETH must be 14 bytes");
 
-int ETH_isARP(const uint8_t *ethType);
-int ETH_isIPv4(const uint8_t *ethType);
+#define ETHTYPE_ARP (0x0608)
+#define ETHTYPE_IPv4 (0x0008)
 
 #endif //GPSDO_ETH_H

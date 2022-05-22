@@ -23,9 +23,7 @@ void TCP_process(uint8_t *frame, int flen) {
     struct HEADER_TCP *headerTCP = (struct HEADER_TCP *) (headerIPv4 + 1);
 
     // load port number
-    uint16_t port;
-    ((uint8_t *) &port)[1] = headerTCP->portDst[0];
-    ((uint8_t *) &port)[0] = headerTCP->portDst[1];
+    uint16_t port = __builtin_bswap16(headerTCP->portDst);
     // discard if port is invalid
     if(port == 0) return;
 
@@ -46,30 +44,35 @@ void TCP_finalize(uint8_t *frame, int flen) {
     flen -= sizeof(struct FRAME_ETH);
     flen -= sizeof(struct HEADER_IPv4);
     // clear checksum field
-    headerTCP->chksum[0] = 0;
-    headerTCP->chksum[1] = 0;
-
+    headerTCP->chksum = 0;
     // partial checksum of header and data
-    RFC1071_checksum(headerTCP, flen, headerTCP->chksum);
+    uint16_t partial = RFC1071_checksum(headerTCP, flen);
 
     // append pseudo header to checksum
-    uint8_t chkbuf[] = {
-            // partial checksum
-            ~headerTCP->chksum[0], ~headerTCP->chksum[1],
+    struct PACKED {
+        uint32_t addrSrc;
+        uint32_t addrDst;
+        uint16_t length;
+        uint16_t chksum;
+        uint8_t zero;
+        uint8_t proto;
+    } chkbuf = {
             // source address
-            headerIPv4->src[0], headerIPv4->src[1], headerIPv4->src[2], headerIPv4->src[3],
+            .addrSrc = headerIPv4->src,
             // destination address
-            headerIPv4->dst[0], headerIPv4->dst[1], headerIPv4->dst[2], headerIPv4->dst[3],
+            .addrDst = headerIPv4->dst,
+            // udp length
+            .length = __builtin_bswap16(flen),
+            // partial checksum
+            .chksum = ~partial,
             // protocol
-            0, headerIPv4->proto,
-            // TCP length
-            (flen >> 8) & 0xFF, (flen >> 0) & 0xFF
+            .zero = 0, .proto = headerIPv4->proto
     };
     // validate buffer size
     _Static_assert(sizeof(chkbuf) == 14, "pseudo header checksum buffer must be 14 bytes");
 
     // finalize checksum calculation
-    RFC1071_checksum(chkbuf, sizeof(chkbuf), headerTCP->chksum);
+    headerTCP->chksum = RFC1071_checksum(&chkbuf, sizeof(chkbuf));
 }
 
 int TCP_register(uint16_t port, CallbackTCP callback) {
@@ -108,17 +111,11 @@ void TCP_delegate(uint8_t *frame, int flen, struct TCP_CONN *tcpConn, int cntCon
     struct HEADER_TCP *headerTCP = (struct HEADER_TCP *) (headerIPv4 + 1);
 
     // load destination
-    uint32_t dstIP;
-    copyIPv4(&dstIP, headerIPv4->dst);
-    uint16_t dstPort;
-    ((uint8_t *) &dstPort)[1] = headerTCP->portDst[0];
-    ((uint8_t *) &dstPort)[0] = headerTCP->portDst[1];
+    uint32_t dstIP = headerIPv4->dst;
+    uint16_t dstPort = __builtin_bswap16(headerTCP->portDst);
     // load source
-    uint32_t srcIP;
-    copyIPv4(&srcIP, headerIPv4->src);
-    uint16_t srcPort;
-    ((uint8_t *) &srcPort)[1] = headerTCP->portSrc[0];
-    ((uint8_t *) &srcPort)[0] = headerTCP->portSrc[1];
+    uint32_t srcIP = headerIPv4->src;
+    uint16_t srcPort = __builtin_bswap16(headerTCP->portSrc);
 
     // search for connection instance
     int cid = -1;

@@ -23,17 +23,17 @@ struct PACKED HEADER_IPv4 {
             unsigned ECN: 2;
             unsigned DSCP: 6;
         };
-        uint8_t bytes[2];
+        uint16_t bits;
     } head;
-    uint8_t len[2];
-    uint8_t id[2];
+    uint16_t len;
+    uint16_t id;
     uint8_t flags;
     uint8_t frag;
     uint8_t ttl;
     uint8_t proto;
-    uint8_t chksum[2];
-    uint8_t src[4];
-    uint8_t dst[4];
+    uint16_t chksum;
+    uint32_t src;
+    uint32_t dst;
 };
 _Static_assert(sizeof(struct HEADER_IPv4) == 20, "HEADER_IPv4 must be 20 bytes");
 
@@ -46,6 +46,6 @@ void IPv4_process(uint8_t *frame, int flen);
 void IPv4_init(uint8_t *frame);
 void IPv4_finalize(uint8_t *frame, int flen);
 
-void RFC1071_checksum(volatile const void *buffer, int len, volatile void *result);
+uint16_t RFC1071_checksum(volatile const void *buffer, int len);
 
 #endif //GPSDO_IP_H

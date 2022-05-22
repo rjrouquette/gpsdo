@@ -11,6 +11,5 @@ void getMAC(volatile void *mac);
 void broadcastMAC(volatile void *mac);
 
 void copyMAC(volatile void *dst, volatile const void *src);
-void copyIPv4(volatile void *dst, volatile const void *src);
 
 #endif //GPSDO_UTIL_H
