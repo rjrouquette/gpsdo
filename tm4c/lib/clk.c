@@ -89,32 +89,38 @@ uint32_t CLK_MONOTONIC_INT() {
 
 // return current time as 32.32 fixed point value
 uint64_t CLK_MONOTONIC() {
-    // capture current time
-    volatile uint32_t snapI = cntMonotonic;
-    volatile uint32_t snapF = GPTM0.TAV;
-
-    // split fractional time in to base(2) and base(5) parts
-    union {
+    // result structure
+    register union {
         struct {
             uint32_t fpart;
             uint32_t ipart;
         };
-        uint64_t raw;
-    } scratch = { .ipart = snapF, .fpart = snapF };
-    scratch.ipart /= 1953125u;
-    scratch.fpart -= 1953125u * scratch.ipart;
+        uint64_t full;
+    } result;
 
-    // convert base(5) part into base(2)
-    uint32_t twiddle = scratch.fpart;
-    twiddle *= 1524u;
-    scratch.fpart *= 2199u;
-    scratch.fpart += (twiddle >> 16);
-    // restore correct bit alignment
-    scratch.raw >>= 6u;
+    // capture current time
+    register uint32_t snapI = cntMonotonic;
+    result.fpart = GPTM0.TAV;
+
+    // split fractional time into fraction and remainder
+    result.ipart = result.fpart;
+    result.ipart /= 1953125;
+    result.fpart -= 1953125 * result.ipart;
+
+    // compute twiddle for fractional conversion
+    register uint32_t twiddle = result.fpart;
+    twiddle *= 1524;
+    twiddle >>= 16;
+    // apply fractional coefficient
+    result.fpart *= 2199;
+    // apply fraction twiddle
+    result.fpart += twiddle;
+    // adjust bit alignment
+    result.full >>= 6;
 
     // merge with full integer count
-    scratch.ipart ^= snapI;
-    scratch.ipart &= 0x1u;
-    scratch.ipart += snapI;
-    return scratch.raw;
+    result.ipart ^= snapI;
+    result.ipart &= 1;
+    result.ipart += snapI;
+    return result.full;
 }
