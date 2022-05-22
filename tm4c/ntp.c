@@ -24,13 +24,13 @@ struct PACKED FRAME_NTPv3 {
     uint8_t stratum;
     uint8_t poll;
     int8_t precision;
-    uint8_t rootDelay[4];
-    uint8_t rootDispersion[4];
+    uint32_t rootDelay;
+    uint32_t rootDispersion;
     uint8_t refID[4];
-    uint8_t refTime[8];
-    uint8_t origTime[8];
-    uint8_t rxTime[8];
-    uint8_t txTime[8];
+    uint32_t refTime[2];
+    uint32_t origTime[2];
+    uint32_t rxTime[2];
+    uint32_t txTime[2];
 };
 _Static_assert(sizeof(struct FRAME_NTPv3) == 48, "FRAME_NTPv3 must be 48 bytes");
 
@@ -76,46 +76,23 @@ void NTP_process(uint8_t *frame, int flen) {
     // set reference ID
     memcpy(frameNTP->refID, "GPS", 4);
     // set root delay
-    frameNTP->rootDelay[0] = 0;
-    frameNTP->rootDelay[1] = 0;
-    frameNTP->rootDelay[2] = 0;
-    frameNTP->rootDelay[3] = 0;
+    frameNTP->rootDelay = 0;
     // set root dispersion
-    frameNTP->rootDispersion[0] = 0;
-    frameNTP->rootDispersion[1] = 0;
-    frameNTP->rootDispersion[2] = 0;
-    frameNTP->rootDispersion[3] = 1;
+    frameNTP->rootDispersion = __builtin_bswap32(1);
     // set origin timestamp
-    memcpy(frameNTP->origTime, frameNTP->txTime, 8);
+    frameNTP->origTime[0] = frameNTP->txTime[0];
+    frameNTP->origTime[1] = frameNTP->txTime[1];
     // set reference timestamp
     uint64_t refTime = CLK_MONOTONIC() + ntpTimeOffset;
-    frameNTP->refTime[0] = ((uint8_t *) &refTime)[7];
-    frameNTP->refTime[1] = ((uint8_t *) &refTime)[6];
-    frameNTP->refTime[2] = ((uint8_t *) &refTime)[5];
-    frameNTP->refTime[3] = ((uint8_t *) &refTime)[4];
-    frameNTP->refTime[4] = ((uint8_t *) &refTime)[3];
-    frameNTP->refTime[5] = ((uint8_t *) &refTime)[2];
-    frameNTP->refTime[6] = ((uint8_t *) &refTime)[1];
-    frameNTP->refTime[7] = ((uint8_t *) &refTime)[0];
+    frameNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
+    frameNTP->refTime[1] = __builtin_bswap32(((uint32_t *) &refTime)[0]);
     // set RX time
-    frameNTP->rxTime[0] = ((uint8_t *) &rxTime)[7];
-    frameNTP->rxTime[1] = ((uint8_t *) &rxTime)[6];
-    frameNTP->rxTime[2] = ((uint8_t *) &rxTime)[5];
-    frameNTP->rxTime[3] = ((uint8_t *) &rxTime)[4];
-    frameNTP->rxTime[4] = ((uint8_t *) &rxTime)[3];
-    frameNTP->rxTime[5] = ((uint8_t *) &rxTime)[2];
-    frameNTP->rxTime[6] = ((uint8_t *) &rxTime)[1];
-    frameNTP->rxTime[7] = ((uint8_t *) &rxTime)[0];
+    frameNTP->rxTime[0] = __builtin_bswap32(((uint32_t *) &rxTime)[1]);
+    frameNTP->rxTime[1] = __builtin_bswap32(((uint32_t *) &rxTime)[0]);
     // set TX time
     uint64_t txTime = CLK_MONOTONIC() + ntpTimeOffset;
-    frameNTP->txTime[0] = ((uint8_t *) &txTime)[7];
-    frameNTP->txTime[1] = ((uint8_t *) &txTime)[6];
-    frameNTP->txTime[2] = ((uint8_t *) &txTime)[5];
-    frameNTP->txTime[3] = ((uint8_t *) &txTime)[4];
-    frameNTP->txTime[4] = ((uint8_t *) &txTime)[3];
-    frameNTP->txTime[5] = ((uint8_t *) &txTime)[2];
-    frameNTP->txTime[6] = ((uint8_t *) &txTime)[1];
-    frameNTP->txTime[7] = ((uint8_t *) &txTime)[0];
+    frameNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
+    frameNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
 
     // send packet
     UDP_finalize(frame, flen);
