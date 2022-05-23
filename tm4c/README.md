@@ -1,6 +1,6 @@
 # TM4C1249NCPDT Source Code
 
-References:
+Hardware References:
 - [TM4C1249NCPDT Datasheet](../docs/tm4c1294ncpdt.pdf)
 - [EK-TM4C1249XL Manual](../docs/EK-TM4C1249XL.pdf)
 - [TM4C Template for Linux](https://github.com/shawn-dsilva/tm4c-linux-template)
@@ -8,3 +8,13 @@ References:
 - [LM73 Datasheet](../docs/lm73.pdf)
 - [SiT3521 Datasheet](../docs/SiT3521.pdf)
 
+NTP References:
+- [RFC 5905: Network Time Protocol Version 4: Protocol and Algorithms Specification](https://www.ietf.org/rfc/rfc5905.html)
+
+SNMP References:
+- [RFC 1155: Structure and Identification of Management Information for TCP/IP-based Internets](https://www.ietf.org/rfc/rfc1155.html)
+- [RFC 1157: A Simple Network Management Protocol (SNMP)](https://www.ietf.org/rfc/rfc1157.html)
+- [RFC 5907: Definitions of Managed Objects for Network Time Protocol Version 4 (NTPv4)](https://www.ietf.org/rfc/rfc5907.html)
+- [RFC 7577: Definition of Managed Objects for Battery Monitoring](https://www.ietf.org/rfc/rfc7577.html)
+- [RFC 8173: Precision Time Protocol Version 2 (PTPv2) Management Information Base](https://www.ietf.org/rfc/rfc8173.html)
+- [SMI Network Management MGMT Codes](https://www.iana.org/assignments/smi-numbers/smi-numbers.xhtml#smi-numbers-2)
