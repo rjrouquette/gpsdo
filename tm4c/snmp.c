@@ -24,6 +24,8 @@ void SNMP_init() {
     UDP_register(161, SNMP_process);
 }
 
+extern volatile uint8_t debugHex[8];
+
 void SNMP_process(uint8_t *frame, int flen) {
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
@@ -41,7 +43,8 @@ void SNMP_process(uint8_t *frame, int flen) {
 
     // parse packet
     int offset = 0, r;
-    // read SNMP version
+
+    // SNMP version
     uint32_t version;
     r = readInt32(dataSNMP, offset, dlen, &version);
     // only process version 1 packets
@@ -56,6 +59,8 @@ void SNMP_process(uint8_t *frame, int flen) {
     if(r < 0 || clen != 8) return;
     if(memcmp(community, "status", 6) != 0) return;
     offset += r;
+
+    memcpy((void *) debugHex, dataSNMP + offset, 8);
 }
 
 int readLength(const uint8_t *data, int offset, int dlen, int *result) {
