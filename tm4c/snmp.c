@@ -116,9 +116,21 @@ int readInt32(const uint8_t *data, int offset, int dlen, uint32_t *result) {
     if(r < 0 || (offset + r) >= dlen) return -1;
     offset += r;
     uint32_t temp = 0;
-    for(int i = 0; i < blen; i++) {
-        temp <<= 8;
-        temp |= data[offset + i];
+    // odd byte sign extension
+    if(blen & 1) {
+        temp = (int32_t) ((int8_t) data[offset++]);
+        blen -= 1;
+    }
+    // even byte sign extension
+    else if(blen < 4) {
+        temp = (int32_t) ((int16_t *) (data + offset));
+        blen -= 2;
+        offset += 2;
+    }
+    // append remaining 16-bit words
+    for(int i = 0; i < blen; i += 2) {
+        temp <<= 16;
+        temp |= *(uint16_t *)(data + offset + i);
     }
     *result = temp;
     return 1 + r + blen;
