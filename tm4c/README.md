@@ -18,3 +18,4 @@ SNMP References:
 - [RFC 7577: Definition of Managed Objects for Battery Monitoring](https://www.ietf.org/rfc/rfc7577.html)
 - [RFC 8173: Precision Time Protocol Version 2 (PTPv2) Management Information Base](https://www.ietf.org/rfc/rfc8173.html)
 - [SMI Network Management MGMT Codes](https://www.iana.org/assignments/smi-numbers/smi-numbers.xhtml#smi-numbers-2)
+- [X.690 (ANS.1)](../docs/T-REC-X.690-202102-I.pdf)
