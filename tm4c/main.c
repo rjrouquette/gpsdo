@@ -18,7 +18,7 @@
 #include "lib/net/ip.h"
 
 #include "ntp.h"
-#include "http.h"
+#include "snmp.h"
 
 volatile uint8_t debugHex[8];
 
@@ -49,14 +49,13 @@ int main(void) {
     PLOT_setLine(0, 215, EPD_width()-1, 215, 1);
 
     NTP_init();
-    HTTP_init();
+    SNMP_init();
 
     uint32_t next = 0;
     int end;
     for(;;) {
         LED_run();
         NET_run();
-        HTTP_run();
 
         uint32_t now = CLK_MONOTONIC_INT();
         int32_t diff = (int32_t) (now - next);

@@ -21,7 +21,7 @@ add_executable(
 
         main.c
         ntp.c
-        http.c
+        snmp.c
         hw/emac.c
         hw/interrupts.c
         lib/clk.c
@@ -37,7 +37,6 @@ add_executable(
         lib/net/dhcp.c
         lib/net/icmp.c
         lib/net/ip.c
-        lib/net/tcp.c
         lib/net/udp.c
         lib/net/util.c
         lib/temp.c

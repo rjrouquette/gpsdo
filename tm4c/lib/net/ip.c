@@ -6,7 +6,6 @@
 #include "eth.h"
 #include "icmp.h"
 #include "ip.h"
-#include "tcp.h"
 #include "udp.h"
 
 volatile uint32_t ipAddress = 0;
@@ -39,11 +38,6 @@ void IPv4_process(uint8_t *frame, int flen) {
     // process ICMP frame
     if(headerIPv4->proto == IP_PROTO_ICMP) {
         ICMP_process(frame, flen);
-        return;
-    }
-    // process TCP frame
-    if(headerIPv4->proto == IP_PROTO_TCP) {
-        TCP_process(frame, flen);
         return;
     }
     // process UDP frame
