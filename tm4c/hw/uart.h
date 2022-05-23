@@ -249,13 +249,13 @@ PAGE_MAP (UART_MAP, {
     uint32_t PCellID3;
 })
 
-#define UART0    (*(volatile struct UART_MAP *) 0x4000C000)
-#define UART1    (*(volatile struct UART_MAP *) 0x4000D000)
-#define UART2    (*(volatile struct UART_MAP *) 0x4000E000)
-#define UART3    (*(volatile struct UART_MAP *) 0x4000F000)
-#define UART4    (*(volatile struct UART_MAP *) 0x40010000)
-#define UART5    (*(volatile struct UART_MAP *) 0x40011000)
-#define UART6    (*(volatile struct UART_MAP *) 0x40012000)
-#define UART7    (*(volatile struct UART_MAP *) 0x40013000)
+#define UART0   (*(volatile struct UART_MAP *) 0x4000C000)
+#define UART1   (*(volatile struct UART_MAP *) 0x4000D000)
+#define UART2   (*(volatile struct UART_MAP *) 0x4000E000)
+#define UART3   (*(volatile struct UART_MAP *) 0x4000F000)
+#define UART4   (*(volatile struct UART_MAP *) 0x40010000)
+#define UART5   (*(volatile struct UART_MAP *) 0x40011000)
+#define UART6   (*(volatile struct UART_MAP *) 0x40012000)
+#define UART7   (*(volatile struct UART_MAP *) 0x40013000)
 
 #endif //TM4C_UART_H

@@ -2,8 +2,8 @@
 // Created by robert on 5/12/22.
 //
 
-#ifndef GPSDO_CRC_H
-#define GPSDO_CRC_H
+#ifndef TM4C_CRC_H
+#define TM4C_CRC_H
 
 #include "register.h"
 
@@ -70,4 +70,4 @@ REGMAP_32 (PRCCM_MAP, {
 });
 #define PRCCM (*(volatile union PRCCM_MAP *)0x400FE674)
 
-#endif //GPSDO_CRC_H
+#endif //TM4C_CRC_H
