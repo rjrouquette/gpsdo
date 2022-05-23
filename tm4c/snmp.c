@@ -109,7 +109,7 @@ int readBytes(const uint8_t *data, int offset, int dlen, void *result, int *rlen
 int readInt32(const uint8_t *data, int offset, int dlen, uint32_t *result) {
     uint8_t tag = data[offset++];
     // verify type
-    if(tag != 0xE4) return -1;
+    if(tag != 0xE2) return -1;
     // get content length
     int blen;
     int r = readLength(data, offset, dlen, &blen);
