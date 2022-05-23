@@ -15,4 +15,6 @@ int NET_getTxDesc();
 uint8_t * NET_getTxBuff(int desc);
 void NET_transmit(int desc, int len);
 
+uint64_t NET_getRxTime(const uint8_t *rxFrame);
+
 #endif //GPSDO_NET_H

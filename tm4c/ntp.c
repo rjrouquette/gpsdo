@@ -53,11 +53,12 @@ void NTP_process(uint8_t *frame, int flen) {
 
     // verify destination
     if(headerIPv4->dst != ipAddress) return;
-
-    uint64_t rxTime = CLK_MONOTONIC() + ntpTimeOffset;
-
     // ignore non-client frames
     if(frameNTP->flags.mode != 0x03) return;
+
+    // record rx time
+    uint64_t rxTime = NET_getRxTime(frame) + ntpTimeOffset;
+
     // modify ethernet frame header
     copyMAC(headerEth->macDst, headerEth->macSrc);
     // modify IP header

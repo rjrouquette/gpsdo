@@ -29,7 +29,6 @@ void HTTP_poll() {
 
 }
 
-extern volatile uint8_t debugMac[6];
 void HTTP_process(uint8_t *frame, int flen) {
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;

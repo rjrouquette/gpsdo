@@ -26,9 +26,6 @@ void NET_getIpAddress(char *strAddr) {
     *strAddr = 0;
 }
 
-
-extern volatile uint8_t debugMac[6];
-
 void IPv4_process(uint8_t *frame, int flen) {
     // discard malformed frames
     if(flen < 60) return;

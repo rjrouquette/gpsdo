@@ -20,7 +20,7 @@
 #include "ntp.h"
 #include "http.h"
 
-volatile uint8_t debugMac[6];
+volatile uint8_t debugHex[8];
 
 int main(void) {
     char temp[32];
@@ -74,8 +74,8 @@ int main(void) {
             temp[end] = 0;
             FONT_drawText(EPD_width()-73, 0, temp, FONT_ASCII_16, 0, 2);
 
-            for(int i = 0; i < 6; i++) {
-                toHex(debugMac[i], 2, '0', temp);
+            for(int i = 0; i < 8; i++) {
+                toHex(debugHex[i], 2, '0', temp);
                 temp[2] = 0;
                 FONT_drawText(i * 20, 16, temp, FONT_ASCII_16, 0, 3);
             }
@@ -92,11 +92,11 @@ int main(void) {
             temp[end] = 0;
             FONT_drawText(0, 128, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(ipGateway, 8, '0', temp);
+            end = toHex(EMAC0.TIMSEC, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(ipDNS, 8, '0', temp);
+            end = toHex(EMAC0.TIMNANO, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 160, temp, FONT_ASCII_16, 0, 3);
 

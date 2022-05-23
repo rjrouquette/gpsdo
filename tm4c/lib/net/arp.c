@@ -54,7 +54,6 @@ void ARP_poll() {
     }
 }
 
-volatile uint8_t debugMac[6];
 void ARP_process(uint8_t *frame, int flen) {
     // reject if packet is incorrect size
     if(flen != ARP_FRAME_LEN) return;

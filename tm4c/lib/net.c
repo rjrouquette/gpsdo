@@ -2,6 +2,7 @@
 // Created by robert on 4/26/22.
 //
 
+#include <memory.h>
 #include "../hw/crc.h"
 #include "../hw/emac.h"
 #include "../hw/interrupts.h"
@@ -16,6 +17,7 @@
 #include "net/ip.h"
 #include "net/udp.h"
 #include "net/util.h"
+#include "../hw/timer.h"
 
 #define RX_RING_SIZE (16)
 #define RX_BUFF_SIZE (1520)
@@ -23,15 +25,15 @@
 #define TX_RING_SIZE (4)
 #define TX_BUFF_SIZE (1520)
 
-static volatile uint8_t ptrRX = 0;
-static volatile uint8_t ptrTX = 0;
-static volatile uint16_t phyStatus = 0;
+static uint8_t ptrRX = 0;
+static uint8_t ptrTX = 0;
+static uint16_t phyStatus = 0;
 
-static volatile struct EMAC_RX_DESC rxDesc[RX_RING_SIZE];
-static volatile uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
+static struct EMAC_RX_DESC rxDesc[RX_RING_SIZE];
+static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 
-static volatile struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
-static volatile uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
+static struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
+static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
 static void initDescriptors() {
     // init receive descriptors
@@ -125,19 +127,17 @@ static void initPPS() {
     PORTG.CR = 0;
     PORTG.LOCK = 0;
 
+    // enable PTP clock
+    EMAC0.CC.PTPCEN = 1;
     // configure PTP
-    EMAC0.TIMSTCTRL.TSMAST = 1;
-    EMAC0.TIMSTCTRL.PTPIPV4 = 1;
-    EMAC0.TIMSTCTRL.PTPIPV6 = 1;
-    EMAC0.TIMSTCTRL.PTPVER2 = 1;
     EMAC0.TIMSTCTRL.ALLF = 1;
     EMAC0.TIMSTCTRL.DGTLBIN = 1;
     EMAC0.TIMSTCTRL.TSEN = 1;
     // 25MHz = 40ns
     EMAC0.SUBSECINC.SSINC = 40;
-
-    // PTP clock enabled
-    EMAC0.CC.PTPCEN = 1;
+    // init timer
+    EMAC0.TIMNANOU = GPTM0.TAV << 3;
+    EMAC0.TIMSTCTRL.TSINIT = 1;
 }
 
 static void initMAC() {
@@ -294,4 +294,41 @@ void NET_transmit(int desc, int len) {
     txDesc[desc & (TX_RING_SIZE-1)].TDES0.OWN = 1;
     // wake TX DMA
     EMAC0.TXPOLLD = 1;
+}
+
+uint64_t NET_getRxTime(const uint8_t *rxFrame) {
+    // compute descriptor offset
+    uint32_t rxId = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
+    if(rxId >= RX_RING_SIZE) return 0;
+
+    // result structure
+    register union {
+        struct {
+            uint32_t fpart;
+            uint32_t ipart;
+        };
+        uint64_t full;
+    } result;
+
+    // load RX timestamp
+    result.fpart = rxDesc[rxId].RTSL >> 3;
+    result.ipart = result.fpart;
+
+    // split fractional time into fraction and remainder
+    result.ipart /= 1953125;
+    result.fpart -= 1953125 * result.ipart;
+
+    // compute twiddle for fractional conversion
+    register uint32_t twiddle = result.fpart;
+    twiddle *= 1524;
+    twiddle >>= 16;
+    // apply fractional coefficient
+    result.fpart *= 2199;
+    // apply fraction twiddle
+    result.fpart += twiddle;
+    // adjust bit alignment
+    result.full >>= 6;
+
+    result.ipart = rxDesc[rxId].RTSH;
+    return result.full;
 }
