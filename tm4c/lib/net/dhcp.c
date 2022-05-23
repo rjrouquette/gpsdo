@@ -77,7 +77,7 @@ static void initPacket(void *frame) {
     headerDHCP->MAGIC = DHCP_MAGIC;
 }
 
-void DHCP_poll() {
+void DHCP_run() {
     const uint32_t now = CLK_MONOTONIC_INT();
     if(((int32_t)(dhcpLeaseExpire - now)) <= 0) {
         // re-attempt in 10 seconds if renewal fails

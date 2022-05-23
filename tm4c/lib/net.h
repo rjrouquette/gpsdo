@@ -9,7 +9,7 @@ void NET_init();
 void NET_getLinkStatus(char *strStatus);
 void NET_getMacAddress(char *strAddr);
 void NET_getIpAddress(char *strAddr);
-void NET_poll();
+void NET_run();
 
 int NET_getTxDesc();
 uint8_t * NET_getTxBuff(int desc);

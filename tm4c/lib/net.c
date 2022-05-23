@@ -249,7 +249,7 @@ void NET_getMacAddress(char *strAddr) {
     strAddr[-1] = 0;
 }
 
-void NET_poll() {
+void NET_run() {
     while(!rxDesc[ptrRX].RDES0.OWN) {
         if(!rxDesc[ptrRX].RDES0.ES) {
             uint8_t *buffer = (uint8_t *) rxDesc[ptrRX].BUFF1;
@@ -266,8 +266,8 @@ void NET_poll() {
 
     // if link is up, poll ARP and DHCP state
     if(phyStatus & 1) {
-        ARP_poll();
-        DHCP_poll();
+        ARP_run();
+        DHCP_run();
     }
 }
 

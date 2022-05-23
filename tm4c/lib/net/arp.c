@@ -46,7 +46,7 @@ void makeArpIp4(
     payload->TPA = ipTrg;
 }
 
-void ARP_poll() {
+void ARP_run() {
     const uint32_t now = CLK_MONOTONIC_INT();
     if(((int32_t)(nextAnnounce - now)) <= 0) {
         nextAnnounce = now + ANNOUNCE_INTERVAL;

@@ -6,6 +6,8 @@
 #include "ip.h"
 #include "tcp.h"
 #include "util.h"
+#include "../led.h"
+#include "../net.h"
 
 
 #define MAX_ENTRIES (8)
@@ -101,7 +103,7 @@ int TCP_deregister(uint16_t port) {
     return -1;
 }
 
-
+void sendReset(void *frame, int flen);
 void TCP_CONN_recv(struct TCP_CONN *tcpConn, int cid, void *frame, int flen);
 
 void TCP_delegate(uint8_t *frame, int flen, struct TCP_CONN *tcpConn, int cntConn) {
@@ -139,7 +141,7 @@ void TCP_delegate(uint8_t *frame, int flen, struct TCP_CONN *tcpConn, int cntCon
         // no descriptors available
         if(headerTCP->flags.SYN) {
             // reset connection
-
+            sendReset(frame, flen);
         }
         return;
     }
@@ -147,9 +149,21 @@ void TCP_delegate(uint8_t *frame, int flen, struct TCP_CONN *tcpConn, int cntCon
 }
 
 void TCP_CONN_recv(struct TCP_CONN *tcpConn, int cid, void *frame, int flen) {
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_TCP *headerTCP = (struct HEADER_TCP *) (headerIPv4 + 1);
 
 }
 
 int TCP_CONN_send(struct TCP_CONN *tcpConn, void *data, int len) {
     return -1;
+}
+
+void sendReset(void *frame, int flen) {
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_TCP *headerTCP = (struct HEADER_TCP *) (headerIPv4 + 1);
+
 }

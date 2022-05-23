@@ -50,20 +50,15 @@ int main(void) {
 
     NTP_init();
     HTTP_init();
-    LED0_ON();
 
     uint32_t next = 0;
     int end;
     for(;;) {
-        NET_poll();
-        HTTP_poll();
+        LED_run();
+        NET_run();
+        HTTP_run();
 
         uint32_t now = CLK_MONOTONIC_INT();
-        if(now & 0x1u)
-            LED1_ON();
-        else
-            LED1_OFF();
-
         int32_t diff = (int32_t) (now - next);
         if(diff >= 0) {
             end = toHMS(now, temp);

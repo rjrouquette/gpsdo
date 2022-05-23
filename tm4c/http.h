@@ -6,6 +6,6 @@
 #define GPSDO_HTTP_H
 
 void HTTP_init();
-void HTTP_poll();
+void HTTP_run();
 
 #endif //GPSDO_HTTP_H

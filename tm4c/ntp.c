@@ -11,6 +11,7 @@
 #include "lib/net/ip.h"
 #include "lib/net/udp.h"
 #include "lib/net/util.h"
+#include "lib/led.h"
 
 struct PACKED FRAME_NTPv3 {
     union PACKED {
@@ -55,6 +56,8 @@ void NTP_process(uint8_t *frame, int flen) {
     if(headerIPv4->dst != ipAddress) return;
     // ignore non-client frames
     if(frameNTP->flags.mode != 0x03) return;
+    // time-server activity
+    LED_act0();
 
     // record rx time
     uint64_t rxTime = NET_getRxTime(frame) + ntpTimeOffset;

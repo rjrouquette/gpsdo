@@ -25,7 +25,7 @@ void HTTP_init() {
     TCP_register(80, HTTP_process);
 }
 
-void HTTP_poll() {
+void HTTP_run() {
 
 }
 
