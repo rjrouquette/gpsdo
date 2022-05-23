@@ -49,12 +49,12 @@ void SNMP_process(uint8_t *frame, int flen) {
     offset += r;
 
     // SNMP community
-    int clen = 16;
-    char community[16];
+    int clen = 8;
+    char community[8];
     r = readBytes(dataSNMP, offset, dlen, community, &clen);
-    // community must match "GPSDO-NTP"
-    if(r < 0 || clen != 9) return;
-    if(memcmp(community, "GPSDO-NTP", 9) != 0) return;
+    // community must match "status"
+    if(r < 0 || clen != 8) return;
+    if(memcmp(community, "status", 6) != 0) return;
     offset += r;
 }
 
