@@ -7,7 +7,6 @@
 #include "hw/gpio.h"
 #include "lib/delay.h"
 #include "lib/clk.h"
-#include "lib/led.h"
 
 static uint8_t edgeUpdate = 0;
 static uint32_t edgeValue = 0;
