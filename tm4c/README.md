@@ -14,6 +14,14 @@ Supported SNMP MIB Requests:
   - 1.3.6.1.2.1.197.1.2.1 NTP Current Mode
     - 2 = Not Synchronized
     - 5 = GPS Synchronized
+  - 1.3.6.1.2.1.197.1.2.2 NTP Stratum
+  - 1.3.6.1.2.1.197.1.2.3 NTP Active Reference ID
+  - 1.3.6.1.2.1.197.1.2.4 NTP Active Reference Name
+  - 1.3.6.1.2.1.197.1.2.5 NTP Active Reference Offset
+  - 1.3.6.1.2.1.197.1.2.6 NTP Number of References
+  - 1.3.6.1.2.1.197.1.2.7 NTP Root Dispersion
+  - 1.3.6.1.2.1.197.1.2.8 NTP Uptime (in seconds)
+  - 1.3.6.1.2.1.197.1.2.9 NTP Date (128-bit format)
 
 
 Hardware References:

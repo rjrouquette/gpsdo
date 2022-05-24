@@ -503,11 +503,10 @@ const uint8_t OID_NTP_STATUS_PREFIX[] = { 0x06, 0x0A, 0x2B, 6, 1, 2, 1, 0x81, 0x
 #define NTP_STATUS_NUM_REFS (6)
 #define NTP_STATUS_ROOT_DISP (7)
 #define NTP_STATUS_UPTIME (8)
-#define NTP_STATUS_NTP_DATE (8)
+#define NTP_STATUS_NTP_DATE (9)
 
 int writeNtpStatus(uint8_t *buffer) {
     int isLocked = GPSDO_isLocked();
-    uint64_t ntpOffset = NTP_offset();
     uint64_t clkMono = CLK_MONOTONIC();
 
     int dlen = 0;
@@ -556,7 +555,7 @@ int writeNtpStatus(uint8_t *buffer) {
     dlen = writeValueInt64(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_UPTIME,
-            ((clkMono >> 16) * 100) >> 16
+            ((uint32_t *) &clkMono)[1]
     );
 
     uint32_t ntpDate[4];
