@@ -13,6 +13,8 @@
 #include "lib/net/util.h"
 #include "lib/led.h"
 
+#define NTP_PORT (123)
+
 struct PACKED FRAME_NTPv3 {
     union PACKED {
         struct PACKED {
@@ -40,7 +42,7 @@ static volatile uint64_t ntpTimeOffset = 0xe6338cbb00000000;
 void NTP_process(uint8_t *frame, int flen);
 
 void NTP_init() {
-    UDP_register(123, NTP_process);
+    UDP_register(NTP_PORT, NTP_process);
 }
 
 void NTP_process(uint8_t *frame, int flen) {
@@ -69,7 +71,7 @@ void NTP_process(uint8_t *frame, int flen) {
     headerIPv4->src = ipAddress;
     // modify UDP header
     headerUDP->portDst = headerUDP->portSrc;
-    headerUDP->portSrc = __builtin_bswap16(123);
+    headerUDP->portSrc = __builtin_bswap16(NTP_PORT);
     // set type to server response
     frameNTP->flags.mode = 4;
     // indicate that the time is not currently set

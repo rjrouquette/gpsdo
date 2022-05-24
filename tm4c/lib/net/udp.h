@@ -19,6 +19,8 @@ struct PACKED HEADER_UDP {
 };
 _Static_assert(sizeof(struct HEADER_UDP) == 8, "HEADER_UDP must be 8 bytes");
 
+#define UDP_DATA_OFFSET (14+20+8)
+
 typedef void (*CallbackUDP)(uint8_t *frame, int flen);
 
 void UDP_process(uint8_t *frame, int flen);

@@ -16,6 +16,9 @@ set(LINKER_FLAGS "${LINKER_FLAGS} -L/usr/lib/arm-none-eabi/lib/thumb/v7e-m+fp/ha
 set(CMAKE_C_LINK_EXECUTABLE "<CMAKE_LINKER> ${LINKER_FLAGS} <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
 set(CMAKE_CXX_LINK_EXECUTABLE "<CMAKE_LINKER> ${LINKER_FLAGS} <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
 
+# Include generated headers.
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 add_executable(
         gpsdo
 
@@ -48,6 +51,22 @@ target_link_libraries(
         -lc
         -lm
 )
+
+# a custom target that is always built
+add_custom_target(githeader ALL
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/githeader.h)
+
+# creates githeader.h using cmake script
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/githeader.h
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/getgit.cmake)
+
+# gitversion.h is a generated file
+set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/gitversion.h
+        PROPERTIES GENERATED TRUE
+        HEADER_FILE_ONLY TRUE)
+
+add_dependencies(gpsdo githeader)
 
 # split out debug symbols
 add_custom_command(
