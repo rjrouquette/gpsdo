@@ -26,7 +26,7 @@ void initPPS() {
 
     // 1 Hz 10% duty cycle
     EMAC0.PPS0INTVL = 25000000-1;
-    EMAC0.PPS0WIDTH =  2500000-1;
+    EMAC0.PPS0WIDTH = 12500000-1;
     // use command mode
     EMAC0.PPSCTRL.TRGMODS0 = 3;
     EMAC0.PPSCTRL.PPSEN0 = 1;
