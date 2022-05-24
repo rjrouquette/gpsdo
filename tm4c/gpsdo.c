@@ -5,7 +5,7 @@
 #include "gpsdo.h"
 
 int GPSDO_isLocked() {
-    return 1;
+    return 0;
 }
 
 int GPSDO_offsetNano() {
