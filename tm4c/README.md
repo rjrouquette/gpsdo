@@ -1,5 +1,21 @@
 # TM4C1249NCPDT Source Code
 
+
+Supported SNMP MIB Requests:
+- 1.3.6.1.2.1.197.1.1 = NTP Info (Get)
+  - 1.3.6.1.2.1.197.1.1.1 = NTP Software Name
+  - 1.3.6.1.2.1.197.1.1.2 = NTP Software Version
+  - 1.3.6.1.2.1.197.1.1.3 = NTP Software Vendor
+  - 1.3.6.1.2.1.197.1.1.4 = NTP System Type
+  - 1.3.6.1.2.1.197.1.1.5 = NTP Time Resolution
+  - 1.3.6.1.2.1.197.1.1.6 = NTP Time Precision
+  - 1.3.6.1.2.1.197.1.1.7 = NTP Time Distance
+- 1.3.6.1.2.1.197.1.2 NTP Status (Get)
+  - 1.3.6.1.2.1.197.1.2.1 NTP Current Mode
+    - 2 = Not Synchronized
+    - 5 = GPS Synchronized
+
+
 Hardware References:
 - [TM4C1249NCPDT Datasheet](../docs/tm4c1294ncpdt.pdf)
 - [EK-TM4C1249XL Manual](../docs/EK-TM4C1249XL.pdf)

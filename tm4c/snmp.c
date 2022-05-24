@@ -444,6 +444,19 @@ int writeNtpInfo(uint8_t *buffer) {
     return dlen;
 }
 
+const uint8_t OID_NTP_STATUS_PREFIX[] = { 0x06, 0x0A, 0x2B, 6, 1, 2, 1, 0x81, 0x45, 1, 2 };
+#define NTP_STATUS_CURR_MODE (1)
+
+int writeNtpStatus(uint8_t *buffer) {
+    int dlen = 0;
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_CURR_MODE,
+            2
+    );
+    return dlen;
+}
+
 void sendNTP(uint8_t *frame) {
     // variable bindings
     uint8_t buffer[1024];
@@ -456,6 +469,9 @@ void sendNTP(uint8_t *frame) {
     switch (buffOID[sizeof(OID_PREFIX_MGMT)+3]) {
         case 1:
             dlen = writeNtpInfo(buffer);
+            break;
+        case 2:
+            dlen = writeNtpStatus(buffer);
             break;
         default:
             return;
