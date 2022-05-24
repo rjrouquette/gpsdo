@@ -56,6 +56,7 @@ int main(void) {
     uint32_t next = 0;
     int end;
     for(;;) {
+        GPSDO_run();
         LED_run();
         NET_run();
 

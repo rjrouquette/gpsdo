@@ -105,14 +105,14 @@ void NTP_process(uint8_t *frame, int flen) {
     frameNTP->origTime[0] = frameNTP->txTime[0];
     frameNTP->origTime[1] = frameNTP->txTime[1];
     // set reference timestamp
-    uint64_t refTime = CLK_MONOTONIC() + ntpTimeOffset;
+    uint64_t refTime = CLK_TAI() + ntpTimeOffset;
     frameNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
     frameNTP->refTime[1] = __builtin_bswap32(((uint32_t *) &refTime)[0]);
     // set RX time
     frameNTP->rxTime[0] = __builtin_bswap32(((uint32_t *) &rxTime)[1]);
     frameNTP->rxTime[1] = __builtin_bswap32(((uint32_t *) &rxTime)[0]);
     // set TX time
-    uint64_t txTime = CLK_MONOTONIC() + ntpTimeOffset;
+    uint64_t txTime = CLK_TAI() + ntpTimeOffset;
     frameNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
     frameNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
 

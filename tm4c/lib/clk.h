@@ -31,4 +31,12 @@ uint32_t CLK_MONOTONIC_INT();
  */
 uint64_t CLK_MONOTONIC();
 
+/**
+ * Returns the current value of TAI clock (~0.232ns resolution)
+ * @return 64-bit fixed-point format (32.32)
+ */
+uint64_t CLK_TAI();
+
+void CLK_setFracTAI(uint32_t offset);
+
 #endif //GPSDO_CLK_H

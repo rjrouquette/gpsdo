@@ -6,6 +6,13 @@
 #include "hw/emac.h"
 #include "hw/gpio.h"
 #include "lib/delay.h"
+#include "lib/clk.h"
+#include "lib/led.h"
+
+static uint8_t edgeUpdate = 0;
+static uint32_t edgeValue = 0;
+
+void updateFracTAI(uint32_t clkRaw);
 
 void initPPS() {
     // configure PPS output pin
@@ -20,6 +27,9 @@ void initPPS() {
     PORTG.PCTL.PMC0 = 0x5;
     PORTG.AFSEL.ALT0 = 1;
     PORTG.DEN = 0x01u;
+    // configure interrupt
+    PORTG.IEV = 0x01u;
+    PORTG.IM = 0x01u;
     // lock GPIO config
     PORTG.CR = 0;
     PORTG.LOCK = 0;
@@ -40,10 +50,55 @@ void GPSDO_init() {
     initPPS();
 }
 
+void GPSDO_run() {
+    if(edgeUpdate) {
+        edgeUpdate = 0;
+        updateFracTAI(edgeValue);
+    }
+}
+
 int GPSDO_isLocked() {
-    return 0;
+    return 1;
 }
 
 int GPSDO_offsetNano() {
     return 0;
+}
+
+// capture rising edge of PPS output for calculating CLK_MONOTONIC offset
+void ISR_GPIOPortG() {
+    edgeValue = CLK_MONOTONIC_RAW();
+    edgeUpdate = 1;
+    PORTG.ICR = 1;
+}
+
+void updateFracTAI(uint32_t clkRaw) {
+    register union {
+        struct {
+            uint32_t fpart;
+            uint32_t ipart;
+        };
+        uint64_t full;
+    } result;
+
+    // split fractional time into fraction and remainder
+    result.ipart = clkRaw;
+    result.ipart /= 1953125;
+    result.fpart = clkRaw;
+    result.fpart -= 1953125 * result.ipart;
+
+    // compute twiddle for fractional conversion
+    register uint32_t twiddle = result.fpart;
+    twiddle *= 1524;
+    twiddle >>= 16;
+    // apply fractional coefficient
+    result.fpart *= 2199;
+    // apply fraction twiddle
+    result.fpart += twiddle;
+    // adjust bit alignment
+    result.full >>= 6;
+    // remove ISR delay of 400 ns
+    result.fpart -= 1718;
+    // update TAI alignment
+    CLK_setFracTAI(-result.fpart);
 }

@@ -6,6 +6,7 @@
 #define GPSDO_GPSDO_H
 
 void GPSDO_init();
+void GPSDO_run();
 int GPSDO_isLocked();
 int GPSDO_offsetNano();
 

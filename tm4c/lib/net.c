@@ -2,7 +2,6 @@
 // Created by robert on 4/26/22.
 //
 
-#include <memory.h>
 #include "../hw/crc.h"
 #include "../hw/emac.h"
 #include "../hw/interrupts.h"
@@ -17,7 +16,6 @@
 #include "net/ip.h"
 #include "net/udp.h"
 #include "net/util.h"
-#include "../hw/timer.h"
 
 #define RX_RING_SIZE (16)
 #define RX_BUFF_SIZE (1520)
@@ -120,7 +118,8 @@ static void initPTP() {
     // 25MHz = 40ns
     EMAC0.SUBSECINC.SSINC = 40;
     // init timer
-    EMAC0.TIMNANOU = GPTM0.TAV << 3;
+    EMAC0.TIMNANOU = 0;
+    EMAC0.TIMSECU = 0;
     EMAC0.TIMSTCTRL.TSINIT = 1;
 }
 

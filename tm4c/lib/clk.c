@@ -13,6 +13,8 @@
 #define CLK_MOD (32u*125000000u)
 
 static volatile uint32_t cntMonotonic = 0;
+static volatile uint32_t taiFracOffset = 0;
+static volatile uint32_t taiIntOffset = -1;
 
 void CLK_init() {
     // Enable external clock
@@ -123,4 +125,15 @@ uint64_t CLK_MONOTONIC() {
     result.ipart &= 1;
     result.ipart += snapI;
     return result.full;
+}
+
+uint64_t CLK_TAI() {
+    uint64_t result = CLK_MONOTONIC();
+    result += taiFracOffset;
+    ((uint32_t*)&result)[1] += taiIntOffset;
+    return result;
+}
+
+void CLK_setFracTAI(uint32_t offset) {
+    taiFracOffset = offset;
 }
