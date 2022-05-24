@@ -5,6 +5,7 @@
 #include <memory.h>
 
 #include "lib/clk.h"
+#include "lib/format.h"
 #include "lib/net.h"
 #include "lib/net/eth.h"
 #include "lib/net/ip.h"
@@ -14,6 +15,8 @@
 #include "snmp.h"
 
 #include "gitversion.h"
+#include "gpsdo.h"
+#include "ntp.h"
 
 #define SNMP_PORT (161)
 
@@ -34,9 +37,11 @@ int readOID(const uint8_t *data, int offset, int dlen, void *result, int *rlen);
 int writeLength(uint8_t *data, int offset, int len);
 int writeBytes(uint8_t *data, int offset, const void *value, int len);
 int writeInt32(uint8_t *data, int offset, uint32_t value);
+int writeInt64(uint8_t *data, int offset, uint64_t value);
 
 int writeValueBytes(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, const void *value, int len);
 int writeValueInt32(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint32_t value);
+int writeValueInt64(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint64_t value);
 
 int wrapVars(uint8_t *data, int offset, uint8_t *vars, int len);
 
@@ -278,16 +283,42 @@ int writeInt32(uint8_t *data, int offset, uint32_t value) {
     int vlen = 0;
     buff[vlen++] = 0x02;
     buff[vlen++] = 0;
+    uint8_t skip = 1;
     uint8_t *bytes = (uint8_t *) &value;
     for(int i = 3; i >= 0; i--) {
+        if(i < 1) skip = 0;
         // skip zeros
-        if(i && (bytes[i] == 0))
+        if(skip && (bytes[i] == 0))
             continue;
         // skip extended sign bits
-        if(i && (bytes[i] == 0xFF) && (bytes[i] & 0x80))
+        if(skip && (bytes[i] == 0xFF) && (bytes[i] & 0x80))
             continue;
-        //
+        // append byte
         buff[vlen++] = bytes[i];
+        skip = 0;
+    }
+    buff[1] = vlen - 2;
+    return offset + vlen;
+}
+
+int writeInt64(uint8_t *data, int offset, uint64_t value) {
+    uint8_t *buff = data + offset;
+    int vlen = 0;
+    buff[vlen++] = 0x02;
+    buff[vlen++] = 0;
+    uint8_t skip = 1;
+    uint8_t *bytes = (uint8_t *) &value;
+    for(int i = 7; i >= 0; i--) {
+        if(i < 1) skip = 0;
+        // skip zeros
+        if(skip && (bytes[i] == 0))
+            continue;
+        // skip extended sign bits
+        if(skip && (bytes[i] == 0xFF) && (bytes[i] & 0x80))
+            continue;
+        // append byte
+        buff[vlen++] = bytes[i];
+        skip = 0;
     }
     buff[1] = vlen - 2;
     return offset + vlen;
@@ -315,6 +346,18 @@ int writeValueInt32(uint8_t *data, int offset, const uint8_t *prefOID, int prefL
     vlen += prefLen;
     buff[vlen++] = oid;
     vlen = writeInt32(buff, vlen, value);
+    buff[0] = 0x30;
+    buff[1] = vlen - 2;
+    return offset + vlen;
+}
+
+int writeValueInt64(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint64_t value) {
+    uint8_t *buff = data + offset;
+    int vlen = 2;
+    memcpy(buff + vlen, prefOID, prefLen);
+    vlen += prefLen;
+    buff[vlen++] = oid;
+    vlen = writeInt64(buff, vlen, value);
     buff[0] = 0x30;
     buff[1] = vlen - 2;
     return offset + vlen;
@@ -446,13 +489,75 @@ int writeNtpInfo(uint8_t *buffer) {
 
 const uint8_t OID_NTP_STATUS_PREFIX[] = { 0x06, 0x0A, 0x2B, 6, 1, 2, 1, 0x81, 0x45, 1, 2 };
 #define NTP_STATUS_CURR_MODE (1)
+#define NTP_STATUS_STRATUM (2)
+#define NTP_STATUS_ACTV_ID (3)
+#define NTP_STATUS_ACTV_NAME (4)
+#define NTP_STATUS_ACTV_OFFSET (5)
+#define NTP_STATUS_NUM_REFS (6)
+#define NTP_STATUS_ROOT_DISP (7)
+#define NTP_STATUS_UPTIME (8)
+#define NTP_STATUS_NTP_DATE (8)
 
 int writeNtpStatus(uint8_t *buffer) {
+    int isLocked = GPSDO_isLocked();
+    uint64_t ntpOffset = NTP_offset();
+    uint64_t clkMono = CLK_MONOTONIC();
+
     int dlen = 0;
     dlen = writeValueInt32(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_CURR_MODE,
-            2
+            isLocked ? 5 : 2
+    );
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_STRATUM,
+            isLocked ? 1 : 16
+    );
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_ACTV_ID,
+            0
+    );
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_ACTV_NAME,
+            "GPS", 3
+    );
+
+    char temp[16];
+    int end = toDec(GPSDO_offsetNano(), 0, '0', temp);
+    temp[end++] = ' ';
+    temp[end++] = 'n';
+    temp[end++] = 's';
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_ACTV_OFFSET,
+            temp, end
+    );
+
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_NUM_REFS,
+            1
+    );
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_ROOT_DISP,
+            0
+    );
+    dlen = writeValueInt64(
+            buffer, dlen,
+            OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_UPTIME,
+            ((clkMono >> 16) * 100) >> 16
+    );
+
+    uint32_t ntpDate[4];
+    NTP_date(clkMono, ntpDate);
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_NTP_DATE,
+            ntpDate, sizeof(ntpDate)
     );
     return dlen;
 }

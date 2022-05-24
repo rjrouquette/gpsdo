@@ -12,6 +12,7 @@
 #include "lib/net/udp.h"
 #include "lib/net/util.h"
 #include "lib/led.h"
+#include "gpsdo.h"
 
 #define NTP_PORT (123)
 
@@ -37,12 +38,27 @@ struct PACKED FRAME_NTPv3 {
 };
 _Static_assert(sizeof(struct FRAME_NTPv3) == 48, "FRAME_NTPv3 must be 48 bytes");
 
+static volatile uint32_t ntpEra = 0;
 static volatile uint64_t ntpTimeOffset = 0xe6338cbb00000000;
 
 void NTP_process(uint8_t *frame, int flen);
 
 void NTP_init() {
     UDP_register(NTP_PORT, NTP_process);
+}
+
+uint64_t NTP_offset() {
+    return ntpTimeOffset;
+}
+
+void NTP_date(uint64_t clkMono, uint32_t *ntpDate) {
+    uint64_t rollover = ((uint32_t *)&clkMono)[1];
+    rollover += ((uint32_t *)&ntpTimeOffset)[1];
+    clkMono += ntpTimeOffset;
+    ntpDate[0] = ntpEra + ((uint32_t *)&rollover)[1];
+    ntpDate[1] = __builtin_bswap32(((uint32_t *)&clkMono)[1]);
+    ntpDate[2] = __builtin_bswap32(((uint32_t *)&clkMono)[0]);
+    ntpDate[3] = 0;
 }
 
 void NTP_process(uint8_t *frame, int flen) {
@@ -75,16 +91,16 @@ void NTP_process(uint8_t *frame, int flen) {
     // set type to server response
     frameNTP->flags.mode = 4;
     // indicate that the time is not currently set
-    frameNTP->flags.status = 3;
+    frameNTP->flags.status = GPSDO_isLocked() ? 0 : 3;
     // set other header fields
-    frameNTP->stratum = 1;
+    frameNTP->stratum = GPSDO_isLocked() ? 1 : 16;
     frameNTP->precision = -24;
     // set reference ID
     memcpy(frameNTP->refID, "GPS", 4);
     // set root delay
     frameNTP->rootDelay = 0;
     // set root dispersion
-    frameNTP->rootDispersion = __builtin_bswap32(1);
+    frameNTP->rootDispersion = 0;
     // set origin timestamp
     frameNTP->origTime[0] = frameNTP->txTime[0];
     frameNTP->origTime[1] = frameNTP->txTime[1];
