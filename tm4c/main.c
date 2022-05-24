@@ -17,6 +17,7 @@
 #include "hw/sys.h"
 #include "lib/net/ip.h"
 
+#include "gpsdo.h"
 #include "ntp.h"
 #include "snmp.h"
 
@@ -48,6 +49,7 @@ int main(void) {
     PLOT_setLine(0, 15, EPD_width()-1, 15, 1);
     PLOT_setLine(0, 215, EPD_width()-1, 215, 1);
 
+    GPSDO_init();
     NTP_init();
     SNMP_init();
 

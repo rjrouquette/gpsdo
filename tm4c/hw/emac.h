@@ -443,7 +443,7 @@ PAGE_MAP (EMAC_MAP, {
     REGMAP_32(, {
         unsigned PPSCTRL: 4;
         unsigned PPSEN0: 1;
-        unsigned TRGMODS0: 1;
+        unsigned TRGMODS0: 2;
     }) PPSCTRL;
 
     // reserved space
