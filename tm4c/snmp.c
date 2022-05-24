@@ -409,7 +409,7 @@ int wrapVars(uint8_t *data, int offset, uint8_t *vars, int len) {
     return offset;
 }
 
-void sendBatt(uint8_t *frame) {
+void sendResults(uint8_t *frame, uint8_t *data, int dlen) {
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
@@ -422,20 +422,27 @@ void sendBatt(uint8_t *frame) {
     headerIPv4->src = ipAddress;
     // modify UDP header
     headerUDP->portDst = headerUDP->portSrc;
-    headerUDP->portSrc = __builtin_bswap16(123);
+    headerUDP->portSrc = __builtin_bswap16(SNMP_PORT);
 
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    uint8_t *txFrame = NET_getTxBuff(txDesc);
+    memcpy(txFrame, frame, UDP_DATA_OFFSET);
+
+    dlen = wrapVars(txFrame, UDP_DATA_OFFSET, data, dlen);
+
+    // transmit response
+    UDP_finalize(txFrame, dlen);
+    IPv4_finalize(txFrame, dlen);
+    NET_transmit(txDesc, dlen);
+}
+
+void sendBatt(uint8_t *frame) {
     // variable bindings
     uint8_t buffer[1024];
     int dlen = 0;
 
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
-    uint8_t *data = NET_getTxBuff(txDesc);
-    memcpy(data, frame, UDP_DATA_OFFSET);
-    data += UDP_DATA_OFFSET;
-
-    // transmit response
-    NET_transmit(txDesc, UDP_DATA_OFFSET + dlen);
+    sendResults(frame, buffer, dlen);
 }
 
 const uint8_t OID_NTP_INFO_PREFIX[] = { 0x06, 0x0A, 0x2B, 6, 1, 2, 1, 0x81, 0x45, 1, 1 };
@@ -570,70 +577,24 @@ void sendNTP(uint8_t *frame) {
     // filter MIB
     if(buffOID[sizeof(OID_PREFIX_MGMT)+2] != 1)
         return;
+
     // select output data
     switch (buffOID[sizeof(OID_PREFIX_MGMT)+3]) {
         case 1:
             dlen = writeNtpInfo(buffer);
+            sendResults(frame, buffer, dlen);
             break;
         case 2:
             dlen = writeNtpStatus(buffer);
+            sendResults(frame, buffer, dlen);
             break;
-        default:
-            return;
     }
-
-    // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-
-    // modify ethernet frame header
-    copyMAC(headerEth->macDst, headerEth->macSrc);
-    // modify IP header
-    headerIPv4->dst = headerIPv4->src;
-    headerIPv4->src = ipAddress;
-    // modify UDP header
-    headerUDP->portDst = headerUDP->portSrc;
-    headerUDP->portSrc = __builtin_bswap16(123);
-
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
-    uint8_t *txFrame = NET_getTxBuff(txDesc);
-    memcpy(txFrame, frame, UDP_DATA_OFFSET);
-
-    dlen = wrapVars(txFrame, UDP_DATA_OFFSET, buffer, dlen);
-
-    // transmit response
-    UDP_finalize(txFrame, dlen);
-    IPv4_finalize(txFrame, dlen);
-    NET_transmit(txDesc, dlen);
 }
 
 void sendPTP(uint8_t *frame) {
-    // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-
-    // modify ethernet frame header
-    copyMAC(headerEth->macDst, headerEth->macSrc);
-    // modify IP header
-    headerIPv4->dst = headerIPv4->src;
-    headerIPv4->src = ipAddress;
-    // modify UDP header
-    headerUDP->portDst = headerUDP->portSrc;
-    headerUDP->portSrc = __builtin_bswap16(SNMP_PORT);
-
     // variable bindings
     uint8_t buffer[1024];
     int dlen = 0;
 
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
-    uint8_t *data = NET_getTxBuff(txDesc);
-    memcpy(data, frame, UDP_DATA_OFFSET);
-    data += UDP_DATA_OFFSET;
-
-    // transmit response
-    NET_transmit(txDesc, UDP_DATA_OFFSET + dlen);
+    sendResults(frame, buffer, dlen);
 }
