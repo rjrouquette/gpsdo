@@ -291,7 +291,7 @@ int writeInt32(uint8_t *data, int offset, uint32_t value) {
         if(skip && (bytes[i] == 0))
             continue;
         // skip extended sign bits
-        if(skip && (bytes[i] == 0xFF) && (bytes[i] & 0x80))
+        if(skip && (bytes[i] == 0xFF) && (bytes[i-i] & 0x80))
             continue;
         // append byte
         buff[vlen++] = bytes[i];
@@ -314,7 +314,7 @@ int writeInt64(uint8_t *data, int offset, uint64_t value) {
         if(skip && (bytes[i] == 0))
             continue;
         // skip extended sign bits
-        if(skip && (bytes[i] == 0xFF) && (bytes[i] & 0x80))
+        if(skip && (bytes[i] == 0xFF) && (bytes[i-1] & 0x80))
             continue;
         // append byte
         buff[vlen++] = bytes[i];
