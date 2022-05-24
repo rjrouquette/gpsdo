@@ -36,10 +36,11 @@ int readOID(const uint8_t *data, int offset, int dlen, void *result, int *rlen);
 
 int writeLength(uint8_t *data, int offset, int len);
 int writeBytes(uint8_t *data, int offset, const void *value, int len);
-int writeInt32(uint8_t *data, int offset, uint32_t value);
-int writeInt64(uint8_t *data, int offset, uint64_t value);
+int writeInt(uint8_t *data, int offset, void *value, int size);
 
 int writeValueBytes(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, const void *value, int len);
+int writeValueInt8(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint8_t value);
+int writeValueInt16(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint16_t value);
 int writeValueInt32(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint32_t value);
 int writeValueInt64(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint64_t value);
 
@@ -278,50 +279,14 @@ int writeBytes(uint8_t *data, int offset, const void *value, int len) {
     return offset;
 }
 
-int writeInt32(uint8_t *data, int offset, uint32_t value) {
-    uint8_t *buff = data + offset;
-    int vlen = 0;
-    buff[vlen++] = 0x02;
-    buff[vlen++] = 0;
-    uint8_t skip = 1;
-    uint8_t *bytes = (uint8_t *) &value;
-    for(int i = 3; i >= 0; i--) {
-        if(i < 1) skip = 0;
-        // skip zeros
-        if(skip && (bytes[i] == 0))
-            continue;
-        // skip extended sign bits
-        if(skip && (bytes[i] == 0xFF) && (bytes[i-i] & 0x80))
-            continue;
+int writeInt(uint8_t *data, int offset, void *value, int size) {
+    data[offset++] = 0x02;
+    data[offset++] = size--;
+    while(size >= 0) {
         // append byte
-        buff[vlen++] = bytes[i];
-        skip = 0;
+        data[offset++] = ((uint8_t *) value)[size--];
     }
-    buff[1] = vlen - 2;
-    return offset + vlen;
-}
-
-int writeInt64(uint8_t *data, int offset, uint64_t value) {
-    uint8_t *buff = data + offset;
-    int vlen = 0;
-    buff[vlen++] = 0x02;
-    buff[vlen++] = 0;
-    uint8_t skip = 1;
-    uint8_t *bytes = (uint8_t *) &value;
-    for(int i = 7; i >= 0; i--) {
-        if(i < 1) skip = 0;
-        // skip zeros
-        if(skip && (bytes[i] == 0))
-            continue;
-        // skip extended sign bits
-        if(skip && (bytes[i] == 0xFF) && (bytes[i-1] & 0x80))
-            continue;
-        // append byte
-        buff[vlen++] = bytes[i];
-        skip = 0;
-    }
-    buff[1] = vlen - 2;
-    return offset + vlen;
+    return offset;
 }
 
 int writeValueBytes(
@@ -339,13 +304,37 @@ int writeValueBytes(
     return offset + vlen;
 }
 
+int writeValueInt8(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint8_t value) {
+    uint8_t *buff = data + offset;
+    int vlen = 2;
+    memcpy(buff + vlen, prefOID, prefLen);
+    vlen += prefLen;
+    buff[vlen++] = oid;
+    vlen = writeInt(buff, vlen, &value, sizeof(value));
+    buff[0] = 0x30;
+    buff[1] = vlen - 2;
+    return offset + vlen;
+}
+
+int writeValueInt16(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint16_t value) {
+    uint8_t *buff = data + offset;
+    int vlen = 2;
+    memcpy(buff + vlen, prefOID, prefLen);
+    vlen += prefLen;
+    buff[vlen++] = oid;
+    vlen = writeInt(buff, vlen, &value, sizeof(value));
+    buff[0] = 0x30;
+    buff[1] = vlen - 2;
+    return offset + vlen;
+}
+
 int writeValueInt32(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint32_t value) {
     uint8_t *buff = data + offset;
     int vlen = 2;
     memcpy(buff + vlen, prefOID, prefLen);
     vlen += prefLen;
     buff[vlen++] = oid;
-    vlen = writeInt32(buff, vlen, value);
+    vlen = writeInt(buff, vlen, &value, sizeof(value));
     buff[0] = 0x30;
     buff[1] = vlen - 2;
     return offset + vlen;
@@ -357,7 +346,7 @@ int writeValueInt64(uint8_t *data, int offset, const uint8_t *prefOID, int prefL
     memcpy(buff + vlen, prefOID, prefLen);
     vlen += prefLen;
     buff[vlen++] = oid;
-    vlen = writeInt64(buff, vlen, value);
+    vlen = writeInt(buff, vlen, &value, sizeof(value));
     buff[0] = 0x30;
     buff[1] = vlen - 2;
     return offset + vlen;
@@ -378,7 +367,7 @@ int lengthSize(int len) {
 int wrapVars(uint8_t *data, int offset, uint8_t *vars, int len) {
     // request id
     uint8_t rid[8];
-    int lenRID = writeInt32(rid, 0, reqId);
+    int lenRID = writeInt(rid, 0, &reqId, sizeof(reqId));
 
     int tlen = len;
     tlen += lengthSize(len);
@@ -481,7 +470,7 @@ int writeNtpInfo(uint8_t *buffer) {
             OID_NTP_INFO_PREFIX, sizeof(OID_NTP_INFO_PREFIX), NTP_INFO_TIME_RES,
             25000000
     );
-    dlen = writeValueInt32(
+    dlen = writeValueInt8(
             buffer, dlen,
             OID_NTP_INFO_PREFIX, sizeof(OID_NTP_INFO_PREFIX), NTP_INFO_TIME_PREC,
             -24
@@ -510,17 +499,17 @@ int writeNtpStatus(uint8_t *buffer) {
     uint64_t clkMono = CLK_MONOTONIC();
 
     int dlen = 0;
-    dlen = writeValueInt32(
+    dlen = writeValueInt8(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_CURR_MODE,
             isLocked ? 5 : 2
     );
-    dlen = writeValueInt32(
+    dlen = writeValueInt8(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_STRATUM,
             isLocked ? 1 : 16
     );
-    dlen = writeValueInt32(
+    dlen = writeValueInt8(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_ACTV_ID,
             0
@@ -542,7 +531,7 @@ int writeNtpStatus(uint8_t *buffer) {
             temp, end
     );
 
-    dlen = writeValueInt32(
+    dlen = writeValueInt8(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_NUM_REFS,
             1
