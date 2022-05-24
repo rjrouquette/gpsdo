@@ -552,7 +552,7 @@ int writeNtpStatus(uint8_t *buffer) {
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_ROOT_DISP,
             0
     );
-    dlen = writeValueInt64(
+    dlen = writeValueInt32(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_UPTIME,
             ((uint32_t *) &clkMono)[1]
