@@ -45,7 +45,6 @@ int wrapVars(uint8_t *data, int offset, uint8_t *vars, int len);
 
 void sendBatt(uint8_t *frame);
 void sendNTP(uint8_t *frame);
-void sendPTP(uint8_t *frame);
 
 void SNMP_process(uint8_t *frame, int flen);
 
@@ -133,10 +132,6 @@ void SNMP_process(uint8_t *frame, int flen) {
                 // battery
                 case 233:
                     sendBatt(frame);
-                    break;
-                // PTP
-                case 241:
-                    sendPTP(frame);
                     break;
                 default:
                     break;
@@ -426,4 +421,3 @@ void sendResults(uint8_t *frame, uint8_t *data, int dlen) {
 // sub units
 #include "snmp.batt.c"
 #include "snmp.ntp.c"
-#include "snmp.ptp.c"
