@@ -138,25 +138,25 @@ PAGE_MAP(GPTM_MAP, {
     // offset 0x048
     // GPTM Timer A
     REGMAP_32(, {
-        unsigned LO: 16;
+        uint16_t LO: 16;
     }) TAR;
 
     // offset 0x04C
     // GPTM Timer B
     REGMAP_32(, {
-        unsigned LO: 16;
+        uint16_t LO: 16;
     }) TBR;
 
     // offset 0x050
     // GPTM Timer A Value
     REGMAP_32(, {
-        unsigned LO: 16;
+        uint16_t LO: 16;
     }) TAV;
 
     // offset 0x054
     // GPTM Timer B Value
     REGMAP_32(, {
-        unsigned LO: 16;
+        uint16_t LO: 16;
     }) TBV;
 
     uint32_t RTCPD;     // GPTM RTC Predivide

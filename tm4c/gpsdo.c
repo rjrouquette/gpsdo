@@ -99,9 +99,9 @@ int GPSDO_offsetNano() {
 void ISR_Timer5A() {
     edgeTAI = GPTM0.TAV.raw;
     // compensate for ISR delay
-    int16_t delta = GPTM5.TAV.LO;
-    delta -= GPTM5.TAR.LO;
-    edgeTAI -= delta;
+    uint16_t delay = GPTM5.TAV.LO;
+    delay -= GPTM5.TAR.LO;
+    edgeTAI -= delay;
     // signal update
     edgeUpdate = 1;
     GPTM5.ICR.CAE = 1;
