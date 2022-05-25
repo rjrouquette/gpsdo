@@ -129,16 +129,15 @@ void workerRX() {
         int64_t delayCli = rx2 - tx1;
         int64_t delayXfr = delayCli - delaySrv;
 
-        log("offset 1:  %+.9f", ((double)(int32_t)(tx1 - rx1))/(1l<<32));
-        log("offset 2:  %+.9f", ((double)(int32_t)(rx2 - tx2))/(1l<<32));
+        log("offset 1:  %+.9f", ((double)(tx1 - rx1))/(1l<<32));
+        log("offset 2:  %+.9f", ((double)(rx2 - tx2))/(1l<<32));
 
         log("delay client:  %+.9f", ((double)delayCli)/(1l<<32));
         log("delay server:  %+.9f", ((double)delaySrv)/(1l<<32));
         log("delay transit: %+.9f", ((double)delayXfr)/(1l<<32));
 
-//        int64_t offset = (int32_t) (rx2 - tx2);
-//        offset -= delayXfr / 2;
-        int64_t offset = ((rx2 - tx2) + (tx1 - rx1)) / 2;
+        int64_t offset = rx2 - tx2;
+        offset -= delayXfr / 2;
         log("time offset: %+.9f", ((double)offset)/(1l<<32));
         log("delta offset: %+.9f", ((double)(offset - prevOffset))/(1l<<32));
         prevOffset = offset;
