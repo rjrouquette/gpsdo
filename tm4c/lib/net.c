@@ -20,11 +20,12 @@
 #define RX_RING_SIZE (16)
 #define RX_BUFF_SIZE (1520)
 
-#define TX_RING_SIZE (4)
+#define TX_RING_SIZE (8)
 #define TX_BUFF_SIZE (1520)
 
 static uint8_t ptrRX = 0;
 static uint8_t ptrTX = 0;
+static uint8_t endTX = 0;
 static uint16_t phyStatus = 0;
 
 static struct EMAC_RX_DESC rxDesc[RX_RING_SIZE];
@@ -32,6 +33,7 @@ static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 
 static struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
 static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
+static CallbackNetTX txCallback[TX_RING_SIZE];
 
 static void initDescriptors() {
     // init receive descriptors
@@ -62,6 +64,8 @@ static void initDescriptors() {
         txDesc[i].TDES0.LS = 1;
         // capture timestamp
         txDesc[i].TDES0.TTSE = 1;
+        // clear callback
+        txCallback[i] = 0;
     }
     txDesc[TX_RING_SIZE-1].TDES0.TER = 1;
 }
@@ -233,18 +237,38 @@ void NET_getMacAddress(char *strAddr) {
 }
 
 void NET_run() {
-    while(!rxDesc[ptrRX].RDES0.OWN) {
-        if(!rxDesc[ptrRX].RDES0.ES) {
-            uint8_t *buffer = (uint8_t *) rxDesc[ptrRX].BUFF1;
-            if(((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_ARP) {
-                ARP_process(buffer, rxDesc[ptrRX].RDES0.FL);
+    for(;;) {
+        int busy = 0;
+        // check for completed receptions
+        if (!rxDesc[ptrRX].RDES0.OWN) {
+            if (!rxDesc[ptrRX].RDES0.ES) {
+                uint8_t *buffer = (uint8_t *) rxDesc[ptrRX].BUFF1;
+                if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_ARP) {
+                    ARP_process(buffer, rxDesc[ptrRX].RDES0.FL);
+                } else if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_IPv4) {
+                    IPv4_process(buffer, rxDesc[ptrRX].RDES0.FL);
+                }
             }
-            else if(((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_IPv4) {
-                IPv4_process(buffer, rxDesc[ptrRX].RDES0.FL);
-            }
+            rxDesc[ptrRX].RDES0.OWN = 1;
+            ptrRX = (ptrRX + 1) & (RX_RING_SIZE - 1);
+            busy = 1;
         }
-        rxDesc[ptrRX].RDES0.OWN = 1;
-        ptrRX = (ptrRX + 1) & (RX_RING_SIZE-1);
+        // check for completed transmissions
+        if ((endTX != ptrTX) && !txDesc[endTX].TDES0.OWN) {
+            // invoke callback
+            CallbackNetTX callback = txCallback[endTX];
+            if(callback) {
+                (*callback) (
+                        txBuffer[endTX], txDesc[endTX].TDES1.TBS1,
+                        txDesc[endTX].TTSH, txDesc[endTX].TTSL
+                );
+            }
+            // clear callback
+            txCallback[endTX] = 0;
+            endTX = (endTX + 1) & (TX_RING_SIZE - 1);
+            busy = 1;
+        }
+        if (!busy) break;
     }
 
     // if link is up, poll ARP and DHCP state
@@ -265,6 +289,10 @@ int NET_getTxDesc() {
 
 uint8_t * NET_getTxBuff(int desc) {
     return (uint8_t *) txDesc[desc & (TX_RING_SIZE-1)].BUFF1;
+}
+
+void NET_setTxCallback(int desc, CallbackNetTX callback) {
+    txCallback[desc & (TX_RING_SIZE-1)] = callback;
 }
 
 void NET_transmit(int desc, int len) {
@@ -314,4 +342,13 @@ uint64_t NET_getRxTime(const uint8_t *rxFrame) {
 
     result.ipart = rxDesc[rxId].RTSH;
     return result.full;
+}
+
+void NET_getRxTimeRaw(const uint8_t *rxFrame, uint32_t *rxTime) {
+    // compute descriptor offset
+    uint32_t rxId = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
+    if(rxId >= RX_RING_SIZE) return ;
+    // retrieve raw timestamp
+    rxTime[0] = rxDesc[rxId].RTSH;
+    rxTime[1] = rxDesc[rxId].RTSL;
 }
