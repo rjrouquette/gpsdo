@@ -5,14 +5,14 @@
 #include <memory.h>
 #include <stdint.h>
 
+#include "../../hw/sys.h"
 #include "../clk.h"
+#include "../net.h"
 #include "eth.h"
 #include "dhcp.h"
 #include "ip.h"
 #include "udp.h"
 #include "util.h"
-#include "../net.h"
-#include "../../hw/sys.h"
 
 
 struct PACKED HEADER_DHCP {
@@ -87,8 +87,10 @@ void DHCP_run() {
 }
 
 void DHCP_renew() {
+    uint64_t now = CLK_MONOTONIC();
     // compute new transaction ID
-    dhcpXID = CLK_MONOTONIC_RAW();
+    dhcpXID  = ((uint32_t*)&now)[0];
+    dhcpXID += ((uint32_t*)&now)[0];
     for(int i = 0; i < 4; i++)
         dhcpXID += UNIQUEID.WORD[i];
 

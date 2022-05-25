@@ -102,7 +102,7 @@ uint64_t CLK_MONOTONIC() {
 
     // capture current time
     register uint32_t snapI = cntMonotonic;
-    result.fpart = GPTM0.TAV;
+    result.fpart = GPTM0.TAV.raw;
 
     // split fractional time into fraction and remainder
     result.ipart = result.fpart;

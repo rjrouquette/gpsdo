@@ -5,11 +5,12 @@
 #include "gpsdo.h"
 #include "hw/emac.h"
 #include "hw/gpio.h"
+#include "hw/timer.h"
 #include "lib/delay.h"
 #include "lib/clk.h"
 
 static uint8_t edgeUpdate = 0;
-static uint32_t edgeValue = 0;
+static uint32_t edgeTAI = 0;
 
 void updateFracTAI(uint32_t clkRaw);
 
@@ -82,7 +83,7 @@ void GPSDO_init() {
 void GPSDO_run() {
     if(edgeUpdate) {
         edgeUpdate = 0;
-        updateFracTAI(edgeValue);
+        updateFracTAI(edgeTAI);
     }
 }
 
@@ -96,7 +97,12 @@ int GPSDO_offsetNano() {
 
 // capture rising edge of PPS output for calculating CLK_MONOTONIC offset
 void ISR_Timer5A() {
-    edgeValue = CLK_MONOTONIC_RAW();
+    edgeTAI = GPTM0.TAV.raw;
+    // compensate for ISR delay
+    int16_t delta = GPTM5.TAV.LO;
+    delta -= GPTM5.TAR.LO;
+    edgeTAI -= delta;
+    // signal update
     edgeUpdate = 1;
     GPTM5.ICR.CAE = 1;
 }
@@ -131,8 +137,6 @@ void updateFracTAI(uint32_t clkRaw) {
     result.fpart += twiddle;
     // adjust bit alignment
     result.full >>= 6;
-    // remove ISR delay of 400 ns
-    result.fpart -= 1718;
     // update TAI alignment
     CLK_setFracTAI(-result.fpart);
 }

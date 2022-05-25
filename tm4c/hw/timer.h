@@ -134,10 +134,31 @@ PAGE_MAP(GPTM_MAP, {
     uint32_t TBPR;      // GPTM Timer B Prescale
     uint32_t TAPMR;     // GPTM Timer A Prescale Match
     uint32_t TBPMR;     // GPTM Timer B Prescale Match
-    uint32_t TAR;       // GPTM Timer A
-    uint32_t TBR;       // GPTM Timer B
-    uint32_t TAV;       // GPTM Timer A Value
-    uint32_t TBV;       // GPTM Timer B Value
+
+    // offset 0x048
+    // GPTM Timer A
+    REGMAP_32(, {
+        unsigned LO: 16;
+    }) TAR;
+
+    // offset 0x04C
+    // GPTM Timer B
+    REGMAP_32(, {
+        unsigned LO: 16;
+    }) TBR;
+
+    // offset 0x050
+    // GPTM Timer A Value
+    REGMAP_32(, {
+        unsigned LO: 16;
+    }) TAV;
+
+    // offset 0x054
+    // GPTM Timer B Value
+    REGMAP_32(, {
+        unsigned LO: 16;
+    }) TBV;
+
     uint32_t RTCPD;     // GPTM RTC Predivide
     uint32_t TAPS;      // GPTM Timer A Prescale Snapshot
     uint32_t TBPS;      // GPTM Timer B Prescale Snapshot
