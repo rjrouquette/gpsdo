@@ -145,8 +145,8 @@ void NTP_process0(const uint8_t *frame, struct FRAME_NTPv3 *frameNTP) {
     frameNTP->refTime[0] = refTime[0];
     frameNTP->refTime[1] = refTime[1];
     // no TX time
-    frameNTP->refTime[0] = 0;
-    frameNTP->refTime[1] = 0;
+    frameNTP->txTime[0] = 0;
+    frameNTP->txTime[1] = 0;
 }
 
 void NTP_followup0(uint8_t *frame, int flen, uint32_t txSec, uint32_t txNano) {
@@ -166,8 +166,8 @@ void NTP_followup0(uint8_t *frame, int flen, uint32_t txSec, uint32_t txNano) {
     if(frameNTP->flags.version != 0) return;
 
     // append original TX time and resend
-    frameNTP->refTime[0] = txSec;
-    frameNTP->refTime[1] = txNano;
+    frameNTP->txTime[0] = txSec;
+    frameNTP->txTime[1] = txNano;
 
     // send packet
     UDP_finalize(frame, flen);
