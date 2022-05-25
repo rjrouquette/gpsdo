@@ -41,6 +41,7 @@ int fdSocket;
 
 void log(const char *format, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 void workerRX();
+uint64_t toFixedPoint(uint32_t sec, uint32_t nano);
 
 int main(int argc, char **argv) {
     fdSocket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -91,19 +92,66 @@ int main(int argc, char **argv) {
 void workerRX() {
     struct sockaddr_in sa = {};
     PACKET_NTPv3 packetNtp = {};
+    struct timespec ts = {};
 
+    bool hasRxTimestamp = false;
+    int64_t prevOffset = 0;
     for(;;) {
         socklen_t sl = sizeof(struct sockaddr_in);
         ssize_t nread = recvfrom(fdSocket, &packetNtp, sizeof(packetNtp), 0, (struct sockaddr *) &sa, &sl);
         if (nread != sizeof(packetNtp))
             continue;
 
-        log("recvfrom: %ld bytes", nread);
-        log("orig: %u.%9u", packetNtp.origTime[0], packetNtp.origTime[1]);
-        log("rx:   %u.%9u", packetNtp.rxTime[0], packetNtp.rxTime[1]);
-        log("ref:  %u.%9u", packetNtp.refTime[0], packetNtp.refTime[1]);
-        log("tx:   %u.%9u", packetNtp.txTime[0], packetNtp.txTime[1]);
+        // timestamp first response
+        if(packetNtp.txTime[0] == 0) {
+            clock_gettime(CLOCK_REALTIME, &ts);
+            hasRxTimestamp = true;
+            continue;
+        }
+        if(!hasRxTimestamp)
+            continue;
+        hasRxTimestamp = false;
+
+        // display final response
+        log("tx1: %12u.%09u", packetNtp.origTime[0], packetNtp.origTime[1]);
+        log("rx1: %12u.%09u", packetNtp.rxTime[0], packetNtp.rxTime[1]);
+        log("ref: %12u.%09u", packetNtp.refTime[0], packetNtp.refTime[1]);
+        log("tx2: %12u.%09u", packetNtp.txTime[0], packetNtp.txTime[1]);
+        log("rx2: %12lu.%09lu", ts.tv_sec, ts.tv_nsec);
+
+        // compute delays
+        auto tx1 = toFixedPoint(packetNtp.origTime[0], packetNtp.origTime[1]);
+        auto rx1 = toFixedPoint(packetNtp.rxTime[0], packetNtp.rxTime[1]);
+        auto tx2 = toFixedPoint(packetNtp.txTime[0], packetNtp.txTime[1]);
+        auto rx2 = toFixedPoint(ts.tv_sec, ts.tv_nsec);
+
+        int64_t delaySrv = tx2 - rx1;
+        int64_t delayCli = rx2 - tx1;
+        int64_t delayXfr = delayCli - delaySrv;
+
+        log("offset 1:  %+.9f", ((double)(int32_t)(tx1 - rx1))/(1l<<32));
+        log("offset 2:  %+.9f", ((double)(int32_t)(rx2 - tx2))/(1l<<32));
+
+        log("delay client:  %+.9f", ((double)delayCli)/(1l<<32));
+        log("delay server:  %+.9f", ((double)delaySrv)/(1l<<32));
+        log("delay transit: %+.9f", ((double)delayXfr)/(1l<<32));
+
+//        int64_t offset = (int32_t) (rx2 - tx2);
+//        offset -= delayXfr / 2;
+        int64_t offset = ((rx2 - tx2) + (tx1 - rx1)) / 2;
+        log("time offset: %+.9f", ((double)offset)/(1l<<32));
+        log("delta offset: %+.9f", ((double)(offset - prevOffset))/(1l<<32));
+        prevOffset = offset;
     }
+}
+
+uint64_t toFixedPoint(uint32_t sec, uint32_t nano) {
+    uint64_t result;
+    ((uint32_t *) &result)[0] = 0;
+    ((uint32_t *) &result)[1] = nano;
+    result /= 1000000000;
+    ((uint32_t *) &result)[1] = sec;
+    return result;
 }
 
 
