@@ -57,25 +57,75 @@ PAGE_MAP(GPTM_MAP, {
     // offset 0x018
     // GPTM Interrupt Mask
     REGMAP_32 (, {
-            unsigned TATOIM: 1;
-            unsigned CAMIM: 1;
-            unsigned CAEIM: 1;
-            unsigned RTCIM: 1;
-            unsigned TAMIM: 1;
-            unsigned DMAAIM: 1;
+            unsigned TATO: 1;
+            unsigned CAM: 1;
+            unsigned CAE: 1;
+            unsigned RTC: 1;
+            unsigned TAM: 1;
+            unsigned DMAA: 1;
             unsigned : 2;
-            unsigned TBTOIM: 1;
-            unsigned CBMIM: 1;
-            unsigned CBEIM: 1;
+            unsigned TBTO: 1;
+            unsigned CBM: 1;
+            unsigned CBE: 1;
             unsigned : 1;
-            unsigned TBMIM: 1;
-            unsigned DMABIM: 1;
-            unsigned : 2;
+            unsigned TBM: 1;
+            unsigned DMAB: 1;
     }) IMR;
 
-    uint32_t RIS;       // GPTM Raw Interrupt Status
-    uint32_t MIS;       // GPTM Masked Interrupt Status
-    uint32_t ICR;       // GPTM Interrupt Clear
+    // offset 0x01C
+    // GPTM Raw Interrupt Status
+    REGMAP_32 (, {
+        unsigned TATO: 1;
+        unsigned CAM: 1;
+        unsigned CAE: 1;
+        unsigned RTC: 1;
+        unsigned TAM: 1;
+        unsigned DMAA: 1;
+        unsigned : 2;
+        unsigned TBTO: 1;
+        unsigned CBM: 1;
+        unsigned CBE: 1;
+        unsigned : 1;
+        unsigned TBM: 1;
+        unsigned DMAB: 1;
+    }) RIS;
+
+    // offset 0x020
+    // GPTM Masked Interrupt Status
+    REGMAP_32(, {
+        unsigned TATO: 1;
+        unsigned CAM: 1;
+        unsigned CAE: 1;
+        unsigned RTC: 1;
+        unsigned TAM: 1;
+        unsigned DMAA: 1;
+        unsigned : 2;
+        unsigned TBTO: 1;
+        unsigned CBM: 1;
+        unsigned CBE: 1;
+        unsigned : 1;
+        unsigned TBM: 1;
+        unsigned DMAB: 1;
+    }) MIS;
+
+    // offset 0x024
+    // GPTM Interrupt Clear
+    REGMAP_32(, {
+        unsigned TATO: 1;
+        unsigned CAM: 1;
+        unsigned CAE: 1;
+        unsigned RTC: 1;
+        unsigned TAM: 1;
+        unsigned DMAA: 1;
+        unsigned : 2;
+        unsigned TBTO: 1;
+        unsigned CBM: 1;
+        unsigned CBE: 1;
+        unsigned : 1;
+        unsigned TBM: 1;
+        unsigned DMAB: 1;
+    }) ICR;
+
     uint32_t TAILR;     // GPTM Timer A Interval Load
     uint32_t TBILR;     // GPTM Timer B Interval Load
     uint32_t TAMATCHR;  // GPTM Timer A Match

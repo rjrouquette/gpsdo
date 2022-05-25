@@ -26,9 +26,6 @@ void initPPS() {
     PORTG.PCTL.PMC0 = 0x5;
     PORTG.AFSEL.ALT0 = 1;
     PORTG.DEN = 0x01u;
-    // configure interrupt
-    PORTG.IEV = 0x01u;
-    PORTG.IM = 0x01u;
     // lock GPIO config
     PORTG.CR = 0;
     PORTG.LOCK = 0;
@@ -45,8 +42,41 @@ void initPPS() {
     EMAC0.PPSCTRL.PPSCTRL = 2;
 }
 
+void initEdgeComp() {
+    // Enable Timer 5
+    RCGCTIMER.EN_GPTM5 = 1;
+    delay_cycles_4();
+    // Configure Timer 5 for capture mode
+    GPTM5.CFG.GPTMCFG = 4;
+    GPTM5.TAMR.MR = 0x3;
+    GPTM5.TBMR.MR = 0x3;
+    // edge-time mode
+    GPTM5.TBMR.CMR = 1;
+    GPTM5.TBMR.CMR = 1;
+    // count up
+    GPTM5.TBMR.CDIR = 1;
+    GPTM5.TBMR.CDIR = 1;
+    // disable overflow interrupt
+    GPTM5.TAMR.CINTD = 0;
+    GPTM5.TBMR.CINTD = 0;
+    // full 24-bit count
+    GPTM5.TAILR = 0xFFFF;
+    GPTM5.TBILR = 0xFFFF;
+    GPTM5.TAPR = 0xFF;
+    GPTM5.TBPR = 0xFF;
+    // interrupts
+    GPTM5.IMR.CAE = 1;
+    GPTM5.IMR.CBE = 1;
+    // start timer
+    GPTM5.CTL.TAEN = 1;
+    GPTM5.CTL.TBEN = 1;
+    // synchronize timers
+    GPTM0.SYNC = (3 << 10);
+}
+
 void GPSDO_init() {
     initPPS();
+    initEdgeComp();
 }
 
 void GPSDO_run() {
@@ -65,10 +95,15 @@ int GPSDO_offsetNano() {
 }
 
 // capture rising edge of PPS output for calculating CLK_MONOTONIC offset
-void ISR_GPIOPortG() {
+void ISR_Timer5A() {
     edgeValue = CLK_MONOTONIC_RAW();
     edgeUpdate = 1;
-    PORTG.ICR = 1;
+    GPTM5.ICR.CAE = 1;
+}
+
+// capture rising edge of GPS PPS for offset measurement
+void ISR_Timer5B() {
+    GPTM5.ICR.CBE = 1;
 }
 
 void updateFracTAI(uint32_t clkRaw) {

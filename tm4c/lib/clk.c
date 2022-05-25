@@ -64,7 +64,7 @@ void CLK_init() {
     GPTM0.TAMR.MR = 0x2;
     GPTM0.TAMR.CDIR = 1;
     GPTM0.TAMR.CINTD = 0;
-    GPTM0.IMR.TAMIM = 1;
+    GPTM0.IMR.TAM = 1;
     GPTM0.TAMR.MIE = 1;
     // start timer
     GPTM0.CTL.TAEN = 1;
@@ -73,7 +73,7 @@ void CLK_init() {
 // second boundary comparison
 void ISR_Timer0A() {
     // clear interrupt flag
-    GPTM0.ICR = GPTM0.MIS;
+    GPTM0.ICR.TAM = 1;
     // increment counter
     ++cntMonotonic;
     // set next second boundary
