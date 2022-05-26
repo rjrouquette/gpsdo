@@ -23,8 +23,8 @@
 
 volatile uint8_t debugHex[32];
 
-void drawStatusBanner();
-void drawStatusNetwork();
+void updateStatusBanner();
+void updateStatusNetwork();
 
 int main(void) {
     char temp[32];
@@ -72,8 +72,8 @@ int main(void) {
         LED_run();
         NET_run();
 
-        drawStatusBanner();
-        drawStatusNetwork();
+        updateStatusBanner();
+        updateStatusNetwork();
 
         uint32_t now = CLK_MONOTONIC_INT();
         int32_t diff = (int32_t) (now - next);
@@ -92,7 +92,7 @@ int main(void) {
     }
 }
 
-void drawStatusBanner() {
+void updateStatusBanner() {
     char temp[32];
     int end;
 
@@ -106,7 +106,7 @@ void drawStatusBanner() {
     FONT_drawText(EPD_width()-73, 0, temp, FONT_ASCII_16, 0, 2);
 }
 
-void drawStatusNetwork() {
+void updateStatusNetwork() {
     char temp[32];
     int end;
 
