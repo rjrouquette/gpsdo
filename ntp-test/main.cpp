@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
                 (sockaddr *) &srvAddr,
                 sizeof(srvAddr)
         );
-        log("sendto: %ld bytes", len);
+        //log("sendto: %ld bytes", len);
         sleep(1);
     }
 
@@ -94,8 +94,11 @@ void workerRX() {
     PACKET_NTPv3 packetNtp = {};
     struct timespec ts = {};
 
-    bool hasRxTimestamp = false;
     int64_t prevOffset = 0;
+    int64_t ringOffset[4];
+    int i = 0;
+
+    bool hasRxTimestamp = false;
     for(;;) {
         socklen_t sl = sizeof(struct sockaddr_in);
         ssize_t nread = recvfrom(fdSocket, &packetNtp, sizeof(packetNtp), 0, (struct sockaddr *) &sa, &sl);
@@ -112,12 +115,12 @@ void workerRX() {
             continue;
         hasRxTimestamp = false;
 
-        // display final response
-        log("tx1: %12u.%09u", packetNtp.origTime[0], packetNtp.origTime[1]);
-        log("rx1: %12u.%09u", packetNtp.rxTime[0], packetNtp.rxTime[1]);
-        log("ref: %12u.%09u", packetNtp.refTime[0], packetNtp.refTime[1]);
-        log("tx2: %12u.%09u", packetNtp.txTime[0], packetNtp.txTime[1]);
-        log("rx2: %12lu.%09lu", ts.tv_sec, ts.tv_nsec);
+//        // display final response
+//        log("tx1: %12u.%09u", packetNtp.origTime[0], packetNtp.origTime[1]);
+//        log("rx1: %12u.%09u", packetNtp.rxTime[0], packetNtp.rxTime[1]);
+//        log("ref: %12u.%09u", packetNtp.refTime[0], packetNtp.refTime[1]);
+//        log("tx2: %12u.%09u", packetNtp.txTime[0], packetNtp.txTime[1]);
+//        log("rx2: %12lu.%09lu", ts.tv_sec, ts.tv_nsec);
 
         // compute delays
         auto tx1 = toFixedPoint(packetNtp.origTime[0], packetNtp.origTime[1]);
@@ -129,18 +132,31 @@ void workerRX() {
         int64_t delayCli = rx2 - tx1;
         int64_t delayXfr = delayCli - delaySrv;
 
-        log("offset 1:  %+.9f", ((double)(tx1 - rx1))/(1l<<32));
-        log("offset 2:  %+.9f", ((double)(rx2 - tx2))/(1l<<32));
-
-        log("delay client:  %+.9f", ((double)delayCli)/(1l<<32));
-        log("delay server:  %+.9f", ((double)delaySrv)/(1l<<32));
-        log("delay transit: %+.9f", ((double)delayXfr)/(1l<<32));
+//        log("offset 1:  %+.9f", ((double)(tx1 - rx1))/(1l<<32));
+//        log("offset 2:  %+.9f", ((double)(rx2 - tx2))/(1l<<32));
+//
+//        log("delay client:  %+.9f", ((double)delayCli)/(1l<<32));
+//        log("delay server:  %+.9f", ((double)delaySrv)/(1l<<32));
+//        log("delay transit: %+.9f", ((double)delayXfr)/(1l<<32));
 
         int64_t offset = rx2 - tx2;
         offset -= delayXfr / 2;
-        log("time offset: %+.9f", ((double)offset)/(1l<<32));
-        log("delta offset: %+.9f", ((double)(offset - prevOffset))/(1l<<32));
-        prevOffset = offset;
+//        log("time offset: %+.9f", ((double)offset)/(1l<<32));
+//        log("delta offset: %+.9f", ((double)(offset - prevOffset))/(1l<<32));
+//        prevOffset = offset;
+
+        // ring average
+        ringOffset[i] = offset;
+        i = (i + 1) & (int) (std::size(ringOffset) - 1);
+        if(i == 0) {
+            int64_t acc = 0;
+            for(auto &o : ringOffset)
+                acc += o;
+            acc /= std::size(ringOffset);
+            log("time offset: %+.9f", ((double)acc)/(1l<<32));
+            log("delta offset: %+.9f", ((double)(acc - prevOffset))/(1l<<32));
+            prevOffset = acc;
+        }
     }
 }
 
