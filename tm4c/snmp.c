@@ -44,6 +44,7 @@ int writeValueInt64(uint8_t *data, int offset, const uint8_t *prefOID, int prefL
 int wrapVars(uint8_t *data, int offset, uint8_t *vars, int len);
 
 void sendBatt(uint8_t *frame);
+void sendGPSDO(uint8_t *frame);
 void sendNTP(uint8_t *frame);
 
 void SNMP_process(uint8_t *frame, int flen);
@@ -125,6 +126,10 @@ void SNMP_process(uint8_t *frame, int flen) {
                 section |= buffOID[sizeof(OID_PREFIX_MGMT)+1];
             }
             switch (section) {
+                // GPSDO (Phyiscal Sensors)
+                case 99:
+                    sendGPSDO(frame);
+                    break;
                 // NTP
                 case 197:
                     sendNTP(frame);
@@ -420,4 +425,5 @@ void sendResults(uint8_t *frame, uint8_t *data, int dlen) {
 
 // sub units
 #include "snmp.batt.c"
+#include "snmp.gpsdo.c"
 #include "snmp.ntp.c"
