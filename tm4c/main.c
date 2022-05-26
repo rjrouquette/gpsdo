@@ -23,6 +23,9 @@
 
 volatile uint8_t debugHex[32];
 
+void drawStatusBanner();
+void drawStatusNetwork();
+
 int main(void) {
     char temp[32];
     // enable FPU
@@ -45,9 +48,18 @@ int main(void) {
     NET_getMacAddress(temp);
     FONT_drawText(16, 248, temp, FONT_ASCII_16, 0, 3);
 
+    // banner background fill
     PLOT_setRect(0, 0, EPD_width()-1, 15, 2);
+    // separators
     PLOT_setLine(0, 15, EPD_width()-1, 15, 1);
+    PLOT_setLine(0, 183, EPD_width()-1, 183, 1);
     PLOT_setLine(0, 215, EPD_width()-1, 215, 1);
+
+    // packet count headers
+    FONT_drawText(0, 184, "RX:", FONT_ASCII_16, 0, 3);
+    FONT_drawText(0, 200, "TX:", FONT_ASCII_16, 0, 3);
+    FONT_drawText(120, 184, "frames", FONT_ASCII_16, 0, 3);
+    FONT_drawText(120, 200, "frames", FONT_ASCII_16, 0, 3);
 
     GPSDO_init();
     NTP_init();
@@ -60,18 +72,12 @@ int main(void) {
         LED_run();
         NET_run();
 
+        drawStatusBanner();
+        drawStatusNetwork();
+
         uint32_t now = CLK_MONOTONIC_INT();
         int32_t diff = (int32_t) (now - next);
         if(diff >= 0) {
-            end = toHMS(CLK_TAI_INT(), temp);
-            memcpy(temp + end, " TAI", 4);
-            temp[end+4] = 0;
-            FONT_drawText(0, 0, temp, FONT_ASCII_16, 0, 2);
-
-            end = toTemp(TEMP_proc(), temp);
-            temp[end] = 0;
-            FONT_drawText(EPD_width()-73, 0, temp, FONT_ASCII_16, 0, 2);
-
             for(int j = 0; j < 4; j++) {
                 for (int i = 0; i < 8; i++) {
                     toHex(debugHex[j*8 + i], 2, '0', temp);
@@ -80,35 +86,53 @@ int main(void) {
                 }
             }
 
-            end = toDec(EMAC0.RXCNTGB, 8, ' ', temp);
-            temp[end] = 0;
-            FONT_drawText(0, 96, temp, FONT_ASCII_16, 0, 3);
-
-            end = toDec(EMAC0.TXCNTGB, 8, ' ', temp);
-            temp[end] = 0;
-            FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3);
-
-            uint64_t tai = CLK_TAI();
-            end = toHex(tai >> 32, 8, '0', temp);
-            temp[end] = 0;
-            FONT_drawText(0, 128, temp, FONT_ASCII_16, 0, 3);
-
-            end = toHex(tai, 8, '0', temp);
-            temp[end] = 0;
-            FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
-
-            NET_getLinkStatus(temp);
-            FONT_drawText(0, 216, "LINK:", FONT_ASCII_16, 0, 3);
-            FONT_drawText(48, 216, temp, FONT_ASCII_16, 0, 3);
-
-            NET_getIpAddress(temp);
-            PLOT_setRect(0, 232, EPD_width()-1, 247, 3);
-            FONT_drawText(16, 232, temp, FONT_ASCII_16, 0, 3);
-
             EPD_refresh();
             next += 10;
         }
     }
+}
+
+void drawStatusBanner() {
+    char temp[32];
+    int end;
+
+    end = toHMS(CLK_TAI_INT(), temp);
+    memcpy(temp + end, " TAI", 4);
+    temp[end+4] = 0;
+    FONT_drawText(0, 0, temp, FONT_ASCII_16, 0, 2);
+
+    end = toTemp(TEMP_proc(), temp);
+    temp[end] = 0;
+    FONT_drawText(EPD_width()-73, 0, temp, FONT_ASCII_16, 0, 2);
+}
+
+void drawStatusNetwork() {
+    char temp[32];
+    int end;
+
+    // clear packet counts
+    PLOT_setRect(32, 184, 112, 214, 3);
+    // clear link status
+    PLOT_setRect(0, 216, EPD_width()-1, 247, 3);
+
+    // packets received
+    end = toDec(EMAC0.RXCNTGB, 10, ' ', temp);
+    temp[end] = 0;
+    FONT_drawText(32, 184, temp, FONT_ASCII_16, 0, 3);
+
+    // packets sent
+    end = toDec(EMAC0.TXCNTGB, 10, ' ', temp);
+    temp[end] = 0;
+    FONT_drawText(32, 200, temp, FONT_ASCII_16, 0, 3);
+
+    // link status
+    NET_getLinkStatus(temp);
+    FONT_drawText(0, 216, "LINK:", FONT_ASCII_16, 0, 3);
+    FONT_drawText(48, 216, temp, FONT_ASCII_16, 0, 3);
+
+    // current ip address
+    NET_getIpAddress(temp);
+    FONT_drawText(16, 232, temp, FONT_ASCII_16, 0, 3);
 }
 
 void debugBlink(int cnt) {
