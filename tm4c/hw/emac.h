@@ -411,7 +411,10 @@ PAGE_MAP (EMAC_MAP, {
 
     // offset 0x714
     // Ethernet MAC System Time - Nanoseconds Update
-    uint32_t TIMNANOU;
+    REGMAP_32(, {
+        unsigned VALUE: 31;
+        unsigned NEG: 1;
+    }) TIMNANOU;
 
     // offset 0x718
     // Ethernet MAC Timestamp Addend

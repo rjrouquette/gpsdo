@@ -113,6 +113,8 @@ static void initPHY() {
 }
 
 static void initPTP() {
+    // disable timer interrupts
+    EMAC0.IM.TS = 1;
     // enable PTP clock
     EMAC0.CC.PTPCEN = 1;
     // configure PTP
@@ -122,8 +124,13 @@ static void initPTP() {
     // 25MHz = 40ns
     EMAC0.SUBSECINC.SSINC = 40;
     // init timer
-    EMAC0.TIMNANOU = 0;
-    EMAC0.TIMSECU = 1653522483;
+    EMAC0.TIMSECU = 1653530160;
+    EMAC0.TIMNANOU.VALUE = 0;
+    // frequency correction
+    EMAC0.TIMADD = 0xFFF464C1;
+    EMAC0.TIMSTCTRL.ADDREGUP = 1;
+    EMAC0.TIMSTCTRL.TSFCUPDT = 1;
+    // start timer
     EMAC0.TIMSTCTRL.TSINIT = 1;
 }
 
