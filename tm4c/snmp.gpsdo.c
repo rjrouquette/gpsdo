@@ -11,6 +11,8 @@ const uint8_t OID_SENSOR_PREFIX[] = { 0x06, 0x0A, 0x2B, 6, 1, 2, 1, 99, 1, 1, 1 
 #define OID_SENSOR_PREC (3)
 #define OID_SENSOR_VALUE (4)
 
+#define OID_SENSOR_UNITS (6)
+
 #define OID_SENSOR_TYPE_OTHER (1)
 #define OID_SENSOR_TYPE_UNKNOWN (2)
 #define OID_SENSOR_TYPE_VOLTS_AC (3)
@@ -46,6 +48,7 @@ int writeGpsdoType(uint8_t *buffer);
 int writeGpsdoScale(uint8_t *buffer);
 int writeGpsdoPrec(uint8_t *buffer);
 int writeGpsdoValue(uint8_t *buffer);
+int writeGpsdoUnits(uint8_t *buffer);
 
 void sendGPSDO(uint8_t *frame) {
     // variable bindings
@@ -73,6 +76,10 @@ void sendGPSDO(uint8_t *frame) {
             break;
         case OID_SENSOR_VALUE:
             dlen = writeGpsdoValue(buffer);
+            sendResults(frame, buffer, dlen);
+            break;
+        case OID_SENSOR_UNITS:
+            dlen = writeGpsdoUnits(buffer);
             sendResults(frame, buffer, dlen);
             break;
     }
@@ -128,6 +135,20 @@ int writeGpsdoValue(uint8_t *buffer) {
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
             (temp * 1000) / 256
+    );
+
+    return dlen;
+}
+
+int writeGpsdoUnits(uint8_t *buffer) {
+    int dlen = 0;
+
+    // processor temp
+    uint32_t temp = TEMP_proc();
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,
+            "C", 1
     );
 
     return dlen;
