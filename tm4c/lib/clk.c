@@ -126,6 +126,10 @@ uint64_t CLK_MONOTONIC() {
     return result.full;
 }
 
+uint32_t CLK_TAI_INT() {
+    return EMAC0.TIMSEC;
+}
+
 uint64_t CLK_TAI() {
     // get current TAI
     uint32_t sa = EMAC0.TIMSEC;

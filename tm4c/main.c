@@ -4,6 +4,7 @@
  * @date 2022-04-13
  */
 
+#include <memory.h>
 #include "lib/clk.h"
 #include "lib/delay.h"
 #include "lib/epd.h"
@@ -62,8 +63,9 @@ int main(void) {
         uint32_t now = CLK_MONOTONIC_INT();
         int32_t diff = (int32_t) (now - next);
         if(diff >= 0) {
-            end = toHMS(now, temp);
-            temp[end] = 0;
+            end = toHMS(CLK_TAI_INT(), temp);
+            memcpy(temp + end, " TAI", 4);
+            temp[end+4] = 0;
             FONT_drawText(0, 0, temp, FONT_ASCII_16, 0, 2);
 
             end = toTemp(TEMP_proc(), temp);
@@ -94,14 +96,6 @@ int main(void) {
             end = toHex(tai, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
-
-            end = toHex(EMAC0.TIMSEC, 8, '0', temp);
-            temp[end] = 0;
-            FONT_drawText(0, 160, temp, FONT_ASCII_16, 0, 3);
-
-            end = toHex(EMAC0.TIMNANO, 8, '0', temp);
-            temp[end] = 0;
-            FONT_drawText(0, 176, temp, FONT_ASCII_16, 0, 3);
 
             NET_getLinkStatus(temp);
             FONT_drawText(0, 216, "LINK:", FONT_ASCII_16, 0, 3);
