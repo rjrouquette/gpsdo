@@ -30,6 +30,4 @@ uint64_t CLK_MONOTONIC();
  */
 uint64_t CLK_TAI();
 
-void CLK_setFracTAI(uint32_t offset);
-
 #endif //GPSDO_CLK_H

@@ -87,10 +87,8 @@ void DHCP_run() {
 }
 
 void DHCP_renew() {
-    uint64_t now = CLK_MONOTONIC();
     // compute new transaction ID
-    dhcpXID  = ((uint32_t*)&now)[0];
-    dhcpXID += ((uint32_t*)&now)[0];
+    dhcpXID = CLK_MONOTONIC_INT();
     for(int i = 0; i < 4; i++)
         dhcpXID += UNIQUEID.WORD[i];
 

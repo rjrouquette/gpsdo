@@ -123,7 +123,7 @@ static void initPTP() {
     EMAC0.SUBSECINC.SSINC = 40;
     // init timer
     EMAC0.TIMNANOU = 0;
-    EMAC0.TIMSECU = 0;
+    EMAC0.TIMSECU = 1653522483;
     EMAC0.TIMSTCTRL.TSINIT = 1;
 }
 
@@ -347,7 +347,7 @@ uint64_t NET_getRxTime(const uint8_t *rxFrame) {
 void NET_getRxTimeRaw(const uint8_t *rxFrame, uint32_t *rxTime) {
     // compute descriptor offset
     uint32_t rxId = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
-    if(rxId >= RX_RING_SIZE) return ;
+    if(rxId >= RX_RING_SIZE) return;
     // retrieve raw timestamp
     rxTime[0] = rxDesc[rxId].RTSH;
     rxTime[1] = rxDesc[rxId].RTSL;

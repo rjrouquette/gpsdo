@@ -40,7 +40,7 @@ struct PACKED FRAME_NTPv3 {
 _Static_assert(sizeof(struct FRAME_NTPv3) == 48, "FRAME_NTPv3 must be 48 bytes");
 
 static volatile uint32_t ntpEra = 0;
-static volatile uint64_t ntpTimeOffset = 0xe6338cbb00000000;
+static volatile uint64_t ntpTimeOffset = 2208988800ll << 32;
 
 void NTP_process(uint8_t *frame, int flen);
 

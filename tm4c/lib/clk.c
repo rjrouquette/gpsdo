@@ -7,14 +7,13 @@
 #include "../hw/timer.h"
 #include "clk.h"
 #include "delay.h"
+#include "../hw/emac.h"
 
 #define USE_XTAL 1
 #define CLK_FREQ (125000000)
 #define CLK_MOD (32u*125000000u)
 
 static volatile uint32_t cntMonotonic = 0;
-static volatile uint32_t taiFracOffset = 0;
-static volatile uint32_t taiIntOffset = -1;
 
 void CLK_init() {
     // Enable external clock
@@ -128,12 +127,42 @@ uint64_t CLK_MONOTONIC() {
 }
 
 uint64_t CLK_TAI() {
-    uint64_t result = CLK_MONOTONIC();
-    result += taiFracOffset;
-    ((uint32_t*)&result)[1] += taiIntOffset;
-    return result;
-}
+    // get current TAI
+    uint32_t sa = EMAC0.TIMSEC;
+    uint32_t na = EMAC0.TIMNANO;
+    uint32_t sb = EMAC0.TIMSEC;
+    uint32_t nb = EMAC0.TIMNANO;
+    // correct for access time skew around second boundary
+    if(nb < na && sb == sa) ++sb;
 
-void CLK_setFracTAI(uint32_t offset) {
-    taiFracOffset = offset;
+    // result structure
+    register union {
+        struct {
+            uint32_t fpart;
+            uint32_t ipart;
+        };
+        uint64_t full;
+    } result;
+
+    // load RX timestamp
+    result.fpart = nb >> 3;
+    result.ipart = result.fpart;
+
+    // split fractional time into fraction and remainder
+    result.ipart /= 1953125;
+    result.fpart -= 1953125 * result.ipart;
+
+    // compute twiddle for fractional conversion
+    register uint32_t twiddle = result.fpart;
+    twiddle *= 1524;
+    twiddle >>= 16;
+    // apply fractional coefficient
+    result.fpart *= 2199;
+    // apply fraction twiddle
+    result.fpart += twiddle;
+    // adjust bit alignment
+    result.full >>= 6;
+    // set integer part
+    result.ipart = sb;
+    return result.full;
 }

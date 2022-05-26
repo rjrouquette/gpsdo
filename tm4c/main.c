@@ -15,7 +15,6 @@
 #include "lib/temp.h"
 #include "hw/emac.h"
 #include "hw/sys.h"
-#include "lib/net/ip.h"
 
 #include "gpsdo.h"
 #include "ntp.h"
@@ -87,17 +86,22 @@ int main(void) {
             temp[end] = 0;
             FONT_drawText(0, 112, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(ipSubnet, 8, '0', temp);
+            uint64_t tai = CLK_TAI();
+            end = toHex(tai >> 32, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 128, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(EMAC0.TIMSEC, 8, '0', temp);
+            end = toHex(tai, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
 
-            end = toHex(EMAC0.TIMNANO, 8, '0', temp);
+            end = toHex(EMAC0.TIMSEC, 8, '0', temp);
             temp[end] = 0;
             FONT_drawText(0, 160, temp, FONT_ASCII_16, 0, 3);
+
+            end = toHex(EMAC0.TIMNANO, 8, '0', temp);
+            temp[end] = 0;
+            FONT_drawText(0, 176, temp, FONT_ASCII_16, 0, 3);
 
             NET_getLinkStatus(temp);
             FONT_drawText(0, 216, "LINK:", FONT_ASCII_16, 0, 3);

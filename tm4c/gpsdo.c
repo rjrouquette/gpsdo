@@ -7,12 +7,6 @@
 #include "hw/gpio.h"
 #include "hw/timer.h"
 #include "lib/delay.h"
-#include "lib/clk.h"
-
-static uint8_t edgeUpdate = 0;
-static uint32_t edgeTAI = 0;
-
-void updateFracTAI(uint32_t clkRaw);
 
 void initPPS() {
     // configure PPS output pin
@@ -52,10 +46,12 @@ void initEdgeComp() {
     GPTM5.TAMR.MR = 0x3;
     GPTM5.TBMR.MR = 0x3;
     // edge-time mode
+    GPTM5.TAMR.CMR = 1;
     GPTM5.TBMR.CMR = 1;
-    GPTM5.TBMR.CMR = 1;
+    GPTM5.CTL.TAEVENT = 1;
+    GPTM5.CTL.TBEVENT = 1;
     // count up
-    GPTM5.TBMR.CDIR = 1;
+    GPTM5.TAMR.CDIR = 1;
     GPTM5.TBMR.CDIR = 1;
     // disable overflow interrupt
     GPTM5.TAMR.CINTD = 0;
@@ -68,11 +64,29 @@ void initEdgeComp() {
     // interrupts
     GPTM5.IMR.CAE = 1;
     GPTM5.IMR.CBE = 1;
+    GPTM0.TAMR.MIE = 1;
+    GPTM0.TBMR.MIE = 1;
     // start timer
     GPTM5.CTL.TAEN = 1;
     GPTM5.CTL.TBEN = 1;
     // synchronize timers
     GPTM0.SYNC = (3 << 10);
+
+    // configure capture pins
+    RCGCGPIO.EN_PORTM = 1;
+    delay_cycles_4();
+    // unlock GPIO config
+    PORTM.LOCK = GPIO_LOCK_KEY;
+    PORTM.CR = 0xC0u;
+    // configure pins;
+    PORTM.PCTL.PMC6 = 3;
+    PORTM.PCTL.PMC7 = 3;
+    PORTM.AFSEL.ALT6 = 1;
+    PORTM.AFSEL.ALT7 = 1;
+    PORTM.DEN = 0xC0u;
+    // lock GPIO config
+    PORTM.CR = 0;
+    PORTM.LOCK = 0;
 }
 
 void GPSDO_init() {
@@ -81,10 +95,7 @@ void GPSDO_init() {
 }
 
 void GPSDO_run() {
-    if(edgeUpdate) {
-        edgeUpdate = 0;
-        updateFracTAI(edgeTAI);
-    }
+    // TODO implement GPSDO logic
 }
 
 int GPSDO_isLocked() {
@@ -97,46 +108,12 @@ int GPSDO_offsetNano() {
 
 // capture rising edge of PPS output for calculating CLK_MONOTONIC offset
 void ISR_Timer5A() {
-    edgeTAI = GPTM0.TAV.raw;
-    // compensate for ISR delay
-    uint16_t delay = GPTM5.TAV.LO;
-    delay -= GPTM5.TAR.LO;
-    edgeTAI -= delay;
-    // signal update
-    edgeUpdate = 1;
+    // TODO implement GPSDO logic
     GPTM5.ICR.CAE = 1;
 }
 
 // capture rising edge of GPS PPS for offset measurement
 void ISR_Timer5B() {
+    // TODO implement GPSDO logic
     GPTM5.ICR.CBE = 1;
-}
-
-void updateFracTAI(uint32_t clkRaw) {
-    register union {
-        struct {
-            uint32_t fpart;
-            uint32_t ipart;
-        };
-        uint64_t full;
-    } result;
-
-    // split fractional time into fraction and remainder
-    result.ipart = clkRaw;
-    result.ipart /= 1953125;
-    result.fpart = clkRaw;
-    result.fpart -= 1953125 * result.ipart;
-
-    // compute twiddle for fractional conversion
-    register uint32_t twiddle = result.fpart;
-    twiddle *= 1524;
-    twiddle >>= 16;
-    // apply fractional coefficient
-    result.fpart *= 2199;
-    // apply fraction twiddle
-    result.fpart += twiddle;
-    // adjust bit alignment
-    result.full >>= 6;
-    // update TAI alignment
-    CLK_setFracTAI(-result.fpart);
 }
