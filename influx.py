@@ -10,7 +10,7 @@ gpsdoHost = sys.argv[1]
 influxUrl = 'http://192.168.3.200:8086/write?db=radio_astronomy'
 
 while True:
-    # try:
+    try:
         iterator = getCmd(
             SnmpEngine(),
             CommunityData('status', mpModel=0),
@@ -31,15 +31,15 @@ while True:
         varTuple = varBinds[0]
         proc_temp = int(varTuple[1]) / 1000
 
-        varTuple = varBinds[1]
-        dcxo_temp = int(varTuple[1]) / 1000
+        # varTuple = varBinds[1]
+        dcxo_temp = proc_temp //int(varTuple[1]) / 1000
 
         body = 'gpsdo,host=%s proc_temp=%.2f,dcxo_temp=%.2f' % (
             gpsdoHost, proc_temp, dcxo_temp
         )
         requests.post(influxUrl, data=body, timeout=1)
-    # except:
-    #     print('failed to poll or record stats')
+    except:
+        print('failed to poll or record stats')
 
     # 1 second update interval
-        time.sleep(1)
+    time.sleep(1)
