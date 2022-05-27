@@ -134,22 +134,10 @@ static void initPTP() {
     EMAC0.TIMSTCTRL.TSINIT = 1;
 }
 
-static void initMAC() {
-    // disable flash prefetch per errata
-    FLASHCONF.FPFOFF = 1;
+static void initHwAddr() {
     // enable CRC module
     RCGCCCM.EN = 1;
     while(!PRCCM.RDY);
-    // enable clock
-    RCGCEMAC.EN0 = 1;
-    while(!PREMAC.RDY0);
-    // initialize PHY
-    initPHY();
-    // wait for DMA reset to complete
-    while(EMAC0.DMABUSMOD.SWR);
-
-    initPTP();
-
     // compute MAC address
     CRC.CTRL.TYPE = CRC_TYPE_04C11DB7;
     CRC.CTRL.INIT = CRC_INIT_ZERO;
@@ -160,6 +148,23 @@ static void initMAC() {
     // set MAC address (byte-order is reversed)
     EMAC0.ADDR0.HI.ADDR = ((CRC.SEED & 0xFF) << 8) | ((CRC.SEED  >> 8) & 0xFF);
     EMAC0.ADDR0.LO = (((CRC.SEED >> 16) & 0xFF) << 24) | 0x585554;
+    // disable CRC module
+    RCGCCCM.EN = 1;
+}
+
+static void initMAC() {
+    // disable flash prefetch per errata
+    FLASHCONF.FPFOFF = 1;
+    // enable clock
+    RCGCEMAC.EN0 = 1;
+    while(!PREMAC.RDY0);
+    // initialize PHY
+    initPHY();
+    // wait for DMA reset to complete
+    while(EMAC0.DMABUSMOD.SWR);
+
+    initHwAddr();
+    initPTP();
 
     // configure DMA
     EMAC0.DMABUSMOD.ATDS = 1;
