@@ -8,6 +8,14 @@
 #include "hw/timer.h"
 #include "lib/delay.h"
 
+static int32_t ppsGpsEdge;
+static int32_t ppsOutEdge;
+static int ppsOffsetNano;
+
+static uint8_t ppsGpsReady;
+static uint8_t ppsOutReady;
+static uint8_t isGpsLocked;
+
 void initPPS() {
     // configure PPS output pin
     RCGCGPIO.EN_PORTG = 1;
@@ -38,6 +46,17 @@ void initPPS() {
 }
 
 void initEdgeComp() {
+    // Enable Timer 4
+    RCGCTIMER.EN_GPTM4 = 1;
+    delay_cycles_4();
+    // Configure Timer 4 as 32-bit free-running timer
+    GPTM4.TAILR = -1;
+    GPTM4.TAMR.MR = 0x2;
+    GPTM4.TAMR.CDIR = 1;
+    GPTM4.TAMR.CINTD = 0;
+    // start timer
+    GPTM4.CTL.TAEN = 1;
+
     // Enable Timer 5
     RCGCTIMER.EN_GPTM5 = 1;
     delay_cycles_4();
@@ -92,28 +111,59 @@ void initEdgeComp() {
 void GPSDO_init() {
     initPPS();
     initEdgeComp();
+    // TODO get this status from the GPS receiver
+    isGpsLocked = 1;
 }
 
 void GPSDO_run() {
-    // TODO implement GPSDO logic
+    // only update if GPS has lock
+    if(!isGpsLocked) {
+        ppsGpsReady = 0;
+        ppsOutReady = 0;
+        return;
+    }
+    // ensure that both edge events have occurred
+    if(!(ppsGpsReady && ppsOutReady))
+        return;
+    // compute offset
+    int offset = ppsOutEdge - ppsGpsEdge;
+    // convert to nano seconds
+    offset <<= 8;
+    ppsOffsetNano = offset;
+
 }
 
 int GPSDO_isLocked() {
-    return 1;
+    return (int) isGpsLocked;
 }
 
 int GPSDO_offsetNano() {
-    return 0;
+    // TODO replace this with EMA value
+    return ppsOffsetNano;
 }
 
-// capture rising edge of PPS output for calculating CLK_MONOTONIC offset
+// capture rising edge of output PPS for offset measurement
 void ISR_Timer5A() {
-    // TODO implement GPSDO logic
+    // compute edge time
+    int32_t now = GPTM4.TAV.raw;
+    uint16_t delta = GPTM5.TAV.LO;
+    delta -= GPTM5.TAR.LO;
+    ppsOutEdge = now - delta;
+    // clear interrupt flag
     GPTM5.ICR.CAE = 1;
+    // indicate variable is ready
+    ppsOutReady = 1;
 }
 
 // capture rising edge of GPS PPS for offset measurement
 void ISR_Timer5B() {
-    // TODO implement GPSDO logic
+    // compute edge time
+    int32_t now = GPTM4.TAV.raw;
+    uint16_t delta = GPTM5.TBV.LO;
+    delta -= GPTM5.TBR.LO;
+    ppsGpsEdge = now - delta;
+    // clear interrupt flag
     GPTM5.ICR.CBE = 1;
+    // indicate variable is ready
+    ppsGpsReady = 1;
 }
