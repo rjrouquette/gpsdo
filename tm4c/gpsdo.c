@@ -2,11 +2,16 @@
 // Created by robert on 5/24/22.
 //
 
+#include <stdlib.h>
 #include "gpsdo.h"
 #include "hw/emac.h"
 #include "hw/gpio.h"
 #include "hw/timer.h"
 #include "lib/delay.h"
+
+
+#define OFFSET_COARSE_ALIGN (1000000) // 1 millisecond
+
 
 static int32_t ppsGpsEdge;
 static int32_t ppsOutEdge;
@@ -15,6 +20,7 @@ static int ppsOffsetNano;
 static uint8_t ppsGpsReady;
 static uint8_t ppsOutReady;
 static uint8_t isGpsLocked;
+static uint8_t waitRealign;
 
 void initPPS() {
     // configure PPS output pin
@@ -116,6 +122,8 @@ void GPSDO_init() {
     initEdgeComp();
     // TODO get this status from the GPS receiver
     isGpsLocked = 1;
+    // wait at least 10 PPS updates before attempting lock
+    waitRealign = 10;
 }
 
 void GPSDO_run() {
@@ -125,15 +133,47 @@ void GPSDO_run() {
         ppsOutReady = 0;
         return;
     }
-    // ensure that both edge events have occurred
+
+    // wait for both edge events
     if(!(ppsGpsReady && ppsOutReady))
         return;
+
+    // coarse realignment in progress
+    if(waitRealign) {
+        --waitRealign;
+        return;
+    }
+
     // compute offset
     int offset = ppsOutEdge - ppsGpsEdge;
     // convert to nano seconds
     offset <<= 8;
     ppsOffsetNano = offset;
 
+    // perform coarse realignment if offset is too large
+    if(abs(offset) > OFFSET_COARSE_ALIGN) {
+        // realign TAI second boundary
+        waitRealign = 2;
+        // truncate offset precision to 40ns
+        offset %= 1000000000;
+        offset /= 40;
+        offset *= 40;
+        // adjust sign
+        if(offset > 0) {
+            offset = -offset;
+            EMAC0.TIMNANOU.NEG = 1;
+        }
+        // set update update registers
+        EMAC0.TIMNANOU.VALUE = -offset;
+        EMAC0.TIMSECU = 0;
+        // wait for hardware ready state
+        while(EMAC0.TIMSTCTRL.TSUPDT);
+        // start update
+        EMAC0.TIMSTCTRL.TSUPDT = 1;
+        return;
+    }
+
+    // TODO implement PLL logic
 }
 
 int GPSDO_isLocked() {
