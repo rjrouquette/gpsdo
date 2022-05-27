@@ -7,7 +7,7 @@
 
 
 void FONT_drawText(
-        int x, int y, char *text, const volatile uint8_t *font,
+        int x, int y, const char *text, const volatile uint8_t *font,
         uint8_t foreground, uint8_t background
 ) {
     uint16_t charWidth = font[0];

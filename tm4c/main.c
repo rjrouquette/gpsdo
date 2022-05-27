@@ -20,6 +20,7 @@
 #include "gpsdo.h"
 #include "ntp.h"
 #include "snmp.h"
+#include "lib/net/dhcp.h"
 
 volatile uint8_t debugHex[32];
 
@@ -109,6 +110,8 @@ void updateStatusBanner() {
 void updateStatusNetwork() {
     char temp[32];
     int end;
+
+    FONT_drawText(0, 168, DHCP_hostname(), FONT_ASCII_16, 0, 3);
 
     // clear packet counts
     PLOT_setRect(32, 184, 112, 214, 3);

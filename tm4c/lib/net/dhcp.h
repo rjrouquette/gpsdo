@@ -14,4 +14,6 @@ void DHCP_renew();
 // handler for server responses
 void DHCP_process(uint8_t *frame, int flen);
 
+const char * DHCP_hostname();
+
 #endif //GPSDO_DHCP_H

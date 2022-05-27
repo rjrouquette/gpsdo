@@ -13,6 +13,7 @@
 #include "ip.h"
 #include "udp.h"
 #include "util.h"
+#include "../format.h"
 
 
 struct PACKED HEADER_DHCP {
@@ -37,6 +38,10 @@ _Static_assert(sizeof(struct HEADER_DHCP) == 240, "HEADER_DHCP must be 240 bytes
 #define DHCP_MAGIC (0x63538263)
 uint32_t dhcpXID = 0;
 uint32_t dhcpLeaseExpire = 0;
+
+static const char lut_hex[] = "0123456789abcdef";
+static char hostname[16] = "gpsdo-";
+static int lenHostname = 0;
 
 static const uint8_t DHCP_OPT_DISCOVER[] = { 0x35, 0x01, 0x01 };
 static const uint8_t DHCP_OPT_REQUEST[] = { 0x35, 0x01, 0x03 };
@@ -88,9 +93,18 @@ void DHCP_run() {
 
 void DHCP_renew() {
     // compute new transaction ID
-    dhcpXID = CLK_MONOTONIC_INT();
     for(int i = 0; i < 4; i++)
         dhcpXID += UNIQUEID.WORD[i];
+    // set hostname
+    if(lenHostname == 0) {
+        // create "unique" hostname
+        for(int i = 0; i < 4; i++) {
+            hostname[6 + i] = lut_hex[(dhcpXID >> (i * 4)) & 0xF];
+        }
+        lenHostname = 10;
+    }
+    // scramble ID
+    dhcpXID += CLK_MONOTONIC_INT();
 
     // get TX descriptor
     int txDesc = NET_getTxDesc();
@@ -117,6 +131,11 @@ void DHCP_renew() {
         // parameter request
         memcpy(frame + flen, DHCP_OPT_PARAM_REQ, sizeof(DHCP_OPT_PARAM_REQ));
         flen += sizeof(DHCP_OPT_PARAM_REQ);
+        // hostname
+        frame[flen++] = 12;
+        frame[flen++] = lenHostname;
+        memcpy(frame+flen, hostname, lenHostname);
+        flen += lenHostname;
         // end mark
         frame[flen++] = 0xFF;
     } else {
@@ -263,6 +282,11 @@ static void sendReply(struct HEADER_DHCP *response) {
     // parameter request
     memcpy(frame + flen, DHCP_OPT_PARAM_REQ, sizeof(DHCP_OPT_PARAM_REQ));
     flen += sizeof(DHCP_OPT_PARAM_REQ);
+    // hostname
+    frame[flen++] = 12;
+    frame[flen++] = lenHostname;
+    memcpy(frame+flen, hostname, lenHostname);
+    flen += lenHostname;
     // requested IP
     frame[flen++] = 50;
     frame[flen++] = 4;
@@ -279,4 +303,8 @@ static void sendReply(struct HEADER_DHCP *response) {
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
     NET_transmit(txDesc, flen);
+}
+
+const char * DHCP_hostname() {
+    return hostname;
 }
