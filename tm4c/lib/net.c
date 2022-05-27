@@ -217,6 +217,8 @@ void NET_init() {
     ipID = EMAC0.ADDR0.HI.ADDR;
     // register DHCP client port
     UDP_register(DHCP_PORT_CLI, DHCP_process);
+    // initialize DHCP
+    DHCP_init();
 }
 
 void NET_getLinkStatus(char *strStatus) {

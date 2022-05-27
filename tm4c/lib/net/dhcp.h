@@ -8,6 +8,7 @@
 #define DHCP_PORT_SRV (67)
 #define DHCP_PORT_CLI (68)
 
+void DHCP_init();
 void DHCP_run();
 void DHCP_renew();
 

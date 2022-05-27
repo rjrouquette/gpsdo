@@ -83,7 +83,7 @@ int main(void) {
                 for (int i = 0; i < 8; i++) {
                     toHex(debugHex[j*8 + i], 2, '0', temp);
                     temp[2] = 0;
-                    FONT_drawText(i * 20, (j+1)*16, temp, FONT_ASCII_16, 0, 3);
+                    FONT_drawText(i * 20, (j+4)*16, temp, FONT_ASCII_16, 0, 3);
                 }
             }
 
@@ -111,7 +111,7 @@ void updateStatusNetwork() {
     char temp[32];
     int end;
 
-    FONT_drawText(0, 168, DHCP_hostname(), FONT_ASCII_16, 0, 3);
+    FONT_drawText(48, 16, DHCP_hostname(), FONT_ASCII_16, 0, 3);
 
     // clear packet counts
     PLOT_setRect(32, 184, 112, 214, 3);

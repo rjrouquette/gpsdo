@@ -36,8 +36,9 @@ struct PACKED HEADER_DHCP {
 _Static_assert(sizeof(struct HEADER_DHCP) == 240, "HEADER_DHCP must be 240 bytes");
 
 #define DHCP_MAGIC (0x63538263)
-uint32_t dhcpXID = 0;
-uint32_t dhcpLeaseExpire = 0;
+static uint32_t dhcpUUID;
+static uint32_t dhcpXID = 0;
+static uint32_t dhcpLeaseExpire = 0;
 
 static const char lut_hex[] = "0123456789abcdef";
 static char hostname[16] = "gpsdo-";
@@ -82,6 +83,19 @@ static void initPacket(void *frame) {
     headerDHCP->MAGIC = DHCP_MAGIC;
 }
 
+void DHCP_init() {
+    // compute UUID
+    dhcpUUID = UNIQUEID.WORD[0];
+    for(int i = 1; i < 4; i++)
+        dhcpUUID += UNIQUEID.WORD[i];
+    // create "unique" hostname
+    for(int i = 0; i < 4; i++) {
+        hostname[6 + i] = lut_hex[(dhcpUUID >> (i * 4)) & 0xF];
+    }
+    hostname[10] = 0;
+    lenHostname = 10;
+}
+
 void DHCP_run() {
     const uint32_t now = CLK_MONOTONIC_INT();
     if(((int32_t)(dhcpLeaseExpire - now)) <= 0) {
@@ -92,19 +106,8 @@ void DHCP_run() {
 }
 
 void DHCP_renew() {
-    // compute new transaction ID
-    for(int i = 0; i < 4; i++)
-        dhcpXID += UNIQUEID.WORD[i];
-    // set hostname
-    if(lenHostname == 0) {
-        // create "unique" hostname
-        for(int i = 0; i < 4; i++) {
-            hostname[6 + i] = lut_hex[(dhcpXID >> (i * 4)) & 0xF];
-        }
-        lenHostname = 10;
-    }
-    // scramble ID
-    dhcpXID += CLK_MONOTONIC_INT();
+    // create request ID
+    dhcpXID = dhcpUUID + CLK_MONOTONIC_INT();
 
     // get TX descriptor
     int txDesc = NET_getTxDesc();
