@@ -35,6 +35,14 @@ int16_t TEMP_proc() {
     return (int16_t) (temp / 4096);
 }
 
+int16_t TEMP_dcxo() {
+    // TODO implement I2C sensor
+    int32_t temp = adc_temp;
+    temp *= 63360;
+    temp = 154664960 - temp;
+    return (int16_t) (temp / 4096);
+}
+
 void ISR_ADC0Sequence3(void) {
     // clear interrupt
     ADC0.ISC.IN3 = 1;

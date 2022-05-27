@@ -95,6 +95,13 @@ int writeGpsdoType(uint8_t *buffer) {
             OID_SENSOR_TYPE_CELSIUS
     );
 
+    // DCXO temp
+    dlen = writeValueInt8(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_TYPE,
+            OID_SENSOR_TYPE_CELSIUS
+    );
+
     return dlen;
 }
 
@@ -102,7 +109,13 @@ int writeGpsdoScale(uint8_t *buffer) {
     int dlen = 0;
 
     // processor temp
-    uint32_t temp = TEMP_proc();
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_SCALE,
+            OID_SENSOR_SCALE_1
+    );
+
+    // DCXO temp
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_SCALE,
@@ -116,7 +129,13 @@ int writeGpsdoPrec(uint8_t *buffer) {
     int dlen = 0;
 
     // processor temp
-    uint32_t temp = TEMP_proc();
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC,
+            3
+    );
+
+    // DCXO temp
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC,
@@ -127,10 +146,19 @@ int writeGpsdoPrec(uint8_t *buffer) {
 }
 
 int writeGpsdoValue(uint8_t *buffer) {
+    uint32_t temp;
     int dlen = 0;
 
     // processor temp
-    uint32_t temp = TEMP_proc();
+    temp = TEMP_proc();
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
+            (temp * 1000) / 256
+    );
+
+    // DCXO temp
+    temp = TEMP_dcxo();
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
@@ -144,7 +172,13 @@ int writeGpsdoUnits(uint8_t *buffer) {
     int dlen = 0;
 
     // processor temp
-    uint32_t temp = TEMP_proc();
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,
+            "C", 1
+    );
+
+    // DCXO temp
     dlen = writeValueBytes(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,
