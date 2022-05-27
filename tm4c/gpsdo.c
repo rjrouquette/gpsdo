@@ -38,11 +38,12 @@ void initPPS() {
     EMAC0.PPS0WIDTH = 12500000-1;
     // use command mode
     EMAC0.PPSCTRL.TRGMODS0 = 3;
-    EMAC0.PPSCTRL.PPSEN0 = 1;
-    // start zero-aligned pulse train
-    EMAC0.TARGNANO = 0;
-    EMAC0.TARGSEC = EMAC0.TIMSEC + 1;
-    EMAC0.PPSCTRL.PPSCTRL = 2;
+    EMAC0.PPSCTRL.PPSEN0 = 0;
+//    // start zero-aligned pulse train
+//    EMAC0.PPSCTRL.PPSEN0 = 1;
+//    EMAC0.TARGNANO = 0;
+//    EMAC0.TARGSEC = EMAC0.TIMSEC + 1;
+//    EMAC0.PPSCTRL.PPSCTRL = 2;
 }
 
 void initEdgeComp() {
