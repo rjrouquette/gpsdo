@@ -9,5 +9,6 @@ void GPSDO_init();
 void GPSDO_run();
 int GPSDO_isLocked();
 int GPSDO_offsetNano();
+float GPSDO_getCorrection();
 
 #endif //GPSDO_GPSDO_H

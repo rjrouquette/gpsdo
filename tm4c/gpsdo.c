@@ -3,6 +3,7 @@
 //
 
 #include <stdlib.h>
+#include <math.h>
 #include "gpsdo.h"
 #include "hw/emac.h"
 #include "hw/gpio.h"
@@ -21,6 +22,11 @@ static uint8_t ppsGpsReady;
 static uint8_t ppsOutReady;
 static uint8_t isGpsLocked;
 static uint8_t waitRealign;
+
+
+void setFeedback(float feedback);
+float getFeedback();
+
 
 void initPPS() {
     // configure PPS output pin
@@ -174,6 +180,7 @@ void GPSDO_run() {
     }
 
     // TODO implement PLL logic
+    setFeedback(0.9e-9f * (float) offset);
 }
 
 int GPSDO_isLocked() {
@@ -183,6 +190,10 @@ int GPSDO_isLocked() {
 int GPSDO_offsetNano() {
     // TODO replace this with EMA value
     return ppsOffsetNano;
+}
+
+float GPSDO_getCorrection() {
+    return getFeedback();
 }
 
 // capture rising edge of output PPS for offset measurement
@@ -209,4 +220,19 @@ void ISR_Timer5B() {
     GPTM5.ICR.CBE = 1;
     // indicate variable is ready
     ppsGpsReady = 1;
+}
+
+void setFeedback(float feedback) {
+    int32_t correction = lroundf(ldexpf(feedback, 32));
+    // correction factor must always be negative
+    if(correction > 0) correction = -1;
+    // correction factor must not exceed 1 part-per-thousand
+    if(correction < -(1 << 22)) correction = -(1 << 22);
+    // apply correction update
+    EMAC0.TIMADD = correction;
+    EMAC0.TIMSTCTRL.ADDREGUP = 1;
+}
+
+float getFeedback() {
+    return ldexpf((float) (int32_t)EMAC0.TIMADD, -32);
 }

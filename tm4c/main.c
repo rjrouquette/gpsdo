@@ -5,6 +5,7 @@
  */
 
 #include <memory.h>
+#include <math.h>
 #include "lib/clk.h"
 #include "lib/delay.h"
 #include "lib/epd.h"
@@ -90,6 +91,13 @@ int main(void) {
             EPD_refresh();
             next += 10;
         }
+
+        int32_t fb = lroundf(GPSDO_getCorrection() * 1e10f);
+        toDec(fb / 10000, 4, ' ', temp);
+        temp[4] = '.';
+        toDec(fb % 10000, 4, '0', temp + 5);
+        temp[9] = 0;
+        FONT_drawText(0, 160, "RX:", FONT_ASCII_16, 0, 3);
     }
 }
 
