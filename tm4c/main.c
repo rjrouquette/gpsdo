@@ -26,6 +26,7 @@
 volatile uint8_t debugHex[32];
 
 void updateStatusBanner();
+void updateStatusGPSDO();
 void updateStatusNetwork();
 
 int main(void) {
@@ -74,12 +75,13 @@ int main(void) {
         LED_run();
         NET_run();
 
-        updateStatusBanner();
-        updateStatusNetwork();
-
         uint32_t now = CLK_MONOTONIC_INT();
         int32_t diff = (int32_t) (now - next);
         if(diff >= 0) {
+            updateStatusBanner();
+            updateStatusGPSDO();
+            updateStatusNetwork();
+
             for(int j = 0; j < 4; j++) {
                 for (int i = 0; i < 8; i++) {
                     toHex(debugHex[j*8 + i], 2, '0', temp);
@@ -91,13 +93,6 @@ int main(void) {
             EPD_refresh();
             next += 10;
         }
-
-        int32_t fb = lroundf(GPSDO_getCorrection() * 1e10f);
-        toDec(fb / 10000, 4, ' ', temp);
-        temp[4] = '.';
-        toDec(fb % 10000, 4, '0', temp + 5);
-        temp[9] = 0;
-        FONT_drawText(0, 160, "RX:", FONT_ASCII_16, 0, 3);
     }
 }
 
@@ -113,6 +108,16 @@ void updateStatusBanner() {
     end = toTemp(TEMP_proc(), temp);
     temp[end] = 0;
     FONT_drawText(EPD_width()-73, 0, temp, FONT_ASCII_16, 0, 2);
+}
+
+void updateStatusGPSDO() {
+    char temp[16];
+    int32_t fb = lroundf(GPSDO_getCorrection() * 1e4f);
+    toDec(fb / 10000, 4, ' ', temp);
+    temp[4] = '.';
+    toDec(fb % 10000, 4, '0', temp + 5);
+    temp[9] = 0;
+    FONT_drawText(0, 160, temp, FONT_ASCII_16, 0, 3);
 }
 
 void updateStatusNetwork() {
