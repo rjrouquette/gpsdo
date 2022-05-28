@@ -125,6 +125,27 @@ int writeGpsdoType(uint8_t *buffer) {
             OID_SENSOR_TYPE_OTHER
     );
 
+    // GPSDO temperature compensation bias
+    dlen = writeValueInt8(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_TYPE,
+            OID_SENSOR_TYPE_OTHER
+    );
+
+    // GPSDO temperature compensation coefficient
+    dlen = writeValueInt8(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_TYPE,
+            OID_SENSOR_TYPE_OTHER
+    );
+
+    // GPSDO temperature compensation value
+    dlen = writeValueInt8(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_TYPE,
+            OID_SENSOR_TYPE_OTHER
+    );
+
     return dlen;
 }
 
@@ -166,6 +187,27 @@ int writeGpsdoScale(uint8_t *buffer) {
             OID_SENSOR_SCALE_1
     );
 
+    // GPSDO temperature compensation bias
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_SCALE,
+            OID_SENSOR_SCALE_1
+    );
+
+    // GPSDO temperature compensation coefficient
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_SCALE,
+            OID_SENSOR_SCALE_1
+    );
+
+    // GPSDO temperature compensation value
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_SCALE,
+            OID_SENSOR_SCALE_1
+    );
+
     return dlen;
 }
 
@@ -201,6 +243,27 @@ int writeGpsdoPrec(uint8_t *buffer) {
     );
 
     // GPSDO correction
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC,
+            4
+    );
+
+    // GPSDO temperature compensation bias
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC,
+            4
+    );
+
+    // GPSDO temperature compensation coefficient
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC,
+            4
+    );
+
+    // GPSDO temperature compensation value
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC,
@@ -251,6 +314,27 @@ int writeGpsdoValue(uint8_t *buffer) {
             lroundf(GPSDO_freqCorr() * 1e10f)
     );
 
+    // GPSDO temperature compensation bias
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
+            lroundf(GPSDO_compBias() * 1e10f)
+    );
+
+    // GPSDO temperature compensation coefficient
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
+            lroundf(GPSDO_compCoeff() * 1e10f)
+    );
+
+    // GPSDO temperature compensation value
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
+            lroundf(GPSDO_compValue() * 1e10f)
+    );
+
     return dlen;
 }
 
@@ -286,6 +370,27 @@ int writeGpsdoUnits(uint8_t *buffer) {
     );
 
     // GPSDO correction
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,
+            "ppm", 1
+    );
+
+    // GPSDO temperature compensation bias
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,
+            "ppm", 1
+    );
+
+    // GPSDO temperature compensation coefficient
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,
+            "ppm/C", 1
+    );
+
+    // GPSDO temperature compensation value
     dlen = writeValueBytes(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,

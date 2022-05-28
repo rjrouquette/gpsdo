@@ -12,5 +12,8 @@ int GPSDO_offsetNano();
 float GPSDO_offsetMean();
 float GPSDO_offsetRms();
 float GPSDO_freqCorr();
+float GPSDO_compBias();
+float GPSDO_compCoeff();
+float GPSDO_compValue();
 
 #endif //GPSDO_GPSDO_H

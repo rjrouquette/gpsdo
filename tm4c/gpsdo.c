@@ -10,6 +10,7 @@
 #include "hw/timer.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
+#include "lib/temp.h"
 
 
 #define OFFSET_COARSE_ALIGN (1000000) // 1 millisecond
@@ -31,8 +32,23 @@ static uint8_t isGpsLocked;
 static uint8_t waitRealign;
 
 
-void setFeedback(float feedback);
-float getFeedback();
+// temperature compensation
+#define COMP_SPAN (8)
+#define COMP_PREC (8)
+#define COMP_MASK (0xFF)
+static uint16_t compTau[256];
+static float compMat[256];
+static float compM, compB;
+
+// current correction values
+static float currFeedback;
+static float currTemperature;
+static float currCompensation;
+
+static void setFeedback(float feedback);
+static float getFeedback();
+static void updateCompensation();
+static float getCompensation();
 
 
 void initPPS() {
@@ -160,6 +176,8 @@ void GPSDO_run() {
     // clear ready state
     ppsGpsReady = 0;
     ppsOutReady = 0;
+    // update current temperature
+    currTemperature = ldexpf(TEMP_dcxo(), -8);
 
     // coarse realignment in progress
     if(waitRealign > 0) {
@@ -199,6 +217,8 @@ void GPSDO_run() {
         return;
     }
 
+    currCompensation = getCompensation();
+
     // TODO implement PLL logic
     setFeedback(pllBias + 1e-10f * (float) offset);
     pllBias += 1e-11f * (float) offset;
@@ -212,6 +232,10 @@ void GPSDO_run() {
     fltOffset *= fltOffset;
     ppsOffsetVar += (fltOffset - ppsOffsetVar) / STAT_TIME_CONST;
     ppsOffsetRms = sqrtf(ppsOffsetVar);
+
+    // update temperature coefficient
+    if(ppsOffsetRms < STAT_LOCK_RMS)
+        updateCompensation();
 }
 
 int GPSDO_isLocked() {
@@ -233,6 +257,18 @@ float GPSDO_offsetRms() {
 
 float GPSDO_freqCorr() {
     return getFeedback();
+}
+
+float GPSDO_compBias() {
+    return compB;
+}
+
+float GPSDO_compCoeff() {
+    return compM;
+}
+
+float GPSDO_compValue() {
+    return currCompensation;
 }
 
 // capture rising edge of output PPS for offset measurement
@@ -262,6 +298,9 @@ void ISR_Timer5B() {
 }
 
 void setFeedback(float feedback) {
+    // update current feedback value
+    currFeedback = feedback;
+    // convert to correction factor
     int32_t correction = lroundf(ldexpf(feedback, 32));
     // correction factor must always be negative
     if(correction > 0) correction = -1;
@@ -274,4 +313,61 @@ void setFeedback(float feedback) {
 
 float getFeedback() {
     return ldexpf((float)(int32_t)(EMAC0.TIMADD), -32);
+}
+
+void updateCompensation() {
+    // update temperature bins
+    const int ibase = (int) (currTemperature * COMP_PREC);
+    volatile uint16_t *tau = &compTau[ibase & COMP_MASK];
+    volatile float *step = &compMat[ibase & COMP_MASK];
+    // update selected bin
+    if(tau[0] < 4096) ++tau[0];
+    step[0] += (currFeedback - step[0]) / (float) tau[0];
+}
+
+float getCompensation() {
+    const int ibase = (int) (currTemperature * COMP_PREC);
+
+    float m = 0;
+    int cnt = 0;
+    float scratch[COMP_SPAN * 2];
+    for(int i = -COMP_SPAN; i <= (COMP_SPAN-1); i++) {
+        float l = compMat[(ibase + i) & COMP_MASK];
+        float u = compMat[(ibase + i + 1) & COMP_MASK];
+        if(l != 0 && u != 0) {
+            scratch[cnt++] = u - l;
+        }
+    }
+    if(cnt != 0) {
+        float mean = 0;
+        for (int i = 0; i < cnt; i++)
+            mean += scratch[i];
+        mean /= (float) cnt;
+
+        float stddev = 0;
+        for (int i = 0; i < cnt; i++) {
+            float diff = scratch[i] - mean;
+            stddev += diff * diff;
+        }
+        stddev = sqrtf(stddev / (float) cnt);
+
+        int n = 0;
+        for (int i = 0; i < cnt; i++) {
+            float diff = scratch[i] - mean;
+            if (fabsf(diff) <= stddev) {
+                m += scratch[i];
+                ++n;
+            }
+        }
+        if (n > 0) {
+            m /= (float) n;
+            m *= COMP_PREC;
+        }
+    }
+    compM = m;
+
+    const float b = compMat[ibase & COMP_MASK];
+    if(b != 0) compB = b;
+    const float o = (((float)ibase) + 0.5f) / COMP_PREC;
+    return (compM * (currTemperature - o)) + compB;
 }
