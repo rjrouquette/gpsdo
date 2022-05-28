@@ -22,6 +22,8 @@ static int32_t ppsGpsEdge;
 static int32_t ppsOutEdge;
 static int ppsOffsetNano;
 
+static float pllBias;
+
 static float ppsOffsetMean;
 static float ppsOffsetVar;
 static float ppsOffsetRms;
@@ -148,7 +150,6 @@ void GPSDO_init() {
     GPS_init();
 }
 
-static float pllBias = -177.1e-6f;
 void GPSDO_run() {
     // run GPS state machine
     GPS_run();
@@ -208,17 +209,16 @@ void GPSDO_run() {
         return;
     }
 
-    currCompensation = getCompensation();
-
-    // TODO implement PLL logic
-    setFeedback(pllBias + 1e-10f * (float) offset);
-    pllBias += 1e-11f * (float) offset;
-
-    // update PPS stats
+    // update control loop
     float fltOffset = ((float) offset) * 1e-9f;
-    // limit offset
+    currCompensation = getCompensation();
+    setFeedback(currCompensation + pllBias + ldexpf(fltOffset, -4));
+    pllBias += ldexpf(fltOffset, -8);
+
+    // restrict offset
     if(fltOffset > 10e6f) fltOffset = 10e6f;
     if(fltOffset < -10e6f) fltOffset = -10e6f;
+    // update PPS stats
     ppsOffsetMean += (fltOffset - ppsOffsetMean) / STAT_TIME_CONST;
     fltOffset *= fltOffset;
     ppsOffsetVar += (fltOffset - ppsOffsetVar) / STAT_TIME_CONST;
