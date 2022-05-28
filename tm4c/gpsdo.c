@@ -16,6 +16,7 @@
 #define OFFSET_COARSE_ALIGN (1000000) // 1 millisecond
 #define STAT_TIME_CONST (16)
 #define STAT_LOCK_RMS (250e-9f)
+#define STAT_CTRL_RMS (500e-9f)
 #define STAT_COMP_RMS (200e-9f)
 
 
@@ -213,6 +214,19 @@ void GPSDO_run() {
         EMAC0.TIMSTCTRL.TSUPDT = 1;
         return;
     }
+    // convert PPS offset to float
+    float fltOffset = ((float) offset) * 1e-9f;
+    // update PPS stats
+    ppsOffsetMean += (fltOffset - ppsOffsetMean) / STAT_TIME_CONST;
+    fltOffset *= fltOffset;
+    ppsOffsetVar += (fltOffset - ppsOffsetVar) / STAT_TIME_CONST;
+    ppsOffsetRms = sqrtf(ppsOffsetVar);
+    // update skew stats
+    ppsSkew *= ppsSkew;
+    // restrict skew
+    if(ppsSkew > 1e8f) ppsSkew = 1e8f;
+    ppsSkewVar += (ppsSkew - ppsSkewVar) / STAT_TIME_CONST;
+    ppsSkewRms = sqrtf(ppsSkewVar);
 
     // get temperature compensation
     float newComp = getCompensation();
@@ -226,26 +240,16 @@ void GPSDO_run() {
         currCompensation = newComp;
     }
 
+    // convert PPS offset to float
+    fltOffset = ((float) offset) * 1e-9f;
+    // determine compensation rate
+    float rate = ppsOffsetRms / 256e-9f;
+    if(rate > 0.5f) rate = 0.5f;
     // update control loop
-    float fltOffset = ((float) offset) * 1e-9f;
-    setFeedback(currCompensation + pllBias + ldexpf(fltOffset, -4));
-    pllBias += ldexpf(fltOffset, -8);
-
-    // restrict offset
-    if(fltOffset > 10e6f) fltOffset = 10e6f;
-    if(fltOffset < -10e6f) fltOffset = -10e6f;
-    // update PPS stats
-    ppsOffsetMean += (fltOffset - ppsOffsetMean) / STAT_TIME_CONST;
-    fltOffset *= fltOffset;
-    ppsOffsetVar += (fltOffset - ppsOffsetVar) / STAT_TIME_CONST;
-    ppsOffsetRms = sqrtf(ppsOffsetVar);
-    // update skew stats
-    ppsSkew *= ppsSkew;
-    // restrict skew
-    if(ppsSkew > 1e8f) ppsSkew = 1e8f;
-    ppsSkewVar += (ppsSkew - ppsSkewVar) / STAT_TIME_CONST;
-    ppsSkewRms = sqrtf(ppsSkewVar);
-
+    setFeedback(currCompensation + pllBias + (fltOffset * rate));
+    // update control bias
+    if(ppsSkewRms < STAT_CTRL_RMS)
+        pllBias += ldexpf(fltOffset, -8);
     // update temperature coefficient
     if(ppsSkewRms < STAT_COMP_RMS)
         updateCompensation();
