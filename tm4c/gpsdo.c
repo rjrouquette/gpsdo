@@ -234,5 +234,5 @@ void setFeedback(float feedback) {
 }
 
 float getFeedback() {
-    return ldexpf((float) (int32_t)EMAC0.TIMADD, -32);
+    return ldexpf((float)(int32_t)(EMAC0.TIMADD), -32);
 }

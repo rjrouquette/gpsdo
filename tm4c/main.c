@@ -5,7 +5,6 @@
  */
 
 #include <memory.h>
-#include <math.h>
 #include "lib/clk.h"
 #include "lib/delay.h"
 #include "lib/epd.h"
@@ -111,12 +110,9 @@ void updateStatusBanner() {
 }
 
 void updateStatusGPSDO() {
-    char temp[16];
-    int32_t fb = lroundf(GPSDO_getCorrection() * 1e4f);
-    toDec(fb / 10000, 4, ' ', temp);
-    temp[4] = '.';
-    toDec(fb % 10000, 4, '0', temp + 5);
-    temp[9] = 0;
+    char temp[32];
+    int len = fmtFloat(GPSDO_getCorrection() * 1e6f, 12, 4, temp);
+    strcpy(temp+len, " ppm");
     FONT_drawText(0, 160, temp, FONT_ASCII_16, 0, 3);
 }
 
