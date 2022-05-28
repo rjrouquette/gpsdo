@@ -97,8 +97,6 @@ void initEdgeComp() {
     // edge-time mode
     GPTM5.TAMR.CMR = 1;
     GPTM5.TBMR.CMR = 1;
-    GPTM5.CTL.TAEVENT = 1;
-    GPTM5.CTL.TBEVENT = 1;
     // count up
     GPTM5.TAMR.CDIR = 1;
     GPTM5.TBMR.CDIR = 1;
