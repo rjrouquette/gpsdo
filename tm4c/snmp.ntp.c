@@ -94,14 +94,12 @@ int writeNtpStatus(uint8_t *buffer) {
     );
 
     char temp[16];
-    int end = toDec(GPSDO_offsetNano(), 0, '0', temp);
-    temp[end++] = ' ';
-    temp[end++] = 'n';
-    temp[end++] = 's';
+    int end = fmtFloat((float) GPSDO_offsetNano(), 0, 0, temp);
+    strcpy(temp+end, " ns");
     dlen = writeValueBytes(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_ACTV_OFFSET,
-            temp, end
+            temp, end + 3
     );
 
     dlen = writeValueInt8(

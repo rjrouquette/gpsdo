@@ -9,6 +9,7 @@
 #include "hw/gpio.h"
 #include "hw/timer.h"
 #include "lib/delay.h"
+#include "lib/led.h"
 
 
 #define OFFSET_COARSE_ALIGN (1000000) // 1 millisecond
@@ -132,6 +133,7 @@ void GPSDO_init() {
     waitRealign = 10;
 }
 
+static float pllBias = -177.1e-6f;
 void GPSDO_run() {
     // only update if GPS has lock
     if(!isGpsLocked) {
@@ -143,9 +145,12 @@ void GPSDO_run() {
     // wait for both edge events
     if(!(ppsGpsReady && ppsOutReady))
         return;
+    // clear ready state
+    ppsGpsReady = 0;
+    ppsOutReady = 0;
 
     // coarse realignment in progress
-    if(waitRealign) {
+    if(waitRealign > 0) {
         --waitRealign;
         return;
     }
@@ -153,7 +158,9 @@ void GPSDO_run() {
     // compute offset
     int offset = ppsOutEdge - ppsGpsEdge;
     // convert to nano seconds
-    offset <<= 8;
+    offset <<= 3;
+    if(offset < 500000000) offset += 1000000000;
+    if(offset > 500000000) offset -= 1000000000;
     ppsOffsetNano = offset;
 
     // perform coarse realignment if offset is too large
@@ -180,7 +187,8 @@ void GPSDO_run() {
     }
 
     // TODO implement PLL logic
-    setFeedback(0.9e-9f * (float) offset);
+    setFeedback(pllBias + 1e-10f * (float) offset);
+    pllBias += 1e-11f * (float) offset;
 }
 
 int GPSDO_isLocked() {
