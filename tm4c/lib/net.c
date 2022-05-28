@@ -127,7 +127,7 @@ static void initPTP() {
     EMAC0.TIMSECU = 1653530160;
     EMAC0.TIMNANOU.VALUE = 0;
     // frequency correction
-    EMAC0.TIMADD = 0xFFF464C1;
+    EMAC0.TIMADD = 0xFFFFFFFF;
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     EMAC0.TIMSTCTRL.TSFCUPDT = 1;
     // start timer

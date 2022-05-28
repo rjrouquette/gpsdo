@@ -346,12 +346,17 @@ float getCompensation() {
     const int ibase = (int) (currTemperature * COMP_PREC);
 
     int cnt = 0;
+    float offset[COMP_SPAN * 2];
+    float median[COMP_SPAN * 2];
     float scratch[COMP_SPAN * 2];
     for(int i = -COMP_SPAN; i <= (COMP_SPAN-1); i++) {
         float l = compMat[(ibase + i) & COMP_MASK];
         float u = compMat[(ibase + i + 1) & COMP_MASK];
         if(l != 0 && u != 0) {
-            scratch[cnt++] = u - l;
+            scratch[cnt] = u - l;
+            median[cnt] = (u + l) / 2;
+            offset[cnt] = (float)(ibase + i);
+            ++cnt;
         }
     }
 
@@ -373,23 +378,29 @@ float getCompensation() {
     stddev = sqrtf(stddev / (float) cnt);
 
     // compute temperature coefficient
+    float o = 0;
+    float b = 0;
     float m = 0;
     int n = 0;
     for (int i = 0; i < cnt; i++) {
         float diff = scratch[i] - mean;
         if (fabsf(diff) <= stddev) {
+            o += offset[i];
+            b += median[i];
             m += scratch[i];
             ++n;
         }
     }
     if (n > 0) {
+        o /= (float) n;
+        b /= (float) n;
         m /= (float) n;
         m *= COMP_PREC;
+        o += 1;
+        o /= COMP_PREC;
     }
     compM = m;
+    compB = b - (m * o);
 
-    const float b = compMat[ibase & COMP_MASK];
-    if(b != 0) compB = b;
-    const float o = (((float)ibase) + 0.5f) / COMP_PREC;
-    return (compM * (currTemperature - o)) + compB;
+    return (compM * currTemperature) + compB;
 }
