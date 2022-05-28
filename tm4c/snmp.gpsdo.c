@@ -118,6 +118,13 @@ int writeGpsdoType(uint8_t *buffer) {
             OID_SENSOR_TYPE_OTHER
     );
 
+    // GPSDO RMS skew
+    dlen = writeValueInt8(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_TYPE,
+            OID_SENSOR_TYPE_OTHER
+    );
+
     // GPSDO correction
     dlen = writeValueInt8(
             buffer, dlen,
@@ -180,6 +187,13 @@ int writeGpsdoScale(uint8_t *buffer) {
             OID_SENSOR_SCALE_1E_9
     );
 
+    // GPSDO RMS skew
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_SCALE,
+            OID_SENSOR_SCALE_1E_9
+    );
+
     // GPSDO correction
     dlen = writeValueInt32(
             buffer, dlen,
@@ -236,6 +250,13 @@ int writeGpsdoPrec(uint8_t *buffer) {
     );
 
     // GPSDO RMS offset
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC,
+            1
+    );
+
+    // GPSDO RMS skew
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC,
@@ -307,6 +328,13 @@ int writeGpsdoValue(uint8_t *buffer) {
             lroundf(GPSDO_offsetRms() * 1e10f)
     );
 
+    // GPSDO RMS skew
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
+            lroundf(GPSDO_skewRms() * 1e10f)
+    );
+
     // GPSDO correction
     dlen = writeValueInt32(
             buffer, dlen,
@@ -363,6 +391,13 @@ int writeGpsdoUnits(uint8_t *buffer) {
     );
 
     // GPSDO RMS offset
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,
+            "s", 1
+    );
+
+    // GPSDO RMS skew
     dlen = writeValueBytes(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,

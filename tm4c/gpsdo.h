@@ -11,6 +11,7 @@ int GPSDO_isLocked();
 int GPSDO_offsetNano();
 float GPSDO_offsetMean();
 float GPSDO_offsetRms();
+float GPSDO_skewRms();
 float GPSDO_freqCorr();
 float GPSDO_compBias();
 float GPSDO_compCoeff();

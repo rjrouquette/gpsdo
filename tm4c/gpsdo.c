@@ -16,6 +16,7 @@
 #define OFFSET_COARSE_ALIGN (1000000) // 1 millisecond
 #define STAT_TIME_CONST (16)
 #define STAT_LOCK_RMS (250e-9f)
+#define STAT_COMP_RMS (200e-9f)
 
 
 static int32_t ppsGpsEdge;
@@ -27,11 +28,14 @@ static float pllBias;
 static float ppsOffsetMean;
 static float ppsOffsetVar;
 static float ppsOffsetRms;
+static float ppsSkewVar;
+static float ppsSkewRms;
 
 static uint8_t ppsGpsReady;
 static uint8_t ppsOutReady;
 static uint8_t isGpsLocked;
 static uint8_t waitRealign;
+static uint8_t resetBias;
 
 
 // temperature compensation
@@ -184,6 +188,7 @@ void GPSDO_run() {
     if(offset < -500000000) { ppsOutReady = 1; return; }
     if(offset >  500000000) { ppsOutReady = 1; return; }
     // update PPS offset
+    float ppsSkew = 1e-9f * (float) (offset - ppsOffsetNano);
     ppsOffsetNano = offset;
 
     // perform coarse realignment if offset is too large
@@ -209,9 +214,20 @@ void GPSDO_run() {
         return;
     }
 
+    // get temperature compensation
+    float newComp = getCompensation();
+    if(isnan(newComp)) {
+        resetBias = 1;
+    } else {
+        if(resetBias) {
+            pllBias -= (newComp - currCompensation);
+            resetBias = 0;
+        }
+        currCompensation = newComp;
+    }
+
     // update control loop
     float fltOffset = ((float) offset) * 1e-9f;
-    currCompensation = getCompensation();
     setFeedback(currCompensation + pllBias + ldexpf(fltOffset, -4));
     pllBias += ldexpf(fltOffset, -8);
 
@@ -223,9 +239,15 @@ void GPSDO_run() {
     fltOffset *= fltOffset;
     ppsOffsetVar += (fltOffset - ppsOffsetVar) / STAT_TIME_CONST;
     ppsOffsetRms = sqrtf(ppsOffsetVar);
+    // update skew stats
+    ppsSkew *= ppsSkew;
+    // restrict skew
+    if(ppsSkew > 1e8f) ppsSkew = 1e8f;
+    ppsSkewVar += (ppsSkew - ppsSkewVar) / STAT_TIME_CONST;
+    ppsSkewRms = sqrtf(ppsSkewVar);
 
     // update temperature coefficient
-    if(ppsOffsetRms < STAT_LOCK_RMS)
+    if(ppsSkewRms < STAT_COMP_RMS)
         updateCompensation();
 }
 
@@ -244,6 +266,10 @@ float GPSDO_offsetMean() {
 
 float GPSDO_offsetRms() {
     return ppsOffsetRms;
+}
+
+float GPSDO_skewRms() {
+    return ppsSkewRms;
 }
 
 float GPSDO_freqCorr() {
@@ -319,7 +345,6 @@ void updateCompensation() {
 float getCompensation() {
     const int ibase = (int) (currTemperature * COMP_PREC);
 
-    float m = 0;
     int cnt = 0;
     float scratch[COMP_SPAN * 2];
     for(int i = -COMP_SPAN; i <= (COMP_SPAN-1); i++) {
@@ -329,31 +354,37 @@ float getCompensation() {
             scratch[cnt++] = u - l;
         }
     }
-    if(cnt != 0) {
-        float mean = 0;
-        for (int i = 0; i < cnt; i++)
-            mean += scratch[i];
-        mean /= (float) cnt;
 
-        float stddev = 0;
-        for (int i = 0; i < cnt; i++) {
-            float diff = scratch[i] - mean;
-            stddev += diff * diff;
-        }
-        stddev = sqrtf(stddev / (float) cnt);
+    // verify that temperature compensation is valid
+    if(cnt == 0) return NAN;
 
-        int n = 0;
-        for (int i = 0; i < cnt; i++) {
-            float diff = scratch[i] - mean;
-            if (fabsf(diff) <= stddev) {
-                m += scratch[i];
-                ++n;
-            }
+    // compute mean temperature coefficient
+    float mean = 0;
+    for (int i = 0; i < cnt; i++)
+        mean += scratch[i];
+    mean /= (float) cnt;
+
+    // compute deviation of temperature coefficient
+    float stddev = 0;
+    for (int i = 0; i < cnt; i++) {
+        float diff = scratch[i] - mean;
+        stddev += diff * diff;
+    }
+    stddev = sqrtf(stddev / (float) cnt);
+
+    // compute temperature coefficient
+    float m = 0;
+    int n = 0;
+    for (int i = 0; i < cnt; i++) {
+        float diff = scratch[i] - mean;
+        if (fabsf(diff) <= stddev) {
+            m += scratch[i];
+            ++n;
         }
-        if (n > 0) {
-            m /= (float) n;
-            m *= COMP_PREC;
-        }
+    }
+    if (n > 0) {
+        m /= (float) n;
+        m *= COMP_PREC;
     }
     compM = m;
 
