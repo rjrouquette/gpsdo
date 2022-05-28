@@ -179,8 +179,9 @@ void GPSDO_run() {
     int offset = ppsOutEdge - ppsGpsEdge;
     // convert to nano seconds
     offset <<= 3;
-    if(offset < 500000000) offset += 1000000000;
-    if(offset > 500000000) offset -= 1000000000;
+    // reorder events if necessary
+    if(offset < -500000000) { ppsOutReady = 1; return; }
+    if(offset >  500000000) { ppsGpsReady = 1; return; }
     // update PPS offset
     ppsOffsetNano = offset;
 
@@ -271,7 +272,7 @@ void ISR_Timer5A() {
     // clear interrupt flag
     GPTM5.ICR.CAE = 1;
     // indicate variable is ready
-    ppsOutReady = 1;
+    ppsOutReady ^= 1;
 }
 
 // capture rising edge of GPS PPS for offset measurement
@@ -284,7 +285,7 @@ void ISR_Timer5B() {
     // clear interrupt flag
     GPTM5.ICR.CBE = 1;
     // indicate variable is ready
-    ppsGpsReady = 1;
+    ppsGpsReady ^= 1;
 }
 
 void setFeedback(float feedback) {
