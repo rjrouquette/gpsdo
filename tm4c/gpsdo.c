@@ -181,7 +181,7 @@ void GPSDO_run() {
     offset <<= 3;
     // reorder events if necessary
     if(offset < -500000000) { ppsOutReady = 1; return; }
-    if(offset >  500000000) { ppsGpsReady = 1; return; }
+    if(offset >  500000000) { ppsOutReady = 1; return; }
     // update PPS offset
     ppsOffsetNano = offset;
 
