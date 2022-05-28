@@ -68,19 +68,11 @@ void initPPS() {
     PORTG.CR = 0;
     PORTG.LOCK = 0;
 
-    // 1 Hz 10% duty cycle
-    EMAC0.PPS0INTVL = 25000000-1;
-    EMAC0.PPS0WIDTH = 12500000-1;
     // use command mode
     EMAC0.PPSCTRL.TRGMODS0 = 3;
     // start 1 Hz PPS output
     EMAC0.PPSCTRL.PPSEN0 = 0;
     EMAC0.PPSCTRL.PPSCTRL = 1;
-//    // start zero-aligned pulse train
-//    EMAC0.PPSCTRL.PPSEN0 = 1;
-//    EMAC0.TARGNANO = 0;
-//    EMAC0.TARGSEC = EMAC0.TIMSEC + 1;
-//    EMAC0.PPSCTRL.PPSCTRL = 2;
 }
 
 void initEdgeComp() {
