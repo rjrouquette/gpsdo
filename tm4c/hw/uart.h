@@ -258,4 +258,17 @@ PAGE_MAP (UART_MAP, {
 #define UART6   (*(volatile struct UART_MAP *) 0x40012000)
 #define UART7   (*(volatile struct UART_MAP *) 0x40013000)
 
+
+REGMAP_32 (RCGCUART_MAP, {
+    unsigned EN_UART0: 1;
+    unsigned EN_UART1: 1;
+    unsigned EN_UART2: 1;
+    unsigned EN_UART3: 1;
+    unsigned EN_UART4: 1;
+    unsigned EN_UART5: 1;
+    unsigned EN_UART6: 1;
+    unsigned EN_UART7: 1;
+});
+#define RCGCUART (*(volatile union RCGCUART_MAP *)0x400FE618)
+
 #endif //TM4C_UART_H

@@ -9,15 +9,21 @@
 #include "hw/gpio.h"
 #include "hw/timer.h"
 #include "lib/delay.h"
-#include "lib/led.h"
+#include "lib/gps.h"
 
 
 #define OFFSET_COARSE_ALIGN (1000000) // 1 millisecond
+#define STAT_TIME_CONST (16)
+#define STAT_LOCK_RMS (250e-9f)
 
 
 static int32_t ppsGpsEdge;
 static int32_t ppsOutEdge;
 static int ppsOffsetNano;
+
+static float ppsOffsetMean;
+static float ppsOffsetVar;
+static float ppsOffsetRms;
 
 static uint8_t ppsGpsReady;
 static uint8_t ppsOutReady;
@@ -131,10 +137,16 @@ void GPSDO_init() {
     isGpsLocked = 1;
     // wait at least 10 PPS updates before attempting lock
     waitRealign = 10;
+
+    // init GPS
+    GPS_init();
 }
 
 static float pllBias = -177.1e-6f;
 void GPSDO_run() {
+    // run GPS state machine
+    GPS_run();
+
     // only update if GPS has lock
     if(!isGpsLocked) {
         ppsGpsReady = 0;
@@ -161,6 +173,7 @@ void GPSDO_run() {
     offset <<= 3;
     if(offset < 500000000) offset += 1000000000;
     if(offset > 500000000) offset -= 1000000000;
+    // update PPS offset
     ppsOffsetNano = offset;
 
     // perform coarse realignment if offset is too large
@@ -189,18 +202,36 @@ void GPSDO_run() {
     // TODO implement PLL logic
     setFeedback(pllBias + 1e-10f * (float) offset);
     pllBias += 1e-11f * (float) offset;
+
+    // update PPS stats
+    float fltOffset = ((float) offset) * 1e-9f;
+    // limit offset
+    if(fltOffset > 10e6f) fltOffset = 10e6f;
+    if(fltOffset < -10e6f) fltOffset = -10e6f;
+    ppsOffsetMean += (fltOffset - ppsOffsetMean) / STAT_TIME_CONST;
+    fltOffset *= fltOffset;
+    ppsOffsetVar += (fltOffset - ppsOffsetVar) / STAT_TIME_CONST;
+    ppsOffsetRms = sqrtf(ppsOffsetVar);
 }
 
 int GPSDO_isLocked() {
-    return (int) isGpsLocked;
+    if(!isGpsLocked) return 0;
+    return (ppsOffsetRms < STAT_LOCK_RMS);
 }
 
 int GPSDO_offsetNano() {
-    // TODO replace this with EMA value
     return ppsOffsetNano;
 }
 
-float GPSDO_getCorrection() {
+float GPSDO_offsetMean() {
+    return ppsOffsetMean;
+}
+
+float GPSDO_offsetRms() {
+    return ppsOffsetRms;
+}
+
+float GPSDO_freqCorr() {
     return getFeedback();
 }
 

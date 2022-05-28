@@ -2,7 +2,9 @@
 // Created by robert on 5/26/22.
 //
 
+#include <math.h>
 #include "lib/temp.h"
+#include "gpsdo.h"
 
 const uint8_t OID_SENSOR_PREFIX[] = { 0x06, 0x0A, 0x2B, 6, 1, 2, 1, 99, 1, 1, 1 };
 
@@ -102,6 +104,27 @@ int writeGpsdoType(uint8_t *buffer) {
             OID_SENSOR_TYPE_CELSIUS
     );
 
+    // GPSDO mean offset
+    dlen = writeValueInt8(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_TYPE,
+            OID_SENSOR_TYPE_OTHER
+    );
+
+    // GPSDO RMS offset
+    dlen = writeValueInt8(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_TYPE,
+            OID_SENSOR_TYPE_OTHER
+    );
+
+    // GPSDO correction
+    dlen = writeValueInt8(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_TYPE,
+            OID_SENSOR_TYPE_OTHER
+    );
+
     return dlen;
 }
 
@@ -116,6 +139,27 @@ int writeGpsdoScale(uint8_t *buffer) {
     );
 
     // DCXO temp
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_SCALE,
+            OID_SENSOR_SCALE_1
+    );
+
+    // GPSDO mean offset
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_SCALE,
+            OID_SENSOR_SCALE_1E_9
+    );
+
+    // GPSDO RMS offset
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_SCALE,
+            OID_SENSOR_SCALE_1E_9
+    );
+
+    // GPSDO correction
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_SCALE,
@@ -142,6 +186,27 @@ int writeGpsdoPrec(uint8_t *buffer) {
             3
     );
 
+    // GPSDO mean offset
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC,
+            1
+    );
+
+    // GPSDO RMS offset
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC,
+            1
+    );
+
+    // GPSDO correction
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC,
+            4
+    );
+
     return dlen;
 }
 
@@ -165,6 +230,27 @@ int writeGpsdoValue(uint8_t *buffer) {
             (temp * 1000) / 256
     );
 
+    // GPSDO mean offset
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
+            lroundf(GPSDO_offsetMean() * 1e10f)
+    );
+
+    // GPSDO RMS offset
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
+            lroundf(GPSDO_offsetRms() * 1e10f)
+    );
+
+    // GPSDO correction
+    dlen = writeValueInt32(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
+            lroundf(GPSDO_freqCorr() * 1e10f)
+    );
+
     return dlen;
 }
 
@@ -183,6 +269,27 @@ int writeGpsdoUnits(uint8_t *buffer) {
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,
             "C", 1
+    );
+
+    // GPSDO mean offset
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,
+            "s", 1
+    );
+
+    // GPSDO RMS offset
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,
+            "s", 1
+    );
+
+    // GPSDO correction
+    dlen = writeValueBytes(
+            buffer, dlen,
+            OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS,
+            "ppm", 1
     );
 
     return dlen;

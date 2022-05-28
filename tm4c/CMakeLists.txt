@@ -34,6 +34,7 @@ add_executable(
         lib/font.c
         lib/fonts/ascii_16.c
         lib/format.c
+        lib/gps.c
         lib/led.c
         lib/plot.c
         lib/net.c

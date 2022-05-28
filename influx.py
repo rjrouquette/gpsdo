@@ -28,14 +28,14 @@ while True:
             print('%s at %s' % (errorStatus.prettyPrint(),
                                 errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
 
-        varTuple = varBinds[0]
-        proc_temp = int(varTuple[1]) / 1000
+        proc_temp = int(varBinds[0][1]) / 1000
+        dcxo_temp = int(varBinds[1][1]) / 1000
+        err_mean = int(varBinds[2][1]) / 10
+        err_rms = int(varBinds[3][1]) / 10
+        pll_ppm = int(varBinds[4][1]) / 10000
 
-        # varTuple = varBinds[1]
-        dcxo_temp = proc_temp //int(varTuple[1]) / 1000
-
-        body = 'gpsdo,host=%s proc_temp=%.2f,dcxo_temp=%.2f' % (
-            gpsdoHost, proc_temp, dcxo_temp
+        body = 'gpsdo,host=%s proc_temp=%.2f,dcxo_temp=%.2f,pll_error=%.1f,pll_rmse=%.1f,pll_ppm=%.4f' % (
+            gpsdoHost, proc_temp, dcxo_temp, err_mean, err_rms, pll_ppm
         )
         requests.post(influxUrl, data=body, timeout=1)
     except:

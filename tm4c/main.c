@@ -117,7 +117,7 @@ void updateStatusGPSDO() {
     strcpy(temp+len, " ns");
     FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
 
-    len = fmtFloat(GPSDO_getCorrection() * 1e6f, 12, 4, temp);
+    len = fmtFloat(GPSDO_freqCorr() * 1e6f, 12, 4, temp);
     strcpy(temp+len, " ppm");
     FONT_drawText(0, 160, temp, FONT_ASCII_16, 0, 3);
 }
