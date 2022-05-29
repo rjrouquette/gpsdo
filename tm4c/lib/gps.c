@@ -85,7 +85,7 @@ int GPS_hasLock() {
     return 1;
 }
 
-volatile uint8_t debugStr[8][24];
+volatile uint8_t debugStr[7][24];
 void processUBX(uint8_t *msg, int len) {
 
 }

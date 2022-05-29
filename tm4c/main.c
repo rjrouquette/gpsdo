@@ -22,7 +22,7 @@
 #include "snmp.h"
 #include "lib/net/dhcp.h"
 
-extern volatile uint8_t debugStr[8][24];
+extern volatile uint8_t debugStr[7][24];
 //volatile uint8_t debugHex[32];
 
 void updateStatusBanner();
@@ -90,7 +90,7 @@ int main(void) {
 //                }
 //            }
 
-            for(int i = 0; i < 8; i++) {
+            for(int i = 0; i < 7; i++) {
                 FONT_drawText(0, (i+2)*16, debugStr[i], FONT_ASCII_16, 0, 3);
             }
 
