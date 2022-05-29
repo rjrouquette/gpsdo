@@ -9,4 +9,6 @@
 void GPS_init();
 void GPS_run();
 
+int GPS_hasLock();
+
 #endif //GPSDO_GPS_H

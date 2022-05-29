@@ -16,7 +16,7 @@
 #define OFFSET_COARSE_ALIGN (1000000) // 1 millisecond
 #define STAT_TIME_CONST (16)
 #define STAT_LOCK_RMS (250e-9f)
-#define STAT_CTRL_RMS (500e-9f)
+#define STAT_CTRL_RMS (1e-6f)
 #define STAT_COMP_RMS (200e-9f)
 
 
@@ -34,7 +34,6 @@ static float ppsSkewRms;
 
 static uint8_t ppsGpsReady;
 static uint8_t ppsOutReady;
-static uint8_t isGpsLocked;
 static uint8_t waitRealign;
 static uint8_t resetBias;
 
@@ -146,8 +145,6 @@ void initEdgeComp() {
 void GPSDO_init() {
     initPPS();
     initEdgeComp();
-    // TODO get this status from the GPS receiver
-    isGpsLocked = 1;
     // wait at least 10 PPS updates before attempting lock
     waitRealign = 10;
 
@@ -160,7 +157,7 @@ void GPSDO_run() {
     GPS_run();
 
     // only update if GPS has lock
-    if(!isGpsLocked) {
+    if(!GPS_hasLock()) {
         ppsGpsReady = 0;
         ppsOutReady = 0;
         return;
@@ -256,7 +253,7 @@ void GPSDO_run() {
 }
 
 int GPSDO_isLocked() {
-    if(!isGpsLocked) return 0;
+    if(!GPS_hasLock()) return 0;
     return (ppsOffsetRms < STAT_LOCK_RMS);
 }
 
