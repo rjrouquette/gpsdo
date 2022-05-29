@@ -251,6 +251,73 @@ struct FloatMath {
     }
 } floatMath;
 
+struct NodeMath {
+    struct Node {
+        float center[2];
+        float cov[2];
+        float tau;
+    } nodes[16];
+
+    NodeMath() {
+        bzero(nodes, sizeof(nodes));
+    }
+
+    void updateNode(Node &node, const Sample &s, float w) {
+        float tau = node.tau + w;
+        if(tau > 256) tau = 256;
+        float del[2];
+        del[0] = w * (s.temp - node.center[0]) / tau;
+        del[1] = w * (s.ppm - node.center[1]) / tau;
+        node.center[0] += del[0];
+        node.center[1] += del[1];
+
+        if(node.tau > 0) {
+            float diff[2];
+            diff[0] = s.temp - node.center[0];
+            diff[1] = s.ppm - node.center[1];
+
+            for(int i = 0; i < 2; i++) {
+                    node.cov[i] += w * ((diff[0] * diff[i]) - node.cov[i]) / (node.tau + w);
+                    node.cov[i] += del[0] * del[i];
+            }
+        }
+        node.tau = tau;
+    }
+
+    void update(const Sample &s) {
+        int best = 0;
+        float min = fabsf(s.temp - nodes[0].center[0]);
+        for(int i = 0; i < 16; i++) {
+            float dist = fabsf(s.temp - nodes[i].center[0]);
+            if(dist < min) {
+                best = i;
+                min = dist;
+            }
+        }
+
+        for(int i = 0; i < 16; i++) {
+            int dist = abs(i - best);
+            if(dist > 3) continue;
+            updateNode(nodes[i], s, ldexpf(1, -3 * dist));
+        }
+    }
+
+    float predict(float temp) {
+        int best = 0;
+        float min = fabsf(temp - nodes[0].center[0]);
+        for(int i = 0; i < 16; i++) {
+            float dist = fabsf(temp - nodes[i].center[0]);
+            if(dist < min) {
+                best = i;
+                min = dist;
+            }
+        }
+
+        auto &node = nodes[best];
+        return (temp - node.center[0]) * (node.cov[1] / node.cov[0]) + node.center[1];
+    }
+
+} nodeMath;
 
 
 /* File format:
@@ -322,11 +389,28 @@ int main(int argc, char **argv) {
         }
         fixedMath.update(s);
 
-        float fm, fb, fo;
-        if(floatMath.coeff(s.temp, fm, fb, fo)) {
-            int ibase = (int) (s.temp / TEMP_PREC);
-            auto fx = s.temp - fo;
-            auto fy = (fm * fx) + fb;
+        // float fm, fb, fo;
+        // if(floatMath.coeff(s.temp, fm, fb, fo)) {
+        //     int ibase = (int) (s.temp / TEMP_PREC);
+        //     auto fx = s.temp - fo;
+        //     auto fy = (fm * fx) + fb;
+        //     auto fd = fy - s.ppm;
+        //     if(std::isfinite(fd)) {
+        //         biasF += fd;
+        //         rmseF += fd * fd;
+        //         ++cntF;
+        //     }
+        //     maxF = std::max(maxF, std::abs(fd));
+        //     if(std::abs(fd) > 0.100) {
+        //         cout << s.temp << " " << s.ppm << " " << fy << endl;
+        //         ++errF;
+        //     }
+        // }
+        // floatMath.update(s);
+
+        nodeMath.update(s);
+        {
+            float fy = nodeMath.predict(s.temp);
             auto fd = fy - s.ppm;
             if(std::isfinite(fd)) {
                 biasF += fd;
@@ -339,7 +423,6 @@ int main(int argc, char **argv) {
                 ++errF;
             }
         }
-        floatMath.update(s);
     }
     cout << "biasI: " << (biasI / cntI) << " ppm" << endl;
     cout << "biasF: " << (biasF / cntF) << " ppm" << endl;
@@ -398,6 +481,15 @@ int main(int argc, char **argv) {
     for(int i = 0; i < 512; i++)
         z += (1 - z) / 4096.0f;
     cout << z << endl;
+
+    for(auto &node : nodeMath.nodes) {
+        cout << node.center[0] << " "  << node.center[1];
+        cout << " " << node.cov[0];
+        cout << " " << node.cov[1];
+
+        cout << " " << node.cov[1] / node.cov[0];
+        cout << endl;
+    }
 
     return 0;
 }

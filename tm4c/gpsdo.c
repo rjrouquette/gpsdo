@@ -11,6 +11,7 @@
 #include "lib/delay.h"
 #include "lib/gps.h"
 #include "lib/temp.h"
+#include "tcomp.h"
 
 
 #define OFFSET_COARSE_ALIGN (1000000) // 1 millisecond
@@ -36,14 +37,10 @@ static uint8_t ppsGpsReady;
 static uint8_t ppsOutReady;
 static uint8_t waitRealign;
 static uint8_t resetBias;
+static uint8_t firstLock;
 
 
 // temperature compensation
-#define COMP_SPAN (8)
-#define COMP_PREC (8)
-#define COMP_MASK (0xFF)
-static uint16_t compTau[256];
-static float compMat[256];
 static float compM, compB;
 
 // current correction values
@@ -53,8 +50,6 @@ static float currCompensation;
 
 static void setFeedback(float feedback);
 static float getFeedback();
-static void updateCompensation();
-static float getCompensation();
 
 
 void initPPS() {
@@ -147,9 +142,13 @@ void GPSDO_init() {
     initEdgeComp();
     // wait at least 10 PPS updates before attempting lock
     waitRealign = 10;
+    // indicate that next lock is first lock
+    firstLock = 1;
 
     // init GPS
     GPS_init();
+    // init temperature compensation module
+    TCOMP_init();
 }
 
 void GPSDO_run() {
@@ -221,12 +220,13 @@ void GPSDO_run() {
     // update skew stats
     ppsSkew *= ppsSkew;
     // restrict skew
-    if(ppsSkew > 1e8f) ppsSkew = 1e8f;
+    if(ppsSkew > 1e-8f) ppsSkew = 1e-8f;
     ppsSkewVar += (ppsSkew - ppsSkewVar) / STAT_TIME_CONST;
     ppsSkewRms = sqrtf(ppsSkewVar);
 
     // get temperature compensation
-    float newComp = getCompensation();
+    TCOMP_getCoeff(currTemperature, &compM, &compB);
+    float newComp = (compM * currTemperature) + compB;
     if(isnan(newComp)) {
         resetBias = 1;
     } else {
@@ -245,11 +245,19 @@ void GPSDO_run() {
     // update control loop
     setFeedback(currCompensation + pllBias + (fltOffset * rate));
     // update control bias
-    if(ppsSkewRms < STAT_CTRL_RMS)
-        pllBias += ldexpf(fltOffset, -8);
+    if(ppsSkewRms < STAT_CTRL_RMS) {
+        // faster settling on first lock
+        if(firstLock) {
+            pllBias = currFeedback - currCompensation;
+            firstLock = 0;
+        }
+        else {
+            pllBias += ldexpf(fltOffset, -6);
+        }
+    }
     // update temperature coefficient
     if(ppsSkewRms < STAT_COMP_RMS)
-        updateCompensation();
+        TCOMP_update(currTemperature, currFeedback);
 }
 
 int GPSDO_isLocked() {
@@ -331,77 +339,4 @@ void setFeedback(float feedback) {
 
 float getFeedback() {
     return ldexpf((float)(int32_t)(EMAC0.TIMADD), -32);
-}
-
-void updateCompensation() {
-    // update temperature bins
-    const int ibase = (int) (currTemperature * COMP_PREC);
-    volatile uint16_t *tau = &compTau[ibase & COMP_MASK];
-    volatile float *step = &compMat[ibase & COMP_MASK];
-    // update selected bin
-    if(tau[0] < 4096) ++tau[0];
-    step[0] += (currFeedback - step[0]) / (float) tau[0];
-}
-
-float getCompensation() {
-    const int ibase = (int) (currTemperature * COMP_PREC);
-
-    int cnt = 0;
-    float offset[COMP_SPAN * 2];
-    float median[COMP_SPAN * 2];
-    float scratch[COMP_SPAN * 2];
-    for(int i = -COMP_SPAN; i <= (COMP_SPAN-1); i++) {
-        float l = compMat[(ibase + i) & COMP_MASK];
-        float u = compMat[(ibase + i + 1) & COMP_MASK];
-        if(l != 0 && u != 0) {
-            scratch[cnt] = u - l;
-            median[cnt] = (u + l) / 2;
-            offset[cnt] = (float)(ibase + i);
-            ++cnt;
-        }
-    }
-
-    // verify that temperature compensation is valid
-    if(cnt == 0) return NAN;
-
-    // compute mean temperature coefficient
-    float mean = 0;
-    for (int i = 0; i < cnt; i++)
-        mean += scratch[i];
-    mean /= (float) cnt;
-
-    // compute deviation of temperature coefficient
-    float stddev = 0;
-    for (int i = 0; i < cnt; i++) {
-        float diff = scratch[i] - mean;
-        stddev += diff * diff;
-    }
-    stddev = sqrtf(stddev / (float) cnt);
-
-    // compute temperature coefficient
-    float o = 0;
-    float b = 0;
-    float m = 0;
-    int n = 0;
-    for (int i = 0; i < cnt; i++) {
-        float diff = scratch[i] - mean;
-        if (fabsf(diff) <= stddev) {
-            o += offset[i];
-            b += median[i];
-            m += scratch[i];
-            ++n;
-        }
-    }
-    if (n > 0) {
-        o /= (float) n;
-        b /= (float) n;
-        m /= (float) n;
-        m *= COMP_PREC;
-        o += 1;
-        o /= COMP_PREC;
-    }
-    compM = m;
-    compB = b - (m * o);
-
-    return (compM * currTemperature) + compB;
 }

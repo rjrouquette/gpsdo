@@ -91,7 +91,7 @@ int main(void) {
 //            }
 
             for(int i = 0; i < 7; i++) {
-                FONT_drawText(0, (i+2)*16, debugStr[i], FONT_ASCII_16, 0, 3);
+                FONT_drawText(0, (i+2)*16, (char *) debugStr[i], FONT_ASCII_16, 0, 3);
             }
 
             EPD_refresh();
