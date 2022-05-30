@@ -255,39 +255,63 @@ struct NodeMath {
     struct Node {
         float center[2];
         float cov[2];
-        float tau;
     } nodes[16];
+
+    float prevTemp;
+    float varNoise;
+    float tau;
+    int cnt;
+    bool firstUpdate;
 
     NodeMath() {
         bzero(nodes, sizeof(nodes));
+        cnt = 0;
+        tau = 256;
+        varNoise = 0;
+        prevTemp = NAN;
     }
 
     void updateNode(Node &node, const Sample &s, float w) {
-        float tau = node.tau + w;
-        if(tau > 256) tau = 256;
+        const float rate = w / tau;
         float del[2];
-        del[0] = w * (s.temp - node.center[0]) / tau;
-        del[1] = w * (s.ppm - node.center[1]) / tau;
+        del[0] = rate * (s.temp - node.center[0]);
+        del[1] = rate * (s.ppm - node.center[1]);
         node.center[0] += del[0];
         node.center[1] += del[1];
+        if(cnt < 256) return;
 
-        if(node.tau > 0) {
-            float diff[2];
-            diff[0] = s.temp - node.center[0];
-            diff[1] = s.ppm - node.center[1];
+        float diff[2];
+        diff[0] = s.temp - node.center[0];
+        diff[1] = s.ppm - node.center[1];
 
-            for(int i = 0; i < 2; i++) {
-                    node.cov[i] += w * ((diff[0] * diff[i]) - node.cov[i]) / (node.tau + w);
-                    node.cov[i] += del[0] * del[i];
-            }
+        for(int i = 0; i < 2; i++) {
+                node.cov[i] += rate * ((diff[0] * diff[i]) - node.cov[i]);
+                node.cov[i] += del[0] * del[i];
         }
-        node.tau = tau;
     }
 
     void update(const Sample &s) {
-        int best = 8;
+        if(std::isnan(prevTemp))
+            prevTemp = s.temp;
+        float deltaTemp = s.temp - prevTemp;
+        varNoise += ((deltaTemp * deltaTemp) - varNoise) / tau;
+        float w = fabsf(deltaTemp) / sqrtf(varNoise);
+        if(w < 1) {
+            if(w < 0.1f) w = 0.1f;
+        } else {
+            w = 1;
+        }
+
+        if(cnt == 0) {
+            for(int i = 0; i < 16; i++) {
+                nodes[i].center[0] = s.temp;
+                nodes[i].center[1] = s.ppm;
+            }
+        }
+
+        int best = 0;
         float min = fabsf(s.temp - nodes[best].center[0]);
-        for(int i = 0; i < 16; i++) {
+        for(int i = 1; i < 16; i++) {
             float dist = fabsf(s.temp - nodes[i].center[0]);
             if(dist < min) {
                 best = i;
@@ -295,18 +319,19 @@ struct NodeMath {
             }
         }
 
+        if(cnt < 256) ++cnt;
         for(int i = 0; i < 16; i++) {
             int dist = abs(i - best);
-            if(dist > 3) continue;
-            updateNode(nodes[i], s, ldexpf(1, -3 * dist));
+            updateNode(nodes[i], s, ldexpf(w, -3 * dist));
         }
     }
 
     float predict(float temp) {
-        int best = 8;
+        if(cnt < 256) return NAN;
+
+        int best = 0;
         float min = fabsf(temp - nodes[best].center[0]);
-        for(int i = 0; i < 16; i++) {
-            if(nodes[i].tau == 0) continue;
+        for(int i = 1; i < 16; i++) {
             float dist = fabsf(temp - nodes[i].center[0]);
             if(dist < min) {
                 best = i;

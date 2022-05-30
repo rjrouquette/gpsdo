@@ -10,42 +10,45 @@
 
 #include "tcomp.h"
 #include "lib/plot.h"
+#include "lib/format.h"
+#include "lib/font.h"
 
-#define MAX_TAU (4096)
 #define NODE_CNT (16)
+#define TAU_INIT (64)
+#define TAU_RUN (1024)
+#define DIST_RATE (-3)
+#define INIT_SOM (256)
+#define INIT_END (512)
 
 static struct CompNode {
     float meanTemp;
     float meanComp;
     float varTempTemp;
     float varTempComp;
-    float tau;
 } nodes[NODE_CNT];
 
+static float tau;
+static int initCnt;
+
 void updateNode(struct CompNode *node, float w, float temp, float comp) {
-    // update learning rate
-    float tau = node->tau + w;
-    if(tau > MAX_TAU) tau = MAX_TAU;
+    // learning rate
+    const float rate = w / tau;
     // compute and apply delta to means
-    float delTemp = w * (temp - node->meanTemp) / tau;
-    float delComp = w * (comp - node->meanComp) / tau;
+    float delTemp = rate * (temp - node->meanTemp);
+    float delComp = rate * (comp - node->meanComp);
     node->meanTemp += delTemp;
     node->meanComp += delComp;
+    if(initCnt < INIT_SOM) return;
 
-    // update variance and covariance
-    if(node->tau > 0) {
-        // re-center variables
-        temp -= node->meanTemp;
-        comp -= node->meanComp;
-        // update temperature variance
-        node->varTempTemp += w * ((temp * temp) - node->varTempTemp) / (node->tau + w);
-        node->varTempTemp += delTemp * delTemp;
-        // update temperature compensation covariance
-        node->varTempComp += w * ((temp * comp) - node->varTempComp) / (node->tau + w);
-        node->varTempComp += delTemp * delComp;
-    }
-    // update node learning rate
-    node->tau = tau;
+    // re-center variables
+    temp -= node->meanTemp;
+    comp -= node->meanComp;
+    // update temperature variance
+    node->varTempTemp += rate * ((temp * temp) - node->varTempTemp);
+    node->varTempTemp += delTemp * delTemp;
+    // update temperature compensation covariance
+    node->varTempComp += rate * ((temp * comp) - node->varTempComp);
+    node->varTempComp += delTemp * delComp;
 }
 
 
@@ -55,10 +58,19 @@ void TCOMP_init() {
 }
 
 void TCOMP_update(float temp, float comp) {
+    // first update special case
+    if(initCnt == 0) {
+        tau = TAU_INIT;
+        for(int i = 0; i < NODE_CNT; i++) {
+            nodes[i].meanTemp = temp;
+            nodes[i].meanComp = comp;
+        }
+    }
+
     // find best matching node
-    int best = NODE_CNT/2;
+    int best = 0;
     float min = fabsf(temp - nodes[best].meanTemp);
-    for(int i = 0; i < NODE_CNT; i++) {
+    for(int i = 1; i < NODE_CNT; i++) {
         float dist = fabsf(temp - nodes[i].meanTemp);
         if(dist < min) {
             best = i;
@@ -67,20 +79,27 @@ void TCOMP_update(float temp, float comp) {
     }
 
     // update nodes
+    if(initCnt < INIT_END) {
+        if(++initCnt == INIT_END)
+            tau = TAU_RUN;
+    }
     for(int i = 0; i < NODE_CNT; i++) {
         int dist = abs(i - best);
-        if(dist > 3) continue;
-        updateNode(&nodes[i], ldexpf(1, -3 * dist), temp, comp);
+        updateNode(&nodes[i], ldexpf(1, dist * DIST_RATE), temp, comp);
     }
 }
 
 
 void TCOMP_getCoeff(float temp, float *m, float *b) {
+    if(initCnt < INIT_END) {
+        *m = NAN;
+        *b = 0;
+    }
+
     // find best matching node
-    int best = NODE_CNT/2;
+    int best = 0;
     float min = fabsf(temp - nodes[best].meanTemp);
-    for(int i = 0; i < NODE_CNT; i++) {
-        if(nodes[i].tau == 0) continue;
+    for(int i = 1; i < NODE_CNT; i++) {
         float dist = fabsf(temp - nodes[i].meanTemp);
         if(dist < min) {
             best = i;
@@ -94,11 +113,11 @@ void TCOMP_getCoeff(float temp, float *m, float *b) {
 }
 
 void TCOMP_plot() {
+    char str[32];
     float xmax, xmin, ymax, ymin;
     xmax = xmin = nodes[NODE_CNT/2].meanTemp;
     ymax = ymin = nodes[NODE_CNT/2].meanComp;
     for(int i = 0; i < NODE_CNT; i++) {
-        if(nodes[i].tau == 0) continue;
         if(nodes[i].meanTemp > xmax) xmax = nodes[i].meanTemp;
         if(nodes[i].meanTemp < xmin) xmin = nodes[i].meanTemp;
         if(nodes[i].meanComp > ymax) ymax = nodes[i].meanComp;
@@ -114,14 +133,16 @@ void TCOMP_plot() {
     PLOT_setLine(0, 104, 176, 104, 1);
     PLOT_setRect(0, 105, 176, 182, 3);
 
+    toDec(initCnt, 8, ' ', str);
+    FONT_drawText(112, 168, str, FONT_ASCII_16, 0, 3);
+
     for(int i = 0; i < NODE_CNT; i++) {
-        if(nodes[i].tau == 0) continue;
         int x = lroundf(xscale * (nodes[i].meanTemp - xmin));
         int y = lroundf(yscale * (nodes[i].meanComp - ymax));
         x += 8;
         y += 108;
-        PLOT_setLine(x-3, y-3, x+3, y+3, 0);
-        PLOT_setLine(x-3, y+3, x+3, y-3, 0);
+        PLOT_setLine(x-2, y, x+2, y, 0);
+        PLOT_setLine(x, y-2, x, y+2, 0);
     }
 
     int px = 0, py = 105;

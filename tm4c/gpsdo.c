@@ -17,8 +17,8 @@
 #define OFFSET_COARSE_ALIGN (1000000) // 1 millisecond
 #define STAT_TIME_CONST (16)
 #define STAT_LOCK_RMS (250e-9f)
-#define STAT_CTRL_RMS (1e-6f)
-#define STAT_COMP_RMS (200e-9f)
+#define STAT_CTRL_RMS (5e-6f)
+#define STAT_COMP_RMS (1e-6f)
 
 
 static int32_t ppsGpsEdge;
@@ -210,6 +210,7 @@ void GPSDO_run() {
         EMAC0.TIMSTCTRL.TSUPDT = 1;
         return;
     }
+
     // convert PPS offset to float
     float fltOffset = ((float) offset) * 1e-9f;
     // update PPS stats
