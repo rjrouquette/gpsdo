@@ -285,8 +285,8 @@ struct NodeMath {
     }
 
     void update(const Sample &s) {
-        int best = 0;
-        float min = fabsf(s.temp - nodes[0].center[0]);
+        int best = 8;
+        float min = fabsf(s.temp - nodes[best].center[0]);
         for(int i = 0; i < 16; i++) {
             float dist = fabsf(s.temp - nodes[i].center[0]);
             if(dist < min) {
@@ -303,9 +303,10 @@ struct NodeMath {
     }
 
     float predict(float temp) {
-        int best = 0;
-        float min = fabsf(temp - nodes[0].center[0]);
+        int best = 8;
+        float min = fabsf(temp - nodes[best].center[0]);
         for(int i = 0; i < 16; i++) {
+            if(nodes[i].tau == 0) continue;
             float dist = fabsf(temp - nodes[i].center[0]);
             if(dist < min) {
                 best = i;

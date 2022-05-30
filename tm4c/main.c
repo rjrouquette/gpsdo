@@ -21,6 +21,7 @@
 #include "ntp.h"
 #include "snmp.h"
 #include "lib/net/dhcp.h"
+#include "tcomp.h"
 
 extern volatile uint8_t debugStr[7][24];
 //volatile uint8_t debugHex[32];
@@ -45,7 +46,6 @@ int main(void) {
     EPD_refresh();
     // initialize temperature sensor
     TEMP_init();
-    TEMP_proc();
     // initialize networking
     NET_init();
     NET_getMacAddress(temp);
@@ -81,6 +81,7 @@ int main(void) {
             updateStatusBanner();
             updateStatusGPSDO();
             updateStatusNetwork();
+            TCOMP_plot();
 
 //            for(int j = 0; j < 4; j++) {
 //                for (int i = 0; i < 8; i++) {
@@ -90,9 +91,9 @@ int main(void) {
 //                }
 //            }
 
-            for(int i = 0; i < 7; i++) {
-                FONT_drawText(0, (i+2)*16, (char *) debugStr[i], FONT_ASCII_16, 0, 3);
-            }
+//            for(int i = 0; i < 7; i++) {
+//                FONT_drawText(0, (i+2)*16, (char *) debugStr[i], FONT_ASCII_16, 0, 3);
+//            }
 
             EPD_refresh();
             next += 10;
@@ -120,11 +121,11 @@ void updateStatusGPSDO() {
 
     len = fmtFloat((float) GPSDO_offsetNano(), 12, 0, temp);
     strcpy(temp+len, " ns");
-    FONT_drawText(0, 144, temp, FONT_ASCII_16, 0, 3);
+    FONT_drawText(0, 48, temp, FONT_ASCII_16, 0, 3);
 
     len = fmtFloat(GPSDO_freqCorr() * 1e6f, 12, 4, temp);
     strcpy(temp+len, " ppm");
-    FONT_drawText(0, 160, temp, FONT_ASCII_16, 0, 3);
+    FONT_drawText(0, 64, temp, FONT_ASCII_16, 0, 3);
 }
 
 void updateStatusNetwork() {

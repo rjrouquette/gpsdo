@@ -8,5 +8,6 @@
 void TCOMP_init();
 void TCOMP_update(float temp, float comp);
 void TCOMP_getCoeff(float temp, float *m, float *b);
+void TCOMP_plot();
 
 #endif //GPSDO_TCOMP_H
