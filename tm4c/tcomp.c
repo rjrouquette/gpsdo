@@ -133,7 +133,7 @@ void TCOMP_plot() {
         float comp = (m * temp) + b;
         int y = lroundf(yscale * (comp - ymax));
         y += 108;
-        if(x > 0 && py > 104 && y > 104 && px < 183 && y < 183) {
+        if((x > 0) && (py > 104) && (y > 104) && (py < 183) && (y < 183)) {
             PLOT_setLine(px, py, x, y, 1);
         }
         px = x;
