@@ -322,7 +322,7 @@ struct NodeMath {
         if(cnt < 256) ++cnt;
         for(int i = 0; i < 16; i++) {
             int dist = abs(i - best);
-            updateNode(nodes[i], s, ldexpf(w, -3 * dist));
+            updateNode(nodes[i], s, ldexpf(w, -dist));
         }
     }
 

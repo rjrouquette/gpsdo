@@ -16,7 +16,7 @@
 #define NODE_CNT (16)
 #define TAU_INIT (64)
 #define TAU_RUN (1024)
-#define DIST_RATE (-3)
+#define DIST_RATE (-1)
 #define INIT_SOM (256)
 #define INIT_END (512)
 
