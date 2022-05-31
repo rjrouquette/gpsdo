@@ -15,10 +15,11 @@
 
 #define NODE_CNT (16)
 #define TAU_INIT (64)
-#define TAU_RUN (1024)
-#define DIST_RATE (-1)
-#define INIT_SOM (256)
-#define INIT_END (512)
+#define TAU_RUN (2048)
+#define DIST_INIT (-1)
+#define DIST_RUN (-3)
+#define INIT_SOM (1024)
+#define INIT_END (2048)
 
 static struct CompNode {
     float meanTemp;
@@ -27,6 +28,7 @@ static struct CompNode {
     float varTempComp;
 } nodes[NODE_CNT];
 
+static int ndist;
 static float tau;
 static int initCnt;
 
@@ -60,9 +62,10 @@ void TCOMP_init() {
 void TCOMP_update(float temp, float comp) {
     // first update special case
     if(initCnt == 0) {
+        ndist = DIST_INIT;
         tau = TAU_INIT;
         for(int i = 0; i < NODE_CNT; i++) {
-            nodes[i].meanTemp = temp;
+            nodes[i].meanTemp = temp + (((float) i) / NODE_CNT);
             nodes[i].meanComp = comp;
         }
     }
@@ -80,12 +83,14 @@ void TCOMP_update(float temp, float comp) {
 
     // update nodes
     if(initCnt < INIT_END) {
-        if(++initCnt == INIT_END)
+        if(++initCnt == INIT_END) {
+            ndist = DIST_RUN;
             tau = TAU_RUN;
+        }
     }
     for(int i = 0; i < NODE_CNT; i++) {
         int dist = abs(i - best);
-        updateNode(&nodes[i], ldexpf(1, dist * DIST_RATE), temp, comp);
+        updateNode(&nodes[i], ldexpf(1, ndist * dist), temp, comp);
     }
 }
 

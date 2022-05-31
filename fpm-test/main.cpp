@@ -257,18 +257,15 @@ struct NodeMath {
         float cov[2];
     } nodes[16];
 
-    float prevTemp;
-    float varNoise;
+    float ndist;
     float tau;
     int cnt;
-    bool firstUpdate;
 
     NodeMath() {
         bzero(nodes, sizeof(nodes));
         cnt = 0;
-        tau = 256;
-        varNoise = 0;
-        prevTemp = NAN;
+        tau = 16;
+        ndist = -1;
     }
 
     void updateNode(Node &node, const Sample &s, float w) {
@@ -291,20 +288,9 @@ struct NodeMath {
     }
 
     void update(const Sample &s) {
-        if(std::isnan(prevTemp))
-            prevTemp = s.temp;
-        float deltaTemp = s.temp - prevTemp;
-        varNoise += ((deltaTemp * deltaTemp) - varNoise) / tau;
-        float w = fabsf(deltaTemp) / sqrtf(varNoise);
-        if(w < 1) {
-            if(w < 0.1f) w = 0.1f;
-        } else {
-            w = 1;
-        }
-
         if(cnt == 0) {
             for(int i = 0; i < 16; i++) {
-                nodes[i].center[0] = s.temp;
+                nodes[i].center[0] = s.temp + (((float)i) / 16);
                 nodes[i].center[1] = s.ppm;
             }
         }
@@ -320,9 +306,13 @@ struct NodeMath {
         }
 
         if(cnt < 256) ++cnt;
+        else {
+            tau = 256;
+            ndist = -3;
+        }
         for(int i = 0; i < 16; i++) {
             int dist = abs(i - best);
-            updateNode(nodes[i], s, ldexpf(w, -dist));
+            updateNode(nodes[i], s, ldexpf(1, ndist * dist));
         }
     }
 
