@@ -18,8 +18,7 @@
 #define TAU_RUN (2048)
 #define DIST_INIT (-1)
 #define DIST_RUN (-3)
-#define INIT_SOM (1024)
-#define INIT_END (2048)
+#define INIT_END (1024)
 
 static struct CompNode {
     float meanTemp;
@@ -40,7 +39,6 @@ void updateNode(struct CompNode *node, float w, float temp, float comp) {
     float delComp = rate * (comp - node->meanComp);
     node->meanTemp += delTemp;
     node->meanComp += delComp;
-    if(initCnt < INIT_SOM) return;
 
     // re-center variables
     temp -= node->meanTemp;

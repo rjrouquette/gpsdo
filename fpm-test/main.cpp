@@ -275,15 +275,14 @@ struct NodeMath {
         del[1] = rate * (s.ppm - node.center[1]);
         node.center[0] += del[0];
         node.center[1] += del[1];
-        if(cnt < 256) return;
 
         float diff[2];
         diff[0] = s.temp - node.center[0];
         diff[1] = s.ppm - node.center[1];
 
         for(int i = 0; i < 2; i++) {
-                node.cov[i] += rate * ((diff[0] * diff[i]) - node.cov[i]);
-                node.cov[i] += del[0] * del[i];
+            node.cov[i] += rate * ((diff[0] * diff[i]) - node.cov[i]);
+            node.cov[i] += del[0] * del[i];
         }
     }
 

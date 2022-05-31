@@ -126,6 +126,10 @@ void updateStatusGPSDO() {
     len = fmtFloat(GPSDO_freqCorr() * 1e6f, 12, 4, temp);
     strcpy(temp+len, " ppm");
     FONT_drawText(0, 64, temp, FONT_ASCII_16, 0, 3);
+
+    len = fmtFloat(GPSDO_skewRms() * 1e6f, 12, 4, temp);
+    strcpy(temp+len, " ppm");
+    FONT_drawText(0, 80, temp, FONT_ASCII_16, 0, 3);
 }
 
 void updateStatusNetwork() {
