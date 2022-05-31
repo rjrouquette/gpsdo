@@ -5,6 +5,7 @@
  */
 
 #include <memory.h>
+#include <math.h>
 #include "lib/clk.h"
 #include "lib/delay.h"
 #include "lib/epd.h"

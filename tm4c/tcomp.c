@@ -30,6 +30,7 @@ static struct CompNode {
 static int ndist;
 static float tau;
 static int initCnt;
+static float lastTemp;
 
 void updateNode(struct CompNode *node, float w, float temp, float comp) {
     // learning rate
@@ -95,6 +96,7 @@ void TCOMP_update(float temp, float comp) {
 
 
 void TCOMP_getCoeff(float temp, float *m, float *b) {
+    lastTemp = temp;
     if(initCnt < INIT_END) {
         *m = NAN;
         *b = 0;
@@ -129,6 +131,9 @@ void TCOMP_plot() {
         if(nodes[i].meanComp < ymin) ymin = nodes[i].meanComp;
     }
 
+    if(lastTemp > xmax) xmax = lastTemp;
+    if(lastTemp < xmin) xmin = lastTemp;
+
     if(xmax == xmin) { xmin -= 0.1f; xmax += 0.1f; }
     if(ymax == ymin) { ymin -= 1e-9f; ymax += 1e-9f; }
 
@@ -138,8 +143,17 @@ void TCOMP_plot() {
     PLOT_setLine(0, 96, 176, 96, 1);
     PLOT_setRect(0, 97, 176, 182, 3);
 
-    toDec(initCnt, 8, ' ', str);
-    FONT_drawText(112, 168, str, FONT_ASCII_16, 0, 3);
+    // initialization count down
+    if(initCnt < INIT_END) {
+        toDec(INIT_END - initCnt, 8, ' ', str);
+        FONT_drawText(112, 168, str, FONT_ASCII_16, 0, 3);
+    }
+
+    // most recent temperature
+    {
+        int x = lroundf(xscale * (lastTemp - xmin));
+        PLOT_setLine(x, 97, x, 182, 2);
+    }
 
     for(int i = 0; i < NODE_CNT; i++) {
         int x = lroundf(xscale * (nodes[i].meanTemp - xmin));
