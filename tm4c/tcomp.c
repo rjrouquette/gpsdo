@@ -62,8 +62,9 @@ void TCOMP_update(float temp, float comp) {
     if(initCnt == 0) {
         ndist = DIST_INIT;
         tau = TAU_INIT;
+        int split = NODE_CNT / 2;
         for(int i = 0; i < NODE_CNT; i++) {
-            nodes[i].meanTemp = temp + (((float) i) / NODE_CNT);
+            nodes[i].meanTemp = temp + (((float) (i - split)) / NODE_CNT);
             nodes[i].meanComp = comp;
         }
     }
@@ -97,6 +98,7 @@ void TCOMP_getCoeff(float temp, float *m, float *b) {
     if(initCnt < INIT_END) {
         *m = NAN;
         *b = 0;
+        return;
     }
 
     // find best matching node
@@ -118,9 +120,9 @@ void TCOMP_getCoeff(float temp, float *m, float *b) {
 void TCOMP_plot() {
     char str[32];
     float xmax, xmin, ymax, ymin;
-    xmax = xmin = nodes[NODE_CNT/2].meanTemp;
-    ymax = ymin = nodes[NODE_CNT/2].meanComp;
-    for(int i = 0; i < NODE_CNT; i++) {
+    xmax = xmin = nodes[0].meanTemp;
+    ymax = ymin = nodes[0].meanComp;
+    for(int i = 1; i < NODE_CNT; i++) {
         if(nodes[i].meanTemp > xmax) xmax = nodes[i].meanTemp;
         if(nodes[i].meanTemp < xmin) xmin = nodes[i].meanTemp;
         if(nodes[i].meanComp > ymax) ymax = nodes[i].meanComp;
@@ -131,10 +133,10 @@ void TCOMP_plot() {
     if(ymax == ymin) { ymin -= 1e-9f; ymax += 1e-9f; }
 
     float xscale = 159.0f / (xmax - xmin);
-    float yscale = 71.0f / (ymin - ymax);
+    float yscale = 79.0f / (ymin - ymax);
 
-    PLOT_setLine(0, 104, 176, 104, 1);
-    PLOT_setRect(0, 105, 176, 182, 3);
+    PLOT_setLine(0, 96, 176, 96, 1);
+    PLOT_setRect(0, 97, 176, 182, 3);
 
     toDec(initCnt, 8, ' ', str);
     FONT_drawText(112, 168, str, FONT_ASCII_16, 0, 3);
@@ -143,12 +145,12 @@ void TCOMP_plot() {
         int x = lroundf(xscale * (nodes[i].meanTemp - xmin));
         int y = lroundf(yscale * (nodes[i].meanComp - ymax));
         x += 8;
-        y += 108;
+        y += 100;
         PLOT_setLine(x-2, y, x+2, y, 0);
         PLOT_setLine(x, y-2, x, y+2, 0);
     }
 
-    int px = 0, py = 105;
+    int px = 0, py = 96;
     for(int x = 0; x < 176; x++) {
         float temp = ((float)(x - 8)) / xscale;
         temp += xmin;
@@ -156,8 +158,8 @@ void TCOMP_plot() {
         TCOMP_getCoeff(temp, &m, &b);
         float comp = (m * temp) + b;
         int y = lroundf(yscale * (comp - ymax));
-        y += 108;
-        if((x > 0) && (py > 104) && (y > 104) && (py < 183) && (y < 183)) {
+        y += 100;
+        if((x > 0) && (py > 96) && (y > 96) && (py < 183) && (y < 183)) {
             PLOT_setLine(px, py, x, y, 1);
         }
         px = x;

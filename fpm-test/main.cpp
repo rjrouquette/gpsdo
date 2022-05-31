@@ -289,7 +289,7 @@ struct NodeMath {
     void update(const Sample &s) {
         if(cnt == 0) {
             for(int i = 0; i < 16; i++) {
-                nodes[i].center[0] = s.temp + (((float)i) / 16);
+                nodes[i].center[0] = s.temp + (((float)(i-8)) / 16);
                 nodes[i].center[1] = s.ppm;
             }
         }
