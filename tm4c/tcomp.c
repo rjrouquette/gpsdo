@@ -151,7 +151,7 @@ void TCOMP_plot() {
 
     // most recent temperature
     {
-        int x = lroundf(xscale * (lastTemp - xmin));
+        int x = 8 + lroundf(xscale * (lastTemp - xmin));
         PLOT_setLine(x, 97, x, 182, 2);
     }
 
