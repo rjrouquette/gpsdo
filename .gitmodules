@@ -1,3 +1,3 @@
 [submodule "tm4c/hw"]
 	path = tm4c/hw
-	url = ssh://git@media-server/git/tm4c1294
+	url = git@github.com:rjrouquette/tm4c1294.git
