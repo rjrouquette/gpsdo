@@ -253,7 +253,7 @@ void GPSDO_run() {
             firstLock = 0;
         }
         else {
-            pllBias += ldexpf(fltOffset, -6);
+            pllBias += ldexpf(fltOffset, -8);
         }
     }
     // update temperature coefficient

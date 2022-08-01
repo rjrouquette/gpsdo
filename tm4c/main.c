@@ -24,8 +24,7 @@
 #include "lib/net/dhcp.h"
 #include "tcomp.h"
 
-extern volatile uint8_t debugStr[7][24];
-//volatile uint8_t debugHex[32];
+volatile uint8_t debugStr[7][24];
 
 void updateStatusBanner();
 void updateStatusGPSDO();
@@ -83,14 +82,6 @@ int main(void) {
             updateStatusGPSDO();
             updateStatusNetwork();
             TCOMP_plot();
-
-//            for(int j = 0; j < 4; j++) {
-//                for (int i = 0; i < 8; i++) {
-//                    toHex(debugHex[j*8 + i], 2, '0', temp);
-//                    temp[2] = 0;
-//                    FONT_drawText(i * 20, (j+4)*16, temp, FONT_ASCII_16, 0, 3);
-//                }
-//            }
 
 //            for(int i = 0; i < 7; i++) {
 //                FONT_drawText(0, (i+2)*16, (char *) debugStr[i], FONT_ASCII_16, 0, 3);
