@@ -1,0 +1,3 @@
+[submodule "tm4c/hw"]
+	path = tm4c/hw
+	url = git@github.com:rjrouquette/tm4c1294.git

@@ -11,7 +11,7 @@ set(CMAKE_C_FLAGS "-std=c17 ${COMP_FLAGS}")
 set(CMAKE_CXX_FLAGS "-std=c++17 ${COMP_FLAGS}")
 
 set(CMAKE_LINKER arm-none-eabi-ld)
-set(LINKER_FLAGS "-T ${CMAKE_SOURCE_DIR}/tm4c1249ncpdt.ld --entry ISR_Reset --gc-sections")
+set(LINKER_FLAGS "-T ${CMAKE_SOURCE_DIR}/hw/linker/tm4c1249ncpdt.ld --entry ISR_Reset --gc-sections")
 set(LINKER_FLAGS "${LINKER_FLAGS} -L/usr/lib/arm-none-eabi/lib/thumb/v7e-m+fp/hard")
 set(CMAKE_C_LINK_EXECUTABLE "<CMAKE_LINKER> ${LINKER_FLAGS} <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
 set(CMAKE_CXX_LINK_EXECUTABLE "<CMAKE_LINKER> ${LINKER_FLAGS} <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
