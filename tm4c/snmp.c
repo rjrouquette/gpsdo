@@ -126,7 +126,7 @@ void SNMP_process(uint8_t *frame, int flen) {
                 section |= buffOID[sizeof(OID_PREFIX_MGMT)+1];
             }
             switch (section) {
-                // GPSDO (Phyiscal Sensors)
+                // GPSDO (Physical Sensors)
                 case 99:
                     sendGPSDO(frame);
                     break;
