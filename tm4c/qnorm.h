@@ -6,7 +6,7 @@
 #define GPSDO_QNORM_H
 
 #define QNORM_SIZE (32)
-#define QNORM_LIM (5*86400)
+#define QNORM_LIM (7*86400)
 
 struct QNormBin {
     float mean;
@@ -20,7 +20,7 @@ struct QNorm {
     float tau;
     float lower;
     float upper;
-    float range;
+    float offset;
     float tscale;
     float rscale;
 };

@@ -183,23 +183,27 @@ int qnorm_update(struct QNorm *qnorm, const float *data, int count, int stride, 
     float _lower, _upper;
     compBounds(qnorm, &_lower, &_upper);
     float _range = _upper - _lower;
+    float range = qnorm->upper - qnorm->lower;
+    float denom = range + _range;
 
     // only update if there has been a significant change
     if(
-            fabsf(_lower - qnorm->lower) / qnorm->range > 0.005f ||
-            fabsf(_upper - qnorm->upper) / qnorm->range > 0.005f ||
-            fabsf(_range - qnorm->range) / qnorm->range > 0.010f
-            ) {
+        fabsf(_lower - qnorm->lower) / denom > 0.01f ||
+        fabsf(_upper - qnorm->upper) / denom > 0.01f ||
+        fabsf(_range - range) / denom > 0.01f
+    ) {
+        // save old zero point
+        float zero = qnorm->offset;
         // compute new scale
+        qnorm->offset = (_upper + _lower) / 2.0f;
         qnorm->tscale = 2.0f / _range;
         qnorm->rscale = 0.5f * _range;
-        // compute scale and offset translation from old bounds to new bounds
-        *dScale = qnorm->range / _range;
-        *dOffset = ((qnorm->lower - _lower) * qnorm->tscale) + (dScale[0] - 1.0f);
         // set new bounds
         qnorm->lower = _lower;
         qnorm->upper = _upper;
-        qnorm->range = _range;
+        // compute scale and offset translation from old bounds to new bounds
+        *dScale = range / _range;
+        *dOffset = (zero - qnorm->offset) * qnorm->tscale;
         return 1;
     }
 
@@ -210,11 +214,11 @@ int qnorm_update(struct QNorm *qnorm, const float *data, int count, int stride, 
 }
 
 float qnorm_transform(const struct QNorm *qnorm, float x) {
-    return ((x - qnorm->lower) * qnorm->tscale) - 1.0f;
+    return (x - qnorm->offset) * qnorm->tscale;
 }
 
 float qnorm_restore(const struct QNorm *qnorm, float x) {
-    return ((x + 1.0f) * qnorm->rscale) + qnorm->lower;
+    return (x * qnorm->rscale) + qnorm->offset;
 }
 
 static void sort(float *begin, float *end) {

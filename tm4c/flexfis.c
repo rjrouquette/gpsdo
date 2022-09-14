@@ -51,7 +51,7 @@ float flexnode_estimate(const struct FlexNode *node, const float *x) {
 }
 
 void flexnode_updateRegressor(struct FlexNode *node) {
-    if(node->n < (DIM_INPUT * 20))
+    if(node->n < (DIM_INPUT * 10))
         return;
 
     // construct regression matrices
@@ -88,7 +88,6 @@ void flexnode_rescale(struct FlexNode *node, const float *scale, const float *of
             node->cov[k++] *= scale[i] * scale[j];
         }
     }
-
     flexnode_updateRegressor(node);
 }
 
@@ -127,8 +126,8 @@ void flexnode_updateRules(struct FlexNode *node, const float *x) {
 }
 
 int flexnode_update(struct FlexNode *node, const float *x) {
-    if(fabsf(x[0] - flexnode_estimate(node, x)) > NODE_THR)
-        return 0;
+//    if(fabsf(x[0] - flexnode_estimate(node, x)) > NODE_THR)
+//        return 0;
     flexnode_updateRules(node, x);
     return 1;
 }
@@ -248,13 +247,20 @@ void flexfis_update(const float *input, const float target) {
 
     // search for best match
     for(int i = 0; i < nodeCount; i++) {
-        if(nodeDist[i].dist > DIM_FLEXNODE)
+        if(nodeDist[i].dist > 0.2f * DIM_FLEXNODE)
             break;
         if(flexnode_update(nodes + nodeDist[i].index, offset)) {
             flexfis_pruneNodes();
             return;
         }
     }
+
+    // sanity check
+    if(nodeDist[0].dist > 2 * DIM_FLEXNODE) return;
+
+    // sanity check
+    float error = offset[0] - flexnode_estimate(nodes + nodeDist[0].index, offset);
+    if(fabsf(error) > 0.2f) return;
 
     // discard oldest node if required
     if(nodeCount >= MAX_NODES) {
@@ -291,18 +297,6 @@ float flexfis_predict(const float *input) {
 
     float estimate = flexnode_estimate(nodes + nodeDist[0].index, offset);
     return qnorm_restore(norms, estimate);
-
-//    float beta = -1.0f / fmaxf(0.1f, nodeDist[0].dist);
-//
-//    float norm = 0;
-//    float pred = 0;
-//    for(int i = 0; i < nodeCount; i++) {
-//        float estimate = flexnode_estimate(nodes + nodeDist[i].index, offset);
-//        float weight = expf(beta * nodeDist[i].dist) + PRED_PSY;
-//        norm += weight;
-//        pred += estimate * weight;
-//    }
-//    return qnorm_restore(norms, pred / norm);
 }
 
 
