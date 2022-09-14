@@ -88,7 +88,11 @@ void flexnode_rescale(struct FlexNode *node, const float *scale, const float *of
             node->cov[k++] *= scale[i] * scale[j];
         }
     }
-    flexnode_updateRegressor(node);
+    // rescale node regressor
+    for(int i = 0; i < DIM_INPUT; i++) {
+        node->reg[i] *= scale[0];
+        node->reg[i] /= scale[i+1];
+    }
 }
 
 void flexnode_updateRules(struct FlexNode *node, const float *x) {
