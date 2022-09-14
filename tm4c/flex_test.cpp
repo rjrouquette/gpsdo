@@ -80,11 +80,13 @@ void printNodes() {
 int main(int argc, char **argv) {
     if(!loadData(argv[1])) return EX_IOERR;
     tcnt = (1 * rows) / 4;
-    tcnt = 256;
+    tcnt = 1024;
     //rows = 65536;
 
     std::cout << "sizeof(QNorm): " << sizeof(QNorm) << std::endl;
     std::cout << "sizeof(FlexNode): " << sizeof(FlexNode) << std::endl;
+    std::cout << "sizeof(norms): " << sizeof(norms) << std::endl;
+    std::cout << "sizeof(nodes): " << sizeof(nodes) << std::endl;
 
     std::cout << "loaded csv data" << std::endl;
     flexfis_init(tcnt, ::data, cols, ::data + cols - 1, cols);
