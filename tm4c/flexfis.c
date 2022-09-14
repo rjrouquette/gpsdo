@@ -31,7 +31,7 @@ struct FlexNode {
     float n;
     float center[DIM_FLEXNODE];
     float cov[((DIM_FLEXNODE+1)*DIM_FLEXNODE)/2];
-    float reg[DIM_FLEXNODE-1];
+    float reg[DIM_INPUT];
 };
 
 static volatile int epoch;
@@ -46,8 +46,33 @@ static void matrix_mult(const float *matX, int rowsX, int colsX, const float *ma
 float flexnode_estimate(const struct FlexNode *node, const float *x) {
     float acc = node->center[0];
     for(int i = 1; i < DIM_FLEXNODE; i++)
-        acc += (x[i] - node->center[i]) * node->reg[i-1];
+        acc += node->reg[i-1] * (x[i] - node->center[i]);
     return acc;
+}
+
+void flexnode_updateRegressor(struct FlexNode *node) {
+    if(node->n < (DIM_INPUT * 20))
+        return;
+
+    // construct regression matrices
+    float xx[DIM_INPUT][DIM_INPUT];
+    float xy[DIM_INPUT];
+    int k = 0;
+    for(int i = DIM_INPUT; i > 0; i--) {
+        int _i = i - 1;
+        for(int j = i; j > 0; j--) {
+            int _j = j - 1;
+            xx[_i][_j] = node->cov[k];
+            xx[_j][_i] = node->cov[k];
+            ++k;
+        }
+        xy[_i] = node->cov[k];
+        ++k;
+    }
+    // compute OLS fit
+    if(matrix_invert(xx[0], DIM_INPUT)) {
+        matrix_mult(xx[0], DIM_INPUT, DIM_INPUT, xy, DIM_INPUT, 1, node->reg);
+    }
 }
 
 void flexnode_rescale(struct FlexNode *node, const float *scale, const float *offset) {
@@ -63,11 +88,8 @@ void flexnode_rescale(struct FlexNode *node, const float *scale, const float *of
             node->cov[k++] *= scale[i] * scale[j];
         }
     }
-    // rescale node regressor
-    for(int i = 0; i < DIM_INPUT; i++) {
-        node->reg[i] *= scale[0];
-        node->reg[i] /= scale[i+1];
-    }
+
+    flexnode_updateRegressor(node);
 }
 
 void flexnode_updateRules(struct FlexNode *node, const float *x) {
@@ -101,28 +123,7 @@ void flexnode_updateRules(struct FlexNode *node, const float *x) {
         }
     }
 
-    if(node->n < (DIM_INPUT * 20))
-        return;
-
-    // construct regression matrices
-    float xx[DIM_INPUT][DIM_INPUT];
-    float xy[DIM_INPUT];
-    k = 0;
-    for(int i = DIM_INPUT; i > 0; i--) {
-        int _i = i - 1;
-        for(int j = i; j > 0; j--) {
-            int _j = j - 1;
-            xx[_i][_j] = node->cov[k];
-            xx[_j][_i] = node->cov[k];
-            ++k;
-        }
-        xy[_i] = node->cov[k];
-        ++k;
-    }
-    // compute OLS fit
-    if(matrix_invert(xx[0], DIM_INPUT)) {
-        matrix_mult(xx[0], DIM_INPUT, DIM_INPUT, xy, DIM_INPUT, 1, node->reg);
-    }
+    flexnode_updateRegressor(node);
 }
 
 int flexnode_update(struct FlexNode *node, const float *x) {
@@ -135,9 +136,8 @@ int flexnode_update(struct FlexNode *node, const float *x) {
 
 
 float flexfis_predDist(const float *a, const float *b) {
-    float diff = a[0] - b[0];
-    float acc = diff * diff;
-    for(int i = 1; i < DIM_INPUT; i++) {
+    float acc = 0, diff;
+    for(int i = 1; i < DIM_FLEXNODE; i++) {
         diff = a[i] - b[i];
         acc += diff * diff;
     }
@@ -145,9 +145,8 @@ float flexfis_predDist(const float *a, const float *b) {
 }
 
 float flexfis_nodeDist(const float *a, const float *b) {
-    float diff = a[0] - b[0];
-    float acc = diff * diff;
-    for(int i = 1; i < DIM_FLEXNODE; i++) {
+    float acc = 0, diff;
+    for(int i = 0; i < DIM_FLEXNODE; i++) {
         diff = a[i] - b[i];
         acc += diff * diff;
     }
@@ -157,7 +156,7 @@ float flexfis_nodeDist(const float *a, const float *b) {
 void flexfis_pruneNodes() {
     for(int i = 0; i < nodeCount;) {
         // check age of node
-        if((epoch - nodes[i].touched) < MAX_AGE) {
+        if((epoch - nodes[i].touched) <= MAX_AGE) {
             ++i;
             continue;
         }
@@ -239,13 +238,15 @@ void flexfis_update(const float *input, const float target) {
         return;
     }
 
+    // compute node proximity to sample
     struct FlexDist nodeDist[nodeCount];
     for(int i = 0; i < nodeCount; i++) {
         nodeDist[i].dist = flexfis_nodeDist(offset, nodes[i].center);
         nodeDist[i].index = i;
     }
     sort(nodeDist, nodeDist + nodeCount);
-    const float maxDist = DIM_FLEXNODE;
+
+    // search for best match
     for(int i = 0; i < nodeCount; i++) {
         if(nodeDist[i].dist > DIM_FLEXNODE)
             break;
@@ -254,8 +255,6 @@ void flexfis_update(const float *input, const float target) {
             return;
         }
     }
-    if(nodeDist[nodeCount-1].dist > 5 * maxDist)
-        return;
 
     // discard oldest node if required
     if(nodeCount >= MAX_NODES) {
@@ -278,17 +277,21 @@ float flexfis_predict(const float *input) {
         offset[i+1] = qnorm_transform(norms+i+1, input[i]);
 
     if(nodeCount < 1) return NAN;
-//    if(nodeCount < 2) {
+    if(nodeCount < 2) {
         float estimate = flexnode_estimate(nodes, offset);
         return qnorm_restore(norms, estimate);
-//    }
-//
-//    struct FlexDist nodeDist[nodeCount];
-//    for(int i = 0; i < nodeCount; i++) {
-//        nodeDist[i].dist = flexfis_predDist(offset+1, nodes[i].center+1);
-//        nodeDist[i].index = i;
-//    }
-//    sort(nodeDist, nodeDist + nodeCount);
+    }
+
+    struct FlexDist nodeDist[nodeCount];
+    for(int i = 0; i < nodeCount; i++) {
+        nodeDist[i].dist = flexfis_predDist(offset, nodes[i].center);
+        nodeDist[i].index = i;
+    }
+    sort(nodeDist, nodeDist + nodeCount);
+
+    float estimate = flexnode_estimate(nodes + nodeDist[0].index, offset);
+    return qnorm_restore(norms, estimate);
+
 //    float beta = -1.0f / fmaxf(0.1f, nodeDist[0].dist);
 //
 //    float norm = 0;
@@ -420,14 +423,14 @@ static void matrix_mult(
 }
 
 static void sort(struct FlexDist *begin, struct FlexDist *end) {
-    while(begin < end) {
+    while(begin < --end) {
         int sorted = 1;
-        for(struct FlexDist *v = ++begin; v < end; v++) {
-            if(v[0].dist < v[-1].dist) {
+        for(struct FlexDist *v = begin; v < end; v++) {
+            if(v[1].dist < v[0].dist) {
                 sorted = 0;
-                struct FlexDist tmp = v[0];
-                v[0] = v[-1];
-                v[-1] = tmp;
+                struct FlexDist tmp = v[1];
+                v[1] = v[0];
+                v[0] = tmp;
             }
         }
         if(sorted) break;

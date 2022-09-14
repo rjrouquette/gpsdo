@@ -218,14 +218,14 @@ float qnorm_restore(const struct QNorm *qnorm, float x) {
 }
 
 static void sort(float *begin, float *end) {
-    while(begin < end) {
+    while(begin < --end) {
         int sorted = 1;
-        for(float *v = ++begin; v < end; v++) {
-            if(v[0] < v[-1]) {
+        for(float *v = begin; v < end; v++) {
+            if(v[1] < v[0]) {
                 sorted = 0;
-                float tmp = v[0];
-                v[0] = v[-1];
-                v[-1] = tmp;
+                float tmp = v[1];
+                v[1] = v[0];
+                v[0] = tmp;
             }
         }
         if(sorted) break;

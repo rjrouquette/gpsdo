@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
             continue;
         }
         auto a = flexfis_predict(r);
-        if(i >= rows - 3600) {
+        if(i >= rows - 7200) {
             fprintf(fout, "%f,%f,%f,%f\n", r[0], r[cols-1], a, a - r[cols-1]);
         }
         flexfis_update(t, t[cols-1]);
@@ -179,6 +179,7 @@ bool loadData(const char *fname) {
                 *(ptr++) = v;
                 for(int i = 3; i < cols; i++)
                     *(ptr++) = parseFloat(row[i]);
+
                 ptr -= cols+DIM_INPUT-3;
                 bool ok = true;
                 for(int i = 0; i < cols+DIM_INPUT-3; i++) {
