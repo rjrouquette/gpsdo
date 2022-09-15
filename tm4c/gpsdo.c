@@ -49,7 +49,6 @@ static float currTemperature;
 static float currCompensation;
 
 static void setFeedback(float feedback);
-static float getFeedback();
 
 
 void initPPS() {
@@ -223,6 +222,10 @@ void GPSDO_run() {
     ppsSkewVar += (ppsSkew - ppsSkewVar) / STAT_TIME_CONST;
     ppsSkewRms = sqrtf(ppsSkewVar);
 
+    // update temperature coefficient
+    if(ppsSkewRms < STAT_COMP_RMS)
+        TCOMP_update(TEMP_dcxo(), currFeedback);
+
     // get temperature compensation
     TCOMP_getCoeff(TEMP_dcxo(), &compM, &compB);
     float newComp = 0;//(compM * currTemperature) + compB;
@@ -254,9 +257,6 @@ void GPSDO_run() {
             pllBias += ldexpf(fltOffset, -8);
         }
     }
-    // update temperature coefficient
-    if(ppsSkewRms < STAT_COMP_RMS)
-        TCOMP_update(TEMP_dcxo(), currFeedback);
 }
 
 int GPSDO_isLocked() {
@@ -281,7 +281,7 @@ float GPSDO_skewRms() {
 }
 
 float GPSDO_freqCorr() {
-    return getFeedback();
+    return currFeedback;
 }
 
 float GPSDO_compBias() {
@@ -323,19 +323,15 @@ void ISR_Timer5B() {
 }
 
 void setFeedback(float feedback) {
-    // update current feedback value
-    currFeedback = feedback;
     // convert to correction factor
     int32_t correction = lroundf(ldexpf(feedback, 32));
     // correction factor must always be negative
-    if(correction > 0) correction = -1;
+    if(correction > -1) correction = -1;
     // correction factor must not exceed 1 part-per-thousand
     if(correction < -(1 << 22)) correction = -(1 << 22);
     // apply correction update
     EMAC0.TIMADD = correction;
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
-}
-
-float getFeedback() {
-    return ldexpf((float)(int32_t)(EMAC0.TIMADD), -32);
+    // update current feedback value
+    currFeedback = ldexpf((float)correction, -32);
 }

@@ -44,7 +44,7 @@ static void updateBin(struct QNormBin *bin, float mu, float x, float w) {
     bin->mean += (x - mu) * w;
 }
 
-static void compBounds(const struct QNorm *qnorm, float *lower, float *upper) {
+static void compBounds(const struct QNorm *qnorm, float *_offset, float *_scale) {
     // compute mean
     float muY = 0;
     for(int i = 0; i < QNORM_SIZE; i++) {
@@ -66,8 +66,8 @@ static void compBounds(const struct QNorm *qnorm, float *lower, float *upper) {
 
     // compute bounds
     m /= n;
-    *lower = muY - m * 0.3f;
-    *upper = muY + m * 0.3f;
+    *_scale = 0.3f * m;
+    *_offset = muY;
 }
 
 static void compUpdate(struct QNorm *qnorm, float x, struct QNormBin *acc) {
@@ -178,30 +178,22 @@ int qnorm_update(struct QNorm *qnorm, const float *data, int count, int stride, 
         qnorm->bins[i].tau *= nrm;
 
     // compute new bounds
-    float _lower, _upper;
-    compBounds(qnorm, &_lower, &_upper);
-    float _range = _upper - _lower;
-    float range = qnorm->upper - qnorm->lower;
-    float denom = range + _range;
+    float _offset, _rscale;
+    compBounds(qnorm, &_offset, &_rscale);
+    float denom = qnorm->rscale + _rscale;
 
     // only update if there has been a significant change
     if(
-        fabsf(_lower - qnorm->lower) / denom > 0.01f ||
-        fabsf(_upper - qnorm->upper) / denom > 0.01f ||
-        fabsf(_range - range) / denom > 0.01f
+        fabsf(_offset - qnorm->offset) / denom > 0.01f ||
+        fabsf(_rscale - qnorm->rscale) / denom > 0.01f
     ) {
-        // save old zero point
-        float zero = qnorm->offset;
-        // compute new scale
-        qnorm->offset = (_upper + _lower) / 2.0f;
-        qnorm->tscale = 2.0f / _range;
-        qnorm->rscale = 0.5f * _range;
-        // set new bounds
-        qnorm->lower = _lower;
-        qnorm->upper = _upper;
         // compute scale and offset translation from old bounds to new bounds
-        *dScale = range / _range;
-        *dOffset = (zero - qnorm->offset) * qnorm->tscale;
+        *dScale =  qnorm->rscale / _rscale;
+        *dOffset = (qnorm->offset - _offset) / _rscale;
+        // set new scale
+        qnorm->offset = _offset;
+        qnorm->tscale = 1.0f / _rscale;
+        qnorm->rscale = _rscale;
         return 1;
     }
 

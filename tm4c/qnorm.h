@@ -17,8 +17,6 @@ struct QNorm {
     struct QNormBin bins[QNORM_SIZE];
 
     float tau;
-    float lower;
-    float upper;
     float offset;
     float tscale;
     float rscale;
