@@ -33,7 +33,6 @@ struct FlexNode {
     int touched;
     float n;
     float center[DIM_INPUT+1];
-    float cov[((DIM_INPUT+2)*(DIM_INPUT+1))/2];
     float reg[DIM_INPUT];
 };
 
@@ -67,9 +66,6 @@ void printNodes() {
         for(auto &v : node.center)
             std::cout << " " << v;
         std::cout << std::endl;
-        for(auto &v : node.cov)
-            std::cout << " " << v;
-        std::cout << std::endl;
         for(auto &v : node.reg)
             std::cout << " " << v;
         std::cout << std::endl;
@@ -80,7 +76,7 @@ void printNodes() {
 int main(int argc, char **argv) {
     if(!loadData(argv[1])) return EX_IOERR;
     tcnt = (1 * rows) / 4;
-    tcnt = 3600;
+    tcnt = 300;
     //rows = 65536;
 
     std::cout << "sizeof(QNorm): " << sizeof(QNorm) << std::endl;
@@ -110,7 +106,7 @@ int main(int argc, char **argv) {
             continue;
         }
         auto a = flexfis_predict(r);
-        if(i >= rows - 7200) {
+        if(i - tcnt < 7200) {
             fprintf(fout, "%f,%f,%f,%f\n", r[0], r[cols-1], a, a - r[cols-1]);
         }
         flexfis_update(t, t[cols-1]);

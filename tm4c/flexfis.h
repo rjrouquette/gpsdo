@@ -5,7 +5,7 @@
 #ifndef GPSDO_FLEXFIS_H
 #define GPSDO_FLEXFIS_H
 
-#define DIM_INPUT (1)
+#define DIM_INPUT (4)
 #define MAX_NODES (64)
 #define NODE_LIM (7*86400)
 #define NODE_THR (0.05f)

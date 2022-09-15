@@ -99,7 +99,6 @@ static void sort(float *begin, float *end);
 
 void qnorm_clear(struct QNorm *qnorm) {
     bzero(qnorm, sizeof(struct QNorm));
-    qnorm->eta = 1;
 }
 
 void qnorm_init(struct QNorm *qnorm, const float * const data, const int count, const int stride) {
@@ -144,7 +143,6 @@ void qnorm_init(struct QNorm *qnorm, const float * const data, const int count, 
     }
 
     // update bins with original data samples
-    qnorm->eta = 1;
     float scratch[2];
     qnorm_update(qnorm, data, count, stride, scratch + 0, scratch + 1);
 }
@@ -159,17 +157,17 @@ int qnorm_update(struct QNorm *qnorm, const float *data, int count, int stride, 
         data += stride;
     }
 
+    // compute eta
+    const float eta = (qnorm->tau > 0) ? (1.0f / qnorm->tau) : 1.0f;
     for(int i = 0; i < QNORM_SIZE; i++) {
         if(acc[i].tau <= 0) continue;
-        qnorm->bins[i].tau += qnorm->eta * acc[i].tau;
-        qnorm->bins[i].mean += qnorm->eta * acc[i].mean / qnorm->bins[i].tau;
+        qnorm->bins[i].tau += eta * acc[i].tau;
+        qnorm->bins[i].mean += eta * acc[i].mean / qnorm->bins[i].tau;
     }
 
     // update global tau
     qnorm->tau += (float) count;
     if(qnorm->tau > QNORM_LIM) qnorm->tau = QNORM_LIM;
-    // update eta
-    qnorm->eta = 1.0f / qnorm->tau;
 
     // normalize bin taus
     float nrm = 0;

@@ -18,7 +18,7 @@
 #define STAT_TIME_CONST (16)
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_CTRL_RMS (5e-6f)
-#define STAT_COMP_RMS (1e-6f)
+#define STAT_COMP_RMS (200e-9f)
 
 
 static int32_t ppsGpsEdge;
@@ -168,8 +168,6 @@ void GPSDO_run() {
     // clear ready state
     ppsGpsReady = 0;
     ppsOutReady = 0;
-    // update current temperature
-    currTemperature = ldexpf(TEMP_dcxo(), -8);
 
     // coarse realignment in progress
     if(waitRealign > 0) {
@@ -226,7 +224,7 @@ void GPSDO_run() {
     ppsSkewRms = sqrtf(ppsSkewVar);
 
     // get temperature compensation
-    TCOMP_getCoeff(&currTemperature, &compM, &compB);
+    TCOMP_getCoeff(TEMP_dcxo(), &compM, &compB);
     float newComp = 0;//(compM * currTemperature) + compB;
     if(isnan(newComp)) {
         resetBias = 1;
@@ -258,7 +256,7 @@ void GPSDO_run() {
     }
     // update temperature coefficient
     if(ppsSkewRms < STAT_COMP_RMS)
-        TCOMP_update(&currTemperature, currFeedback);
+        TCOMP_update(TEMP_dcxo(), currFeedback);
 }
 
 int GPSDO_isLocked() {

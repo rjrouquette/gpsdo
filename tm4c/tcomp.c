@@ -1,38 +1,37 @@
 /**
  * Online-Learning Temperature Compensation
- * 1-D Self-Organizing Map w/ Local Linear Estimators
  * @author Robert J. Rouquette
  */
 
 #include <math.h>
 #include <memory.h>
-#include <stdlib.h>
 
 #include "flexfis.h"
 #include "tcomp.h"
 #include "lib/format.h"
 #include "lib/font.h"
 
-#define BOOT_LEN (1024)
+#define BOOT_LEN (600)
 
-static int initCnt;
-static float bootStrap[BOOT_LEN][DIM_INPUT+1];
+static volatile int initCnt;
+static volatile float bootStrap[BOOT_LEN * (DIM_INPUT+1)];
 
-static float alpha, beta;
+static volatile float alpha, beta;
 
 void TCOMP_init() {
     // clear state
+    initCnt = 0;
     flexfis_init(0, NULL, 0, NULL, 0);
 }
 
 void TCOMP_update(const float *temp, float comp) {
     if(initCnt < BOOT_LEN) {
-        float *row = bootStrap[initCnt++];
+        float *row = (float *) bootStrap + (initCnt++)*((DIM_INPUT+1));
         row[0] = comp;
         for(int i = 0; i < DIM_INPUT; i++)
             row[i+i] = temp[i];
         if(initCnt >= BOOT_LEN) {
-            flexfis_init(BOOT_LEN, bootStrap[0] + 1, DIM_INPUT+1, bootStrap[0], DIM_INPUT+1);
+            flexfis_init(BOOT_LEN, (float*)bootStrap + 1, DIM_INPUT+1, (float*)bootStrap, DIM_INPUT+1);
         }
     }
     else {

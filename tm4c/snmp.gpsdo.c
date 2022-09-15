@@ -307,11 +307,10 @@ int writeGpsdoValue(uint8_t *buffer) {
     );
 
     // DCXO temp
-    temp = TEMP_dcxo();
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            (temp * 1000) / 256
+            lroundf(TEMP_dcxo()[0] * 1e3f)
     );
 
     // GPSDO mean offset

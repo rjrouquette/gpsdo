@@ -16,7 +16,6 @@ struct QNormBin {
 struct QNorm {
     struct QNormBin bins[QNORM_SIZE];
 
-    float eta;
     float tau;
     float lower;
     float upper;

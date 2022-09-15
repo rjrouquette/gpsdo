@@ -2,11 +2,13 @@
 // Created by robert on 4/17/22.
 //
 
+#include <math.h>
 #include "../hw/adc.h"
 #include "delay.h"
 #include "temp.h"
 
 static volatile uint16_t adc_temp = 0;
+static volatile float sequence[4];
 
 void TEMP_init() {
     // Enable ADC0
@@ -35,12 +37,8 @@ int16_t TEMP_proc() {
     return (int16_t) (temp / 4096);
 }
 
-int16_t TEMP_dcxo() {
-    // TODO implement I2C sensor
-    int32_t temp = adc_temp;
-    temp *= 63360;
-    temp = 154664960 - temp;
-    return (int16_t) (temp / 4096);
+const float * TEMP_dcxo() {
+    return (float *) sequence;
 }
 
 void ISR_ADC0Sequence3(void) {
@@ -48,4 +46,14 @@ void ISR_ADC0Sequence3(void) {
     ADC0.ISC.IN3 = 1;
     // store value
     adc_temp = ADC0.SS3.FIFO.DATA;
+
+    // update temperature sequence
+    sequence[3] = sequence[2];
+    sequence[2] = sequence[1];
+    sequence[1] = sequence[0];
+
+    int32_t temp = adc_temp;
+    temp *= 63360;
+    temp = 154664960 - temp;
+    sequence[0] = ldexpf((float) temp, -20);
 }
