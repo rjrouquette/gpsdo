@@ -3,7 +3,6 @@
  * @author Robert J. Rouquette
  */
 
-#include <math.h>
 #include <memory.h>
 
 #include "flexfis.h"
