@@ -251,7 +251,7 @@ void flexfis_update(const float *input, const float target) {
 
     // search for best match
     for(int i = 0; i < nodeCount; i++) {
-        if(nodeDist[i].dist > 0.2f * DIM_FLEXNODE)
+        if(nodeDist[i].dist > 0.5f * DIM_FLEXNODE)
             break;
         if(flexnode_update(nodes + nodeDist[i].index, offset)) {
             flexfis_pruneNodes();
