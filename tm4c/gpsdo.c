@@ -228,7 +228,7 @@ void GPSDO_run() {
 
     // get temperature compensation
     TCOMP_getCoeff(TEMP_dcxo(), &compM, &compB);
-    float newComp = 0;//(compM * currTemperature) + compB;
+    float newComp = (compM * currTemperature) + compB;
     if(isnan(newComp)) {
         resetBias = 1;
     } else {

@@ -152,7 +152,7 @@ void flexfis_init(int count, const float *input, int strideInput, const float *t
     // initialize normalizers
     // reverse sample order
     qnorm_init(
-            norms + 0,
+            &norms[0],
             target + ((count-1) * strideTarget),
             count,
             -strideTarget
@@ -160,7 +160,7 @@ void flexfis_init(int count, const float *input, int strideInput, const float *t
     for(int i = 0; i < DIM_INPUT; i++) {
         // reverse sample order
         qnorm_init(
-                norms + i + 1,
+                &norms[i+1],
                 input + i + ((count-1) * strideInput),
                 count,
                 -strideInput
@@ -183,9 +183,9 @@ void flexfis_update(const float *input, const float target) {
 
     // update normalizers
     float offset[DIM_FLEXNODE], scale[DIM_FLEXNODE];
-    int rescale = qnorm_update(norms+0, &target, 1, 1, offset+0, scale+0);
+    int rescale = qnorm_update(&norms[0], &target, 1, 1, offset+0, scale+0);
     for(int i = 0; i < DIM_INPUT; i++)
-        rescale |= qnorm_update(norms+i+1, input+i, 1, 1, offset+i+1, scale+i+1);
+        rescale |= qnorm_update(&norms[i+1], input+i, 1, 1, offset+i+1, scale+i+1);
 
     // rescale nodes
     if(rescale) {
@@ -194,9 +194,9 @@ void flexfis_update(const float *input, const float target) {
     }
 
     // transform input vector
-    offset[0] = qnorm_transform(norms+0, target);
+    offset[0] = qnorm_transform(&norms[0], target);
     for(int i = 0; i < DIM_INPUT; i++)
-        offset[i+1] = qnorm_transform(norms+i+1,input[i]);
+        offset[i+1] = qnorm_transform(&norms[i+1],input[i]);
 
     // first node special case
     if(nodeCount < 1) {
