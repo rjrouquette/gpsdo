@@ -11,7 +11,7 @@
 #include "lib/format.h"
 #include "lib/font.h"
 
-#define BOOT_LEN (900)
+#define BOOT_LEN (1800)
 
 extern struct QNorm norms[DIM_INPUT+1];
 
