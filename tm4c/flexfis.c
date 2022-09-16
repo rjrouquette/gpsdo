@@ -219,7 +219,6 @@ void flexfis_update(const float *input, const float target) {
             }
         }
         else if(flexnode_update(nodes + nodeDist[i].index, offset)) {
-            flexfis_pruneNodes();
             isDone = 1;
             break;
         }
