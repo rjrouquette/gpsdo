@@ -76,7 +76,7 @@ void printNodes() {
 int main(int argc, char **argv) {
     if(!loadData(argv[1])) return EX_IOERR;
     tcnt = (1 * rows) / 4;
-    tcnt = 300;
+    tcnt = 1800;
     //rows = 65536;
 
     std::cout << "sizeof(QNorm): " << sizeof(QNorm) << std::endl;

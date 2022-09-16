@@ -87,10 +87,8 @@ void flexnode_updateRules(struct FlexNode *node, const float *x) {
 }
 
 int flexnode_update(struct FlexNode *node, const float *x) {
-    if(node->n > 2048) {
-        if (fabsf(x[0] - flexnode_estimate(node, x)) > NODE_THR)
-            return 0;
-    }
+    if (fabsf(x[0] - flexnode_estimate(node, x)) > NODE_THR)
+        return 0;
     flexnode_updateRules(node, x);
     return 1;
 }
@@ -211,7 +209,7 @@ void flexfis_update(const float *input, const float target) {
     // search for best match
     int isDone = 0;
     for(int i = 0; i < nodeCount; i++) {
-        if(nodeDist[i].dist > 0.5f * DIM_FLEXNODE) {
+        if(nodeDist[i].dist > NODE_SEP * DIM_FLEXNODE) {
             if(fabsf(offset[0] - flexnode_estimate(nodes + nodeDist[i].index, offset)) < NODE_THR) {
                 flexnode_update(nodes + nodeDist[i].index, offset);
                 flexfis_pruneNodes();
@@ -225,11 +223,11 @@ void flexfis_update(const float *input, const float target) {
     }
 
     // sanity check
-    if(nodeDist[0].dist > 3 * DIM_FLEXNODE) return;
+    if(nodeDist[0].dist > MAX_DIST * DIM_FLEXNODE) return;
 
     // sanity check
     float error = offset[0] - flexnode_estimate(nodes + nodeDist[0].index, offset);
-    if(fabsf(error) > 1.0f) return;
+    if(fabsf(error) > MAX_ERR) return;
 
     // discard oldest node if required
     if(nodeCount >= MAX_NODES) {
