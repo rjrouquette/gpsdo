@@ -61,8 +61,6 @@ void flexnode_rescale(struct FlexNode *node, const float *scale, const float *of
 }
 
 void flexnode_updateRules(struct FlexNode *node, const float *x) {
-    float delta[DIM_FLEXNODE], diff[DIM_FLEXNODE];
-
     // record update epoch
     node->touched = epoch;
 
@@ -72,25 +70,20 @@ void flexnode_updateRules(struct FlexNode *node, const float *x) {
         node->n = NODE_LIM;
 
     // update node center
+    float diff[DIM_FLEXNODE];
     for(int i = 0; i < DIM_FLEXNODE; i++) {
-        delta[i] = (x[i] - node->center[i]) / node->n;
-        node->center[i] += delta[i];
+        node->center[i] += (x[i] - node->center[i]) / node->n;
         diff[i] = x[i] - node->center[i];
     }
-    if(node->n <= 1)
-        bzero(delta, sizeof(delta));
 
     // update node regressor
-    for(int i = 0; i < DIM_FLEXNODE; i++)
-        diff[i] = x[i] - node->center[i];
-
     float error = diff[0];
-    for(int i = 1; i < DIM_FLEXNODE; i++)
-        error -= node->reg[i-1] * diff[i];
+    for(int i = 0; i < DIM_INPUT; i++)
+        error -= node->reg[i] * diff[i+1];
     error /= 1024;
 
-    for(int i = 1; i < DIM_FLEXNODE; i++)
-        node->reg[i-1] += error * diff[i];
+    for(int i = 0; i < DIM_INPUT; i++)
+        node->reg[i] += error * diff[i+1];
 }
 
 int flexnode_update(struct FlexNode *node, const float *x) {
@@ -216,21 +209,32 @@ void flexfis_update(const float *input, const float target) {
     sort(nodeDist, nodeDist + nodeCount);
 
     // search for best match
+    int isDone = 0;
     for(int i = 0; i < nodeCount; i++) {
-        if(nodeDist[i].dist > 0.5f * DIM_FLEXNODE)
-            break;
-        if(flexnode_update(nodes + nodeDist[i].index, offset)) {
-            flexfis_pruneNodes();
-            return;
+        if(nodeDist[i].dist > 0.5f * DIM_FLEXNODE) {
+            if(fabsf(offset[0] - flexnode_estimate(nodes + nodeDist[i].index, offset)) < NODE_THR) {
+                flexnode_update(nodes + nodeDist[i].index, offset);
+                isDone = 1;
+                break;
+            }
         }
+        else if(flexnode_update(nodes + nodeDist[i].index, offset)) {
+            flexfis_pruneNodes();
+            isDone = 1;
+            break;
+        }
+    }
+    if(isDone) {
+        flexfis_pruneNodes();
+        return;
     }
 
     // sanity check
-    if(nodeDist[0].dist > 2 * DIM_FLEXNODE) return;
+    if(nodeDist[0].dist > 3 * DIM_FLEXNODE) return;
 
     // sanity check
     float error = offset[0] - flexnode_estimate(nodes + nodeDist[0].index, offset);
-    if(fabsf(error) > 0.2f) return;
+    if(fabsf(error) > 1.0f) return;
 
     // discard oldest node if required
     if(nodeCount >= MAX_NODES) {
