@@ -214,18 +214,14 @@ void flexfis_update(const float *input, const float target) {
         if(nodeDist[i].dist > 0.5f * DIM_FLEXNODE) {
             if(fabsf(offset[0] - flexnode_estimate(nodes + nodeDist[i].index, offset)) < NODE_THR) {
                 flexnode_update(nodes + nodeDist[i].index, offset);
-                isDone = 1;
-                break;
+                flexfis_pruneNodes();
+                return;
             }
         }
         else if(flexnode_update(nodes + nodeDist[i].index, offset)) {
-            isDone = 1;
-            break;
+            flexfis_pruneNodes();
+            return;
         }
-    }
-    if(isDone) {
-        flexfis_pruneNodes();
-        return;
     }
 
     // sanity check
