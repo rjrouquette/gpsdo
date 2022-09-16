@@ -80,7 +80,7 @@ void flexnode_updateRules(struct FlexNode *node, const float *x) {
     float error = diff[0];
     for(int i = 0; i < DIM_INPUT; i++)
         error -= node->reg[i] * diff[i+1];
-    error /= 1024;
+    error = ldexpf(error, -10);
 
     for(int i = 0; i < DIM_INPUT; i++)
         node->reg[i] += error * diff[i+1];
