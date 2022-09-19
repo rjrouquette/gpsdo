@@ -232,7 +232,7 @@ void GPSDO_run() {
             pllBias -= (newComp - currCompensation);
             resetBias = 0;
         }
-        else if(fabsf(newComp - currCompensation) > 40e-9) {
+        else if(fabsf(newComp - currCompensation) > 40e-9f) {
             pllBias -= (newComp - currCompensation);
         }
         currCompensation = newComp;
