@@ -327,7 +327,7 @@ void ISR_Timer5B() {
 
 void setFeedback(float feedback) {
     // convert to correction factor
-    int32_t correction = lroundf(ldexpf(feedback, 32));
+    int32_t correction = lroundf(feedback * 0x1p32f);
     // correction factor must always be negative
     if(correction > -1) correction = -1;
     // correction factor must not exceed 1 part-per-thousand
@@ -336,5 +336,5 @@ void setFeedback(float feedback) {
     EMAC0.TIMADD = correction;
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     // update current feedback value
-    currFeedback = ldexpf((float)correction, -32);
+    currFeedback = (float)correction * 0x1p-32f;
 }
