@@ -26,6 +26,7 @@ static int32_t ppsOutEdge;
 static int ppsOffsetNano;
 
 static float pllBias;
+static float pllCorr;
 
 static float ppsOffsetMean;
 static float ppsOffsetVar;
@@ -45,7 +46,6 @@ static float compM, compB;
 
 // current correction values
 static float currFeedback;
-static float currTemperature;
 static float currCompensation;
 
 static void setFeedback(float feedback);
@@ -146,8 +146,6 @@ void GPSDO_init() {
 
     // init GPS
     GPS_init();
-    // init temperature compensation module
-    TCOMP_init();
 }
 
 void GPSDO_run() {
@@ -159,14 +157,12 @@ void GPSDO_run() {
         if(isnan(newComp)) {
             resetBias = 1;
         } else {
-            if(resetBias) {
+            if(resetBias || fabsf(newComp - currCompensation) > 100e-9f) {
                 pllBias -= (newComp - currCompensation);
                 resetBias = 0;
             }
-            else if(fabsf(newComp - currCompensation) > 100e-9f) {
-                pllBias -= (newComp - currCompensation);
-            }
             currCompensation = newComp;
+            setFeedback(currCompensation + pllCorr + pllBias);
         }
     }
 
@@ -247,7 +243,8 @@ void GPSDO_run() {
     float rate = ppsOffsetRms / 256e-9f;
     if(rate > 0.5f) rate = 0.5f;
     // update control loop
-    setFeedback(currCompensation + pllBias + (fltOffset * rate));
+    pllCorr = fltOffset * rate;
+    setFeedback(currCompensation + pllCorr + pllBias);
     // update control bias
     if(ppsSkewRms < STAT_CTRL_RMS) {
         // faster settling on first lock

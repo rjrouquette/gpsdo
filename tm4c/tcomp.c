@@ -19,10 +19,6 @@ static volatile float tau;
 
 static volatile float alpha, beta;
 
-void TCOMP_init() {
-    // clear state
-}
-
 void TCOMP_updateTarget(float target) {
     // update means
     tau += 1.0f;
