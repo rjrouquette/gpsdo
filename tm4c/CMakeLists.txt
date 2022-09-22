@@ -23,9 +23,7 @@ add_executable(
         gpsdo
 
         main.c
-        flexfis.c
         gpsdo.c
-        qnorm.c
         tcomp.c
         ntp.c
         snmp.c

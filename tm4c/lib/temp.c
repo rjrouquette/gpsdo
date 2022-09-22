@@ -8,7 +8,8 @@
 #include "temp.h"
 
 static volatile uint16_t adc_temp = 0;
-static volatile float sequence[4];
+static volatile float dcxoTemp;
+static volatile int hasUpdate;
 
 void TEMP_init() {
     // Enable ADC0
@@ -37,8 +38,14 @@ int16_t TEMP_proc() {
     return (int16_t) (temp / 4096);
 }
 
-const float * TEMP_dcxo() {
-    return (float *) sequence;
+float TEMP_dcxo() {
+    return dcxoTemp;
+}
+
+int TEMP_hasUpdate() {
+    int flag = hasUpdate;
+    hasUpdate = 0;
+    return flag;
 }
 
 void ISR_ADC0Sequence3(void) {
@@ -46,14 +53,11 @@ void ISR_ADC0Sequence3(void) {
     ADC0.ISC.IN3 = 1;
     // store value
     adc_temp = ADC0.SS3.FIFO.DATA;
-
-    // update temperature sequence
-    sequence[3] = sequence[2];
-    sequence[2] = sequence[1];
-    sequence[1] = sequence[0];
-
+    // compute temperature
     int32_t temp = adc_temp;
     temp *= 63360;
     temp = 154664960 - temp;
-    sequence[0] = ldexpf((float) temp, -20);
+    dcxoTemp = 0x1p-20f * (float) temp;
+    // mark update flag
+    hasUpdate = 1;
 }

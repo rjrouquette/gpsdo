@@ -5,46 +5,61 @@
 
 #include <memory.h>
 
-#include "flexfis.h"
-#include "qnorm.h"
 #include "tcomp.h"
 #include "lib/format.h"
 #include "lib/font.h"
 
-#define BOOT_LEN (1800)
+#define SEQ_LEN (64)
+#define TAU_LIM (4096)
 
-extern struct QNorm norms[DIM_INPUT+1];
-
-static volatile int initCnt;
-static volatile float bootStrap[BOOT_LEN * (DIM_INPUT+1)];
+static volatile float sequence[SEQ_LEN];
+static volatile float regressor[SEQ_LEN];
+static volatile float mean[2];
+static volatile float tau;
 
 static volatile float alpha, beta;
 
 void TCOMP_init() {
     // clear state
-    initCnt = 0;
 }
 
-void TCOMP_update(const float *temp, const float target) {
-    if(initCnt < BOOT_LEN) {
-        float *row = (float *) bootStrap;
-        row += initCnt * (DIM_INPUT+1);
-        row[0] = target;
-        for(int i = 0; i < DIM_INPUT; i++)
-            row[i+1] = temp[i];
-        if(++initCnt >= BOOT_LEN) {
-            flexfis_init(BOOT_LEN, (float*)bootStrap+1, DIM_INPUT+1, (float*)bootStrap, DIM_INPUT+1);
-        }
+void TCOMP_updateTarget(float target) {
+    // update means
+    tau += 1.0f;
+    if(tau > TAU_LIM) tau = TAU_LIM;
+    mean[0] += (sequence[0] - mean[0]) / tau;
+    mean[1] += (target - mean[1]) / tau;
+
+    float x[SEQ_LEN];
+    float error = target - mean[1];
+    for(int i = 0; i < SEQ_LEN; i++) {
+        x[i] = sequence[i] - mean[0];
+        error -= regressor[i] * x[i];
     }
-    else {
-        flexfis_update(temp, target);
-    }
+    error /= TAU_LIM;//tau[1];
+
+    for(int i = 0; i < SEQ_LEN; i++)
+        regressor[i] += error * x[i];
 }
 
+void TCOMP_updateTemp(float temp) {
+    for(int i = SEQ_LEN-1; i > 0; i--)
+        sequence[i] = sequence[i-1];
+    sequence[0] = temp;
+}
 
-void TCOMP_getCoeff(const float *temp, float *m, float *b) {
-    *m = beta = 0;
-    *b = alpha = flexfis_predict(temp);
+float TCOMP_getComp(float *m, float *b) {
+    float comp = mean[1];
+    beta = 0;
+    for(int i = 0; i < SEQ_LEN; i++) {
+        comp += regressor[i] * (sequence[i] - mean[0]);
+        beta += regressor[i];
+    }
+    alpha = comp - beta * sequence[0];
+
+    *m = beta;
+    *b = alpha;
+    return comp;
 }
 
 void TCOMP_plot() {

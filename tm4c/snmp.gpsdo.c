@@ -310,7 +310,7 @@ int writeGpsdoValue(uint8_t *buffer) {
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(TEMP_dcxo()[0] * 1e3f)
+            lroundf(TEMP_dcxo() * 1e3f)
     );
 
     // GPSDO mean offset

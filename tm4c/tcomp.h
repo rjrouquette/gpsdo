@@ -6,8 +6,9 @@
 #define GPSDO_TCOMP_H
 
 void TCOMP_init();
-void TCOMP_update(const float *temp, float target);
-void TCOMP_getCoeff(const float *temp, float *m, float *b);
+void TCOMP_updateTarget(float target);
+void TCOMP_updateTemp(float temp);
+float TCOMP_getComp(float *m, float *b);
 void TCOMP_plot();
 
 #endif //GPSDO_TCOMP_H

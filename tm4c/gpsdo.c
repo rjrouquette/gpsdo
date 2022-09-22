@@ -151,6 +151,25 @@ void GPSDO_init() {
 }
 
 void GPSDO_run() {
+    // temperature update
+    if(TEMP_hasUpdate()) {
+        TCOMP_updateTemp(TEMP_dcxo());
+        // get temperature compensation
+        float newComp = TCOMP_getComp(&compM, &compB);
+        if(isnan(newComp)) {
+            resetBias = 1;
+        } else {
+            if(resetBias) {
+                pllBias -= (newComp - currCompensation);
+                resetBias = 0;
+            }
+            else if(fabsf(newComp - currCompensation) > 100e-9f) {
+                pllBias -= (newComp - currCompensation);
+            }
+            currCompensation = newComp;
+        }
+    }
+
     // run GPS state machine
     GPS_run();
 
@@ -222,22 +241,6 @@ void GPSDO_run() {
     ppsSkewVar += (ppsSkew - ppsSkewVar) / STAT_TIME_CONST;
     ppsSkewRms = sqrtf(ppsSkewVar);
 
-    // get temperature compensation
-    TCOMP_getCoeff(TEMP_dcxo(), &compM, &compB);
-    float newComp = (compM * currTemperature) + compB;
-    if(isnan(newComp)) {
-        resetBias = 1;
-    } else {
-        if(resetBias) {
-            pllBias -= (newComp - currCompensation);
-            resetBias = 0;
-        }
-        else if(fabsf(newComp - currCompensation) > 40e-9f) {
-            pllBias -= (newComp - currCompensation);
-        }
-        currCompensation = newComp;
-    }
-
     // convert PPS offset to float
     fltOffset = ((float) offset) * 1e-9f;
     // determine compensation rate
@@ -259,7 +262,7 @@ void GPSDO_run() {
 
     // update temperature coefficient
     if(ppsSkewRms < STAT_COMP_RMS)
-        TCOMP_update(TEMP_dcxo(), currFeedback);
+        TCOMP_updateTarget(currFeedback);
 }
 
 int GPSDO_isLocked() {

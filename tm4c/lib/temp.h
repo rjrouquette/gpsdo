@@ -7,6 +7,7 @@
 
 void TEMP_init();
 int16_t TEMP_proc();
-const float * TEMP_dcxo();
+float TEMP_dcxo();
+int TEMP_hasUpdate();
 
 #endif //GPSDO_TEMP_H
