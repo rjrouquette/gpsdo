@@ -21,6 +21,7 @@ static volatile float alpha, beta;
 
 void TCOMP_updateTarget(float target) {
     if(init) {
+        init = 0;
         mean[0] = sequence[0];
         mean[1] = target;
     }
