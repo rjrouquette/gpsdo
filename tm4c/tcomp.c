@@ -10,21 +10,24 @@
 #include "lib/font.h"
 
 #define SEQ_LEN (16)
-#define TAU_LIM (4096)
+#define ALPHA (0x1p-16f)
 
 static volatile float sequence[SEQ_LEN];
 static volatile float regressor[SEQ_LEN];
 static volatile float mean[2];
-static volatile float tau;
+static volatile int init = 1;
 
 static volatile float alpha, beta;
 
 void TCOMP_updateTarget(float target) {
+    if(init) {
+        mean[0] = sequence[0];
+        mean[1] = target;
+    }
+
     // update means
-    tau += 1.0f;
-    if(tau > TAU_LIM) tau = TAU_LIM;
-    mean[0] += (sequence[0] - mean[0]) / tau;
-    mean[1] += (target - mean[1]) / tau;
+    mean[0] += ALPHA * (sequence[0] - mean[0]);
+    mean[1] += ALPHA * (target - mean[1]);
 
     float x[SEQ_LEN];
     float error = target - mean[1];
@@ -32,7 +35,7 @@ void TCOMP_updateTarget(float target) {
         x[i] = sequence[i] - mean[0];
         error -= regressor[i] * x[i];
     }
-    error /= TAU_LIM;
+    error *= ALPHA;
 
     for(int i = 0; i < SEQ_LEN; i++)
         regressor[i] += error * x[i];
