@@ -25,6 +25,8 @@ add_executable(
         main.c
         gpsdo.c
         tcomp.c
+#        qnorm.c
+#        osr.c
         ntp.c
         snmp.c
         hw/emac.c

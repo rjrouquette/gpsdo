@@ -9,7 +9,7 @@
 #include "lib/format.h"
 #include "lib/font.h"
 
-#define SEQ_LEN (64)
+#define SEQ_LEN (16)
 #define TAU_LIM (4096)
 
 static volatile float sequence[SEQ_LEN];
@@ -32,7 +32,7 @@ void TCOMP_updateTarget(float target) {
         x[i] = sequence[i] - mean[0];
         error -= regressor[i] * x[i];
     }
-    error /= TAU_LIM;//tau[1];
+    error /= TAU_LIM;
 
     for(int i = 0; i < SEQ_LEN; i++)
         regressor[i] += error * x[i];
