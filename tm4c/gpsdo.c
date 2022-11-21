@@ -26,6 +26,7 @@ static int32_t ppsOutEdge;
 static int ppsOffsetNano;
 
 static float pllBias;
+static float pllCorr;
 
 static float ppsOffsetMean;
 static float ppsOffsetVar;
@@ -45,7 +46,6 @@ static float compM, compB;
 
 // current correction values
 static float currFeedback;
-static float currTemperature;
 static float currCompensation;
 
 static void setFeedback(float feedback);
@@ -146,11 +146,26 @@ void GPSDO_init() {
 
     // init GPS
     GPS_init();
-    // init temperature compensation module
-    TCOMP_init();
 }
 
 void GPSDO_run() {
+    // temperature update
+    if(TEMP_hasUpdate()) {
+        TCOMP_updateTemp(TEMP_dcxo());
+        // get temperature compensation
+        float newComp = TCOMP_getComp(&compM, &compB);
+        if(isnan(newComp)) {
+            resetBias = 1;
+        } else {
+            if(resetBias || fabsf(newComp - currCompensation) > 100e-9f) {
+                pllBias -= (newComp - currCompensation);
+                resetBias = 0;
+            }
+            currCompensation = newComp;
+            setFeedback(currCompensation + pllCorr + pllBias);
+        }
+    }
+
     // run GPS state machine
     GPS_run();
 
@@ -222,29 +237,14 @@ void GPSDO_run() {
     ppsSkewVar += (ppsSkew - ppsSkewVar) / STAT_TIME_CONST;
     ppsSkewRms = sqrtf(ppsSkewVar);
 
-    // get temperature compensation
-    TCOMP_getCoeff(TEMP_dcxo(), &compM, &compB);
-    float newComp = (compM * currTemperature) + compB;
-    if(isnan(newComp)) {
-        resetBias = 1;
-    } else {
-        if(resetBias) {
-            pllBias -= (newComp - currCompensation);
-            resetBias = 0;
-        }
-        else if(fabsf(newComp - currCompensation) > 40e-9) {
-            pllBias -= (newComp - currCompensation);
-        }
-        currCompensation = newComp;
-    }
-
     // convert PPS offset to float
     fltOffset = ((float) offset) * 1e-9f;
     // determine compensation rate
     float rate = ppsOffsetRms / 256e-9f;
     if(rate > 0.5f) rate = 0.5f;
     // update control loop
-    setFeedback(currCompensation + pllBias + (fltOffset * rate));
+    pllCorr = fltOffset * rate;
+    setFeedback(currCompensation + pllCorr + pllBias);
     // update control bias
     if(ppsSkewRms < STAT_CTRL_RMS) {
         // faster settling on first lock
@@ -259,7 +259,7 @@ void GPSDO_run() {
 
     // update temperature coefficient
     if(ppsSkewRms < STAT_COMP_RMS)
-        TCOMP_update(TEMP_dcxo(), currFeedback);
+        TCOMP_updateTarget(currFeedback);
 }
 
 int GPSDO_isLocked() {
