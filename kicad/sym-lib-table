@@ -1,3 +1,4 @@
 (sym_lib_table
-  (lib (name gpsdo-rescue)(type Legacy)(uri ${KIPRJMOD}/gpsdo-rescue.lib)(options "")(descr ""))
+  (lib (name "gpsdo-rescue")(type "Legacy")(uri "${KIPRJMOD}/gpsdo-rescue.lib")(options "")(descr ""))
+  (lib (name "TM4C1294NCPDTI3")(type "KiCad")(uri "${KIPRJMOD}/tm4c1294ncpdt/TM4C1294NCPDTI3.kicad_sym")(options "")(descr ""))
 )
