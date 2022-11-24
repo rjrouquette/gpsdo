@@ -11,3 +11,6 @@ cmake-build-*/
 
 # large data files
 gpsdo.csv
+
+# kicad backup file
+kicad/*-backups/
