@@ -13,16 +13,31 @@ volatile uint32_t ipSubnet = -1;
 volatile uint32_t ipGateway = 0;
 volatile uint32_t ipDNS = 0;
 
+void addrToStr(uint32_t addr, char *str) {
+    str += toBase((addr >> 0u) & 0xFFu, 10, str);
+    *(str++) = '.';
+    str += toBase((addr >> 8u) & 0xFFu, 10, str);
+    *(str++) = '.';
+    str += toBase((addr >> 16u) & 0xFFu, 10, str);
+    *(str++) = '.';
+    str += toBase((addr >> 24u) & 0xFFu, 10, str);
+    *str = 0;
+}
 
 void NET_getIpAddress(char *strAddr) {
-    strAddr += toDec((ipAddress >> 0u) & 0xFFu, 0, '0', strAddr);
-    *(strAddr++) = '.';
-    strAddr += toDec((ipAddress >> 8u) & 0xFFu, 0, '0', strAddr);
-    *(strAddr++) = '.';
-    strAddr += toDec((ipAddress >> 16u) & 0xFFu, 0, '0', strAddr);
-    *(strAddr++) = '.';
-    strAddr += toDec((ipAddress >> 24u) & 0xFFu, 0, '0', strAddr);
-    *strAddr = 0;
+    addrToStr(ipAddress, strAddr);
+}
+
+void NET_getIpSubnet(char *strAddr) {
+    addrToStr(ipSubnet, strAddr);
+}
+
+void NET_getIpGateway(char *strAddr) {
+    addrToStr(ipGateway, strAddr);
+}
+
+void NET_getIpDNS(char *strAddr) {
+    addrToStr(ipDNS, strAddr);
 }
 
 void IPv4_process(uint8_t *frame, int flen) {

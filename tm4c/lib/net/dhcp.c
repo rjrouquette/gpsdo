@@ -182,7 +182,7 @@ void DHCP_process(uint8_t *frame, int flen) {
         return;
 
     // relevant options
-    uint32_t optSubnet = 0;
+    uint32_t optSubnet = -1;
     uint32_t optRouter = 0;
     uint32_t optDNS = 0;
     uint32_t optDHCP = 0;

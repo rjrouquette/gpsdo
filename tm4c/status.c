@@ -119,6 +119,24 @@ unsigned statusETH(char *body) {
     end = append(end, tmp);
     end = append(end, "\n");
 
+    // ip address
+    NET_getIpSubnet(tmp);
+    end = append(end, "ip subnet: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // ip address
+    NET_getIpGateway(tmp);
+    end = append(end, "ip gateway: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // ip address
+    NET_getIpDNS(tmp);
+    end = append(end, "ip dns: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
     // rx packets
     tmp[toBase(EMAC0.RXCNTGB, 10, tmp)] = 0;
     end = append(end, "rx packets: ");
