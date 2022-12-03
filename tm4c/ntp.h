@@ -10,6 +10,7 @@
 #define NTP_UTC_OFFSET (2208988800)
 
 void NTP_init();
+void NTP_run();
 uint64_t NTP_offset();
 void NTP_date(uint64_t clkMono, uint32_t *ntpDate);
 

@@ -35,13 +35,9 @@ add_executable(
         hw/sys.c
         lib/clk.c
         lib/delay.c
-        lib/epd.c
-        lib/font.c
-        lib/fonts/ascii_16.c
         lib/format.c
         lib/gps.c
         lib/led.c
-        lib/plot.c
         lib/net.c
         lib/net/arp.c
         lib/net/dhcp.c

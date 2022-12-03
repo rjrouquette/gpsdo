@@ -17,6 +17,7 @@
 #include "hw/emac.h"
 #include "lib/net/dhcp.h"
 #include "hw/sys.h"
+#include "ntp.h"
 
 #define STATUS_PORT (23) // telnet port
 
@@ -226,16 +227,36 @@ unsigned statusGPSDO(char *body) {
 }
 
 unsigned statusNTP(char *body) {
-    return 0;
+    char tmp[32];
+    char *end = body;
+
+    // TAI offset
+    strcpy(tmp, " 0x");
+    toHex(NTP_offset()>>32, 8, '0', tmp+3);
+    toHex(NTP_offset(), 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "tai offset: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // return size
+    return end - body;
 }
 
+#include "gitversion.h"
 unsigned statusSystem(char *body) {
     char tmp[32];
     char *end = body;
 
-    strcpy(tmp, " 0x");
+    // firmware version
+    strncpy(tmp, VERSION_GIT, 8);
+    tmp[8] = 0;
+    end = append(end, "firmware: 0x");
+    end = append(end, tmp);
+    end = append(end, "\n");
 
-    // mcu devide id
+    // mcu device id
+    strcpy(tmp, " 0x");
     toHex(DID0.raw, 8, '0', tmp+3);
     tmp[11] = 0;
     end = append(end, "device id:");

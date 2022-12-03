@@ -3,11 +3,7 @@
  * @author Robert J. Rouquette
  */
 
-#include <memory.h>
-
 #include "tcomp.h"
-#include "lib/format.h"
-#include "lib/font.h"
 
 #define SEQ_LEN (16)
 #define ALPHA (0x1p-16f)
@@ -60,17 +56,4 @@ float TCOMP_getComp(float *m, float *b) {
     *m = beta;
     *b = alpha;
     return comp;
-}
-
-void TCOMP_plot() {
-    char str[32];
-
-    int len;
-    len = fmtFloat(alpha * 1e6f, 12, 4, str);
-    strcpy(str+len, " ppm");
-    FONT_drawText(0, 96, str, FONT_ASCII_16, 0, 3);
-
-    len = fmtFloat(beta * 1e6f, 12, 4, str);
-    strcpy(str+len, " ppm/C");
-    FONT_drawText(0, 112, str, FONT_ASCII_16, 0, 3);
 }
