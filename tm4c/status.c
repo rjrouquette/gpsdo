@@ -75,7 +75,7 @@ void STATUS_process(uint8_t *frame, int flen) {
         size = statusGPSDO(body);
     } else if(strncmp(body, "ntp", 3) == 0 && hasTerminus(body, 3)) {
         size = statusNTP(body);
-    }  else if(strncmp(body, "system", 6) == 0 && hasTerminus(body, 6)) {
+    } else if(strncmp(body, "system", 6) == 0 && hasTerminus(body, 6)) {
         size = statusSystem(body);
     } else {
         char tmp[32];
@@ -212,27 +212,28 @@ unsigned statusNTP(char *body) {
 }
 
 unsigned statusSystem(char *body) {
-    char tmp[64];
+    char tmp[32];
     char *end = body;
 
+    strcpy(tmp, " 0x");
+
     // mcu devide id
-    end = append(end, "device id: 0x");
-    toHex(DID0.raw, 8, '0', tmp);
-    tmp[8] = 0;
-    end = append(end, " 0x");
-    toHex(DID1.raw, 8, '0', tmp);
-    tmp[8] = 0;
+    toHex(DID0.raw, 8, '0', tmp+3);
+    tmp[11] = 0;
+    end = append(end, "device id:");
+    end = append(end, tmp);
+    toHex(DID1.raw, 8, '0', tmp+3);
+    tmp[11] = 0;
     end = append(end, tmp);
     end = append(end, "\n");
 
     // mcu unique id
-    toHex(UNIQUEID.WORD[3], 8, '0', tmp + 0);
-    toHex(UNIQUEID.WORD[2], 8, '0', tmp + 4);
-    toHex(UNIQUEID.WORD[1], 8, '0', tmp + 8);
-    toHex(UNIQUEID.WORD[0], 8, '0', tmp + 12);
-    tmp[32] = 0;
-    end = append(end, "unique id: 0x");
-    end = append(end, tmp);
+    end = append(end, "unique id:");
+    for(int i = 0; i < 4; i++) {
+        toHex(UNIQUEID.WORD[i], 8, '0', tmp+3);
+        tmp[11] = 0;
+        end = append(end, tmp);
+    }
     end = append(end, "\n");
 
     // RAM size

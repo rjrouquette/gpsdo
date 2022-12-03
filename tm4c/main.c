@@ -36,6 +36,8 @@ int main(void) {
     // enable FPU
     CPAC.CP10 = 3;
     CPAC.CP11 = 3;
+    // enable EEPROM
+    RCGCEEPROM.EN_EEPROM = 1;
 
     // initialize status LEDs
     LED_init();
