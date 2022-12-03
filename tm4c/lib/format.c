@@ -7,6 +7,15 @@
 
 const char lut_base[16] = "0123456789ABCDEF";
 
+char* append(char *dst, const char *src) {
+    for(;;) {
+        (*dst) = (*src);
+        if((*src) == 0) break;
+        ++dst; ++src;
+    }
+    return dst;
+}
+
 int padCopy(int width, char pad,  char *dst, const char *src, int len) {
     if(width <= 0) {
         for(int i = 0; i < len; i++)

@@ -21,6 +21,7 @@
 #include "gpsdo.h"
 #include "ntp.h"
 #include "snmp.h"
+#include "status.h"
 #include "lib/net/dhcp.h"
 #include "tcomp.h"
 
@@ -41,9 +42,9 @@ int main(void) {
     // initialize system clock
     CLK_init();
     // initialize display
-    EPD_init();
+//    EPD_init();
     FONT_drawText(0, 0, "Display Configured", FONT_ASCII_16, 0, 3);
-    EPD_refresh();
+//    EPD_refresh();
     // initialize temperature sensor
     TEMP_init();
     // initialize networking
@@ -67,6 +68,7 @@ int main(void) {
     GPSDO_init();
     NTP_init();
     SNMP_init();
+    STATUS_init();
 
     uint32_t next = 0;
     int end;
@@ -87,7 +89,7 @@ int main(void) {
 //                FONT_drawText(0, (i+2)*16, (char *) debugStr[i], FONT_ASCII_16, 0, 3);
 //            }
 
-            EPD_refresh();
+//            EPD_refresh();
             next += 10;
         }
     }

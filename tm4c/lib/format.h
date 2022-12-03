@@ -7,6 +7,8 @@
 
 #include <stdint.h>
 
+char* append(char *dst, const char *src);
+
 int padCopy(int width, char pad,  char *dst, const char *src, int len);
 
 int toBin(uint32_t value, int width, char padding, char *origin);

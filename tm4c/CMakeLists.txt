@@ -29,6 +29,7 @@ add_executable(
 #        osr.c
         ntp.c
         snmp.c
+        status.c
         hw/emac.c
         hw/interrupts.c
         lib/clk.c
