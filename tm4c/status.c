@@ -21,7 +21,7 @@
 
 void STATUS_process(uint8_t *frame, int flen);
 
-unsigned statusEth(char *body);
+unsigned statusETH(char *body);
 unsigned statusGPS(char *body);
 unsigned statusGPSDO(char *body);
 unsigned statusNTP(char *body);
@@ -48,7 +48,7 @@ void STATUS_process(uint8_t *frame, int flen) {
     if(headerIPv4->dst != ipAddress) return;
     // restrict length
     unsigned size = __builtin_bswap16(headerUDP->length) - sizeof(struct HEADER_UDP);
-    if(size > 63) return;
+    if(size > 31) return;
     // status activity
     LED_act1();
 
@@ -66,10 +66,12 @@ void STATUS_process(uint8_t *frame, int flen) {
     // force null termination
     body[size] = 0;
     if(strncmp(body, "ethernet", 8) == 0 && hasTerminus(body, 8)) {
-        size = statusEth(body);
+        size = statusETH(body);
+    } else if(strncmp(body, "gpsdo", 5) == 0 && hasTerminus(body, 5)) {
+        size = statusGPSDO(body);
     } else {
-        char tmp[64];
-        strcpy(tmp, body);
+        char tmp[32];
+        strncpy(tmp, body, size);
         char *end = body;
         end = append(end, "invalid command: ");
         end = append(end, tmp);
@@ -88,7 +90,7 @@ void STATUS_process(uint8_t *frame, int flen) {
     NET_transmit(txDesc, flen);
 }
 
-unsigned statusEth(char *body) {
+unsigned statusETH(char *body) {
     char tmp[32];
     char *end = body;
 
@@ -128,6 +130,7 @@ unsigned statusEth(char *body) {
     end = append(end, (phyStatus & PHY_STATUS_DUPLEX) ? "FDX" : "HDX");
     end = append(end, "\n");
 
+    // return size
     return end - body;
 }
 
@@ -136,7 +139,34 @@ unsigned statusGPS(char *body) {
 }
 
 unsigned statusGPSDO(char *body) {
-    return 0;
+    char tmp[32];
+    char *end = body;
+
+    // pll lock
+    end = append(end, "pll locked: ");
+    end = append(end, GPSDO_isLocked() ? "yes" : "no");
+    end = append(end, "\n");
+
+    // current offset
+    tmp[fmtFloat((float) GPSDO_offsetNano(), 0, 0, tmp)] = 0;
+    end = append(end, "current offset: ");
+    end = append(end, tmp);
+    end = append(end, " ns\n");
+
+    // mean offset
+    tmp[fmtFloat(GPSDO_offsetMean() * 1e9f, 0, 1, tmp)] = 0;
+    end = append(end, "mean offset: ");
+    end = append(end, tmp);
+    end = append(end, " ns\n");
+
+    // rms offset
+    tmp[fmtFloat(GPSDO_offsetRms() * 1e9f, 0, 1, tmp)] = 0;
+    end = append(end, "rms offset: ");
+    end = append(end, tmp);
+    end = append(end, " ns\n");
+
+    // return size
+    return end - body;
 }
 
 unsigned statusNTP(char *body) {
