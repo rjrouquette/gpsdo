@@ -70,9 +70,11 @@ void STATUS_process(uint8_t *frame, int flen) {
     } else {
         char tmp[64];
         strcpy(tmp, body);
-        strcpy(body, "invalid command: ");
-        strcpy(body + 17, tmp);
-        size = strlen(body);
+        char *end = body;
+        end = append(end, "invalid command: ");
+        end = append(end, tmp);
+        end = append(end, "\n");
+        size = end - body;
     }
 
     // finalize response
