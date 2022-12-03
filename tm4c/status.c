@@ -165,6 +165,36 @@ unsigned statusGPSDO(char *body) {
     end = append(end, tmp);
     end = append(end, " ns\n");
 
+    // frequency skew
+    tmp[fmtFloat(GPSDO_skewRms() * 1e6f, 0, 4, tmp)] = 0;
+    end = append(end, "frequency skew: ");
+    end = append(end, tmp);
+    end = append(end, " ppm\n");
+
+    // frequency correction
+    tmp[fmtFloat(GPSDO_freqCorr() * 1e6f, 0, 4, tmp)] = 0;
+    end = append(end, "frequency correction: ");
+    end = append(end, tmp);
+    end = append(end, " ppm\n");
+
+    // temperature compensation
+    tmp[fmtFloat(GPSDO_compValue() * 1e6f, 0, 4, tmp)] = 0;
+    end = append(end, "temperature compensation: ");
+    end = append(end, tmp);
+    end = append(end, " ppm\n");
+
+    // temperature coefficient
+    tmp[fmtFloat(GPSDO_compCoeff() * 1e6f, 0, 4, tmp)] = 0;
+    end = append(end, "temperature coefficient: ");
+    end = append(end, tmp);
+    end = append(end, " ppm/C\n");
+
+    // temperature offset
+    tmp[fmtFloat(GPSDO_compBias() * 1e6f, 0, 4, tmp)] = 0;
+    end = append(end, "temperature offset: ");
+    end = append(end, tmp);
+    end = append(end, " ppm\n");
+
     // return size
     return end - body;
 }
