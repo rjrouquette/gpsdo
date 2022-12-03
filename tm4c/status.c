@@ -101,21 +101,20 @@ unsigned statusEth(char *body) {
     end = append(end, "\n");
 
     // rx packets
-    toDec(EMAC0.RXCNTGB, 0, ' ', tmp);
+    tmp[toBase(EMAC0.RXCNTGB, 10, tmp)] = 0;
     end = append(end, "rx packets: ");
     end = append(end, tmp);
     end = append(end, "\n");
 
     // tx packets
-    toDec(EMAC0.TXCNTGB, 0, ' ', tmp);
+    tmp[toBase(EMAC0.TXCNTGB, 10, tmp)] = 0;
     end = append(end, "tx packets: ");
     end = append(end, tmp);
     end = append(end, "\n");
 
     // link status
     int phyStatus = NET_getPhyStatus();
-    end = append(end, "link status: ");
-    end = append(end, (phyStatus & PHY_STATUS_LINK) ? "UP " : "DOWN ");
+    end = append(end, "link speed: ");
     end = append(end, (phyStatus & PHY_STATUS_100M) ? "100M " : "10M ");
     end = append(end, (phyStatus & PHY_STATUS_DUPLEX) ? "FDX" : "HDX");
     end = append(end, "\n");

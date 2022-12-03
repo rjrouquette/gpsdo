@@ -11,6 +11,8 @@ char* append(char *dst, const char *src);
 
 int padCopy(int width, char pad,  char *dst, const char *src, int len);
 
+int toBase(uint32_t value, char base, char *result);
+
 int toBin(uint32_t value, int width, char padding, char *origin);
 int toOct(uint32_t value, int width, char padding, char *origin);
 int toDec(uint32_t value, int width, char padding, char *origin);
