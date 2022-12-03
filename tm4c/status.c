@@ -16,6 +16,7 @@
 #include "gpsdo.h"
 #include "hw/emac.h"
 #include "lib/net/dhcp.h"
+#include "hw/sys.h"
 
 #define STATUS_PORT (23) // telnet port
 
@@ -25,6 +26,7 @@ unsigned statusETH(char *body);
 unsigned statusGPS(char *body);
 unsigned statusGPSDO(char *body);
 unsigned statusNTP(char *body);
+unsigned statusSystem(char *body);
 
 int hasTerminus(const char *str, int offset) {
     if(str[offset] == 0) return 1;
@@ -67,8 +69,14 @@ void STATUS_process(uint8_t *frame, int flen) {
     body[size] = 0;
     if(strncmp(body, "ethernet", 8) == 0 && hasTerminus(body, 8)) {
         size = statusETH(body);
+    } else if(strncmp(body, "gps", 3) == 0 && hasTerminus(body, 3)) {
+        size = statusGPS(body);
     } else if(strncmp(body, "gpsdo", 5) == 0 && hasTerminus(body, 5)) {
         size = statusGPSDO(body);
+    } else if(strncmp(body, "ntp", 3) == 0 && hasTerminus(body, 3)) {
+        size = statusNTP(body);
+    }  else if(strncmp(body, "system", 6) == 0 && hasTerminus(body, 6)) {
+        size = statusSystem(body);
     } else {
         char tmp[32];
         strncpy(tmp, body, size);
@@ -201,4 +209,50 @@ unsigned statusGPSDO(char *body) {
 
 unsigned statusNTP(char *body) {
     return 0;
+}
+
+unsigned statusSystem(char *body) {
+    char tmp[64];
+    char *end = body;
+
+    // mcu devide id
+    end = append(end, "device id: 0x");
+    toHex(DID0.raw, 8, '0', tmp);
+    tmp[8] = 0;
+    end = append(end, " 0x");
+    toHex(DID1.raw, 8, '0', tmp);
+    tmp[8] = 0;
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // mcu unique id
+    toHex(UNIQUEID.WORD[3], 8, '0', tmp + 0);
+    toHex(UNIQUEID.WORD[2], 8, '0', tmp + 4);
+    toHex(UNIQUEID.WORD[1], 8, '0', tmp + 8);
+    toHex(UNIQUEID.WORD[0], 8, '0', tmp + 12);
+    tmp[32] = 0;
+    end = append(end, "unique id: 0x");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // RAM size
+    tmp[toBase(RAM_size(), 10, tmp)] = 0;
+    end = append(end, "ram size: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // EEPROM size
+    tmp[toBase(EEPROM_size(), 10, tmp)] = 0;
+    end = append(end, "eeprom size: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // FLASH size
+    tmp[toBase(FLASH_size(), 10, tmp)] = 0;
+    end = append(end, "flash size: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // return size
+    return end - body;
 }

@@ -32,6 +32,7 @@ add_executable(
         status.c
         hw/emac.c
         hw/interrupts.c
+        hw/sys.c
         lib/clk.c
         lib/delay.c
         lib/epd.c
