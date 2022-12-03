@@ -14,4 +14,6 @@ void NTP_run();
 uint64_t NTP_offset();
 void NTP_date(uint64_t clkMono, uint32_t *ntpDate);
 
+char* NTP_servers(char *tail);
+
 #endif //GPSDO_NTP_H

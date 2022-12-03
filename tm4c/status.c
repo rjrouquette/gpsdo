@@ -115,27 +115,23 @@ unsigned statusETH(char *body) {
     end = append(end, "\n");
 
     // ip address
-    NET_getIpAddress(tmp);
     end = append(end, "ip address: ");
-    end = append(end, tmp);
+    end = addrToStr(ipAddress, end);
     end = append(end, "\n");
 
-    // ip address
-    NET_getIpSubnet(tmp);
+    // ip subnet
     end = append(end, "ip subnet: ");
-    end = append(end, tmp);
+    end = addrToStr(ipSubnet, end);
     end = append(end, "\n");
 
     // ip address
-    NET_getIpGateway(tmp);
     end = append(end, "ip gateway: ");
-    end = append(end, tmp);
+    end = addrToStr(ipGateway, end);
     end = append(end, "\n");
 
     // ip address
-    NET_getIpDNS(tmp);
     end = append(end, "ip dns: ");
-    end = append(end, tmp);
+    end = addrToStr(ipDNS, end);
     end = append(end, "\n");
 
     // rx packets
@@ -231,13 +227,18 @@ unsigned statusNTP(char *body) {
     char *end = body;
 
     // TAI offset
+    uint64_t offset = NTP_offset();
     strcpy(tmp, " 0x");
-    toHex(NTP_offset()>>32, 8, '0', tmp+3);
-    toHex(NTP_offset(), 8, '0', tmp+11);
-    tmp[19] = 0;
+    toHex(offset>>32, 8, '0', tmp+3);
+    tmp[11] = '.';
+    toHex(offset, 8, '0', tmp+12);
+    tmp[20] = 0;
     end = append(end, "tai offset: ");
     end = append(end, tmp);
     end = append(end, "\n");
+
+    end = append(end, "ntp servers:\n");
+    end = NTP_servers(end);
 
     // return size
     return end - body;

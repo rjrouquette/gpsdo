@@ -15,8 +15,10 @@
 #include "gpsdo.h"
 #include "hw/emac.h"
 #include "hw/sys.h"
+#include "lib/net/arp.h"
+#include "lib/format.h"
 
-#define NTP3_SIZE (UDP_DATA_OFFSET + sizeof(struct FRAME_NTPv3))
+#define NTP3_SIZE (UDP_DATA_OFFSET + 48)
 #define NTP_PORT (123)
 
 struct PACKED FRAME_NTPv3 {
@@ -46,10 +48,14 @@ static volatile uint64_t ntpTimeOffset = 0;
 
 #define SERVER_COUNT (4)
 struct Server {
+    uint64_t offset;
     uint32_t nextPoll;
+    uint32_t lastResponse;
     uint32_t addr;
     uint8_t mac[6];
 } servers[SERVER_COUNT];
+
+void processServerResponse(uint8_t *frame);
 
 void NTP_process(uint8_t *frame, int flen);
 
@@ -61,6 +67,7 @@ void NTP_process3(const uint8_t *frame, struct FRAME_NTPv3 *frameNTP);
 void NTP_init() {
     memset(servers, 0, sizeof(servers));
     UDP_register(NTP_PORT, NTP_process);
+    servers[0].addr = 0xC803A8C0;
 }
 
 uint64_t NTP_offset() {
@@ -88,8 +95,12 @@ void NTP_process(uint8_t *frame, int flen) {
 
     // verify destination
     if(headerIPv4->dst != ipAddress) return;
-    // ignore non-client frames
-    if(frameNTP->flags.mode != 0x03) return;
+    // filter non-client frames
+    if(frameNTP->flags.mode != 3) {
+        if(frameNTP->flags.mode == 4)
+            processServerResponse(frame);
+        return;
+    }
     // time-server activity
     LED_act0();
 
@@ -253,27 +264,10 @@ void poll3(uint8_t *frame, uint32_t addr, uint8_t *mac) {
     headerUDP->portDst = __builtin_bswap16(NTP_PORT);
 
     // set type to client request
+    frameNTP->flags.version = 3;
     frameNTP->flags.mode = 3;
-    // indicate that the time is not currently set
-    frameNTP->flags.status = GPSDO_isLocked() ? 0 : 3;
-    // set other header fields
-    frameNTP->stratum = GPSDO_isLocked() ? 1 : 16;
-    frameNTP->precision = -24;
     // set reference ID
     memcpy(frameNTP->refID, "GPS", 4);
-    // set root delay
-    frameNTP->rootDelay = 0;
-    // set root dispersion
-    frameNTP->rootDispersion = 0;
-    // set origin timestamp
-    frameNTP->origTime[0] = 0;
-    frameNTP->origTime[1] = 0;
-    // set reference timestamp0
-    frameNTP->refTime[0] = 0;
-    frameNTP->refTime[1] = 0;
-    // set RX time
-    frameNTP->rxTime[0] = 0;
-    frameNTP->rxTime[1] = 0;
     // set TX time
     uint64_t txTime = CLK_TAI();
     frameNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
@@ -294,18 +288,41 @@ void pollServer(int index) {
     NET_transmit(txDesc, NTP3_SIZE);
 }
 
+static void arpCallback(uint32_t remoteAddress, uint8_t *macAddress) {
+    for(int i = 0; i < SERVER_COUNT; i++) {
+        if(servers[i].addr == remoteAddress) {
+            copyMAC(servers[i].mac, macAddress);
+            break;
+        }
+    }
+}
+
 void runServer(int index, uint32_t now) {
     // poll client if configured
     if(servers[index].addr == 0)
         return;
+
+    // perform ARP request if MAC address is missing
+    if(isNullMAC(servers[index].mac)) {
+        // determine if server is outside of current subnet
+        if((servers[index].addr ^ ipAddress) & ipSubnet)
+            ARP_request(ipGateway, arpCallback);
+        else
+            ARP_request(servers[index].addr, arpCallback);
+        return;
+    }
+
+    // verify current time
     uint32_t nextPoll = servers[index].nextPoll;
     if(((int32_t) (now - nextPoll)) < 0)
         return;
-    // pseudo-random poll interval
-    nextPoll += 7;
-    nextPoll &= ~7;
+
+    // schedule next poll
+    nextPoll &= ~63;
+    nextPoll += 64;
     nextPoll += (STCURRENT.CURRENT >> 8) & 7;
     servers[index].nextPoll = nextPoll;
+
     // send poll request
     pollServer(index);
 }
@@ -318,4 +335,73 @@ void NTP_run() {
 
     for(int i = 0; i < SERVER_COUNT; i++)
         runServer(i, now);
+
+    int32_t diff = (servers[0].offset - ntpTimeOffset) >> 32;
+    if(diff < -64 || diff > 64)
+        ntpTimeOffset = servers[0].offset;
+}
+
+char* NTP_servers(char *tail) {
+    char tmp[32];
+
+    uint32_t now = CLK_MONOTONIC_INT();
+    for(int i = 0; i < SERVER_COUNT; i++) {
+        if(servers[i].addr == 0) continue;
+
+        tail = append(tail, "  - ");
+        tail = addrToStr(servers[i].addr, tail);
+        tail = append(tail, " [");
+        tail = macToStr(servers[i].mac, tail);
+        tail = append(tail, "]\n");
+
+        tail = append(tail, "    ");
+        tmp[toBase(servers[i].nextPoll - now, 10, tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, " ");
+        tmp[toBase(now - servers[i].lastResponse, 10, tmp)] = 0;
+        tail = append(tail, tmp);
+
+        strcpy(tmp, " 0x");
+        toHex(servers[i].offset>>32, 8, '0', tmp+3);
+        tmp[11] = '.';
+        toHex(servers[i].offset, 8, '0', tmp+12);
+        tmp[20] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "\n");
+    }
+    return tail;
+}
+
+void processServerResponse(uint8_t *frame) {
+    uint64_t rxTime = CLK_TAI();
+
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    struct FRAME_NTPv3 *frameNTP = (struct FRAME_NTPv3 *) (headerUDP + 1);
+
+    uint64_t origTime, recvTime, txTime;
+    ((uint32_t *) &origTime)[1] = __builtin_bswap32(frameNTP->origTime[0]);
+    ((uint32_t *) &origTime)[0] = __builtin_bswap32(frameNTP->origTime[1]);
+
+    ((uint32_t *) &recvTime)[1] = __builtin_bswap32(frameNTP->rxTime[0]);
+    ((uint32_t *) &recvTime)[0] = __builtin_bswap32(frameNTP->rxTime[1]);
+
+    ((uint32_t *) &txTime)[1] = __builtin_bswap32(frameNTP->txTime[0]);
+    ((uint32_t *) &txTime)[0] = __builtin_bswap32(frameNTP->txTime[1]);
+
+    uint64_t a = recvTime - origTime;
+    uint64_t b = txTime - rxTime;
+    int64_t diff = b - a;
+    diff >>= 1;
+    a += diff;
+
+    for(int i = 0; i < SERVER_COUNT; i++) {
+        if(servers[i].addr == headerIPv4->src) {
+            servers[i].lastResponse = CLK_MONOTONIC_INT();
+            servers[i].offset = a;
+            break;
+        }
+    }
 }

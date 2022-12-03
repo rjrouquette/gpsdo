@@ -243,11 +243,7 @@ void NET_getLinkStatus(char *strStatus) {
 void NET_getMacAddress(char *strAddr) {
     uint8_t mac[6];
     getMAC(mac);
-    for(int i = 0; i < 6; i++) {
-        strAddr += toHex(mac[i], 2, '0', strAddr);
-        *(strAddr++) = ':';
-    }
-    strAddr[-1] = 0;
+    macToStr(mac, strAddr);
 }
 
 int NET_getPhyStatus() {

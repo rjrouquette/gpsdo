@@ -14,10 +14,6 @@ typedef void (*CallbackNetTX)(uint8_t *frame, int flen, uint32_t tsSec, uint32_t
 void NET_init();
 void NET_getLinkStatus(char *strStatus);
 void NET_getMacAddress(char *strAddr);
-void NET_getIpAddress(char *strAddr);
-void NET_getIpSubnet(char *strAddr);
-void NET_getIpGateway(char *strAddr);
-void NET_getIpDNS(char *strAddr);
 int NET_getPhyStatus();
 void NET_run();
 

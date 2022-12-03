@@ -12,8 +12,10 @@
 
 #define ANNOUNCE_INTERVAL (60)
 #define MAX_REQUESTS (16)
+#define REQUEST_EXPIRE (5)
 
 volatile struct {
+    uint32_t expire;
     uint32_t remoteAddress;
     CallbackARP callback;
 } requests[MAX_REQUESTS];
@@ -89,6 +91,7 @@ void ARP_process(uint8_t *frame, int flen) {
             for(int i = 0; i < MAX_REQUESTS; i++) {
                 if(requests[i].remoteAddress == payload->SPA) {
                     (*requests[i].callback)(payload->SPA, payload->SHA);
+                    requests[i].remoteAddress = 0;
                 }
             }
         }
@@ -96,9 +99,10 @@ void ARP_process(uint8_t *frame, int flen) {
 }
 
 int ARP_request(uint32_t remoteAddress, CallbackARP callback) {
+    uint32_t now = CLK_MONOTONIC_INT();
     for(int i = 0; i < MAX_REQUESTS; i++) {
-        // look for empty slot
-        if(requests[i].remoteAddress != 0)
+        // look for empty or expired slot
+        if(requests[i].remoteAddress != 0 && ((int32_t) (now - requests[i].expire) > 0))
             continue;
         // get TX descriptor
         int txDesc = NET_getTxDesc();
@@ -114,6 +118,7 @@ int ARP_request(uint32_t remoteAddress, CallbackARP callback) {
         // register callback
         requests[i].callback = callback;
         requests[i].remoteAddress = remoteAddress;
+        requests[i].expire = now + REQUEST_EXPIRE;
         // transmit frame
         NET_transmit(txDesc, ARP_FRAME_LEN);
         return 0;
