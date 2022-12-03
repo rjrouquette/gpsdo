@@ -26,6 +26,13 @@ unsigned statusGPS(char *body);
 unsigned statusGPSDO(char *body);
 unsigned statusNTP(char *body);
 
+inline int hasTerminus(const char *str, int offset) {
+    if(str[offset] == 0) return 1;
+    if(str[offset] == '\n') return 1;
+    if(str[offset] == '\r') return 1;
+    return 0;
+}
+
 void STATUS_init() {
     UDP_register(STATUS_PORT, STATUS_process);
 }
@@ -58,7 +65,7 @@ void STATUS_process(uint8_t *frame, int flen) {
     char *body = (char *) (headerUDP + 1);
     // force null termination
     body[size] = 0;
-    if(strcmp(body, "ethernet") == 0) {
+    if(strncmp(body, "ethernet", 8) == 0 && hasTerminus(body, 8)) {
         size = statusEth(body);
     } else {
         char tmp[64];
