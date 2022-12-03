@@ -250,6 +250,10 @@ void NET_getMacAddress(char *strAddr) {
     strAddr[-1] = 0;
 }
 
+int NET_getPhyStatus() {
+    return phyStatus;
+}
+
 void NET_run() {
     for(;;) {
         int busy = 0;

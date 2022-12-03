@@ -5,12 +5,17 @@
 #ifndef GPSDO_NET_H
 #define GPSDO_NET_H
 
+#define PHY_STATUS_DUPLEX (4)
+#define PHY_STATUS_100M (2)
+#define PHY_STATUS_LINK (1)
+
 typedef void (*CallbackNetTX)(uint8_t *frame, int flen, uint32_t tsSec, uint32_t tsNano);
 
 void NET_init();
 void NET_getLinkStatus(char *strStatus);
 void NET_getMacAddress(char *strAddr);
 void NET_getIpAddress(char *strAddr);
+int NET_getPhyStatus();
 void NET_run();
 
 int NET_getTxDesc();
