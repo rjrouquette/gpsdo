@@ -26,7 +26,7 @@ unsigned statusGPS(char *body);
 unsigned statusGPSDO(char *body);
 unsigned statusNTP(char *body);
 
-inline int hasTerminus(const char *str, int offset) {
+int hasTerminus(const char *str, int offset) {
     if(str[offset] == 0) return 1;
     if(str[offset] == '\n') return 1;
     if(str[offset] == '\r') return 1;
