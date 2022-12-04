@@ -3,6 +3,7 @@
 //
 
 #include <string.h>
+#include <math.h>
 
 #include "status.h"
 #include "lib/clk.h"
@@ -18,6 +19,7 @@
 #include "lib/net/dhcp.h"
 #include "hw/sys.h"
 #include "ntp.h"
+#include "lib/temp.h"
 
 #define STATUS_PORT (23) // telnet port
 
@@ -166,7 +168,7 @@ unsigned statusGPSDO(char *body) {
     char *end = body;
 
     // pll lock
-    end = append(end, "pll locked: ");
+    end = append(end, "pps locked: ");
     end = append(end, GPSDO_isLocked() ? "yes" : "no");
     end = append(end, "\n");
 
@@ -200,21 +202,27 @@ unsigned statusGPSDO(char *body) {
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
+    // temperature
+    tmp[fmtFloat(ldexp(TEMP_proc(), -8), 0, 4, tmp)] = 0;
+    end = append(end, "temperature: ");
+    end = append(end, tmp);
+    end = append(end, " C\n");
+
     // temperature compensation
     tmp[fmtFloat(GPSDO_compValue() * 1e6f, 0, 4, tmp)] = 0;
-    end = append(end, "temperature compensation: ");
+    end = append(end, "compensation: ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
     // temperature coefficient
     tmp[fmtFloat(GPSDO_compCoeff() * 1e6f, 0, 4, tmp)] = 0;
-    end = append(end, "temperature coefficient: ");
+    end = append(end, "  - coefficient: ");
     end = append(end, tmp);
     end = append(end, " ppm/C\n");
 
     // temperature offset
     tmp[fmtFloat(GPSDO_compBias() * 1e6f, 0, 4, tmp)] = 0;
-    end = append(end, "temperature offset: ");
+    end = append(end, "  - offset: ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
