@@ -17,7 +17,6 @@
 #define OFFSET_COARSE_ALIGN (1000000) // 1 millisecond
 #define STAT_TIME_CONST (16)
 #define STAT_LOCK_RMS (250e-9f)
-#define STAT_CTRL_RMS (5e-6f)
 #define STAT_COMP_RMS (200e-9f)
 
 
@@ -38,8 +37,6 @@ static uint8_t ppsGpsReady;
 static uint8_t ppsOutReady;
 static uint8_t waitRealign;
 static uint8_t resetBias;
-static uint8_t firstLock;
-
 
 // temperature compensation
 static float compM, compB;
@@ -141,8 +138,6 @@ void GPSDO_init() {
     initEdgeComp();
     // wait at least 10 PPS updates before attempting lock
     waitRealign = 10;
-    // indicate that next lock is first lock
-    firstLock = 1;
 
     // init GPS
     GPS_init();
@@ -245,17 +240,7 @@ void GPSDO_run() {
     // update control loop
     pllCorr = fltOffset * rate;
     setFeedback(currCompensation + pllCorr + pllBias);
-    // update control bias
-    if(ppsSkewRms < STAT_CTRL_RMS) {
-        // faster settling on first lock
-        if(firstLock) {
-            pllBias = currFeedback - currCompensation;
-            firstLock = 0;
-        }
-        else {
-            pllBias += fltOffset / 256;
-        }
-    }
+    pllBias += fltOffset / 256;
 
     // update temperature coefficient
     if(ppsSkewRms < STAT_COMP_RMS)
