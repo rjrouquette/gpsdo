@@ -337,8 +337,8 @@ void NTP_run() {
         runServer(i, now);
 
     int32_t diff = (servers[0].offset - ntpTimeOffset) >> 32;
-    if(diff < -64 || diff > 64)
-        ntpTimeOffset = servers[0].offset;
+    if(diff != 0)
+        ((uint32_t *) &ntpTimeOffset)[1] += diff;
 }
 
 char* NTP_servers(char *tail) {
