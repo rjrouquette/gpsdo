@@ -396,23 +396,22 @@ char* NTP_servers(char *tail) {
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == 0) continue;
 
-        tail = append(tail, "  - [");
-        tail = macToStr(servers[i].mac, tail);
-        tail = append(tail, "] ");
+        tail = append(tail, "  - ");
+        char *pad = tail + 16;
         tail = addrToStr(servers[i].addr, tail);
-        tail = append(tail, "\n");
+        while(tail < pad)
+            *(tail++) = ' ';
 
-        tail = append(tail, "    ");
         tmp[toDec(servers[i].stratum, 3, ' ', tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, " ");
+        tmp[toOct(servers[i].reach, 3, '0', tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, " ");
         tmp[toDec(servers[i].nextPoll - now, 3, ' ', tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, " ");
         tmp[toDec(now - servers[i].lastResponse, 3, ' ', tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, " ");
-        tmp[toOct(servers[i].reach, 3, '0', tmp)] = 0;
         tail = append(tail, tmp);
 
         strcpy(tmp, "  0x");
