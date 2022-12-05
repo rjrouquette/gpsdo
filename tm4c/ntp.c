@@ -20,11 +20,11 @@
 #include "lib/format.h"
 #include "lib/net/dns.h"
 
-#define NTP3_SIZE (UDP_DATA_OFFSET + 48)
+#define NTP4_SIZE (UDP_DATA_OFFSET + 48)
 #define NTP_PORT (123)
 #define NTP_POOL_FQDN ("pool.ntp.org")
 
-struct PACKED FRAME_NTPv3 {
+struct PACKED HEADER_NTPv4 {
     uint16_t mode: 3;
     uint16_t version: 3;
     uint16_t status: 2;
@@ -39,7 +39,7 @@ struct PACKED FRAME_NTPv3 {
     uint32_t rxTime[2];
     uint32_t txTime[2];
 };
-_Static_assert(sizeof(struct FRAME_NTPv3) == 48, "FRAME_NTPv3 must be 48 bytes");
+_Static_assert(sizeof(struct HEADER_NTPv4) == 48, "HEADER_NTPv4 must be 48 bytes");
 
 static volatile uint32_t ntpEra = 0;
 static volatile uint64_t ntpTimeOffset = 0;
@@ -65,10 +65,10 @@ void processServerResponse(uint8_t *frame);
 
 void NTP_process(uint8_t *frame, int flen);
 
-void NTP_process0(const uint8_t *frame, struct FRAME_NTPv3 *frameNTP);
+void NTP_process0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP);
 void NTP_followup0(uint8_t *frame, int flen, uint32_t txSec, uint32_t txNano);
 
-void NTP_process3(const uint8_t *frame, struct FRAME_NTPv3 *frameNTP);
+void NTP_process4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP);
 
 void NTP_init() {
     memset(servers, 0, sizeof(servers));
@@ -96,13 +96,13 @@ void NTP_process(uint8_t *frame, int flen) {
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct FRAME_NTPv3 *frameNTP = (struct FRAME_NTPv3 *) (headerUDP + 1);
+    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
     // verify destination
     if(headerIPv4->dst != ipAddress) return;
     // filter non-client frames
-    if(frameNTP->mode != 3) {
-        if(frameNTP->mode == 4)
+    if(headerNTP->mode != 3) {
+        if(headerNTP->mode == 4)
             processServerResponse(frame);
         return;
     }
@@ -123,12 +123,12 @@ void NTP_process(uint8_t *frame, int flen) {
     if(txDesc < 0) return;
 
     // process message
-    if(frameNTP->version == 0) {
-        NTP_process0(frame, frameNTP);
+    if(headerNTP->version == 0) {
+        NTP_process0(frame, headerNTP);
         NET_setTxCallback(txDesc, NTP_followup0);
     }
     else {
-        NTP_process3(frame, frameNTP);
+        NTP_process4(frame, headerNTP);
     }
 
     // finalize packet
@@ -139,40 +139,40 @@ void NTP_process(uint8_t *frame, int flen) {
     NET_transmit(txDesc, flen);
 }
 
-void NTP_process0(const uint8_t *frame, struct FRAME_NTPv3 *frameNTP) {
+void NTP_process0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP) {
     // retrieve rx time
     uint32_t rxTime[2];
     NET_getRxTimeRaw(frame, rxTime);
 
     // set type to server response
-    frameNTP->mode = 4;
+    headerNTP->mode = 4;
     // indicate that the time is not currently set
-    frameNTP->status = GPSDO_isLocked() ? 0 : 3;
+    headerNTP->status = GPSDO_isLocked() ? 0 : 3;
     // set other header fields
-    frameNTP->stratum = GPSDO_isLocked() ? 1 : 16;
-    frameNTP->precision = -24;
+    headerNTP->stratum = GPSDO_isLocked() ? 1 : 16;
+    headerNTP->precision = -24;
     // set reference ID
-    memcpy(frameNTP->refID, "GPS", 4);
+    memcpy(headerNTP->refID, "GPS", 4);
     // set root delay
-    frameNTP->rootDelay = 0;
+    headerNTP->rootDelay = 0;
     // set root dispersion
-    frameNTP->rootDispersion = 0;
+    headerNTP->rootDispersion = 0;
     // set origin timestamp
-    frameNTP->origTime[0] = frameNTP->txTime[0];
-    frameNTP->origTime[1] = frameNTP->txTime[1];
+    headerNTP->origTime[0] = headerNTP->txTime[0];
+    headerNTP->origTime[1] = headerNTP->txTime[1];
     // set RX time
-    frameNTP->rxTime[0] = ((uint32_t *) &rxTime)[0];
-    frameNTP->rxTime[1] = ((uint32_t *) &rxTime)[1];
+    headerNTP->rxTime[0] = ((uint32_t *) &rxTime)[0];
+    headerNTP->rxTime[1] = ((uint32_t *) &rxTime)[1];
     // set reference time
     uint32_t refTime[2] = {EMAC0.TIMSEC, EMAC0.TIMNANO };
     if((int32_t)(refTime[1] - rxTime[1]) < 0) {
         if(refTime[0] == rxTime[0]) ++refTime[0];
     }
-    frameNTP->refTime[0] = refTime[0];
-    frameNTP->refTime[1] = refTime[1];
+    headerNTP->refTime[0] = refTime[0];
+    headerNTP->refTime[1] = refTime[1];
     // no TX time
-    frameNTP->txTime[0] = 0;
-    frameNTP->txTime[1] = 0;
+    headerNTP->txTime[0] = 0;
+    headerNTP->txTime[1] = 0;
 }
 
 void NTP_followup0(uint8_t *frame, int flen, uint32_t txSec, uint32_t txNano) {
@@ -183,17 +183,17 @@ void NTP_followup0(uint8_t *frame, int flen, uint32_t txSec, uint32_t txNano) {
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct FRAME_NTPv3 *frameNTP = (struct FRAME_NTPv3 *) (headerUDP + 1);
+    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
     // guard against buffer overruns
     if(headerEth->ethType != ETHTYPE_IPv4) return;
     if(headerIPv4->proto != IP_PROTO_UDP) return;
     if(headerUDP->portSrc != __builtin_bswap16(NTP_PORT)) return;
-    if(frameNTP->version != 0) return;
+    if(headerNTP->version != 0) return;
 
     // append original TX time and resend
-    frameNTP->txTime[0] = txSec;
-    frameNTP->txTime[1] = txNano;
+    headerNTP->txTime[0] = txSec;
+    headerNTP->txTime[1] = txNano;
 
     // send packet
     UDP_finalize(frame, flen);
@@ -210,48 +210,48 @@ void NTP_followup0(uint8_t *frame, int flen, uint32_t txSec, uint32_t txNano) {
     NET_transmit(txDesc, flen);
 }
 
-void NTP_process3(const uint8_t *frame, struct FRAME_NTPv3 *frameNTP) {
+void NTP_process4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP) {
     // retrieve rx time
     uint64_t rxTime = NET_getRxTime(frame) + ntpTimeOffset;
 
     // set type to server response
-    frameNTP->mode = 4;
+    headerNTP->mode = 4;
     // indicate that the time is not currently set
-    frameNTP->status = GPSDO_isLocked() ? 0 : 3;
+    headerNTP->status = GPSDO_isLocked() ? 0 : 3;
     // set other header fields
-    frameNTP->stratum = GPSDO_isLocked() ? 1 : 16;
-    frameNTP->precision = -24;
+    headerNTP->stratum = GPSDO_isLocked() ? 1 : 16;
+    headerNTP->precision = -24;
     // set reference ID
-    memcpy(frameNTP->refID, "GPS", 4);
+    memcpy(headerNTP->refID, "GPS", 4);
     // set root delay
-    frameNTP->rootDelay = 0;
+    headerNTP->rootDelay = 0;
     // set root dispersion
-    frameNTP->rootDispersion = 0;
+    headerNTP->rootDispersion = 0;
     // set origin timestamp
-    frameNTP->origTime[0] = frameNTP->txTime[0];
-    frameNTP->origTime[1] = frameNTP->txTime[1];
+    headerNTP->origTime[0] = headerNTP->txTime[0];
+    headerNTP->origTime[1] = headerNTP->txTime[1];
     // set reference timestamp
     uint64_t refTime = CLK_TAI() + ntpTimeOffset;
-    frameNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
-    frameNTP->refTime[1] = __builtin_bswap32(((uint32_t *) &refTime)[0]);
+    headerNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
+    headerNTP->refTime[1] = __builtin_bswap32(((uint32_t *) &refTime)[0]);
     // set RX time
-    frameNTP->rxTime[0] = __builtin_bswap32(((uint32_t *) &rxTime)[1]);
-    frameNTP->rxTime[1] = __builtin_bswap32(((uint32_t *) &rxTime)[0]);
+    headerNTP->rxTime[0] = __builtin_bswap32(((uint32_t *) &rxTime)[1]);
+    headerNTP->rxTime[1] = __builtin_bswap32(((uint32_t *) &rxTime)[0]);
     // set TX time
     uint64_t txTime = CLK_TAI() + ntpTimeOffset;
-    frameNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
-    frameNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
+    headerNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
+    headerNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
 }
 
-void poll3(int pingOnly, uint8_t *frame, uint32_t addr, uint8_t *mac) {
+void poll4(int pingOnly, uint8_t *frame, uint32_t addr, uint8_t *mac) {
     // clear frame buffer
-    memset(frame, 0, NTP3_SIZE);
+    memset(frame, 0, NTP4_SIZE);
 
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct FRAME_NTPv3 *frameNTP = (struct FRAME_NTPv3 *) (headerUDP + 1);
+    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
     // EtherType = IPv4
     headerEth->ethType = ETHTYPE_IPv4;
@@ -269,15 +269,15 @@ void poll3(int pingOnly, uint8_t *frame, uint32_t addr, uint8_t *mac) {
     headerUDP->portDst = __builtin_bswap16(NTP_PORT);
 
     // set type to client request
-    frameNTP->version = 3;
-    frameNTP->mode = 3;
+    headerNTP->version = 4;
+    headerNTP->mode = 3;
     // set reference ID
-    memcpy(frameNTP->refID, "GPS", 4);
+    memcpy(headerNTP->refID, "GPS", 4);
     // set TX time
     if(pingOnly == 0) {
         uint64_t txTime = CLK_TAI();
-        frameNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
-        frameNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
+        headerNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
+        headerNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
     }
 }
 
@@ -287,12 +287,12 @@ void pollServer(int index, int pingOnly) {
     uint8_t *frame = NET_getTxBuff(txDesc);
 
     // create NTP request
-    poll3(pingOnly, frame, servers[index].addr, servers[index].mac);
+    poll4(pingOnly, frame, servers[index].addr, servers[index].mac);
 
     // transmit request
-    UDP_finalize(frame, NTP3_SIZE);
-    IPv4_finalize(frame, NTP3_SIZE);
-    NET_transmit(txDesc, NTP3_SIZE);
+    UDP_finalize(frame, NTP4_SIZE);
+    IPv4_finalize(frame, NTP4_SIZE);
+    NET_transmit(txDesc, NTP4_SIZE);
     if(pingOnly == 0) {
         // advance reach window
         servers[index].reach <<= 1;
@@ -505,17 +505,17 @@ void processServerResponse(uint8_t *frame) {
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct FRAME_NTPv3 *frameNTP = (struct FRAME_NTPv3 *) (headerUDP + 1);
+    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
     uint32_t *tmp = (uint32_t *) time;
-    tmp[1] = __builtin_bswap32(frameNTP->origTime[0]);
-    tmp[0] = __builtin_bswap32(frameNTP->origTime[1]);
+    tmp[1] = __builtin_bswap32(headerNTP->origTime[0]);
+    tmp[0] = __builtin_bswap32(headerNTP->origTime[1]);
 
-    tmp[3] = __builtin_bswap32(frameNTP->rxTime[0]);
-    tmp[2] = __builtin_bswap32(frameNTP->rxTime[1]);
+    tmp[3] = __builtin_bswap32(headerNTP->rxTime[0]);
+    tmp[2] = __builtin_bswap32(headerNTP->rxTime[1]);
 
-    tmp[5] = __builtin_bswap32(frameNTP->txTime[0]);
-    tmp[4] = __builtin_bswap32(frameNTP->txTime[1]);
+    tmp[5] = __builtin_bswap32(headerNTP->txTime[0]);
+    tmp[4] = __builtin_bswap32(headerNTP->txTime[1]);
 
     // discard ping responses
     if(time[0] == 0) return;
@@ -530,7 +530,7 @@ void processServerResponse(uint8_t *frame) {
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == headerIPv4->src) {
             servers[i].reach |= 1;
-            servers[i].stratum = frameNTP->stratum;
+            servers[i].stratum = headerNTP->stratum;
             servers[i].lastResponse = CLK_MONOTONIC_INT();
             updateTime(servers + i, time, ((uint32_t *) &delay)[0]);
             break;
