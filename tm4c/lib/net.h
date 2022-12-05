@@ -9,7 +9,7 @@
 #define PHY_STATUS_100M (2)
 #define PHY_STATUS_LINK (1)
 
-typedef void (*CallbackNetTX)(uint8_t *frame, int flen, uint32_t tsSec, uint32_t tsNano);
+typedef void (*CallbackNetTX)(uint8_t *frame, int flen);
 
 void NET_init();
 void NET_getLinkStatus(char *strStatus);
@@ -24,5 +24,8 @@ void NET_transmit(int desc, int len);
 
 uint64_t NET_getRxTime(const uint8_t *rxFrame);
 void NET_getRxTimeRaw(const uint8_t *rxFrame, uint32_t *rxTime);
+
+uint64_t NET_getTxTime(const uint8_t *txFrame);
+void NET_getTxTimeRaw(const uint8_t *txFrame, uint32_t *txTime);
 
 #endif //GPSDO_NET_H

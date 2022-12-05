@@ -272,10 +272,7 @@ void NET_run() {
             // invoke callback
             CallbackNetTX callback = txCallback[endTX];
             if(callback) {
-                (*callback) (
-                        txBuffer[endTX], txDesc[endTX].TDES1.TBS1,
-                        txDesc[endTX].TTSH, txDesc[endTX].TTSL
-                );
+                (*callback) (txBuffer[endTX], txDesc[endTX].TDES1.TBS1);
             }
             // clear callback
             txCallback[endTX] = 0;
@@ -365,4 +362,50 @@ void NET_getRxTimeRaw(const uint8_t *rxFrame, uint32_t *rxTime) {
     // retrieve raw timestamp
     rxTime[0] = rxDesc[rxId].RTSH;
     rxTime[1] = rxDesc[rxId].RTSL;
+}
+
+uint64_t NET_getTxTime(const uint8_t *txFrame) {
+    // compute descriptor offset
+    uint32_t txId = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
+    if(txId >= TX_RING_SIZE) return 0;
+
+    // result structure
+    register union {
+        struct {
+            uint32_t fpart;
+            uint32_t ipart;
+        };
+        uint64_t full;
+    } result;
+
+    // load TX timestamp
+    result.fpart = txDesc[txId].TTSL >> 3;
+    result.ipart = result.fpart;
+
+    // split fractional time into fraction and remainder
+    result.ipart /= 1953125;
+    result.fpart -= 1953125 * result.ipart;
+
+    // compute twiddle for fractional conversion
+    register uint32_t twiddle = result.fpart;
+    twiddle *= 1524;
+    twiddle >>= 16;
+    // apply fractional coefficient
+    result.fpart *= 2199;
+    // apply fraction twiddle
+    result.fpart += twiddle;
+    // adjust bit alignment
+    result.full >>= 6;
+
+    result.ipart = txDesc[txId].TTSH;
+    return result.full;
+}
+
+void NET_getTxTimeRaw(const uint8_t *txFrame, uint32_t *txTime) {
+    // compute descriptor offset
+    uint32_t txId = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
+    if(txId >= TX_RING_SIZE) return;
+    // retrieve raw timestamp
+    txTime[0] = txDesc[txId].TTSH;
+    txTime[1] = txDesc[txId].TTSL;
 }
