@@ -236,7 +236,7 @@ static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     // set reference timestamp
     uint64_t refTime = CLK_TAI() + ntpTimeOffset;
     headerNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
-    headerNTP->refTime[1] = __builtin_bswap32(((uint32_t *) &refTime)[0]);
+    headerNTP->refTime[1] = 0;
     // set RX time
     headerNTP->rxTime[0] = __builtin_bswap32(((uint32_t *) &rxTime)[1]);
     headerNTP->rxTime[1] = __builtin_bswap32(((uint32_t *) &rxTime)[0]);
@@ -593,8 +593,14 @@ static void pollServer(struct Server *server, int pingOnly) {
     // set type to client request
     headerNTP->version = 4;
     headerNTP->mode = 3;
+    headerNTP->poll = 4;
+    headerNTP->precision = -24;
     // set reference ID
     memcpy(headerNTP->refID, "GPS", 4);
+    // set reference timestamp
+    uint64_t refTime = CLK_TAI() + ntpTimeOffset;
+    headerNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
+    headerNTP->refTime[1] = 0;
     // set TX time
     if(pingOnly == 0) {
         uint64_t *stamps = server->stamps + (server->burst << 2);
