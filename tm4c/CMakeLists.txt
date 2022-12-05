@@ -41,6 +41,7 @@ add_executable(
         lib/net.c
         lib/net/arp.c
         lib/net/dhcp.c
+        lib/net/dns.c
         lib/net/icmp.c
         lib/net/ip.c
         lib/net/udp.c

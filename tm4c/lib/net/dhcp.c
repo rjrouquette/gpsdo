@@ -48,7 +48,7 @@ static const uint8_t DHCP_OPT_DISCOVER[] = { 0x35, 0x01, 0x01 };
 static const uint8_t DHCP_OPT_REQUEST[] = { 0x35, 0x01, 0x03 };
 static const uint8_t DHCP_OPT_PARAM_REQ[] = { 0x37, 0x03, 0x01, 0x03, 0x06 };
 
-
+static void processFrame(uint8_t *frame, int flen);
 static void sendReply(struct HEADER_DHCP *response);
 
 static void initPacket(void *frame) {
@@ -94,6 +94,9 @@ void DHCP_init() {
     }
     hostname[10] = 0;
     lenHostname = 10;
+
+    // register DHCP client port
+    UDP_register(DHCP_PORT_CLI, processFrame);
 }
 
 void DHCP_run() {
@@ -158,7 +161,7 @@ void DHCP_renew() {
     NET_transmit(txDesc, flen);
 }
 
-void DHCP_process(uint8_t *frame, int flen) {
+static void processFrame(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < 282) return;
     // map headers

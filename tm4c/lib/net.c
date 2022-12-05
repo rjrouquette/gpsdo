@@ -16,6 +16,7 @@
 #include "net/ip.h"
 #include "net/udp.h"
 #include "net/util.h"
+#include "net/dns.h"
 
 #define RX_RING_SIZE (16)
 #define RX_BUFF_SIZE (1520)
@@ -220,10 +221,9 @@ void NET_init() {
 
     // unique IP identifier seed
     ipID = EMAC0.ADDR0.HI.ADDR;
-    // register DHCP client port
-    UDP_register(DHCP_PORT_CLI, DHCP_process);
-    // initialize DHCP
+    // initialize network services
     DHCP_init();
+    DNS_init();
 }
 
 void NET_getLinkStatus(char *strStatus) {

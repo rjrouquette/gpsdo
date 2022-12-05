@@ -17,9 +17,11 @@
 #include "hw/sys.h"
 #include "lib/net/arp.h"
 #include "lib/format.h"
+#include "lib/net/dns.h"
 
 #define NTP3_SIZE (UDP_DATA_OFFSET + 48)
 #define NTP_PORT (123)
+#define NTP_POOL_FQDN ("pool.ntp.org")
 
 struct PACKED FRAME_NTPv3 {
     union PACKED {
@@ -67,7 +69,6 @@ void NTP_process3(const uint8_t *frame, struct FRAME_NTPv3 *frameNTP);
 void NTP_init() {
     memset(servers, 0, sizeof(servers));
     UDP_register(NTP_PORT, NTP_process);
-    servers[0].addr = 0xC803A8C0;
 }
 
 uint64_t NTP_offset() {
@@ -289,6 +290,16 @@ void pollServer(int index) {
 }
 
 static void arpCallback(uint32_t remoteAddress, uint8_t *macAddress) {
+    // special case for external addresses
+    if(remoteAddress == ipGateway) {
+        for(int i = 0; i < SERVER_COUNT; i++) {
+            if((servers[i].addr ^ ipAddress) & ipSubnet) {
+                copyMAC(servers[i].mac, macAddress);
+            }
+        }
+        return;
+    }
+
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == remoteAddress) {
             copyMAC(servers[i].mac, macAddress);
@@ -327,18 +338,38 @@ void runServer(int index, uint32_t now) {
     pollServer(index);
 }
 
+static void dnsCallback(uint32_t addr) {
+    // fill empty server slot
+    for (int i = 0; i < SERVER_COUNT; i++) {
+        if (servers[i].addr == 0) {
+            servers[i].addr = addr;
+            servers[i].nextPoll = CLK_MONOTONIC_INT() + 2;
+            break;
+        }
+    }
+}
+
 static uint32_t nextPoll = 0;
 void NTP_run() {
     uint32_t now = CLK_MONOTONIC_INT();
     if(((int32_t) (now - nextPoll)) < 0) return;
     nextPoll = now + 1;
 
+    // search for additional NTP servers
+    int empty = 0;
+    for(int i = 0; i < SERVER_COUNT; i++)
+        if(servers[i].addr == 0) ++empty;
+    if(empty > 0)
+        DNS_lookup(NTP_POOL_FQDN, dnsCallback);
+
+    // process existing servers
     for(int i = 0; i < SERVER_COUNT; i++)
         runServer(i, now);
 
-    int32_t diff = (servers[0].offset - ntpTimeOffset) >> 32;
+    int64_t diff = (int64_t) (servers[0].offset - ntpTimeOffset);
+    diff >>= 31;
     if(diff != 0)
-        ((uint32_t *) &ntpTimeOffset)[1] += diff;
+        ((uint32_t *) &ntpTimeOffset)[1] += diff >> 1;
 }
 
 char* NTP_servers(char *tail) {
@@ -355,17 +386,17 @@ char* NTP_servers(char *tail) {
         tail = append(tail, "]\n");
 
         tail = append(tail, "    ");
-        tmp[toBase(servers[i].nextPoll - now, 10, tmp)] = 0;
+        tmp[toDec(servers[i].nextPoll - now, 3, ' ', tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, " ");
-        tmp[toBase(now - servers[i].lastResponse, 10, tmp)] = 0;
+        tmp[toDec(now - servers[i].lastResponse, 3, ' ', tmp)] = 0;
         tail = append(tail, tmp);
 
-        strcpy(tmp, " 0x");
-        toHex(servers[i].offset>>32, 8, '0', tmp+3);
-        tmp[11] = '.';
-        toHex(servers[i].offset, 8, '0', tmp+12);
-        tmp[20] = 0;
+        strcpy(tmp, "  0x");
+        toHex(servers[i].offset>>32, 8, '0', tmp+4);
+        tmp[12] = '.';
+        toHex(servers[i].offset, 8, '0', tmp+13);
+        tmp[21] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "\n");
     }
