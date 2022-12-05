@@ -55,6 +55,7 @@ struct Server {
     uint32_t lastResponse;
     uint32_t addr;
     uint8_t mac[6];
+    uint8_t reach;
 } servers[SERVER_COUNT];
 
 void processServerResponse(uint8_t *frame);
@@ -287,6 +288,8 @@ void pollServer(int index) {
     UDP_finalize(frame, NTP3_SIZE);
     IPv4_finalize(frame, NTP3_SIZE);
     NET_transmit(txDesc, NTP3_SIZE);
+    // advance reach window
+    servers[index].reach <<= 1;
 }
 
 static void arpCallback(uint32_t remoteAddress, uint8_t *macAddress) {
@@ -379,17 +382,20 @@ char* NTP_servers(char *tail) {
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == 0) continue;
 
-        tail = append(tail, "  - ");
-        tail = addrToStr(servers[i].addr, tail);
-        tail = append(tail, " [");
+        tail = append(tail, "  - [");
         tail = macToStr(servers[i].mac, tail);
-        tail = append(tail, "]\n");
+        tail = append(tail, "] ");
+        tail = addrToStr(servers[i].addr, tail);
+        tail = append(tail, "\n");
 
         tail = append(tail, "    ");
         tmp[toDec(servers[i].nextPoll - now, 3, ' ', tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, " ");
         tmp[toDec(now - servers[i].lastResponse, 3, ' ', tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, " ");
+        tmp[toOct(servers[i].reach, 3, '0', tmp)] = 0;
         tail = append(tail, tmp);
 
         strcpy(tmp, "  0x");
@@ -432,6 +438,7 @@ void processServerResponse(uint8_t *frame) {
         if(servers[i].addr == headerIPv4->src) {
             servers[i].lastResponse = CLK_MONOTONIC_INT();
             servers[i].offset = a;
+            servers[i].reach |= 1;
             break;
         }
     }
