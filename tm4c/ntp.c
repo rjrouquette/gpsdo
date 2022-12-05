@@ -45,7 +45,7 @@ struct PACKED HEADER_NTPv4 {
 _Static_assert(sizeof(struct HEADER_NTPv4) == 48, "HEADER_NTPv4 must be 48 bytes");
 
 static volatile uint32_t ntpEra = 0;
-static volatile uint64_t ntpTimeOffset = 0;
+static volatile uint64_t ntpOffset = 0;
 
 #define SERVER_COUNT (8)
 struct Server {
@@ -80,13 +80,13 @@ void NTP_init() {
 }
 
 uint64_t NTP_offset() {
-    return ntpTimeOffset;
+    return ntpOffset;
 }
 
 void NTP_date(uint64_t clkMono, uint32_t *ntpDate) {
     uint64_t rollover = ((uint32_t *)&clkMono)[1];
-    rollover += ((uint32_t *)&ntpTimeOffset)[1];
-    clkMono += ntpTimeOffset;
+    rollover += ((uint32_t *)&ntpOffset)[1];
+    clkMono += ntpOffset;
     ntpDate[0] = ntpEra + ((uint32_t *)&rollover)[1];
     ntpDate[1] = __builtin_bswap32(((uint32_t *)&clkMono)[1]);
     ntpDate[2] = __builtin_bswap32(((uint32_t *)&clkMono)[0]);
@@ -216,7 +216,7 @@ static void followupRequest0(uint8_t *frame, int flen) {
 
 static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP) {
     // retrieve rx time
-    uint64_t rxTime = NET_getRxTime(frame) + ntpTimeOffset;
+    uint64_t rxTime = NET_getRxTime(frame) + ntpOffset;
 
     // set type to server response
     headerNTP->mode = 4;
@@ -235,14 +235,14 @@ static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     headerNTP->origTime[0] = headerNTP->txTime[0];
     headerNTP->origTime[1] = headerNTP->txTime[1];
     // set reference timestamp
-    uint64_t refTime = CLK_TAI() + ntpTimeOffset;
+    uint64_t refTime = CLK_TAI() + ntpOffset;
     headerNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
     headerNTP->refTime[1] = 0;
     // set RX time
     headerNTP->rxTime[0] = __builtin_bswap32(((uint32_t *) &rxTime)[1]);
     headerNTP->rxTime[1] = __builtin_bswap32(((uint32_t *) &rxTime)[0]);
     // set TX time
-    uint64_t txTime = CLK_TAI() + ntpTimeOffset;
+    uint64_t txTime = CLK_TAI() + ntpOffset;
     headerNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
     headerNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
 }
@@ -346,10 +346,10 @@ void NTP_run() {
     for(int i = 0; i < SERVER_COUNT; i++)
         runServer(servers + i, now);
 
-    int64_t diff = (int64_t) (servers[0].offset - ntpTimeOffset);
+    int64_t diff = (int64_t) (servers[0].offset - ntpOffset);
     diff >>= 31;
     if(diff != 0)
-        ((uint32_t *) &ntpTimeOffset)[1] += diff >> 1;
+        ((uint32_t *) &ntpOffset)[1] += diff >> 1;
 }
 
 char* NTP_servers(char *tail) {
@@ -599,7 +599,7 @@ static void pollServer(struct Server *server, int pingOnly) {
     // set reference ID
     memcpy(headerNTP->refID, "GPS", 4);
     // set reference timestamp
-    uint64_t refTime = CLK_TAI() + ntpTimeOffset;
+    uint64_t refTime = CLK_TAI() + ntpOffset;
     headerNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
     headerNTP->refTime[1] = 0;
     // set TX time
