@@ -307,6 +307,7 @@ static void runServer(struct Server *server, uint32_t now) {
     ++(server->attempts);
     // send poll request
     server->burst = 0;
+    memset(server->stamps, 0, sizeof(server->stamps));
     pollServer(server, 0);
 }
 
