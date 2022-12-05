@@ -24,14 +24,9 @@
 #define NTP_POOL_FQDN ("pool.ntp.org")
 
 struct PACKED FRAME_NTPv3 {
-    union PACKED {
-        struct PACKED {
-            unsigned mode: 3;
-            unsigned version: 3;
-            unsigned status: 2;
-        };
-        uint8_t bits;
-    } flags;
+    uint16_t mode: 3;
+    uint16_t version: 3;
+    uint16_t status: 2;
     uint8_t stratum;
     uint8_t poll;
     int8_t precision;
@@ -48,7 +43,7 @@ _Static_assert(sizeof(struct FRAME_NTPv3) == 48, "FRAME_NTPv3 must be 48 bytes")
 static volatile uint32_t ntpEra = 0;
 static volatile uint64_t ntpTimeOffset = 0;
 
-#define SERVER_COUNT (4)
+#define SERVER_COUNT (8)
 struct Server {
     uint64_t offset;
     uint32_t nextPoll;
@@ -56,6 +51,7 @@ struct Server {
     uint32_t addr;
     uint8_t mac[6];
     uint8_t reach;
+    uint8_t stratum;
 } servers[SERVER_COUNT];
 
 void processServerResponse(uint8_t *frame);
@@ -98,8 +94,8 @@ void NTP_process(uint8_t *frame, int flen) {
     // verify destination
     if(headerIPv4->dst != ipAddress) return;
     // filter non-client frames
-    if(frameNTP->flags.mode != 3) {
-        if(frameNTP->flags.mode == 4)
+    if(frameNTP->mode != 3) {
+        if(frameNTP->mode == 4)
             processServerResponse(frame);
         return;
     }
@@ -120,7 +116,7 @@ void NTP_process(uint8_t *frame, int flen) {
     if(txDesc < 0) return;
 
     // process message
-    if(frameNTP->flags.version == 0) {
+    if(frameNTP->version == 0) {
         NTP_process0(frame, frameNTP);
         NET_setTxCallback(txDesc, NTP_followup0);
     }
@@ -142,9 +138,9 @@ void NTP_process0(const uint8_t *frame, struct FRAME_NTPv3 *frameNTP) {
     NET_getRxTimeRaw(frame, rxTime);
 
     // set type to server response
-    frameNTP->flags.mode = 4;
+    frameNTP->mode = 4;
     // indicate that the time is not currently set
-    frameNTP->flags.status = GPSDO_isLocked() ? 0 : 3;
+    frameNTP->status = GPSDO_isLocked() ? 0 : 3;
     // set other header fields
     frameNTP->stratum = GPSDO_isLocked() ? 1 : 16;
     frameNTP->precision = -24;
@@ -186,7 +182,7 @@ void NTP_followup0(uint8_t *frame, int flen, uint32_t txSec, uint32_t txNano) {
     if(headerEth->ethType != ETHTYPE_IPv4) return;
     if(headerIPv4->proto != IP_PROTO_UDP) return;
     if(headerUDP->portSrc != __builtin_bswap16(NTP_PORT)) return;
-    if(frameNTP->flags.version != 0) return;
+    if(frameNTP->version != 0) return;
 
     // append original TX time and resend
     frameNTP->txTime[0] = txSec;
@@ -212,9 +208,9 @@ void NTP_process3(const uint8_t *frame, struct FRAME_NTPv3 *frameNTP) {
     uint64_t rxTime = NET_getRxTime(frame) + ntpTimeOffset;
 
     // set type to server response
-    frameNTP->flags.mode = 4;
+    frameNTP->mode = 4;
     // indicate that the time is not currently set
-    frameNTP->flags.status = GPSDO_isLocked() ? 0 : 3;
+    frameNTP->status = GPSDO_isLocked() ? 0 : 3;
     // set other header fields
     frameNTP->stratum = GPSDO_isLocked() ? 1 : 16;
     frameNTP->precision = -24;
@@ -266,8 +262,8 @@ void poll3(uint8_t *frame, uint32_t addr, uint8_t *mac) {
     headerUDP->portDst = __builtin_bswap16(NTP_PORT);
 
     // set type to client request
-    frameNTP->flags.version = 3;
-    frameNTP->flags.mode = 3;
+    frameNTP->version = 3;
+    frameNTP->mode = 3;
     // set reference ID
     memcpy(frameNTP->refID, "GPS", 4);
     // set TX time
@@ -342,6 +338,11 @@ void runServer(int index, uint32_t now) {
 }
 
 static void dnsCallback(uint32_t addr) {
+    // prevent duplicate entries
+    for (int i = 0; i < SERVER_COUNT; i++) {
+        if(servers[i].addr == addr)
+            return;
+    }
     // fill empty server slot
     for (int i = 0; i < SERVER_COUNT; i++) {
         if (servers[i].addr == 0) {
@@ -389,6 +390,9 @@ char* NTP_servers(char *tail) {
         tail = append(tail, "\n");
 
         tail = append(tail, "    ");
+        tmp[toDec(servers[i].stratum, 3, ' ', tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, " ");
         tmp[toDec(servers[i].nextPoll - now, 3, ' ', tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, " ");
@@ -436,9 +440,10 @@ void processServerResponse(uint8_t *frame) {
 
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == headerIPv4->src) {
+            servers[i].reach |= 1;
             servers[i].lastResponse = CLK_MONOTONIC_INT();
             servers[i].offset = a;
-            servers[i].reach |= 1;
+            servers[i].stratum = frameNTP->stratum;
             break;
         }
     }
