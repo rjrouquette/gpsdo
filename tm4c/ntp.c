@@ -25,6 +25,7 @@
 #define NTP_BURST (4)
 #define NTP_BURST_BITS (2)
 #define NTP_POOL_FQDN ("pool.ntp.org")
+#define NTP_PRECISION (-24)
 
 struct PACKED HEADER_NTPv4 {
     uint16_t mode: 3;
@@ -153,7 +154,7 @@ static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     headerNTP->status = GPSDO_isLocked() ? 0 : 3;
     // set other header fields
     headerNTP->stratum = GPSDO_isLocked() ? 1 : 16;
-    headerNTP->precision = -24;
+    headerNTP->precision = NTP_PRECISION;
     // set reference ID
     memcpy(headerNTP->refID, "GPS", 4);
     // set root delay
@@ -223,7 +224,7 @@ static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     headerNTP->status = GPSDO_isLocked() ? 0 : 3;
     // set other header fields
     headerNTP->stratum = GPSDO_isLocked() ? 1 : 16;
-    headerNTP->precision = -24;
+    headerNTP->precision = NTP_PRECISION;
     // set reference ID
     memcpy(headerNTP->refID, "GPS", 4);
     // set root delay
@@ -594,7 +595,7 @@ static void pollServer(struct Server *server, int pingOnly) {
     headerNTP->version = 4;
     headerNTP->mode = 3;
     headerNTP->poll = 4;
-    headerNTP->precision = -24;
+    headerNTP->precision = NTP_PRECISION;
     // set reference ID
     memcpy(headerNTP->refID, "GPS", 4);
     // set reference timestamp
