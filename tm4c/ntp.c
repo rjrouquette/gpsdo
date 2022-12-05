@@ -3,6 +3,7 @@
 //
 
 #include <memory.h>
+#include <math.h>
 
 #include "ntp.h"
 #include "lib/clk.h"
@@ -46,12 +47,16 @@ static volatile uint64_t ntpTimeOffset = 0;
 #define SERVER_COUNT (8)
 struct Server {
     uint64_t offset;
+    uint64_t update;
     uint32_t nextPoll;
     uint32_t lastResponse;
     uint32_t addr;
     uint8_t mac[6];
     uint8_t reach;
     uint8_t stratum;
+    uint32_t attempts;
+    float drift;
+    float variance;
 } servers[SERVER_COUNT];
 
 void processServerResponse(uint8_t *frame);
@@ -286,6 +291,7 @@ void pollServer(int index) {
     NET_transmit(txDesc, NTP3_SIZE);
     // advance reach window
     servers[index].reach <<= 1;
+    ++servers[index].attempts;
 }
 
 static void arpCallback(uint32_t remoteAddress, uint8_t *macAddress) {
@@ -327,6 +333,12 @@ void runServer(int index, uint32_t now) {
     if(((int32_t) (now - nextPoll)) < 0)
         return;
 
+    // clear entry if the server is unreachable
+    if(servers[index].reach == 0 && servers[index].attempts > 8) {
+        memset(servers + index, 0, sizeof(struct Server));
+        return;
+    }
+
     // schedule next poll
     nextPoll &= ~63;
     nextPoll += 64;
@@ -347,7 +359,8 @@ static void dnsCallback(uint32_t addr) {
     for (int i = 0; i < SERVER_COUNT; i++) {
         if (servers[i].addr == 0) {
             servers[i].addr = addr;
-            servers[i].nextPoll = CLK_MONOTONIC_INT() + 2;
+            servers[i].lastResponse = CLK_MONOTONIC_INT();
+            servers[i].nextPoll = servers[i].lastResponse + 2;
             break;
         }
     }
@@ -408,13 +421,55 @@ char* NTP_servers(char *tail) {
         toHex(servers[i].offset, 8, '0', tmp+13);
         tmp[21] = 0;
         tail = append(tail, tmp);
+
+        tail = append(tail, " ");
+        tmp[fmtFloat(servers[i].drift * 1e6f, 9, 3, tmp)] = 0;
+        tail = append(tail, tmp);
+
+        tail = append(tail, " ");
+        tmp[fmtFloat(sqrtf(servers[i].variance) * 1e6f, 9, 3, tmp)] = 0;
+        tail = append(tail, tmp);
+
         tail = append(tail, "\n");
     }
     return tail;
 }
 
+void updateTime(struct Server *server, const uint64_t *time) {
+    // compute offset
+    uint64_t offset = time[1] - time[0];
+    offset += ((int64_t) ((time[2] - time[3]) - offset)) >> 1;
+    // compute update
+    uint64_t update = time[3] + (((int64_t) (time[0] - time[3])) >> 1);
+
+    // compute drift
+    if(server->update != 0) {
+        int64_t interval = (int64_t) (update - server->update);
+        int32_t ipart = ((int32_t *) &interval)[1];
+        if(ipart < 0) ipart = -ipart;
+        int shift = 0;
+        while((ipart >> shift) != 0)
+            ++shift;
+        float drift = (float) (int32_t) (offset - server->offset);
+        drift /= (float) (int32_t) (interval >> shift);
+        drift /= (float) (1 << shift);
+        // update drift metrics
+        if (fabsf(drift) < 1e-2f) {
+            server->drift += (drift - server->drift) * 0x1p-4f;
+            float var = drift - server->drift;
+            var *= var;
+            server->variance += (var - server->variance) * 0x1p-4f;
+        }
+    }
+
+    // update server status
+    server->offset = offset;
+    server->update = update;
+}
+
 void processServerResponse(uint8_t *frame) {
-    uint64_t rxTime = CLK_TAI();
+    uint64_t time[4];
+    time[3] = CLK_TAI();
 
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
@@ -422,28 +477,22 @@ void processServerResponse(uint8_t *frame) {
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct FRAME_NTPv3 *frameNTP = (struct FRAME_NTPv3 *) (headerUDP + 1);
 
-    uint64_t origTime, recvTime, txTime;
-    ((uint32_t *) &origTime)[1] = __builtin_bswap32(frameNTP->origTime[0]);
-    ((uint32_t *) &origTime)[0] = __builtin_bswap32(frameNTP->origTime[1]);
+    uint32_t *tmp = (uint32_t *) time;
+    tmp[1] = __builtin_bswap32(frameNTP->origTime[0]);
+    tmp[0] = __builtin_bswap32(frameNTP->origTime[1]);
 
-    ((uint32_t *) &recvTime)[1] = __builtin_bswap32(frameNTP->rxTime[0]);
-    ((uint32_t *) &recvTime)[0] = __builtin_bswap32(frameNTP->rxTime[1]);
+    tmp[3] = __builtin_bswap32(frameNTP->rxTime[0]);
+    tmp[2] = __builtin_bswap32(frameNTP->rxTime[1]);
 
-    ((uint32_t *) &txTime)[1] = __builtin_bswap32(frameNTP->txTime[0]);
-    ((uint32_t *) &txTime)[0] = __builtin_bswap32(frameNTP->txTime[1]);
-
-    uint64_t a = recvTime - origTime;
-    uint64_t b = txTime - rxTime;
-    int64_t diff = b - a;
-    diff >>= 1;
-    a += diff;
+    tmp[5] = __builtin_bswap32(frameNTP->txTime[0]);
+    tmp[4] = __builtin_bswap32(frameNTP->txTime[1]);
 
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == headerIPv4->src) {
             servers[i].reach |= 1;
-            servers[i].lastResponse = CLK_MONOTONIC_INT();
-            servers[i].offset = a;
             servers[i].stratum = frameNTP->stratum;
+            servers[i].lastResponse = CLK_MONOTONIC_INT();
+            updateTime(servers + i, time);
             break;
         }
     }
