@@ -22,6 +22,8 @@
 
 #define NTP4_SIZE (UDP_DATA_OFFSET + 48)
 #define NTP_PORT (123)
+#define NTP_BURST (4)
+#define NTP_BURST_BITS (2)
 #define NTP_POOL_FQDN ("pool.ntp.org")
 
 struct PACKED HEADER_NTPv4 {
@@ -46,19 +48,21 @@ static volatile uint64_t ntpTimeOffset = 0;
 
 #define SERVER_COUNT (8)
 struct Server {
-    uint64_t offset;
-    uint64_t update;
-    uint32_t nextPoll;
-    uint32_t lastResponse;
-    uint32_t addr;
-    uint8_t mac[6];
-    uint8_t reach;
-    uint8_t stratum;
-    uint32_t attempts;
     float delay;
     float jitter;
     float drift;
     float variance;
+    uint64_t stamps[NTP_BURST << 2];
+    uint64_t offset;
+    uint64_t update;
+    uint32_t nextPoll;
+    uint32_t lastResponse;
+    uint32_t attempts;
+    uint32_t addr;
+    uint8_t mac[6];
+    uint8_t reach;
+    uint8_t stratum;
+    uint8_t burst;
 } servers[SERVER_COUNT];
 
 void processServerResponse(uint8_t *frame);
@@ -243,8 +247,11 @@ void NTP_process4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP) {
     headerNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
 }
 
-void poll4(int pingOnly, uint8_t *frame, uint32_t addr, uint8_t *mac) {
-    // clear frame buffer
+void pollServer(struct Server *server, int pingOnly) {
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    // allocate and clear frame buffer
+    uint8_t *frame = NET_getTxBuff(txDesc);
     memset(frame, 0, NTP4_SIZE);
 
     // map headers
@@ -256,11 +263,11 @@ void poll4(int pingOnly, uint8_t *frame, uint32_t addr, uint8_t *mac) {
     // EtherType = IPv4
     headerEth->ethType = ETHTYPE_IPv4;
     // MAC address
-    copyMAC(headerEth->macDst, mac);
+    copyMAC(headerEth->macDst, server->mac);
 
     // IPv4 Header
     IPv4_init(frame);
-    headerIPv4->dst = addr;
+    headerIPv4->dst = server->addr;
     headerIPv4->src = ipAddress;
     headerIPv4->proto = IP_PROTO_UDP;
 
@@ -275,29 +282,16 @@ void poll4(int pingOnly, uint8_t *frame, uint32_t addr, uint8_t *mac) {
     memcpy(headerNTP->refID, "GPS", 4);
     // set TX time
     if(pingOnly == 0) {
-        uint64_t txTime = CLK_TAI();
-        headerNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
-        headerNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
+        uint64_t *stamps = server->stamps + (server->burst << 2);
+        stamps[0] = CLK_TAI();
+        headerNTP->txTime[0] = __builtin_bswap32(((uint32_t *) stamps)[1]);
+        headerNTP->txTime[1] = __builtin_bswap32(((uint32_t *) stamps)[0]);
     }
-}
-
-void pollServer(int index, int pingOnly) {
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
-    uint8_t *frame = NET_getTxBuff(txDesc);
-
-    // create NTP request
-    poll4(pingOnly, frame, servers[index].addr, servers[index].mac);
 
     // transmit request
     UDP_finalize(frame, NTP4_SIZE);
     IPv4_finalize(frame, NTP4_SIZE);
     NET_transmit(txDesc, NTP4_SIZE);
-    if(pingOnly == 0) {
-        // advance reach window
-        servers[index].reach <<= 1;
-        ++servers[index].attempts;
-    }
 }
 
 static void arpCallback(uint32_t remoteAddress, uint8_t *macAddress) {
@@ -319,34 +313,34 @@ static void arpCallback(uint32_t remoteAddress, uint8_t *macAddress) {
     }
 }
 
-void runServer(int index, uint32_t now) {
+void runServer(struct Server *server, uint32_t now) {
     // poll client if configured
-    if(servers[index].addr == 0)
+    if(server->addr == 0)
         return;
 
     // perform ARP request if MAC address is missing
-    if(isNullMAC(servers[index].mac)) {
+    if(isNullMAC(servers->mac)) {
         // determine if server is outside of current subnet
-        if((servers[index].addr ^ ipAddress) & ipSubnet)
+        if((servers->addr ^ ipAddress) & ipSubnet)
             ARP_request(ipGateway, arpCallback);
         else
-            ARP_request(servers[index].addr, arpCallback);
+            ARP_request(servers->addr, arpCallback);
         return;
     }
 
     // clear entry if the server is unreachable
-    if(servers[index].reach == 0 && servers[index].attempts > 8) {
-        memset(servers + index, 0, sizeof(struct Server));
+    if(server->reach == 0 && servers->attempts > 8) {
+        memset(server, 0, sizeof(struct Server));
         return;
     }
 
     // verify current time
-    uint32_t nextPoll = servers[index].nextPoll;
+    uint32_t nextPoll = server->nextPoll;
     if(((int32_t) (now - nextPoll)) < -1)
         return;
     if(((int32_t) (now - nextPoll)) == -1) {
         // ping server in advance of actual poll request (reduces jitter)
-        pollServer(index, 1);
+        pollServer(server, 1);
         return;
     }
 
@@ -354,10 +348,14 @@ void runServer(int index, uint32_t now) {
     nextPoll &= ~63;
     nextPoll += 64;
     nextPoll += (STCURRENT.CURRENT >> 8) & 7;
-    servers[index].nextPoll = nextPoll;
+    servers->nextPoll = nextPoll;
 
+    // advance reach window
+    server->reach <<= 1;
+    ++(server->attempts);
     // send poll request
-    pollServer(index, 0);
+    server->burst = 0;
+    pollServer(server, 0);
 }
 
 static void dnsCallback(uint32_t addr) {
@@ -392,7 +390,7 @@ void NTP_run() {
 
     // process existing servers
     for(int i = 0; i < SERVER_COUNT; i++)
-        runServer(i, now);
+        runServer(servers + i, now);
 
     int64_t diff = (int64_t) (servers[0].offset - ntpTimeOffset);
     diff >>= 31;
@@ -458,19 +456,34 @@ char* NTP_servers(char *tail) {
     return tail;
 }
 
-void updateTime(struct Server *server, const uint64_t *time, uint32_t _delay) {
+void updateTime(struct Server *server) {
+    // compute delay and offset
+    int64_t _adjust = 0;
+    int64_t _delay = 0;
+    uint64_t offset = server->stamps[1] - server->stamps[0];
+    for(int i = 0; i < NTP_BURST; i++) {
+        uint64_t *set = server->stamps + (i << 2);
+        // accumulate delay
+        _delay += (int64_t) ((set[4] - set[3]) - (set[2] - set[1]));
+        // accumulate offset adjustment
+        _adjust += ((int64_t) ((set[1] - set[0]) - offset));
+        _adjust += ((int64_t) ((set[2] - set[3]) - offset));
+    }
+    // normalize delay
+    _delay >>= NTP_BURST_BITS + 1;
+    // adjust offset
+    offset += _adjust >> (NTP_BURST_BITS + 1);
+
+    // compute update time
+    uint64_t update = server->stamps[(NTP_BURST << 2) - 1];
+    update += (((int64_t) (server->stamps[0] - server->stamps[(NTP_BURST << 2) - 1])) >> 1);
+
     // update delay stats
-    float delay = 0x1p-32f * (float) _delay;
+    float delay = 0x1p-32f * (float) (int32_t) _delay;
     float jitter = delay - server->delay;
     jitter *= jitter;
     server->delay += (delay - server->delay) * 0x1p-4f;
     server->jitter += (jitter - server->jitter) * 0x1p-4f;
-
-    // compute offset
-    uint64_t offset = time[1] - time[0];
-    offset += ((int64_t) ((time[2] - time[3]) - offset)) >> 1;
-    // compute update
-    uint64_t update = time[3] + (((int64_t) (time[0] - time[3])) >> 1);
 
     // compute drift
     if(server->update != 0) {
@@ -498,42 +511,59 @@ void updateTime(struct Server *server, const uint64_t *time, uint32_t _delay) {
 }
 
 void processServerResponse(uint8_t *frame) {
-    uint64_t time[4];
-    time[3] = CLK_TAI();
-
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
-    uint32_t *tmp = (uint32_t *) time;
-    tmp[1] = __builtin_bswap32(headerNTP->origTime[0]);
-    tmp[0] = __builtin_bswap32(headerNTP->origTime[1]);
-
-    tmp[3] = __builtin_bswap32(headerNTP->rxTime[0]);
-    tmp[2] = __builtin_bswap32(headerNTP->rxTime[1]);
-
-    tmp[5] = __builtin_bswap32(headerNTP->txTime[0]);
-    tmp[4] = __builtin_bswap32(headerNTP->txTime[1]);
-
-    // discard ping responses
-    if(time[0] == 0) return;
-    // discard responses with aberrant round-trip times
-    int64_t roundTrip = (int64_t) (time[3] - time[0]);
-    if(((uint32_t *) &roundTrip)[1] != 0) return;
-    // discard responses with aberrant delays
-    int64_t delay = ((int64_t) (roundTrip - (time[2] - time[1]))) >> 1;
-    if(((uint32_t *) &delay)[1] != 0) return;
-
-    // locate server entry
+    // validate server address
+    struct Server *server = NULL;
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == headerIPv4->src) {
-            servers[i].reach |= 1;
-            servers[i].stratum = headerNTP->stratum;
-            servers[i].lastResponse = CLK_MONOTONIC_INT();
-            updateTime(servers + i, time, ((uint32_t *) &delay)[0]);
+            server = servers + 1;
             break;
         }
     }
+    // ignore unsolicited packets
+    if(server == NULL) return;
+    if(server->burst >= NTP_BURST) return;
+    // map timestamps
+    uint64_t *stamps = server->stamps + (server->burst << 2);
+    // record client RX timestamp
+    stamps[3] = CLK_MONOTONIC();
+
+    // verify client TX timestamp
+    uint64_t txTime;
+    ((uint32_t *)&txTime)[1] = __builtin_bswap32(headerNTP->origTime[0]);
+    ((uint32_t *)&txTime)[0] = __builtin_bswap32(headerNTP->origTime[1]);
+    // discard ping responses
+    if(txTime == 0) return;
+    // discard stale or duplicate packets
+    if(txTime != stamps[0]) return;
+
+    // copy server TX timestamp
+    ((uint32_t *)(stamps + 1))[1] = __builtin_bswap32(headerNTP->rxTime[0]);
+    ((uint32_t *)(stamps + 1))[0] = __builtin_bswap32(headerNTP->rxTime[1]);
+    // copy server TX timestamp
+    ((uint32_t *)(stamps + 2))[1] = __builtin_bswap32(headerNTP->txTime[0]);
+    ((uint32_t *)(stamps + 2))[0] = __builtin_bswap32(headerNTP->txTime[1]);
+
+    // discard responses with aberrant round-trip times
+    int64_t roundTrip = (int64_t) (stamps[3] - stamps[0]);
+    if(((uint32_t *) &roundTrip)[1] != 0) return;
+    // discard responses with aberrant delays
+    int64_t delay = ((int64_t) (roundTrip - (stamps[2] - stamps[1]))) >> 1;
+    if(((uint32_t *) &delay)[1] != 0) return;
+
+    if(++server->burst < NTP_BURST) {
+        pollServer(server, 0);
+        return;
+    }
+
+    // burst is complete, perform update calculations
+    server->reach |= 1;
+    server->stratum = headerNTP->stratum;
+    server->lastResponse = CLK_MONOTONIC_INT();
+    updateTime(servers);
 }
