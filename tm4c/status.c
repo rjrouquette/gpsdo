@@ -245,7 +245,6 @@ unsigned statusNTP(char *body) {
     end = append(end, tmp);
     end = append(end, "\n");
 
-    end = append(end, "ntp servers:\n");
     end = NTP_servers(end);
 
     // return size

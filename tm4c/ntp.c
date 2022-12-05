@@ -55,6 +55,8 @@ struct Server {
     uint8_t reach;
     uint8_t stratum;
     uint32_t attempts;
+    float delay;
+    float jitter;
     float drift;
     float variance;
 } servers[SERVER_COUNT];
@@ -241,7 +243,7 @@ void NTP_process3(const uint8_t *frame, struct FRAME_NTPv3 *frameNTP) {
     frameNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
 }
 
-void poll3(uint8_t *frame, uint32_t addr, uint8_t *mac) {
+void poll3(int pingOnly, uint8_t *frame, uint32_t addr, uint8_t *mac) {
     // clear frame buffer
     memset(frame, 0, NTP3_SIZE);
 
@@ -272,26 +274,30 @@ void poll3(uint8_t *frame, uint32_t addr, uint8_t *mac) {
     // set reference ID
     memcpy(frameNTP->refID, "GPS", 4);
     // set TX time
-    uint64_t txTime = CLK_TAI();
-    frameNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
-    frameNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
+    if(pingOnly == 0) {
+        uint64_t txTime = CLK_TAI();
+        frameNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
+        frameNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
+    }
 }
 
-void pollServer(int index) {
+void pollServer(int index, int pingOnly) {
     int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
     uint8_t *frame = NET_getTxBuff(txDesc);
 
     // create NTP request
-    poll3(frame, servers[index].addr, servers[index].mac);
+    poll3(pingOnly, frame, servers[index].addr, servers[index].mac);
 
     // transmit request
     UDP_finalize(frame, NTP3_SIZE);
     IPv4_finalize(frame, NTP3_SIZE);
     NET_transmit(txDesc, NTP3_SIZE);
-    // advance reach window
-    servers[index].reach <<= 1;
-    ++servers[index].attempts;
+    if(pingOnly == 0) {
+        // advance reach window
+        servers[index].reach <<= 1;
+        ++servers[index].attempts;
+    }
 }
 
 static void arpCallback(uint32_t remoteAddress, uint8_t *macAddress) {
@@ -328,14 +334,19 @@ void runServer(int index, uint32_t now) {
         return;
     }
 
-    // verify current time
-    uint32_t nextPoll = servers[index].nextPoll;
-    if(((int32_t) (now - nextPoll)) < 0)
-        return;
-
     // clear entry if the server is unreachable
     if(servers[index].reach == 0 && servers[index].attempts > 8) {
         memset(servers + index, 0, sizeof(struct Server));
+        return;
+    }
+
+    // verify current time
+    uint32_t nextPoll = servers[index].nextPoll;
+    if(((int32_t) (now - nextPoll)) < -1)
+        return;
+    if(((int32_t) (now - nextPoll)) == -1) {
+        // ping server in advance of actual poll request (reduces jitter)
+        pollServer(index, 1);
         return;
     }
 
@@ -346,7 +357,7 @@ void runServer(int index, uint32_t now) {
     servers[index].nextPoll = nextPoll;
 
     // send poll request
-    pollServer(index);
+    pollServer(index, 0);
 }
 
 static void dnsCallback(uint32_t addr) {
@@ -392,6 +403,10 @@ void NTP_run() {
 char* NTP_servers(char *tail) {
     char tmp[32];
 
+    tail = append(tail, "ntp servers: (");
+    tail = append(tail, NTP_POOL_FQDN);
+    tail = append(tail, ")\n");
+
     uint32_t now = CLK_MONOTONIC_INT();
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == 0) continue;
@@ -410,31 +425,47 @@ char* NTP_servers(char *tail) {
         tail = append(tail, " ");
         tmp[toDec(servers[i].nextPoll - now, 3, ' ', tmp)] = 0;
         tail = append(tail, tmp);
-        tail = append(tail, " ");
+        tail = append(tail, "s ");
         tmp[toDec(now - servers[i].lastResponse, 3, ' ', tmp)] = 0;
         tail = append(tail, tmp);
+        tail = append(tail, "s ");
 
-        strcpy(tmp, "  0x");
-        toHex(servers[i].offset>>32, 8, '0', tmp+4);
-        tmp[12] = '.';
-        toHex(servers[i].offset, 8, '0', tmp+13);
-        tmp[21] = 0;
+        strcpy(tmp, "0x");
+        toHex(servers[i].offset>>32, 8, '0', tmp+2);
+        tmp[10] = '.';
+        toHex(servers[i].offset, 8, '0', tmp+11);
+        tmp[19] = 0;
         tail = append(tail, tmp);
 
         tail = append(tail, " ");
+        tmp[fmtFloat(servers[i].delay * 1e3f, 9, 3, tmp)] = 0;
+        tail = append(tail, tmp);
+
+        tail = append(tail, "ms ");
+        tmp[fmtFloat(sqrtf(servers[i].jitter) * 1e3f, 9, 3, tmp)] = 0;
+        tail = append(tail, tmp);
+
+        tail = append(tail, "ms ");
         tmp[fmtFloat(servers[i].drift * 1e6f, 9, 3, tmp)] = 0;
         tail = append(tail, tmp);
 
-        tail = append(tail, " ");
+        tail = append(tail, "ppm ");
         tmp[fmtFloat(sqrtf(servers[i].variance) * 1e6f, 9, 3, tmp)] = 0;
         tail = append(tail, tmp);
 
-        tail = append(tail, "\n");
+        tail = append(tail, "ppm\n");
     }
     return tail;
 }
 
-void updateTime(struct Server *server, const uint64_t *time) {
+void updateTime(struct Server *server, const uint64_t *time, uint32_t _delay) {
+    // update delay stats
+    float delay = 0x1p-32f * (float) _delay;
+    float jitter = delay - server->delay;
+    jitter *= jitter;
+    server->delay += (delay - server->delay) * 0x1p-4f;
+    server->jitter += (jitter - server->jitter) * 0x1p-4f;
+
     // compute offset
     uint64_t offset = time[1] - time[0];
     offset += ((int64_t) ((time[2] - time[3]) - offset)) >> 1;
@@ -454,9 +485,9 @@ void updateTime(struct Server *server, const uint64_t *time) {
         drift /= (float) (1 << shift);
         // update drift metrics
         if (fabsf(drift) < 1e-2f) {
-            server->drift += (drift - server->drift) * 0x1p-4f;
             float var = drift - server->drift;
             var *= var;
+            server->drift += (drift - server->drift) * 0x1p-4f;
             server->variance += (var - server->variance) * 0x1p-4f;
         }
     }
@@ -486,12 +517,22 @@ void processServerResponse(uint8_t *frame) {
     tmp[5] = __builtin_bswap32(frameNTP->txTime[0]);
     tmp[4] = __builtin_bswap32(frameNTP->txTime[1]);
 
+    // discard ping responses
+    if(time[0] == 0) return;
+    // discard responses with aberrant round-trip times
+    int64_t roundTrip = (int64_t) (time[3] - time[0]);
+    if(((uint32_t *) &roundTrip)[1] != 0) return;
+    // discard responses with aberrant delays
+    int64_t delay = ((int64_t) (roundTrip - (time[2] - time[1]))) >> 1;
+    if(((uint32_t *) &delay)[1] != 0) return;
+
+    // locate server entry
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == headerIPv4->src) {
             servers[i].reach |= 1;
             servers[i].stratum = frameNTP->stratum;
             servers[i].lastResponse = CLK_MONOTONIC_INT();
-            updateTime(servers + i, time);
+            updateTime(servers + i, time, ((uint32_t *) &delay)[0]);
             break;
         }
     }
