@@ -94,7 +94,7 @@ void NTP_date(uint64_t clkMono, uint32_t *ntpDate) {
 
 void processRequest(uint8_t *frame, int flen) {
     // discard malformed packets
-    if(flen < 90) return;
+    if(flen < NTP4_SIZE) return;
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
@@ -186,7 +186,7 @@ static void followupRequest0(uint8_t *frame, int flen) {
     struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
     // guard against buffer overruns
-    if(flen < 90) return;
+    if(flen < NTP4_SIZE) return;
     if(headerEth->ethType != ETHTYPE_IPv4) return;
     if(headerIPv4->proto != IP_PROTO_UDP) return;
     if(headerUDP->portSrc != __builtin_bswap16(NTP_PORT)) return;
@@ -531,7 +531,7 @@ static void pollTxCallback(uint8_t *frame, int flen) {
     struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
     // guard against buffer overruns
-    if(flen < 90) return;
+    if(flen < NTP4_SIZE) return;
     if(headerEth->ethType != ETHTYPE_IPv4) return;
     if(headerIPv4->proto != IP_PROTO_UDP) return;
     if(headerUDP->portSrc != __builtin_bswap16(NTP_PORT)) return;
