@@ -36,4 +36,10 @@ uint32_t CLK_TAI_INT();
  */
 uint64_t CLK_TAI();
 
+/**
+ * Constructs fixed-point time value from seconds and fractional counter ticks
+ * @return 64-bit fixed-point format (32.32)
+ */
+uint64_t timeFrom125Mhz(uint32_t seconds, uint32_t fracTicks);
+
 #endif //GPSDO_CLK_H

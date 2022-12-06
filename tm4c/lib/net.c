@@ -15,6 +15,7 @@
 #include "net/ip.h"
 #include "net/util.h"
 #include "net/dns.h"
+#include "clk.h"
 
 #define RX_RING_MASK (31)
 #define RX_RING_SIZE (32)
@@ -316,37 +317,8 @@ uint64_t NET_getRxTime(const uint8_t *rxFrame) {
     // compute descriptor offset
     uint32_t rxId = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
     if(rxId >= RX_RING_SIZE) return 0;
-
-    // result structure
-    register union {
-        struct {
-            uint32_t fpart;
-            uint32_t ipart;
-        };
-        uint64_t full;
-    } result;
-
-    // load RX timestamp
-    result.fpart = rxDesc[rxId].RTSL >> 3;
-    result.ipart = result.fpart;
-
-    // split fractional time into fraction and remainder
-    result.ipart /= 1953125;
-    result.fpart -= 1953125 * result.ipart;
-
-    // compute twiddle for fractional conversion
-    register uint32_t twiddle = result.fpart;
-    twiddle *= 1524;
-    twiddle >>= 16;
-    // apply fractional coefficient
-    result.fpart *= 2199;
-    // apply fraction twiddle
-    result.fpart += twiddle;
-    // adjust bit alignment
-    result.full >>= 6;
-
-    result.ipart = rxDesc[rxId].RTSH;
-    return result.full;
+    // convert timestamp to fixed-point format
+    return timeFrom125Mhz(rxDesc[rxId].RTSH, rxDesc[rxId].RTSL >> 3);
 }
 
 void NET_getRxTimeRaw(const uint8_t *rxFrame, uint32_t *rxTime) {
@@ -362,37 +334,8 @@ uint64_t NET_getTxTime(const uint8_t *txFrame) {
     // compute descriptor offset
     uint32_t txId = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
     if(txId >= TX_RING_SIZE) return 0;
-
-    // result structure
-    register union {
-        struct {
-            uint32_t fpart;
-            uint32_t ipart;
-        };
-        uint64_t full;
-    } result;
-
-    // load TX timestamp
-    result.fpart = txDesc[txId].TTSL >> 3;
-    result.ipart = result.fpart;
-
-    // split fractional time into fraction and remainder
-    result.ipart /= 1953125;
-    result.fpart -= 1953125 * result.ipart;
-
-    // compute twiddle for fractional conversion
-    register uint32_t twiddle = result.fpart;
-    twiddle *= 1524;
-    twiddle >>= 16;
-    // apply fractional coefficient
-    result.fpart *= 2199;
-    // apply fraction twiddle
-    result.fpart += twiddle;
-    // adjust bit alignment
-    result.full >>= 6;
-
-    result.ipart = txDesc[txId].TTSH;
-    return result.full;
+    // convert timestamp to fixed-point format
+    return timeFrom125Mhz(txDesc[txId].TTSH, txDesc[txId].TTSL >> 3);
 }
 
 void NET_getTxTimeRaw(const uint8_t *txFrame, uint32_t *txTime) {

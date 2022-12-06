@@ -2,7 +2,6 @@
 // Created by robert on 4/15/22.
 //
 
-#include "../hw/adc.h"
 #include "../hw/sys.h"
 #include "../hw/timer.h"
 #include "clk.h"
@@ -88,40 +87,17 @@ uint32_t CLK_MONOTONIC_INT() {
 
 // return current time as 32.32 fixed point value
 uint64_t CLK_MONOTONIC() {
-    // result structure
-    register union {
-        struct {
-            uint32_t fpart;
-            uint32_t ipart;
-        };
-        uint64_t full;
-    } result;
-
     // capture current time
     register uint32_t snapI = cntMonotonic;
-    result.fpart = GPTM0.TAV.raw;
+    register uint32_t snapF = GPTM0.TAV.raw;
 
-    // split fractional time into fraction and remainder
-    result.ipart = result.fpart;
-    result.ipart /= 1953125;
-    result.fpart -= 1953125 * result.ipart;
-
-    // compute twiddle for fractional conversion
-    register uint32_t twiddle = result.fpart;
-    twiddle *= 1524;
-    twiddle >>= 16;
-    // apply fractional coefficient
-    result.fpart *= 2199;
-    // apply fraction twiddle
-    result.fpart += twiddle;
-    // adjust bit alignment
-    result.full >>= 6;
+    uint64_t result = timeFrom125Mhz(0, snapF);
 
     // merge with full integer count
-    result.ipart ^= snapI;
-    result.ipart &= 1;
-    result.ipart += snapI;
-    return result.full;
+    ((uint32_t *) &result)[1] ^= snapI;
+    ((uint32_t *) &result)[1] &= 1;
+    ((uint32_t *) &result)[1] += snapI;
+    return result;
 }
 
 uint32_t CLK_TAI_INT() {
@@ -134,9 +110,17 @@ uint64_t CLK_TAI() {
     uint32_t na = EMAC0.TIMNANO;
     uint32_t sb = EMAC0.TIMSEC;
     uint32_t nb = EMAC0.TIMNANO;
-    // correct for access time skew around second boundary
+    // correct for access skew at second boundary
     if(nb < na && sb == sa) ++sb;
 
+    return timeFrom125Mhz(sb, nb >> 3);
+}
+
+/**
+ * Constructs fixed-point time value from seconds and fractional counter ticks
+ * @return 64-bit fixed-point format (32.32)
+ */
+uint64_t timeFrom125Mhz(uint32_t seconds, uint32_t fracTicks) {
     // result structure
     register union {
         struct {
@@ -146,8 +130,8 @@ uint64_t CLK_TAI() {
         uint64_t full;
     } result;
 
-    // load RX timestamp
-    result.fpart = nb >> 3;
+    // load TX timestamp
+    result.fpart = fracTicks;
     result.ipart = result.fpart;
 
     // split fractional time into fraction and remainder
@@ -164,7 +148,8 @@ uint64_t CLK_TAI() {
     result.fpart += twiddle;
     // adjust bit alignment
     result.full >>= 6;
-    // set integer part
-    result.ipart = sb;
+
+    // add full seconds to result
+    result.ipart += seconds;
     return result.full;
 }
