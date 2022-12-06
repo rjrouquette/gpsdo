@@ -491,7 +491,9 @@ static void updateTime(struct Server *server) {
         server->delay = delay;
     float jitter = delay - server->delay;
     jitter *= jitter;
-    server->delay += (delay - server->delay) * 0x1p-4f;
+    // exclude 2-sigma outliers from mean delay
+    if(jitter < server->jitter * 4)
+        server->delay += (delay - server->delay) * 0x1p-4f;
     server->jitter += (jitter - server->jitter) * 0x1p-4f;
 
     // compute drift
@@ -509,7 +511,10 @@ static void updateTime(struct Server *server) {
                 server->drift = drift;
             float skew = drift - server->drift;
             skew *= skew;
-            server->drift += (drift - server->drift) * 0x1p-4f;
+            // exclude 2-sigma outliers from mean drift
+            if(skew < server->skew * 4)
+                server->drift += (drift - server->drift) * 0x1p-4f;
+            // update skew
             server->skew += (skew - server->skew) * 0x1p-4f;
         }
     }
