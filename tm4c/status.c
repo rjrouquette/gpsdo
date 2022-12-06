@@ -202,7 +202,7 @@ unsigned statusGPSDO(char *body) {
     end = append(end, " ppm\n");
 
     // PLL trimming
-    tmp[fmtFloat(GPSDO_pllValue() * 1e6f, 0, 4, tmp)] = 0;
+    tmp[fmtFloat(GPSDO_pllTrim() * 1e6f, 0, 4, tmp)] = 0;
     end = append(end, "  - pll trimming: ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
@@ -219,6 +219,12 @@ unsigned statusGPSDO(char *body) {
     end = append(end, tmp);
     end = append(end, " C\n");
 
+    // temperature offset
+    tmp[fmtFloat(GPSDO_compBias(), 0, 4, tmp)] = 0;
+    end = append(end, "  - bias: ");
+    end = append(end, tmp);
+    end = append(end, " C\n");
+
     // temperature coefficient
     tmp[fmtFloat(GPSDO_compCoeff() * 1e6f, 0, 4, tmp)] = 0;
     end = append(end, "  - coefficient: ");
@@ -226,7 +232,7 @@ unsigned statusGPSDO(char *body) {
     end = append(end, " ppm/C\n");
 
     // temperature offset
-    tmp[fmtFloat(GPSDO_compBias() * 1e6f, 0, 4, tmp)] = 0;
+    tmp[fmtFloat(GPSDO_compOffset() * 1e6f, 0, 4, tmp)] = 0;
     end = append(end, "  - offset: ");
     end = append(end, tmp);
     end = append(end, " ppm\n");

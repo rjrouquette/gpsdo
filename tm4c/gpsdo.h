@@ -15,8 +15,9 @@ float GPSDO_skewRms();
 float GPSDO_freqCorr();
 float GPSDO_temperature();
 float GPSDO_compBias();
+float GPSDO_compOffset();
 float GPSDO_compCoeff();
 float GPSDO_compValue();
-float GPSDO_pllValue();
+float GPSDO_pllTrim();
 
 #endif //GPSDO_GPSDO_H

@@ -338,11 +338,11 @@ int writeGpsdoValue(uint8_t *buffer) {
             lroundf(GPSDO_freqCorr() * 1e10f)
     );
 
-    // GPSDO temperature compensation bias
+    // GPSDO temperature compensation offset
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(GPSDO_compBias() * 1e10f)
+            lroundf(GPSDO_compOffset() * 1e10f)
     );
 
     // GPSDO temperature compensation coefficient

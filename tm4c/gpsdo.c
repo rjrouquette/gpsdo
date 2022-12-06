@@ -16,11 +16,12 @@
 #define STAT_TIME_CONST (16)
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_COMP_RMS (200e-9f)
-#define TCOMP_ALPHA (0x1p-16f)
+#define BIAS_ALPHA (0x1p-17f)
+#define COEF_ALPHA (0x1p-15f)
 
 // temperature compensation state
 static volatile float currTemp;
-static volatile float tcompCoeff, tcompOffset;
+static volatile float tcompCoeff, tcompBias, tcompOffset;
 
 
 static int32_t ppsGpsEdge;
@@ -313,6 +314,10 @@ float GPSDO_temperature() {
 }
 
 float GPSDO_compBias() {
+    return tcompBias;
+}
+
+float GPSDO_compOffset() {
     return tcompOffset;
 }
 
@@ -324,7 +329,7 @@ float GPSDO_compValue() {
     return currCompensation;
 }
 
-float GPSDO_pllValue() {
+float GPSDO_pllTrim() {
     return pllBias + pllCorr;
 }
 
@@ -343,15 +348,21 @@ static void setFeedback(float feedback) {
 }
 
 static void updateTempComp(float target) {
+    float temp = currTemp;
+
     // simple bootstrap to improve stability
-    if(tcompCoeff == 0 && tcompOffset == 0)
+    if(tcompBias == 0)
+        tcompBias = temp;
+    tcompBias += (temp - tcompBias) * BIAS_ALPHA;
+
+    // simple bootstrap to improve stability
+    if(tcompOffset == 0)
         tcompOffset = target;
 
     // compute error
-    float temp = currTemp;
     float error = target - tcompOffset;
     error -= tcompCoeff * temp;
-    error *= TCOMP_ALPHA;
+    error *= COEF_ALPHA;
 
     // update compensation state
     tcompCoeff += error * temp;
