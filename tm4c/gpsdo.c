@@ -61,6 +61,30 @@ void ISR_ADC0Sequence3(void) {
     ADC0.PSSI.SS3 = 1;
 }
 
+// capture rising edge of output PPS for offset measurement
+void ISR_Timer5A() {
+    // compute edge time
+    int32_t now = GPTM4.TAV.raw;
+    uint16_t delta = GPTM5.TAV.LO;
+    delta -= GPTM5.TAR.LO;
+    ppsOutEdge = now - delta;
+    // clear interrupt flag
+    GPTM5.ICR.CAE = 1;
+    // indicate that PPS is ready
+    ppsReady = 1;
+}
+
+// capture rising edge of GPS PPS for offset measurement
+void ISR_Timer5B() {
+    // compute edge time
+    int32_t now = GPTM4.TAV.raw;
+    uint16_t delta = GPTM5.TBV.LO;
+    delta -= GPTM5.TBR.LO;
+    ppsGpsEdge = now - delta;
+    // clear interrupt flag
+    GPTM5.ICR.CBE = 1;
+}
+
 void initTempComp() {
     // Enable ADC0
     RCGCADC.EN_ADC0 = 1;
@@ -304,31 +328,7 @@ float GPSDO_pllValue() {
     return pllBias + pllCorr;
 }
 
-// capture rising edge of output PPS for offset measurement
-void ISR_Timer5A() {
-    // compute edge time
-    int32_t now = GPTM4.TAV.raw;
-    uint16_t delta = GPTM5.TAV.LO;
-    delta -= GPTM5.TAR.LO;
-    ppsOutEdge = now - delta;
-    // clear interrupt flag
-    GPTM5.ICR.CAE = 1;
-    // indicate that PPS is ready
-    ppsReady = 1;
-}
-
-// capture rising edge of GPS PPS for offset measurement
-void ISR_Timer5B() {
-    // compute edge time
-    int32_t now = GPTM4.TAV.raw;
-    uint16_t delta = GPTM5.TBV.LO;
-    delta -= GPTM5.TBR.LO;
-    ppsGpsEdge = now - delta;
-    // clear interrupt flag
-    GPTM5.ICR.CBE = 1;
-}
-
-void setFeedback(float feedback) {
+static void setFeedback(float feedback) {
     // convert to correction factor
     int32_t correction = lroundf(feedback * 0x1p32f);
     // correction factor must always be negative
