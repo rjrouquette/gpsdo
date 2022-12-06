@@ -33,11 +33,16 @@ float TEMP_value() {
 }
 
 void ISR_ADC0Sequence3(void) {
+    // clear interrupt
     ADC0.ISC.IN3 = 1;
     // update temperature
-    int32_t temp = 2441 - ADC0.SS3.FIFO.DATA;
-    float _temp = 0.0604248047f * (float) temp;
-    dcxoTemp += (_temp - dcxoTemp) * 0x1p-8f;
-    // trigger temperature measurement
+    int32_t temp = 2441;
+    temp -= ADC0.SS3.FIFO.DATA;
+    float _temp = (float) temp;
+    _temp *= 0.0604248047f;
+    _temp -= dcxoTemp;
+    _temp *= 0x1p-8f;
+    dcxoTemp += _temp;
+    // start next temperature measurement
     ADC0.PSSI.SS3 = 1;
 }
