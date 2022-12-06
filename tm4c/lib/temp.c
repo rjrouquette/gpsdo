@@ -36,10 +36,10 @@ void ISR_ADC0Sequence3(void) {
     // clear interrupt
     ADC0.ISC.IN3 = 1;
     // update temperature
-    int32_t temp = 2441;
-    temp -= ADC0.SS3.FIFO.DATA;
+    int32_t temp = ADC0.SS3.FIFO.DATA;
+    temp -= 2441;
     float _temp = (float) temp;
-    _temp *= 0.0604248047f;
+    _temp *= -0.0604248047f;
     _temp -= dcxoTemp;
     _temp *= 0x1p-8f;
     dcxoTemp += _temp;
