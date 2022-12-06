@@ -4,7 +4,6 @@
 
 #include <math.h>
 #include "gpsdo.h"
-#include "tcomp.h"
 
 const uint8_t OID_SENSOR_PREFIX[] = { 0x06, 0x0A, 0x2B, 6, 1, 2, 1, 99, 1, 1, 1 };
 
@@ -301,14 +300,14 @@ int writeGpsdoValue(uint8_t *buffer) {
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(TCOMP_temperature() * 1e3f)
+            lroundf(GPSDO_temperature() * 1e3f)
     );
 
     // DCXO temp
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(TCOMP_temperature() * 1e3f)
+            lroundf(GPSDO_temperature() * 1e3f)
     );
 
     // GPSDO mean offset

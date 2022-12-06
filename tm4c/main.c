@@ -14,7 +14,6 @@
 #include "ntp.h"
 #include "snmp.h"
 #include "status.h"
-#include "tcomp.h"
 
 int main(void) {
     char temp[32];
@@ -28,15 +27,15 @@ int main(void) {
     LED_init();
     // initialize system clock
     CLK_init();
-    // initialize temperature compensation
-    TCOMP_init();
+    // intialize GPSDO
+    GPSDO_init();
     // initialize networking
     NET_init();
-    GPSDO_init();
     NTP_init();
     SNMP_init();
     STATUS_init();
 
+    // main loop
     for(;;) {
         GPSDO_run();
         LED_run();

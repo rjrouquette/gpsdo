@@ -4,18 +4,23 @@
 
 #include <math.h>
 #include "gpsdo.h"
+#include "hw/adc.h"
 #include "hw/emac.h"
 #include "hw/gpio.h"
 #include "hw/timer.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
-#include "tcomp.h"
 
 
 #define OFFSET_COARSE_ALIGN (125000) // 1 millisecond
 #define STAT_TIME_CONST (16)
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_COMP_RMS (200e-9f)
+#define TCOMP_ALPHA (0x1p-16f)
+
+// temperature compensation state
+static volatile float currTemp;
+static volatile float tcompCoeff, tcompOffset;
 
 
 static int32_t ppsGpsEdge;
@@ -33,15 +38,48 @@ static float ppsSkewRms;
 
 static uint8_t ppsReady;
 
-// temperature compensation
-static float compM, compB;
-
 // current correction values
 static float currFeedback;
 static float currCompensation;
 
 static void setFeedback(float feedback);
+static void updateTempComp(float target);
 
+// ISR for temperature measurement
+void ISR_ADC0Sequence3(void) {
+    // clear interrupt
+    ADC0.ISC.IN3 = 1;
+    // update temperature
+    int32_t temp = ADC0.SS3.FIFO.DATA;
+    temp -= 2441;
+    float _temp = (float) temp;
+    _temp *= -0.0604248047f;
+    _temp -= currTemp;
+    _temp *= 0x1p-8f;
+    currTemp += _temp;
+    // start next temperature measurement
+    ADC0.PSSI.SS3 = 1;
+}
+
+void initTempComp() {
+    // Enable ADC0
+    RCGCADC.EN_ADC0 = 1;
+    delay_cycles_4();
+
+    // configure ADC0 for temperature measurement
+    ADC0.CC.CLKDIV = 0;
+    ADC0.CC.CS = ADC_CLK_MOSC;
+    ADC0.SAC.AVG = 6;
+    ADC0.EMUX.EM3 = ADC_SS_TRIG_SOFT;
+    ADC0.SS3.CTL.IE0 = 1;
+    ADC0.SS3.CTL.END0 = 1;
+    ADC0.SS3.CTL.TS0 = 1;
+    ADC0.SS3.TSH.TSH0 = ADC_TSH_256;
+    ADC0.IM.MASK3 = 1;
+    ADC0.ACTSS.ASEN3 = 1;
+    // trigger temperature measurement
+    ADC0.PSSI.SS3 = 1;
+}
 
 void initPPS() {
     // configure PPS output pin
@@ -134,6 +172,7 @@ void initEdgeComp() {
 void GPSDO_init() {
     initPPS();
     initEdgeComp();
+    initTempComp();
 
     // init GPS
     GPS_init();
@@ -141,8 +180,7 @@ void GPSDO_init() {
 
 void GPSDO_run() {
     // update temperature compensation
-    TCOMP_getComp(&compM, &compB);
-    float newComp = compB + (compM * TCOMP_temperature());
+    float newComp = tcompOffset + (tcompCoeff * GPSDO_temperature());
     // prevent large correction impulses
     if(fabsf(newComp - currCompensation) > 100e-9f)
         pllBias -= (newComp - currCompensation);
@@ -216,9 +254,9 @@ void GPSDO_run() {
     ppsSkewVar += (ppsSkew - ppsSkewVar) / STAT_TIME_CONST;
     ppsSkewRms = sqrtf(ppsSkewVar);
 
-    // update temperature coefficient
+    // update temperature compensation
     if(ppsSkewRms < STAT_COMP_RMS)
-        TCOMP_updateTarget(currFeedback);
+        updateTempComp(currFeedback);
 }
 
 int GPSDO_isLocked() {
@@ -246,12 +284,16 @@ float GPSDO_freqCorr() {
     return currFeedback;
 }
 
+float GPSDO_temperature() {
+    return currTemp;
+}
+
 float GPSDO_compBias() {
-    return compB;
+    return tcompOffset;
 }
 
 float GPSDO_compCoeff() {
-    return compM;
+    return tcompCoeff;
 }
 
 float GPSDO_compValue() {
@@ -294,4 +336,17 @@ void setFeedback(float feedback) {
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     // update current feedback value
     currFeedback = (float)correction * 0x1p-32f;
+}
+
+static void updateTempComp(float target) {
+    float temp = currTemp;
+
+    // compute error
+    float error = target - tcompOffset;
+    error -= tcompCoeff * temp;
+    error *= TCOMP_ALPHA;
+
+    // update compensation state
+    tcompCoeff += error * temp;
+    tcompOffset += error;
 }
