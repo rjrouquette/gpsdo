@@ -176,7 +176,7 @@ void GPSDO_run() {
         return;
     // clear ready flag
     ppsReady = 0;
-    // return if GPS not ready
+    // return if GPS not ready or more than 1 second stale
     if(now - ppsGpsEdge > 150000000)
         return;
 
@@ -190,7 +190,7 @@ void GPSDO_run() {
         // truncate to 40 ns resolution
         offset /= 5;
         offset *= 40;
-        // set update update registers
+        // set update registers
         EMAC0.TIMNANOU.NEG = 1;
         EMAC0.TIMNANOU.VALUE = offset;
         EMAC0.TIMSECU = 0;
