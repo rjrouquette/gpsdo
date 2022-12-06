@@ -16,12 +16,12 @@
 #include "net/util.h"
 #include "net/dns.h"
 
-#define RX_RING_MASK (15)
-#define RX_RING_SIZE (16)
+#define RX_RING_MASK (31)
+#define RX_RING_SIZE (32)
 #define RX_BUFF_SIZE (1520)
 
-#define TX_RING_MASK (7)
-#define TX_RING_SIZE (8)
+#define TX_RING_MASK (15)
+#define TX_RING_SIZE (16)
 #define TX_BUFF_SIZE (1520)
 
 static int ptrRX = 0;
@@ -224,20 +224,6 @@ void NET_init() {
     // initialize network services
     DHCP_init();
     DNS_init();
-}
-
-void NET_getLinkStatus(char *strStatus) {
-    const char *speed = (phyStatus & 2) ? "100M" : " 10M";
-    const char *duplx = (phyStatus & 4) ? " FDX" : " HDX";
-    const char *link = (phyStatus & 1) ? " ^" : " !";
-
-    while(speed[0] != 0)
-        *(strStatus++) = *(speed++);
-    while(duplx[0] != 0)
-        *(strStatus++) = *(duplx++);
-    while(link[0] != 0)
-        *(strStatus++) = *(link++);
-    strStatus[0] = 0;
 }
 
 void NET_getMacAddress(char *strAddr) {
