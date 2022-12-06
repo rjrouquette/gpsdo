@@ -52,7 +52,7 @@ struct Server {
     float delay;
     float jitter;
     float drift;
-    float variance;
+    float skew;
     uint64_t stamps[NTP_BURST << 2];
     uint64_t offset;
     uint64_t update;
@@ -61,7 +61,7 @@ struct Server {
     uint32_t attempts;
     uint32_t addr;
     uint8_t mac[6];
-    uint8_t reach;
+    uint16_t reach;
     uint8_t stratum;
     uint8_t burst;
 } servers[SERVER_COUNT];
@@ -272,17 +272,17 @@ static void runServer(struct Server *server, uint32_t now) {
         return;
 
     // perform ARP request if MAC address is missing
-    if(isNullMAC(servers->mac)) {
+    if(isNullMAC(server->mac)) {
         // determine if server is outside of current subnet
-        if((servers->addr ^ ipAddress) & ipSubnet)
+        if((server->addr ^ ipAddress) & ipSubnet)
             ARP_request(ipGateway, arpCallback);
         else
-            ARP_request(servers->addr, arpCallback);
+            ARP_request(server->addr, arpCallback);
         return;
     }
 
     // clear entry if the server is unreachable
-    if(server->reach == 0 && servers->attempts > 8) {
+    if(server->reach == 0 && server->attempts > 8) {
         memset(server, 0, sizeof(struct Server));
         return;
     }
@@ -301,7 +301,7 @@ static void runServer(struct Server *server, uint32_t now) {
     nextPoll &= ~63;
     nextPoll += 64;
     nextPoll += (STCURRENT.CURRENT >> 8) & 7;
-    servers->nextPoll = nextPoll;
+    server->nextPoll = nextPoll;
 
     // advance reach window
     server->reach <<= 1;
@@ -359,28 +359,51 @@ char* NTP_servers(char *tail) {
     tail = append(tail, NTP_POOL_FQDN);
     tail = append(tail, ")\n");
 
+    // header
+    tail = append(tail, "    ");
+    tail = append(tail, "address        ");
+    tail = append(tail, "  ");
+    tail = append(tail, "stratum");
+    tail = append(tail, "  ");
+    tail = append(tail, "reach");
+    tail = append(tail, "  ");
+    tail = append(tail, "next (s)");
+    tail = append(tail, "  ");
+    tail = append(tail, "last (s)");
+    tail = append(tail, "  ");
+    tail = append(tail, "offset (s)         ");
+    tail = append(tail, "  ");
+    tail = append(tail, "delay (ms) ");
+    tail = append(tail, "  ");
+    tail = append(tail, "jitter (ms)");
+    tail = append(tail, "  ");
+    tail = append(tail, "drift (ppm)");
+    tail = append(tail, "  ");
+    tail = append(tail, "skew (ppm) ");
+    tail = append(tail, "\n");
+
     uint32_t now = CLK_MONOTONIC_INT();
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == 0) continue;
 
         tail = append(tail, "  - ");
-        char *pad = tail + 16;
+        char *pad = tail + 17;
         tail = addrToStr(servers[i].addr, tail);
         while(tail < pad)
             *(tail++) = ' ';
 
-        tmp[toDec(servers[i].stratum, 3, ' ', tmp)] = 0;
+        tmp[toDec(servers[i].stratum, 7, ' ', tmp)] = 0;
         tail = append(tail, tmp);
-        tail = append(tail, " ");
-        tmp[toOct(servers[i].reach, 3, '0', tmp)] = 0;
+        tail = append(tail, "  ");
+        tmp[toOct(servers[i].reach & 077777, 5, '0', tmp)] = 0;
         tail = append(tail, tmp);
-        tail = append(tail, " ");
-        tmp[toDec(servers[i].nextPoll - now, 3, ' ', tmp)] = 0;
+        tail = append(tail, "  ");
+        tmp[toDec(servers[i].nextPoll - now, 8, ' ', tmp)] = 0;
         tail = append(tail, tmp);
-        tail = append(tail, "s ");
-        tmp[toDec(now - servers[i].lastResponse, 3, ' ', tmp)] = 0;
+        tail = append(tail, "  ");
+        tmp[toDec(now - servers[i].lastResponse, 8, ' ', tmp)] = 0;
         tail = append(tail, tmp);
-        tail = append(tail, "s ");
+        tail = append(tail, "  ");
 
         strcpy(tmp, "0x");
         toHex(servers[i].offset>>32, 8, '0', tmp+2);
@@ -389,23 +412,23 @@ char* NTP_servers(char *tail) {
         tmp[19] = 0;
         tail = append(tail, tmp);
 
-        tail = append(tail, " ");
-        tmp[fmtFloat(servers[i].delay * 1e3f, 9, 3, tmp)] = 0;
+        tail = append(tail, "  ");
+        tmp[fmtFloat(servers[i].delay * 1e3f, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
 
-        tail = append(tail, "ms ");
-        tmp[fmtFloat(sqrtf(servers[i].jitter) * 1e3f, 9, 3, tmp)] = 0;
+        tail = append(tail, "  ");
+        tmp[fmtFloat(sqrtf(servers[i].jitter) * 1e3f, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
 
-        tail = append(tail, "ms ");
-        tmp[fmtFloat(servers[i].drift * 1e6f, 9, 3, tmp)] = 0;
+        tail = append(tail, "  ");
+        tmp[fmtFloat(servers[i].drift * 1e6f, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
 
-        tail = append(tail, "ppm ");
-        tmp[fmtFloat(sqrtf(servers[i].variance) * 1e6f, 9, 3, tmp)] = 0;
+        tail = append(tail, "  ");
+        tmp[fmtFloat(sqrtf(servers[i].skew) * 1e6f, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
 
-        tail = append(tail, "ppm\n");
+        tail = append(tail, "\n");
     }
     return tail;
 }
@@ -413,15 +436,16 @@ char* NTP_servers(char *tail) {
 static void updateTime(struct Server *server) {
     // compute delay and offset
     int64_t _adjust = 0;
-    int64_t _delay = 0;
+    uint64_t _delay = 0;
     uint64_t offset = server->stamps[1] - server->stamps[0];
     for(int i = 0; i < NTP_BURST; i++) {
-        uint64_t *set = server->stamps + (i << 2);
+        const uint64_t *set = server->stamps + (i << 2);
         // accumulate delay
-        _delay += (int64_t) ((set[4] - set[3]) - (set[2] - set[1]));
+        _delay += set[3] - set[2];
+        _delay += set[1] - set[0];
         // accumulate offset adjustment
-        _adjust += ((int64_t) ((set[1] - set[0]) - offset));
-        _adjust += ((int64_t) ((set[2] - set[3]) - offset));
+        _adjust += (int64_t) ((set[1] - set[0]) - offset);
+        _adjust += (int64_t) ((set[2] - set[3]) - offset);
     }
     // normalize delay
     _delay >>= NTP_BURST_BITS + 1;
@@ -433,7 +457,9 @@ static void updateTime(struct Server *server) {
     update += (((int64_t) (server->stamps[0] - server->stamps[(NTP_BURST << 2) - 1])) >> 1);
 
     // update delay stats
-    float delay = 0x1p-32f * (float) (int32_t) _delay;
+    float delay = 0x1p-32f * (float) (uint32_t) _delay;
+    if(server->delay == 0)
+        server->delay = delay;
     float jitter = delay - server->delay;
     jitter *= jitter;
     server->delay += (delay - server->delay) * 0x1p-4f;
@@ -452,10 +478,12 @@ static void updateTime(struct Server *server) {
         drift /= (float) (1 << shift);
         // update drift metrics
         if (fabsf(drift) < 1e-2f) {
-            float var = drift - server->drift;
-            var *= var;
+            if(server->drift == 0)
+                server->drift = drift;
+            float skew = drift - server->drift;
+            skew *= skew;
             server->drift += (drift - server->drift) * 0x1p-4f;
-            server->variance += (var - server->variance) * 0x1p-4f;
+            server->skew += (skew - server->skew) * 0x1p-4f;
         }
     }
 
@@ -475,7 +503,7 @@ static void processResponse(uint8_t *frame) {
     struct Server *server = NULL;
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == headerIPv4->src) {
-            server = servers + 1;
+            server = servers + i;
             break;
         }
     }
@@ -484,8 +512,6 @@ static void processResponse(uint8_t *frame) {
     if(server->burst >= NTP_BURST) return;
     // map timestamps
     uint64_t *stamps = server->stamps + (server->burst << 2);
-    // record client RX timestamp
-    stamps[3] = NET_getRxTime(frame);
 
     // verify client TX timestamp
     uint64_t txTime;
@@ -504,6 +530,8 @@ static void processResponse(uint8_t *frame) {
     // copy server TX timestamp
     ((uint32_t *)(stamps + 2))[1] = __builtin_bswap32(headerNTP->txTime[0]);
     ((uint32_t *)(stamps + 2))[0] = __builtin_bswap32(headerNTP->txTime[1]);
+    // record client RX timestamp
+    stamps[3] = NET_getRxTime(frame);
 
     // discard responses with aberrant round-trip times
     int64_t roundTrip = (int64_t) (stamps[3] - stamps[0]);
@@ -521,7 +549,7 @@ static void processResponse(uint8_t *frame) {
     server->reach |= 1;
     server->stratum = headerNTP->stratum;
     server->lastResponse = CLK_MONOTONIC_INT();
-    updateTime(servers);
+    updateTime(server);
 }
 
 static void pollTxCallback(uint8_t *frame, int flen) {
@@ -536,13 +564,14 @@ static void pollTxCallback(uint8_t *frame, int flen) {
     if(headerEth->ethType != ETHTYPE_IPv4) return;
     if(headerIPv4->proto != IP_PROTO_UDP) return;
     if(headerUDP->portSrc != __builtin_bswap16(NTP_PORT)) return;
-    if(headerNTP->version != 0) return;
+    if(headerUDP->portDst != __builtin_bswap16(NTP_PORT)) return;
+//    if(headerNTP->version != 4) return;
 
     // validate remote address
     struct Server *server = NULL;
     for(int i = 0; i < SERVER_COUNT; i++) {
-        if(servers[i].addr == headerIPv4->src) {
-            server = servers + 1;
+        if(servers[i].addr == headerIPv4->dst) {
+            server = servers + i;
             break;
         }
     }
@@ -556,7 +585,7 @@ static void pollTxCallback(uint8_t *frame, int flen) {
         uint64_t *set = server->stamps + (i << 2);
         if(set[0] == txTime) {
             // update timestamp if unmodified
-            if(set[0] == set[1])
+            if(set[1] == set[0])
                 set[1] = NET_getTxTime(frame);
             break;
         }
@@ -592,7 +621,7 @@ static void pollServer(struct Server *server, int pingOnly) {
     headerUDP->portDst = __builtin_bswap16(NTP_PORT);
 
     // set type to client request
-    headerNTP->version = 4;
+    headerNTP->version = 3;
     headerNTP->mode = 3;
     headerNTP->poll = 4;
     headerNTP->precision = NTP_PRECISION;
