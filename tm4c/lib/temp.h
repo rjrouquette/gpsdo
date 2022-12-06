@@ -6,8 +6,6 @@
 #define GPSDO_TEMP_H
 
 void TEMP_init();
-int16_t TEMP_proc();
-float TEMP_dcxo();
-int TEMP_hasUpdate();
+float TEMP_value();
 
 #endif //GPSDO_TEMP_H

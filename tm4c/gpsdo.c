@@ -144,29 +144,22 @@ void GPSDO_init() {
 
 void GPSDO_run() {
     // temperature update
-    if(TEMP_hasUpdate()) {
-        TCOMP_updateTemp(TEMP_dcxo());
-        // get temperature compensation
-        float newComp = TCOMP_getComp(&compM, &compB);
-        if(isnan(newComp)) {
-            resetBias = 1;
-        } else {
-            if(resetBias || fabsf(newComp - currCompensation) > 100e-9f) {
-                pllBias -= (newComp - currCompensation);
-                resetBias = 0;
-            }
-            currCompensation = newComp;
-            setFeedback(currCompensation + pllCorr + pllBias);
+    TCOMP_updateTemp(TEMP_value());
+    // get temperature compensation
+    float newComp = TCOMP_getComp(&compM, &compB);
+    if(isnan(newComp)) {
+        resetBias = 1;
+    } else {
+        if(resetBias || fabsf(newComp - currCompensation) > 100e-9f) {
+            pllBias -= (newComp - currCompensation);
+            resetBias = 0;
         }
+        currCompensation = newComp;
+        setFeedback(currCompensation + pllCorr + pllBias);
     }
 
     // run GPS state machine
     GPS_run();
-
-    // only update if GPS has lock
-    if(!GPS_hasLock()) {
-        return;
-    }
 
     // wait for pps output
     if(!ppsReady) return;
@@ -176,6 +169,7 @@ void GPSDO_run() {
         return;
     // clear ready flag
     ppsReady = 0;
+
     // return if GPS not ready or more than 1 second stale
     if(now - ppsGpsEdge > 150000000)
         return;
@@ -183,6 +177,8 @@ void GPSDO_run() {
     // compute offset
     int32_t offset = ppsOutEdge - ppsGpsEdge;
     // perform coarse realignment if offset is too large
+    if(offset < -OFFSET_COARSE_ALIGN)
+        return;
     if(offset > OFFSET_COARSE_ALIGN) {
         // limit slew rate (10ms)
         if(offset > 1250000)
@@ -209,6 +205,14 @@ void GPSDO_run() {
 
     // convert PPS offset to float
     float fltOffset = ((float) offset) * 1e-9f;
+    // determine compensation rate
+    float rate = ppsOffsetRms / 256e-9f;
+    if(rate > 0.5f) rate = 0.5f;
+    // update control loop
+    pllCorr = fltOffset * rate;
+    setFeedback(currCompensation + pllCorr + pllBias);
+    pllBias += fltOffset * 0x1p-9f;
+
     // update PPS stats
     ppsOffsetMean += (fltOffset - ppsOffsetMean) / STAT_TIME_CONST;
     fltOffset *= fltOffset;
@@ -220,16 +224,6 @@ void GPSDO_run() {
     if(ppsSkew > 1e-8f) ppsSkew = 1e-8f;
     ppsSkewVar += (ppsSkew - ppsSkewVar) / STAT_TIME_CONST;
     ppsSkewRms = sqrtf(ppsSkewVar);
-
-    // convert PPS offset to float
-    fltOffset = ((float) offset) * 1e-9f;
-    // determine compensation rate
-    float rate = ppsOffsetRms / 256e-9f;
-    if(rate > 0.5f) rate = 0.5f;
-    // update control loop
-    pllCorr = fltOffset * rate;
-    setFeedback(currCompensation + pllCorr + pllBias);
-    pllBias += fltOffset / 256;
 
     // update temperature coefficient
     if(ppsSkewRms < STAT_COMP_RMS)

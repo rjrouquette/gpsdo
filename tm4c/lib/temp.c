@@ -2,14 +2,11 @@
 // Created by robert on 4/17/22.
 //
 
-#include <math.h>
 #include "../hw/adc.h"
 #include "delay.h"
 #include "temp.h"
 
-static volatile uint16_t adc_temp = 0;
 static volatile float dcxoTemp;
-static volatile int hasUpdate;
 
 void TEMP_init() {
     // Enable ADC0
@@ -31,33 +28,16 @@ void TEMP_init() {
     ADC0.PSSI.SS3 = 1;
 }
 
-int16_t TEMP_proc() {
-    int32_t temp = adc_temp;
-    temp *= 63360;
-    temp = 154664960 - temp;
-    return (int16_t) (temp / 4096);
-}
-
-float TEMP_dcxo() {
+float TEMP_value() {
     return dcxoTemp;
 }
 
-int TEMP_hasUpdate() {
-    int flag = hasUpdate;
-    hasUpdate = 0;
-    return flag;
-}
-
 void ISR_ADC0Sequence3(void) {
-    // clear interrupt
     ADC0.ISC.IN3 = 1;
-    // store value
-    adc_temp = ADC0.SS3.FIFO.DATA;
-    // compute temperature
-    int32_t temp = adc_temp;
-    temp *= 63360;
-    temp = 154664960 - temp;
-    dcxoTemp = 0x1p-20f * (float) temp;
-    // mark update flag
-    hasUpdate = 1;
+    // update temperature
+    int32_t temp = 2441 - ADC0.SS3.FIFO.DATA;
+    float _temp = 0.0604248047f * (float) temp;
+    dcxoTemp += (_temp - dcxoTemp) * 0x1p-8f;
+    // trigger temperature measurement
+    ADC0.PSSI.SS3 = 1;
 }

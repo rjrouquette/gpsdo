@@ -203,7 +203,7 @@ unsigned statusGPSDO(char *body) {
     end = append(end, " ppm\n");
 
     // temperature
-    tmp[fmtFloat(TEMP_proc() * 0x1p-8f, 0, 2, tmp)] = 0;
+    tmp[fmtFloat(TEMP_value(), 0, 3, tmp)] = 0;
     end = append(end, "temperature: ");
     end = append(end, tmp);
     end = append(end, " C\n");

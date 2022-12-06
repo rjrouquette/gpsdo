@@ -79,8 +79,6 @@ void ISR_Timer0A() {
     GPTM0.TAMATCHR += CLK_FREQ;
     if (GPTM0.TAMATCHR >= CLK_MOD)
         GPTM0.TAMATCHR = 0;
-    // trigger temperature measurement
-    ADC0.PSSI.SS3 = 1;
 }
 
 // return integer part of current time
