@@ -343,9 +343,12 @@ void setFeedback(float feedback) {
 }
 
 static void updateTempComp(float target) {
-    float temp = currTemp;
+    // simple bootstrap to improve stability
+    if(tcompCoeff == 0 && tcompOffset == 0)
+        tcompOffset = target;
 
     // compute error
+    float temp = currTemp;
     float error = target - tcompOffset;
     error -= tcompCoeff * temp;
     error *= TCOMP_ALPHA;
