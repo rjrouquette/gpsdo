@@ -353,11 +353,14 @@ static void updateTempComp(float target) {
     // simple bootstrap to improve stability
     if(tcompBias == 0)
         tcompBias = temp;
-    tcompBias += (temp - tcompBias) * BIAS_ALPHA;
 
     // simple bootstrap to improve stability
     if(tcompOffset == 0)
         tcompOffset = target;
+
+    // update temperature bias
+    tcompBias += (temp - tcompBias) * BIAS_ALPHA;
+    temp -= tcompBias;
 
     // compute error
     float error = target - tcompOffset;
