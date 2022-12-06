@@ -5,8 +5,10 @@
 #ifndef GPSDO_TCOMP_H
 #define GPSDO_TCOMP_H
 
+void TCOMP_init();
+float TCOMP_temperature();
+
 void TCOMP_updateTarget(float target);
-void TCOMP_updateTemp(float temp);
 float TCOMP_getComp(float *m, float *b);
 
 #endif //GPSDO_TCOMP_H

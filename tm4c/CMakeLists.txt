@@ -50,7 +50,6 @@ add_executable(
         lib/net/ip.c
         lib/net/udp.c
         lib/net/util.c
-        lib/temp.c
 )
 
 target_link_libraries(

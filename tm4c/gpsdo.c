@@ -2,7 +2,6 @@
 // Created by robert on 5/24/22.
 //
 
-#include <stdlib.h>
 #include <math.h>
 #include "gpsdo.h"
 #include "hw/emac.h"
@@ -10,7 +9,6 @@
 #include "hw/timer.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
-#include "lib/temp.h"
 #include "tcomp.h"
 
 
@@ -143,9 +141,7 @@ void GPSDO_init() {
 }
 
 void GPSDO_run() {
-    // temperature update
-    TCOMP_updateTemp(TEMP_value());
-    // get temperature compensation
+    // update temperature compensation
     float newComp = TCOMP_getComp(&compM, &compB);
     if(isnan(newComp)) {
         resetBias = 1;

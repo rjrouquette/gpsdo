@@ -8,13 +8,13 @@
 #include "lib/delay.h"
 #include "lib/led.h"
 #include "lib/net.h"
-#include "lib/temp.h"
 #include "hw/sys.h"
 
 #include "gpsdo.h"
 #include "ntp.h"
 #include "snmp.h"
 #include "status.h"
+#include "tcomp.h"
 
 int main(void) {
     char temp[32];
@@ -28,8 +28,8 @@ int main(void) {
     LED_init();
     // initialize system clock
     CLK_init();
-    // initialize temperature sensor
-    TEMP_init();
+    // initialize temperature compensation
+    TCOMP_init();
     // initialize networking
     NET_init();
     GPSDO_init();

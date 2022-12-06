@@ -15,11 +15,11 @@
 #include "lib/net/udp.h"
 #include "lib/net/util.h"
 #include "gpsdo.h"
+#include "tcomp.h"
 #include "hw/emac.h"
 #include "lib/net/dhcp.h"
 #include "hw/sys.h"
 #include "ntp.h"
-#include "lib/temp.h"
 
 #define STATUS_PORT (23) // telnet port
 
@@ -203,7 +203,7 @@ unsigned statusGPSDO(char *body) {
     end = append(end, " ppm\n");
 
     // temperature
-    tmp[fmtFloat(TEMP_value(), 0, 3, tmp)] = 0;
+    tmp[fmtFloat(TCOMP_temperature(), 0, 3, tmp)] = 0;
     end = append(end, "temperature: ");
     end = append(end, tmp);
     end = append(end, " C\n");
