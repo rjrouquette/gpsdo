@@ -20,8 +20,8 @@
 #define COEF_ALPHA (0x1p-15f)
 
 // temperature compensation state
-static volatile float currTemp;
-static volatile float tcompCoeff, tcompBias, tcompOffset;
+static float currTemp;
+static float tcompCoeff, tcompBias, tcompOffset;
 
 
 static int32_t ppsGpsEdge;
@@ -37,7 +37,7 @@ static float ppsOffsetRms;
 static float ppsSkewVar;
 static float ppsSkewRms;
 
-static uint8_t ppsReady;
+static int ppsReady;
 
 // current correction values
 static float currFeedback;

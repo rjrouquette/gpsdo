@@ -314,11 +314,9 @@ void NET_transmit(int desc, int len) {
 }
 
 uint64_t NET_getRxTime(const uint8_t *rxFrame) {
-    // compute descriptor offset
-    uint32_t rxId = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
-    if(rxId >= RX_RING_SIZE) return 0;
-    // convert timestamp to fixed-point format
-    return timeFrom125Mhz(rxDesc[rxId].RTSH, rxDesc[rxId].RTSL >> 3);
+    uint32_t raw[2] = { 0, 0 };
+    NET_getRxTimeRaw(rxFrame, raw);
+    return timeFrom125Mhz(raw[0], raw[1] >> 3);
 }
 
 void NET_getRxTimeRaw(const uint8_t *rxFrame, uint32_t *rxTime) {
@@ -331,11 +329,9 @@ void NET_getRxTimeRaw(const uint8_t *rxFrame, uint32_t *rxTime) {
 }
 
 uint64_t NET_getTxTime(const uint8_t *txFrame) {
-    // compute descriptor offset
-    uint32_t txId = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
-    if(txId >= TX_RING_SIZE) return 0;
-    // convert timestamp to fixed-point format
-    return timeFrom125Mhz(txDesc[txId].TTSH, txDesc[txId].TTSL >> 3);
+    uint32_t raw[2] = { 0, 0 };
+    NET_getTxTimeRaw(txFrame, raw);
+    return timeFrom125Mhz(raw[0], raw[1] >> 3);
 }
 
 void NET_getTxTimeRaw(const uint8_t *txFrame, uint32_t *txTime) {
