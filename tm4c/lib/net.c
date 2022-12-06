@@ -8,33 +8,33 @@
 #include "../hw/gpio.h"
 #include "../hw/sys.h"
 #include "../lib/delay.h"
-#include "../lib/format.h"
 #include "net.h"
 #include "net/arp.h"
 #include "net/dhcp.h"
 #include "net/eth.h"
 #include "net/ip.h"
-#include "net/udp.h"
 #include "net/util.h"
 #include "net/dns.h"
 
+#define RX_RING_MASK (15)
 #define RX_RING_SIZE (16)
 #define RX_BUFF_SIZE (1520)
 
+#define TX_RING_MASK (7)
 #define TX_RING_SIZE (8)
 #define TX_BUFF_SIZE (1520)
 
-static uint8_t ptrRX = 0;
-static uint8_t ptrTX = 0;
-static uint8_t endTX = 0;
-static uint16_t phyStatus = 0;
+static int ptrRX = 0;
+static int ptrTX = 0;
+static int endTX = 0;
+static int phyStatus = 0;
 
 static struct EMAC_RX_DESC rxDesc[RX_RING_SIZE];
 static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 
+static CallbackNetTX txCallback[TX_RING_SIZE];
 static struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
 static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
-static CallbackNetTX txCallback[TX_RING_SIZE];
 
 static void initDescriptors() {
     // init receive descriptors
@@ -252,21 +252,6 @@ int NET_getPhyStatus() {
 
 void NET_run() {
     for(;;) {
-        int busy = 0;
-        // check for completed receptions
-        if (!rxDesc[ptrRX].RDES0.OWN) {
-            if (!rxDesc[ptrRX].RDES0.ES) {
-                uint8_t *buffer = (uint8_t *) rxDesc[ptrRX].BUFF1;
-                if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_ARP) {
-                    ARP_process(buffer, rxDesc[ptrRX].RDES0.FL);
-                } else if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_IPv4) {
-                    IPv4_process(buffer, rxDesc[ptrRX].RDES0.FL);
-                }
-            }
-            rxDesc[ptrRX].RDES0.OWN = 1;
-            ptrRX = (ptrRX + 1) & (RX_RING_SIZE - 1);
-            busy = 1;
-        }
         // check for completed transmissions
         if ((endTX != ptrTX) && !txDesc[endTX].TDES0.OWN) {
             // invoke callback
@@ -276,10 +261,32 @@ void NET_run() {
             }
             // clear callback
             txCallback[endTX] = 0;
-            endTX = (endTX + 1) & (TX_RING_SIZE - 1);
-            busy = 1;
+            // advance pointer
+            ++endTX;
+            endTX &= TX_RING_MASK;
+            continue;
         }
-        if (!busy) break;
+
+        // check for completed receptions
+        struct EMAC_RX_DESC *emacRxDesc = rxDesc + ptrRX;
+        if (!emacRxDesc->RDES0.OWN) {
+            if (!emacRxDesc->RDES0.ES) {
+                uint8_t *buffer = (uint8_t *) emacRxDesc->BUFF1;
+                if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_ARP) {
+                    ARP_process(buffer, emacRxDesc->RDES0.FL);
+                } else if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_IPv4) {
+                    IPv4_process(buffer, emacRxDesc->RDES0.FL);
+                }
+            }
+            emacRxDesc->RDES0.OWN = 1;
+            // advance pointer
+            ++ptrRX;
+            ptrRX &= RX_RING_MASK;
+            continue;
+        }
+
+        // no pending tasks
+        break;
     }
 
     // if link is up, poll ARP and DHCP state
@@ -294,16 +301,17 @@ int NET_getTxDesc() {
         return -1;
 
     int temp = ptrTX;
-    ptrTX = (ptrTX + 1) & (TX_RING_SIZE-1);
+    ++ptrTX;
+    ptrTX &= TX_RING_MASK;
     return temp;
 }
 
 uint8_t * NET_getTxBuff(int desc) {
-    return (uint8_t *) txDesc[desc & (TX_RING_SIZE-1)].BUFF1;
+    return (uint8_t *) txDesc[desc & TX_RING_MASK].BUFF1;
 }
 
 void NET_setTxCallback(int desc, CallbackNetTX callback) {
-    txCallback[desc & (TX_RING_SIZE-1)] = callback;
+    txCallback[desc & TX_RING_MASK] = callback;
 }
 
 void NET_transmit(int desc, int len) {
@@ -311,9 +319,9 @@ void NET_transmit(int desc, int len) {
     if(len < 60) len = 60;
     if(len > TX_BUFF_SIZE) len = TX_BUFF_SIZE;
     // set transmission size
-    txDesc[desc & (TX_RING_SIZE-1)].TDES1.TBS1 = len;
+    txDesc[desc & TX_RING_MASK].TDES1.TBS1 = len;
     // release descriptor
-    txDesc[desc & (TX_RING_SIZE-1)].TDES0.OWN = 1;
+    txDesc[desc & TX_RING_MASK].TDES0.OWN = 1;
     // wake TX DMA
     EMAC0.TXPOLLD = 1;
 }
