@@ -54,6 +54,7 @@ struct Server {
     float drift;
     float skew;
     uint64_t stamps[NTP_BURST << 2];
+    int64_t asym;
     uint64_t offset;
     uint64_t update;
     uint32_t nextPoll;
@@ -77,6 +78,7 @@ static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
 void NTP_init() {
     memset(servers, 0, sizeof(servers));
     UDP_register(NTP_PORT, processRequest);
+    servers[0].addr = 0xC803A8C0;
 }
 
 uint64_t NTP_offset() {
@@ -281,10 +283,19 @@ static void runServer(struct Server *server, uint32_t now) {
         return;
     }
 
-    // clear entry if the server is unreachable
-    if(server->reach == 0 && server->attempts > 8) {
-        memset(server, 0, sizeof(struct Server));
-        return;
+    // remove the server if it has high packet loss
+    if(server->attempts > 16 && server->reach != 0xFFFF) {
+        // count bits
+        uint32_t cnt = server->reach;
+        cnt -= (cnt >> 1) & 0x55555555;
+        cnt = (cnt & 0x33333333) + ((cnt >> 2) & 0x33333333);
+        cnt += cnt >> 4; cnt &= 0x0F0F0F0F;
+        cnt += cnt >> 8; cnt &= 0xFF;
+        // remove server if too many lost packets
+        if(cnt < 9) {
+            memset(server, 0, sizeof(struct Server));
+            return;
+        }
     }
 
     // verify current time
@@ -347,9 +358,12 @@ void NTP_run() {
         runServer(servers + i, now);
 
     int64_t diff = (int64_t) (servers[0].offset - ntpOffset);
-    diff >>= 31;
-    if(diff != 0)
-        ((uint32_t *) &ntpOffset)[1] += diff >> 1;
+    if(((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
+        ((int32_t *) &diff)[1] -= 1;
+    else if(((uint32_t *) &diff)[0] >= (1 << 31))
+        ((int32_t *) &diff)[1] += 1;
+    if(((int32_t *) &diff)[1] != 0)
+        ((uint32_t *) &ntpOffset)[1] += ((int32_t *) &diff)[1];
 }
 
 char* NTP_servers(char *tail) {
@@ -371,7 +385,9 @@ char* NTP_servers(char *tail) {
     tail = append(tail, "  ");
     tail = append(tail, "last (s)");
     tail = append(tail, "  ");
-    tail = append(tail, "offset (s)         ");
+    tail = append(tail, "offset (ms)");
+    tail = append(tail, "  ");
+    tail = append(tail, "asymm (ms)");
     tail = append(tail, "  ");
     tail = append(tail, "delay (ms) ");
     tail = append(tail, "  ");
@@ -405,29 +421,30 @@ char* NTP_servers(char *tail) {
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        strcpy(tmp, "0x");
-        toHex(servers[i].offset>>32, 8, '0', tmp+2);
-        tmp[10] = '.';
-        toHex(servers[i].offset, 8, '0', tmp+11);
-        tmp[19] = 0;
+        int32_t offset = (int32_t) (servers[i].offset - ntpOffset);
+        tmp[fmtFloat((1e3f * 0x1p-32f) * (float) offset, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
-
         tail = append(tail, "  ");
+
+        int32_t asym = (int32_t) servers[i].asym;
+        tmp[fmtFloat((1e3f * 0x1p-32f) * (float) asym, 10, 3, tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
         tmp[fmtFloat(servers[i].delay * 1e3f, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
-
         tail = append(tail, "  ");
+
         tmp[fmtFloat(sqrtf(servers[i].jitter) * 1e3f, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
-
         tail = append(tail, "  ");
+
         tmp[fmtFloat(servers[i].drift * 1e6f, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
-
         tail = append(tail, "  ");
+
         tmp[fmtFloat(sqrtf(servers[i].skew) * 1e6f, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
-
         tail = append(tail, "\n");
     }
     return tail;
@@ -452,9 +469,21 @@ static void updateTime(struct Server *server) {
     // adjust offset
     offset += _adjust >> (NTP_BURST_BITS + 1);
 
+    // compute asymmetry
+    uint64_t asym = 0;
+    for(int i = 0; i < NTP_BURST; i++) {
+        const uint64_t *set = server->stamps + (i << 2);
+        asym += set[3] - set[1];
+        asym += set[2] - set[0];
+    }
+    // normalize delay
+    asym >>= NTP_BURST_BITS + 1;
+    server->asym = (int64_t) (asym - _delay);
+//    offset += asym;
+
     // compute update time
     uint64_t update = server->stamps[(NTP_BURST << 2) - 1];
-    update += (((int64_t) (server->stamps[0] - server->stamps[(NTP_BURST << 2) - 1])) >> 1);
+    update += ((int64_t) (server->stamps[0] - update)) >> 1;
 
     // update delay stats
     float delay = 0x1p-32f * (float) (uint32_t) _delay;
@@ -467,17 +496,15 @@ static void updateTime(struct Server *server) {
 
     // compute drift
     if(server->update != 0) {
-        int64_t interval = (int64_t) (update - server->update);
-        int32_t ipart = ((int32_t *) &interval)[1];
-        if(ipart < 0) ipart = -ipart;
-        int shift = 0;
-        while((ipart >> shift) != 0)
-            ++shift;
+        uint64_t interval = update - server->update;
+        uint32_t ipart = ((uint32_t *) &interval)[1];
+        uint8_t shift = 0;
+        while(ipart >> shift) ++shift;
         float drift = (float) (int32_t) (offset - server->offset);
-        drift /= (float) (int32_t) (interval >> shift);
+        drift /= (float) (uint32_t) (interval >> shift);
         drift /= (float) (1 << shift);
         // update drift metrics
-        if (fabsf(drift) < 1e-2f) {
+        if (fabsf(drift) < 1e-3f) {
             if(server->drift == 0)
                 server->drift = drift;
             float skew = drift - server->drift;

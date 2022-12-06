@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
-project(gpsdo)
-find_program(OBJCOPY arm-none-eabi-objcopy)
-find_program(OBJDUMP arm-none-eabi-objdump)
 
 set(CMAKE_C_COMPILER arm-none-eabi-gcc)
 set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
+
+set(CMAKE_C_COMPILER_WORKS 1)
+set(CMAKE_CXX_COMPILER_WORKS 1)
+
+project(gpsdo)
+find_program(OBJCOPY arm-none-eabi-objcopy)
+find_program(OBJDUMP arm-none-eabi-objdump)
 
 set(COMP_FLAGS "-ggdb -Os -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard")
 set(CMAKE_C_FLAGS "-std=c17 ${COMP_FLAGS}")

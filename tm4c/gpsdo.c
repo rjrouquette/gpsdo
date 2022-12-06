@@ -14,7 +14,7 @@
 #include "tcomp.h"
 
 
-#define OFFSET_COARSE_ALIGN (1000000) // 1 millisecond
+#define OFFSET_COARSE_ALIGN (125000) // 1 millisecond
 #define STAT_TIME_CONST (16)
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_COMP_RMS (200e-9f)
@@ -33,9 +33,7 @@ static float ppsOffsetRms;
 static float ppsSkewVar;
 static float ppsSkewRms;
 
-static uint8_t ppsGpsReady;
-static uint8_t ppsOutReady;
-static uint8_t waitRealign;
+static uint8_t ppsReady;
 static uint8_t resetBias;
 
 // temperature compensation
@@ -94,6 +92,9 @@ void initEdgeComp() {
     // edge-time mode
     GPTM5.TAMR.CMR = 1;
     GPTM5.TBMR.CMR = 1;
+    // rising edge
+    GPTM5.CTL.TAEVENT = 0;
+    GPTM5.CTL.TBEVENT = 0;
     // count up
     GPTM5.TAMR.CDIR = 1;
     GPTM5.TBMR.CDIR = 1;
@@ -136,8 +137,6 @@ void initEdgeComp() {
 void GPSDO_init() {
     initPPS();
     initEdgeComp();
-    // wait at least 10 PPS updates before attempting lock
-    waitRealign = 10;
 
     // init GPS
     GPS_init();
@@ -166,50 +165,34 @@ void GPSDO_run() {
 
     // only update if GPS has lock
     if(!GPS_hasLock()) {
-        ppsGpsReady = 0;
-        ppsOutReady = 0;
         return;
     }
 
-    // wait for both edge events
-    if(!(ppsGpsReady && ppsOutReady))
+    // wait for pps output
+    if(!ppsReady) return;
+    // wait for window to expire
+    const int32_t now = ((int32_t) GPTM4.TAV.raw);
+    if(now - ppsOutEdge < OFFSET_COARSE_ALIGN)
         return;
-    // clear ready state
-    ppsGpsReady = 0;
-    ppsOutReady = 0;
-
-    // coarse realignment in progress
-    if(waitRealign > 0) {
-        --waitRealign;
+    // clear ready flag
+    ppsReady = 0;
+    // return if GPS not ready
+    if(now - ppsGpsEdge > 150000000)
         return;
-    }
 
     // compute offset
-    int offset = ppsOutEdge - ppsGpsEdge;
-    // convert to nano seconds
-    offset <<= 3;
-    // reorder events if necessary
-    if(offset < -500000000) { ppsOutReady = 1; return; }
-    if(offset >  500000000) { ppsOutReady = 1; return; }
-    // update PPS offset
-    float ppsSkew = 1e-9f * (float) (offset - ppsOffsetNano);
-    ppsOffsetNano = offset;
-
+    int32_t offset = ppsOutEdge - ppsGpsEdge;
     // perform coarse realignment if offset is too large
-    if(abs(offset) > OFFSET_COARSE_ALIGN) {
-        // realign TAI second boundary
-        waitRealign = 2;
-        // truncate offset precision to 40ns
-        offset %= 1000000000;
-        offset /= 40;
+    if(offset > OFFSET_COARSE_ALIGN) {
+        // limit slew rate (10ms)
+        if(offset > 1250000)
+            offset = 1250000;
+        // truncate to 40 ns resolution
+        offset /= 5;
         offset *= 40;
-        // adjust sign
-        if(offset > 0) {
-            offset = -offset;
-            EMAC0.TIMNANOU.NEG = 1;
-        }
         // set update update registers
-        EMAC0.TIMNANOU.VALUE = -offset;
+        EMAC0.TIMNANOU.NEG = 1;
+        EMAC0.TIMNANOU.VALUE = offset;
         EMAC0.TIMSECU = 0;
         // wait for hardware ready state
         while(EMAC0.TIMSTCTRL.TSUPDT);
@@ -217,6 +200,12 @@ void GPSDO_run() {
         EMAC0.TIMSTCTRL.TSUPDT = 1;
         return;
     }
+
+    // convert to nano seconds
+    offset <<= 3;
+    // update PPS offset
+    float ppsSkew = 1e-9f * (float) (offset - ppsOffsetNano);
+    ppsOffsetNano = offset;
 
     // convert PPS offset to float
     float fltOffset = ((float) offset) * 1e-9f;
@@ -293,8 +282,8 @@ void ISR_Timer5A() {
     ppsOutEdge = now - delta;
     // clear interrupt flag
     GPTM5.ICR.CAE = 1;
-    // indicate variable is ready
-    ppsOutReady ^= 1;
+    // indicate that PPS is ready
+    ppsReady = 1;
 }
 
 // capture rising edge of GPS PPS for offset measurement
@@ -306,8 +295,6 @@ void ISR_Timer5B() {
     ppsGpsEdge = now - delta;
     // clear interrupt flag
     GPTM5.ICR.CBE = 1;
-    // indicate variable is ready
-    ppsGpsReady ^= 1;
 }
 
 void setFeedback(float feedback) {
