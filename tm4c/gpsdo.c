@@ -25,7 +25,7 @@ static volatile float tcompCoeff, tcompOffset;
 
 static int32_t ppsGpsEdge;
 static int32_t ppsOutEdge;
-static int ppsOffsetNano;
+static int32_t ppsOffsetNano;
 
 static float pllBias;
 static float pllCorr;
@@ -298,6 +298,10 @@ float GPSDO_compCoeff() {
 
 float GPSDO_compValue() {
     return currCompensation;
+}
+
+float GPSDO_pllValue() {
+    return pllBias + pllCorr;
 }
 
 // capture rising edge of output PPS for offset measurement

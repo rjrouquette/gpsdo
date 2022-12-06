@@ -17,5 +17,6 @@ float GPSDO_temperature();
 float GPSDO_compBias();
 float GPSDO_compCoeff();
 float GPSDO_compValue();
+float GPSDO_pllValue();
 
 #endif //GPSDO_GPSDO_H

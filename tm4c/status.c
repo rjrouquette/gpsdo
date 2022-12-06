@@ -201,17 +201,23 @@ unsigned statusGPSDO(char *body) {
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
-    // temperature
-    tmp[fmtFloat(GPSDO_temperature(), 0, 3, tmp)] = 0;
-    end = append(end, "temperature: ");
+    // PLL trimming
+    tmp[fmtFloat(GPSDO_pllValue() * 1e6f, 0, 4, tmp)] = 0;
+    end = append(end, "  - pll trimming: ");
     end = append(end, tmp);
-    end = append(end, " C\n");
+    end = append(end, " ppm\n");
 
     // temperature compensation
     tmp[fmtFloat(GPSDO_compValue() * 1e6f, 0, 4, tmp)] = 0;
     end = append(end, "compensation: ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
+
+    // temperature
+    tmp[fmtFloat(GPSDO_temperature(), 0, 3, tmp)] = 0;
+    end = append(end, "  - temperature: ");
+    end = append(end, tmp);
+    end = append(end, " C\n");
 
     // temperature coefficient
     tmp[fmtFloat(GPSDO_compCoeff() * 1e6f, 0, 4, tmp)] = 0;
