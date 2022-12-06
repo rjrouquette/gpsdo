@@ -11,8 +11,6 @@
 
 static volatile float currTemp;
 static volatile float coeff, offset;
-static volatile float mean[2];
-static volatile int init = 1;
 
 
 void ISR_ADC0Sequence3(void) {
@@ -57,29 +55,17 @@ float TCOMP_temperature() {
 void TCOMP_updateTarget(float target) {
     float temp = currTemp;
 
-    if(init) {
-        init = 0;
-        mean[0] = temp;
-        mean[1] = target;
-    }
-
-    // update means
-    mean[0] += ALPHA * (temp - mean[0]);
-    mean[1] += ALPHA * (target - mean[1]);
-
-    float x = temp - mean[0];
-    float y = target - mean[1];
-
-    float error = y;
-    error -= coeff * x;
+    // compute error
+    float error = target - offset;
+    error -= coeff * temp;
     error *= ALPHA;
 
-    // update temperature coefficient
-    coeff += error * x;
+    // update compensation state
+    coeff += error * temp;
+    offset += error;
 }
 
-float TCOMP_getComp(float *m, float *b) {
+void TCOMP_getComp(float *m, float *b) {
     *m = coeff;
-    *b = mean[1] - (coeff * mean[0]);
-    return (coeff * (currTemp - mean[0])) + mean[1];
+    *b = offset;
 }

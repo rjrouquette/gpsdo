@@ -32,7 +32,6 @@ static float ppsSkewVar;
 static float ppsSkewRms;
 
 static uint8_t ppsReady;
-static uint8_t resetBias;
 
 // temperature compensation
 static float compM, compB;
@@ -142,17 +141,13 @@ void GPSDO_init() {
 
 void GPSDO_run() {
     // update temperature compensation
-    float newComp = TCOMP_getComp(&compM, &compB);
-    if(isnan(newComp)) {
-        resetBias = 1;
-    } else {
-        if(resetBias || fabsf(newComp - currCompensation) > 100e-9f) {
-            pllBias -= (newComp - currCompensation);
-            resetBias = 0;
-        }
-        currCompensation = newComp;
-        setFeedback(currCompensation + pllCorr + pllBias);
-    }
+    TCOMP_getComp(&compM, &compB);
+    float newComp = compB + (compM * TCOMP_temperature());
+    // prevent large correction impulses
+    if(fabsf(newComp - currCompensation) > 100e-9f)
+        pllBias -= (newComp - currCompensation);
+    currCompensation = newComp;
+    setFeedback(currCompensation + pllCorr + pllBias);
 
     // run GPS state machine
     GPS_run();
