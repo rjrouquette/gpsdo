@@ -390,7 +390,7 @@ void NTP_run() {
             continue;
         }
 
-        int elapsed = centerOfMass(servers[i].reach) + (int) (CLK_MONOTONIC() & 63);
+        int elapsed = centerOfMass(servers[i].reach) + (int) (CLK_MONOTONIC_INT() & 63);
         servers[i].currentOffset = servers[i].meanOffset;
         servers[i].currentOffset += servers[i].meanDrift * (float) elapsed;
 
