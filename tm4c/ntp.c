@@ -381,9 +381,9 @@ void NTP_run() {
 char* NTP_servers(char *tail) {
     char tmp[32];
 
-    tail = append(tail, "ntp servers: (");
+    tail = append(tail, "ntp servers: ");
     tail = append(tail, NTP_POOL_FQDN);
-    tail = append(tail, ")\n");
+    tail = append(tail, "\n");
 
     // header
     tail = append(tail, "    ");

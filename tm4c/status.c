@@ -252,18 +252,18 @@ unsigned statusNTP(char *body) {
     tmp[11] = '.';
     toHex(tai, 8, '0', tmp+12);
     tmp[20] = 0;
-    end = append(end, "tai: ");
+    end = append(end, "tai:         ");
     end = append(end, tmp);
     end = append(end, "\n");
 
     // TAI offset
     uint64_t offset = NTP_offset();
-    strcpy(tmp, " 0x");
-    toHex(offset>>32, 8, '0', tmp+3);
-    tmp[11] = '.';
-    toHex(offset, 8, '0', tmp+12);
-    tmp[20] = 0;
-    end = append(end, "tai offset: ");
+    strcpy(tmp, "0x");
+    toHex(offset>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(offset, 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "tai offset:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
