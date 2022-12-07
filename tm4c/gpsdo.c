@@ -359,6 +359,7 @@ static void updateTempComp(float target) {
         tcompOffset = target;
 
     // update temperature bias
+    tcompOffset += (target - tcompOffset) * BIAS_ALPHA;
     tcompBias += (temp - tcompBias) * BIAS_ALPHA;
     temp -= tcompBias;
 
@@ -367,7 +368,6 @@ static void updateTempComp(float target) {
     error -= tcompCoeff * temp;
     error *= COEF_ALPHA;
 
-    // update compensation state
+    // update compensation coefficient
     tcompCoeff += error * temp;
-    tcompOffset += error;
 }
