@@ -63,7 +63,6 @@ struct Server {
     float meanDrift, varDrift;
     float weight, currentOffset;
     uint64_t stamps[NTP_BURST << 2];
-    int64_t asym;
     uint64_t offset;
     uint64_t update;
     uint32_t nextPoll;
@@ -466,8 +465,6 @@ char* NTP_servers(char *tail) {
     tail = append(tail, "  ");
     tail = append(tail, "offset (ms)");
     tail = append(tail, "  ");
-    tail = append(tail, "asymm (ms)");
-    tail = append(tail, "  ");
     tail = append(tail, "delay (ms)");
     tail = append(tail, "  ");
     tail = append(tail, "jitter (ms)");
@@ -500,11 +497,6 @@ char* NTP_servers(char *tail) {
         tail = append(tail, "  ");
 
         tmp[fmtFloat(1e3f * servers[i].currentOffset, 11, 3, tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-
-        int32_t asym = (int32_t) servers[i].asym;
-        tmp[fmtFloat((1e3f * 0x1p-32f) * (float) asym, 10, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
@@ -586,18 +578,6 @@ static void updateTracking(struct Server *server) {
     _delay >>= NTP_BURST_BITS + 1;
     // adjust offset
     offset += _adjust >> (NTP_BURST_BITS + 1);
-
-    // compute asymmetry
-    uint64_t asym = 0;
-    for(int i = 0; i < NTP_BURST; i++) {
-        const uint64_t *set = server->stamps + (i << 2);
-        asym += set[3] - set[1];
-        asym += set[2] - set[0];
-    }
-    // normalize delay
-    asym >>= NTP_BURST_BITS + 1;
-    server->asym = (int64_t) (asym - _delay);
-//    offset += asym;
 
     // compute update time
     uint64_t update = server->stamps[(NTP_BURST << 2) - 1];
