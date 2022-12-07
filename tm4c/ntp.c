@@ -26,6 +26,8 @@
 #define NTP_BURST_BITS (2)
 #define NTP_POOL_FQDN ("pool.ntp.org")
 #define NTP_PRECISION (-24)
+#define NTP_RING_MASK (15)
+#define NTP_RING_SIZE (16)
 
 struct PACKED HEADER_NTPv4 {
     uint16_t mode: 3;
@@ -49,10 +51,13 @@ static volatile uint64_t ntpOffset = 0;
 
 #define SERVER_COUNT (8)
 struct Server {
-    float delay;
-    float jitter;
-    float drift;
-    float skew;
+    int head;
+    float ringOffset[NTP_RING_SIZE];
+    float ringDelay[NTP_RING_SIZE];
+    float ringDrift[NTP_RING_SIZE];
+    float meanOffset, varOffset;
+    float meanDelay, varDelay;
+    float meanDrift, varDrift;
     uint64_t stamps[NTP_BURST << 2];
     int64_t asym;
     uint64_t offset;
@@ -357,7 +362,14 @@ void NTP_run() {
     for(int i = 0; i < SERVER_COUNT; i++)
         runServer(servers + i, now);
 
-    int64_t diff = (int64_t) (servers[0].offset - ntpOffset);
+    // compute mean offset
+    uint64_t offset = servers[0].offset;
+    int64_t diff = 0;
+    for(int i = 1; i < SERVER_COUNT; i++)
+        diff += (int64_t) (servers[i].offset - offset);
+    offset += diff >> 3;
+
+    diff = (int64_t) (offset - ntpOffset);
     if(((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
         ((int32_t *) &diff)[1] -= 1;
     else if(((uint32_t *) &diff)[0] >= (1 << 31))
@@ -385,8 +397,6 @@ char* NTP_servers(char *tail) {
     tail = append(tail, "  ");
     tail = append(tail, "last (s)");
     tail = append(tail, "  ");
-    tail = append(tail, "window (s)");
-    tail = append(tail, "  ");
     tail = append(tail, "offset (ms)");
     tail = append(tail, "  ");
     tail = append(tail, "asymm (ms)");
@@ -400,7 +410,6 @@ char* NTP_servers(char *tail) {
     tail = append(tail, "skew (ppm)");
     tail = append(tail, "\n");
 
-    uint64_t nowTai = CLK_TAI();
     uint32_t now = CLK_MONOTONIC_INT();
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == 0) continue;
@@ -424,13 +433,7 @@ char* NTP_servers(char *tail) {
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        int32_t window = (int32_t) ((nowTai - servers[i].update) >> 28);
-        tmp[fmtFloat(0x1p-4f * (float) window, 10, 1, tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-
-        int32_t offset = (int32_t) (servers[i].offset - ntpOffset);
-        tmp[fmtFloat((1e3f * 0x1p-32f) * (float) offset, 11, 3, tmp)] = 0;
+        tmp[fmtFloat(1e3f * servers[i].meanOffset, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
@@ -439,33 +442,60 @@ char* NTP_servers(char *tail) {
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(servers[i].delay * 1e3f, 10, 3, tmp)] = 0;
+        tmp[fmtFloat(servers[i].meanDelay * 1e3f, 10, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(sqrtf(servers[i].jitter) * 1e3f, 11, 3, tmp)] = 0;
+        tmp[fmtFloat(sqrtf(servers[i].varDelay) * 1e3f, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(servers[i].drift * 1e6f, 11, 3, tmp)] = 0;
+        tmp[fmtFloat(servers[i].meanDrift * 1e6f, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(sqrtf(servers[i].skew) * 1e6f, 10, 3, tmp)] = 0;
+        tmp[fmtFloat(sqrtf(servers[i].varDrift) * 1e6f, 10, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "\n");
     }
     return tail;
 }
 
-static inline void updateEma(uint64_t *acc, uint64_t value, int logRate) {
-    // boostrap initial value
-    if(*acc == 0) { *acc = value; return; }
-    // perform EMA update
-    *acc += ((int64_t) (value - *acc)) >> logRate;
+void computeMeanVar(const float *ring, float *mean, float *var) {
+    float _mean = 0;
+    for(int i = 0; i < NTP_RING_SIZE; i++)
+        _mean += ring[i];
+    _mean /= NTP_RING_SIZE;
+
+    float _var = 0;
+    for(int i = 0; i < NTP_RING_SIZE; i++) {
+        float diff = ring[i] - _mean;
+        _var += diff * diff;
+    }
+    _var /= NTP_RING_SIZE;
+    _var *= 4;
+
+    int cnt = 0;
+    *mean = 0, *var = 0;
+    for(int i = 0; i < NTP_RING_SIZE; i++) {
+        float diff = ring[i] - _mean;
+        diff *= diff;
+        if(diff < _var) {
+            *mean += ring[i];
+            *var += diff;
+            ++cnt;
+        }
+    }
+    *mean /= (float) cnt;
+    *var /= (float) cnt;
 }
 
 static void updateTime(struct Server *server) {
+    // advance ring
+    ++server->head;
+    server->head &= NTP_RING_MASK;
+    const int head = server->head;
+
     // compute delay and offset
     int64_t _adjust = 0;
     uint64_t _delay = 0;
@@ -500,18 +530,16 @@ static void updateTime(struct Server *server) {
     uint64_t update = server->stamps[(NTP_BURST << 2) - 1];
     update += ((int64_t) (server->stamps[0] - update)) >> 1;
 
-    // update delay stats
-    float delay = 0x1p-32f * (float) (uint32_t) _delay;
-    if(server->delay == 0)
-        server->delay = delay;
-    float jitter = delay - server->delay;
-    jitter *= jitter;
-    // exclude 2-sigma outliers from mean delay
-    if(jitter < server->jitter * 4)
-        server->delay += (delay - server->delay) * 0x1p-3f;
-    if(server->jitter == 0)
-        server->jitter = jitter;
-    server->jitter += (jitter - server->jitter) * 0x1p-3f;
+    // update ring
+    server->ringOffset[head] = 0x1p-32f * (float) (int32_t) (offset - ntpOffset);
+    server->ringDelay[head] = 0x1p-32f * (float) (uint32_t) _delay;
+    if(server->reach == 1) {
+        for(int i = 0; i < NTP_RING_SIZE; i++) {
+            int j = (i + head) & NTP_RING_MASK;
+            server->ringOffset[j] = server->ringOffset[head];
+            server->ringDelay[j] = server->ringDelay[head];
+        }
+    }
 
     // compute drift
     if(server->update != 0) {
@@ -522,25 +550,17 @@ static void updateTime(struct Server *server) {
         float drift = (float) (int32_t) (offset - server->offset);
         drift /= (float) (uint32_t) (interval >> shift);
         drift /= (float) (1 << shift);
-        // update drift metrics
-        if (fabsf(drift) < 1e-3f) {
-            if(server->drift == 0)
-                server->drift = drift;
-            float skew = drift - server->drift;
-            skew *= skew;
-            // exclude 2-sigma outliers from mean drift
-            if(skew < server->skew * 4)
-                server->drift += (drift - server->drift) * 0x1p-3f;
-            // update skew
-            if(server->skew == 0)
-                server->skew = skew;
-            server->skew += (skew - server->skew) * 0x1p-3f;
-        }
+        server->ringDrift[head] = drift;
+        computeMeanVar(server->ringDrift, &(server->meanDrift), &(server->varDrift));
     }
 
     // update server status
-    updateEma(&(server->offset), offset, 3);
-    updateEma(&(server->update), update, 3);
+    server->offset = offset;
+    server->update = update;
+
+    // update stats
+    computeMeanVar(server->ringOffset, &(server->meanOffset), &(server->varOffset));
+    computeMeanVar(server->ringDelay, &(server->meanDelay), &(server->varDelay));
 }
 
 static void processResponse(uint8_t *frame) {

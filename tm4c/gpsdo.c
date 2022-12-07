@@ -16,8 +16,8 @@
 #define STAT_TIME_CONST (16)
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_COMP_RMS (200e-9f)
-#define BIAS_ALPHA (0x1p-17f)
-#define COEF_ALPHA (0x1p-15f)
+#define BIAS_ALPHA (0x1p-16f)
+#define COEF_ALPHA (0x1p-12f)
 
 // temperature compensation state
 static float currTemp;
