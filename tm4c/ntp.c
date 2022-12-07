@@ -87,7 +87,9 @@ static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
 void NTP_init() {
     memset(servers, 0, sizeof(servers));
     UDP_register(NTP_PORT, processRequest);
-    servers[0].addr = 0xC803A8C0;
+    // explicitly include some local stratum 1 servers for testing
+    servers[0].addr = 0xC803A8C0; // local network GPS timeserver
+    servers[1].addr = 0x87188F68; // nearby GPS timeserver on same ISP
 }
 
 uint64_t NTP_offset() {
