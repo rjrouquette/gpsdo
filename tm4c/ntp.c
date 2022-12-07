@@ -28,6 +28,7 @@
 #define NTP_PRECISION (-24)
 #define NTP_RING_MASK (15)
 #define NTP_RING_SIZE (16)
+#define NTP_MAX_STRATUM (4)
 
 struct PACKED HEADER_NTPv4 {
     uint16_t mode: 3;
@@ -386,6 +387,12 @@ void NTP_run() {
             servers[i].weight = 0;
             continue;
         }
+        if(servers[i].stratum == 0 || servers[i].stratum > NTP_MAX_STRATUM) {
+            // unset reach bit if server stratum is too poor
+            servers[i].reach &= 0xFFFE;
+            servers[i].weight = 0;
+            continue;
+        }
 
         int reach = servers[i].reach;
         int elapsed = 0, quality = 0;
@@ -693,12 +700,7 @@ static void pollTxCallback(uint8_t *frame, int flen) {
     struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
     // guard against buffer overruns
-    if(flen < NTP4_SIZE) return;
-    if(headerEth->ethType != ETHTYPE_IPv4) return;
-    if(headerIPv4->proto != IP_PROTO_UDP) return;
-    if(headerUDP->portSrc != __builtin_bswap16(NTP_PORT)) return;
-    if(headerUDP->portDst != __builtin_bswap16(NTP_PORT)) return;
-    if(headerNTP->version != 4) return;
+    if(flen != NTP4_SIZE) return;
 
     // validate remote address
     struct Server *server = NULL;
