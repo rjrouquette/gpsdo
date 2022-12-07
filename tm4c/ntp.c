@@ -508,6 +508,8 @@ char* NTP_servers(char *tail) {
     tail = append(tail, "  ");
     tail = append(tail, "stratum");
     tail = append(tail, "  ");
+    tail = append(tail, "leap");
+    tail = append(tail, "  ");
     tail = append(tail, "reach");
     tail = append(tail, "  ");
     tail = append(tail, "next");
@@ -536,6 +538,9 @@ char* NTP_servers(char *tail) {
             *(tail++) = ' ';
 
         tmp[toDec(servers[i].stratum, 7, ' ', tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+        tmp[toDec(servers[i].leapIndicator, 4, ' ', tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
         tmp[toOct(servers[i].reach & 077777, 5, '0', tmp)] = 0;

@@ -3,7 +3,6 @@
 //
 
 #include <string.h>
-#include <math.h>
 
 #include "status.h"
 #include "lib/clk.h"
