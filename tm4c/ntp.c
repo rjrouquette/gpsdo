@@ -46,8 +46,10 @@ struct PACKED HEADER_NTPv4 {
 };
 _Static_assert(sizeof(struct HEADER_NTPv4) == 48, "HEADER_NTPv4 must be 48 bytes");
 
-static volatile uint32_t ntpEra = 0;
-static volatile uint64_t ntpOffset = 0;
+static uint32_t ntpEra = 0;
+static uint64_t ntpOffset = 0;
+static float clockOffset;
+static float clockDrift;
 
 #define SERVER_COUNT (8)
 struct Server {
@@ -58,6 +60,7 @@ struct Server {
     float meanOffset, varOffset;
     float meanDelay, varDelay;
     float meanDrift, varDrift;
+    float weight, currentOffset;
     uint64_t stamps[NTP_BURST << 2];
     int64_t asym;
     uint64_t offset;
@@ -88,6 +91,14 @@ void NTP_init() {
 
 uint64_t NTP_offset() {
     return ntpOffset;
+}
+
+float NTP_clockOffset() {
+    return clockOffset;
+}
+
+float NTP_clockDrift() {
+    return clockDrift;
 }
 
 void NTP_date(uint64_t clkMono, uint32_t *ntpDate) {
@@ -345,6 +356,15 @@ static void dnsCallback(uint32_t addr) {
     }
 }
 
+static inline int centerOfMass(int reach) {
+    int result = 0;
+    for(int i = 0; i < 16; i++) {
+        if((reach >> i) & 1)
+            result += i;
+    }
+    return result << 2;
+}
+
 static uint32_t nextPoll = 0;
 void NTP_run() {
     uint32_t now = CLK_MONOTONIC_INT();
@@ -361,6 +381,39 @@ void NTP_run() {
     // process existing servers
     for(int i = 0; i < SERVER_COUNT; i++)
         runServer(servers + i, now);
+
+    // update server weights
+    float norm = 0;
+    for(int i = 0; i < SERVER_COUNT; i++) {
+        if(servers[i].reach == 0) {
+            servers[i].weight = 0;
+            continue;
+        }
+
+        int elapsed = centerOfMass(servers[i].reach) + (int) (CLK_MONOTONIC() & 63);
+        servers[i].currentOffset = servers[i].meanOffset;
+        servers[i].currentOffset += servers[i].meanDrift * (float) elapsed;
+
+        float weight = 0;
+        if(servers[i].varDrift > 0) {
+            weight = (float) elapsed;
+            weight *= servers[i].varDrift;
+            weight = sqrtf(weight);
+            weight = 1.0f / weight;
+        }
+        servers[i].weight = weight;
+        norm += weight;
+    }
+    clockDrift = 0;
+    clockOffset = 0;
+    if(norm > 0) {
+        norm = 1.0f / norm;
+        for(int i = 0; i < SERVER_COUNT; i++) {
+            servers[i].weight *= norm;
+            clockDrift += servers[i].weight * servers[i].meanDrift;
+            clockOffset += servers[i].weight * servers[i].currentOffset;
+        }
+    }
 
     // compute mean offset
     uint64_t offset = servers[0].offset;
@@ -393,9 +446,7 @@ char* NTP_servers(char *tail) {
     tail = append(tail, "  ");
     tail = append(tail, "reach");
     tail = append(tail, "  ");
-    tail = append(tail, "next (s)");
-    tail = append(tail, "  ");
-    tail = append(tail, "last (s)");
+    tail = append(tail, "next");
     tail = append(tail, "  ");
     tail = append(tail, "offset (ms)");
     tail = append(tail, "  ");
@@ -408,6 +459,8 @@ char* NTP_servers(char *tail) {
     tail = append(tail, "drift (ppm)");
     tail = append(tail, "  ");
     tail = append(tail, "skew (ppm)");
+    tail = append(tail, "  ");
+    tail = append(tail, "weight");
     tail = append(tail, "\n");
 
     uint32_t now = CLK_MONOTONIC_INT();
@@ -426,14 +479,11 @@ char* NTP_servers(char *tail) {
         tmp[toOct(servers[i].reach & 077777, 5, '0', tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
-        tmp[toDec(servers[i].nextPoll - now, 8, ' ', tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-        tmp[toDec(now - servers[i].lastResponse, 8, ' ', tmp)] = 0;
+        tmp[toDec(servers[i].nextPoll - now, 4, ' ', tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(1e3f * servers[i].meanOffset, 11, 3, tmp)] = 0;
+        tmp[fmtFloat(1e3f * servers[i].currentOffset, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
@@ -455,6 +505,10 @@ char* NTP_servers(char *tail) {
         tail = append(tail, "  ");
 
         tmp[fmtFloat(sqrtf(servers[i].varDrift) * 1e6f, 10, 3, tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
+        tmp[fmtFloat(servers[i].weight, 6, 4, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "\n");
     }

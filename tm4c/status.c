@@ -247,11 +247,11 @@ unsigned statusNTP(char *body) {
 
     // TAI time
     uint64_t tai = CLK_TAI();
-    strcpy(tmp, " 0x");
-    toHex(tai>>32, 8, '0', tmp+3);
-    tmp[11] = '.';
-    toHex(tai, 8, '0', tmp+12);
-    tmp[20] = 0;
+    strcpy(tmp, "0x");
+    toHex(tai>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(tai, 8, '0', tmp+11);
+    tmp[19] = 0;
     end = append(end, "tai:         ");
     end = append(end, tmp);
     end = append(end, "\n");
@@ -268,6 +268,16 @@ unsigned statusNTP(char *body) {
     end = append(end, "\n");
 
     end = NTP_servers(end);
+
+    end = append(end, "clock offset: ");
+    tmp[fmtFloat(NTP_clockOffset() * 1e3f, 0, 3, tmp)] = 0;
+    end = append(end, tmp);
+    end = append(end, " ms\n");
+
+    end = append(end, "clock drift: ");
+    tmp[fmtFloat(NTP_clockDrift() * 1e6f, 0, 3, tmp)] = 0;
+    end = append(end, tmp);
+    end = append(end, " ppm\n");
 
     // return size
     return end - body;
