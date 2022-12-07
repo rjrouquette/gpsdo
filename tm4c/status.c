@@ -256,14 +256,14 @@ unsigned statusNTP(char *body) {
     end = append(end, tmp);
     end = append(end, "\n");
 
-    // TAI offset
+    // NTP offset
     uint64_t offset = NTP_offset();
     strcpy(tmp, "0x");
     toHex(offset>>32, 8, '0', tmp+2);
     tmp[10] = '.';
     toHex(offset, 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "tai offset:  ");
+    end = append(end, "ntp offset:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
