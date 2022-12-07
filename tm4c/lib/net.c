@@ -126,7 +126,7 @@ static void initPTP() {
     // 25MHz = 40ns
     EMAC0.SUBSECINC.SSINC = 40;
     // init timer
-    EMAC0.TIMSECU = 1653530160;
+    EMAC0.TIMSECU = 0;
     EMAC0.TIMNANOU.VALUE = 0;
     // frequency correction
     EMAC0.TIMADD = 0xFFFFFFFF;

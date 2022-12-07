@@ -220,7 +220,7 @@ unsigned statusGPSDO(char *body) {
     end = append(end, " C\n");
 
     // temperature offset
-    tmp[fmtFloat(GPSDO_compBias(), 0, 4, tmp)] = 0;
+    tmp[fmtFloat(GPSDO_compBias(), 0, 3, tmp)] = 0;
     end = append(end, "  - bias: ");
     end = append(end, tmp);
     end = append(end, " C\n");
@@ -244,6 +244,17 @@ unsigned statusGPSDO(char *body) {
 unsigned statusNTP(char *body) {
     char tmp[32];
     char *end = body;
+
+    // TAI time
+    uint64_t tai = CLK_TAI();
+    strcpy(tmp, " 0x");
+    toHex(tai>>32, 8, '0', tmp+3);
+    tmp[11] = '.';
+    toHex(tai, 8, '0', tmp+12);
+    tmp[20] = 0;
+    end = append(end, "tai: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
 
     // TAI offset
     uint64_t offset = NTP_offset();

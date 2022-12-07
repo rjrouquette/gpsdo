@@ -123,11 +123,11 @@ void initPPS() {
     PORTG.CR = 0;
     PORTG.LOCK = 0;
 
-    // use command mode
+    // use PPS free-running mode
     EMAC0.PPSCTRL.TRGMODS0 = 3;
     // start 1 Hz PPS output
     EMAC0.PPSCTRL.PPSEN0 = 0;
-    EMAC0.PPSCTRL.PPSCTRL = 1;
+    EMAC0.PPSCTRL.PPSCTRL = 0;
 }
 
 void initEdgeComp() {
@@ -265,7 +265,7 @@ void GPSDO_run() {
     // update control loop
     pllCorr = fltOffset * rate;
     setFeedback(currCompensation + pllCorr + pllBias);
-    pllBias += fltOffset * 0x1p-9f;
+    pllBias += fltOffset * 0x1p-8f;
 
     // update PPS stats
     ppsOffsetMean += (fltOffset - ppsOffsetMean) / STAT_TIME_CONST;

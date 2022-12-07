@@ -385,19 +385,22 @@ char* NTP_servers(char *tail) {
     tail = append(tail, "  ");
     tail = append(tail, "last (s)");
     tail = append(tail, "  ");
+    tail = append(tail, "window (s)");
+    tail = append(tail, "  ");
     tail = append(tail, "offset (ms)");
     tail = append(tail, "  ");
     tail = append(tail, "asymm (ms)");
     tail = append(tail, "  ");
-    tail = append(tail, "delay (ms) ");
+    tail = append(tail, "delay (ms)");
     tail = append(tail, "  ");
     tail = append(tail, "jitter (ms)");
     tail = append(tail, "  ");
     tail = append(tail, "drift (ppm)");
     tail = append(tail, "  ");
-    tail = append(tail, "skew (ppm) ");
+    tail = append(tail, "skew (ppm)");
     tail = append(tail, "\n");
 
+    uint64_t nowTai = CLK_TAI();
     uint32_t now = CLK_MONOTONIC_INT();
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == 0) continue;
@@ -421,6 +424,11 @@ char* NTP_servers(char *tail) {
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
+        int32_t window = (int32_t) ((nowTai - servers[i].update) >> 28);
+        tmp[fmtFloat(0x1p-4f * (float) window, 10, 1, tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
         int32_t offset = (int32_t) (servers[i].offset - ntpOffset);
         tmp[fmtFloat((1e3f * 0x1p-32f) * (float) offset, 11, 3, tmp)] = 0;
         tail = append(tail, tmp);
@@ -431,7 +439,7 @@ char* NTP_servers(char *tail) {
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(servers[i].delay * 1e3f, 11, 3, tmp)] = 0;
+        tmp[fmtFloat(servers[i].delay * 1e3f, 10, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
@@ -443,11 +451,18 @@ char* NTP_servers(char *tail) {
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(sqrtf(servers[i].skew) * 1e6f, 11, 3, tmp)] = 0;
+        tmp[fmtFloat(sqrtf(servers[i].skew) * 1e6f, 10, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "\n");
     }
     return tail;
+}
+
+static inline void updateEma(uint64_t *acc, uint64_t value, int logRate) {
+    // boostrap initial value
+    if(*acc == 0) { *acc = value; return; }
+    // perform EMA update
+    *acc += ((int64_t) (value - *acc)) >> logRate;
 }
 
 static void updateTime(struct Server *server) {
@@ -493,8 +508,10 @@ static void updateTime(struct Server *server) {
     jitter *= jitter;
     // exclude 2-sigma outliers from mean delay
     if(jitter < server->jitter * 4)
-        server->delay += (delay - server->delay) * 0x1p-4f;
-    server->jitter += (jitter - server->jitter) * 0x1p-4f;
+        server->delay += (delay - server->delay) * 0x1p-3f;
+    if(server->jitter == 0)
+        server->jitter = jitter;
+    server->jitter += (jitter - server->jitter) * 0x1p-3f;
 
     // compute drift
     if(server->update != 0) {
@@ -513,15 +530,17 @@ static void updateTime(struct Server *server) {
             skew *= skew;
             // exclude 2-sigma outliers from mean drift
             if(skew < server->skew * 4)
-                server->drift += (drift - server->drift) * 0x1p-4f;
+                server->drift += (drift - server->drift) * 0x1p-3f;
             // update skew
-            server->skew += (skew - server->skew) * 0x1p-4f;
+            if(server->skew == 0)
+                server->skew = skew;
+            server->skew += (skew - server->skew) * 0x1p-3f;
         }
     }
 
     // update server status
-    server->offset = offset;
-    server->update = update;
+    updateEma(&(server->offset), offset, 3);
+    updateEma(&(server->update), update, 3);
 }
 
 static void processResponse(uint8_t *frame) {
