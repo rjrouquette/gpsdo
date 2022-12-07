@@ -205,7 +205,7 @@ void GPSDO_init() {
 
 void GPSDO_run() {
     // update temperature compensation
-    float newComp = tcompOffset + (tcompCoeff * GPSDO_temperature());
+    float newComp = tcompOffset + (tcompCoeff * (GPSDO_temperature() - tcompBias));
     // prevent large correction impulses
     if(fabsf(newComp - currCompensation) > 100e-9f)
         pllBias -= (newComp - currCompensation);
