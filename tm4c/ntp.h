@@ -14,6 +14,7 @@ void NTP_run();
 uint64_t NTP_offset();
 float NTP_clockOffset();
 float NTP_clockDrift();
+int NTP_clockStratum();
 void NTP_date(uint64_t clkMono, uint32_t *ntpDate);
 
 char* NTP_servers(char *tail);

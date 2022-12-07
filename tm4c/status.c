@@ -269,6 +269,11 @@ unsigned statusNTP(char *body) {
 
     end = NTP_servers(end);
 
+    end = append(end, "clock stratum: ");
+    tmp[toBase(NTP_clockStratum(), 10, tmp)] = 0;
+    end = append(end, tmp);
+    end = append(end, "\n");
+
     end = append(end, "clock offset: ");
     tmp[fmtFloat(NTP_clockOffset() * 1e3f, 0, 3, tmp)] = 0;
     end = append(end, tmp);

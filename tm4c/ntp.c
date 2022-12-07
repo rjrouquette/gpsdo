@@ -29,6 +29,8 @@
 #define NTP_RING_MASK (15)
 #define NTP_RING_SIZE (16)
 #define NTP_MAX_STRATUM (4)
+#define NTP_REF_GPS (0x00535047) // "GPS"
+#define NTP_LI_ALARM (3)
 
 struct PACKED HEADER_NTPv4 {
     uint16_t mode: 3;
@@ -51,10 +53,12 @@ static uint32_t ntpEra = 0;
 static uint64_t ntpOffset = 0;
 static float clockOffset;
 static float clockDrift;
+static int clockStratum = 16;
+static uint32_t refId;
+static int leapIndicator;
 
 #define SERVER_COUNT (8)
 struct Server {
-    int head;
     float ringOffset[NTP_RING_SIZE];
     float ringDelay[NTP_RING_SIZE];
     float ringDrift[NTP_RING_SIZE];
@@ -68,10 +72,12 @@ struct Server {
     uint32_t nextPoll;
     uint32_t attempts;
     uint32_t addr;
-    uint8_t mac[6];
     uint16_t reach;
+    uint8_t mac[6];
+    uint8_t leapIndicator;
     uint8_t stratum;
     uint8_t burst;
+    uint8_t head;
 } servers[SERVER_COUNT];
 
 static void processResponse(uint8_t *frame);
@@ -101,6 +107,10 @@ float NTP_clockOffset() {
 
 float NTP_clockDrift() {
     return clockDrift;
+}
+
+int NTP_clockStratum() {
+    return clockStratum;
 }
 
 void NTP_date(uint64_t clkMono, uint32_t *ntpDate) {
@@ -170,13 +180,12 @@ static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
 
     // set type to server response
     headerNTP->mode = 4;
-    // indicate that the time is not currently set
-    headerNTP->status = GPSDO_isLocked() ? 0 : 3;
-    // set other header fields
-    headerNTP->stratum = GPSDO_isLocked() ? 1 : 16;
+    headerNTP->status = leapIndicator;
+    // set stratum and precision
+    headerNTP->stratum = clockStratum;
     headerNTP->precision = NTP_PRECISION;
     // set reference ID
-    memcpy(headerNTP->refID, "GPS", 4);
+    memcpy(headerNTP->refID, &refId, 4);
     // set root delay
     headerNTP->rootDelay = 0;
     // set root dispersion
@@ -240,13 +249,12 @@ static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
 
     // set type to server response
     headerNTP->mode = 4;
-    // indicate that the time is not currently set
-    headerNTP->status = GPSDO_isLocked() ? 0 : 3;
-    // set other header fields
-    headerNTP->stratum = GPSDO_isLocked() ? 1 : 16;
+    headerNTP->status = leapIndicator;
+    // set stratum and precision
+    headerNTP->stratum = clockStratum;
     headerNTP->precision = NTP_PRECISION;
     // set reference ID
-    memcpy(headerNTP->refID, "GPS", 4);
+    memcpy(headerNTP->refID, &refId, 4);
     // set root delay
     headerNTP->rootDelay = 0;
     // set root dispersion
@@ -384,11 +392,18 @@ void NTP_run() {
     // update server weights
     float norm = 0;
     for(int i = 0; i < SERVER_COUNT; i++) {
+        // skip servers that are still initializing
         if(servers[i].reach == 0) {
             servers[i].weight = 0;
             continue;
         }
-        if(servers[i].stratum == 0 || servers[i].stratum > NTP_MAX_STRATUM) {
+
+        // check for failure states
+        if(
+                servers[i].leapIndicator == NTP_LI_ALARM ||
+                servers[i].stratum == 0 ||
+                servers[i].stratum > NTP_MAX_STRATUM
+        ) {
             // unset reach bit if server stratum is too poor
             servers[i].reach &= 0xFFFE;
             servers[i].weight = 0;
@@ -419,14 +434,48 @@ void NTP_run() {
         servers[i].weight = weight;
         norm += weight;
     }
+    refId = 0;
     clockDrift = 0;
     clockOffset = 0;
+    float _stratum = 0;
+    float best = 0;
+    int li[4];
     if(norm > 0) {
         norm = 1.0f / norm;
         for(int i = 0; i < SERVER_COUNT; i++) {
             servers[i].weight *= norm;
             clockDrift += servers[i].weight * servers[i].meanDrift;
             clockOffset += servers[i].weight * servers[i].currentOffset;
+            _stratum += servers[i].weight * (float) servers[i].stratum;
+            // set reference ID to server with best weight
+            if(servers[i].weight > best) {
+                best = servers[i].weight;
+                refId = servers[i].addr;
+            }
+            // tally leap indicator votes
+            if(servers[i].weight > 0.05f)
+                ++li[servers->leapIndicator];
+        }
+    }
+    // update clock stratum
+    if(GPSDO_isLocked())
+        clockStratum = 1;
+    else if(_stratum == 0)
+        clockStratum = 16;
+    else
+        clockStratum = (int) roundf(_stratum) + 1;
+
+    // set reference ID to GPS if stratum is 1
+    if(clockStratum == 1)
+        refId = NTP_REF_GPS;
+
+    // tally leap indicator votes
+    leapIndicator = 0;
+    int bestLI = 0;
+    for(int i = 0; i < 3; i++) {
+        if(li[i] > bestLI) {
+            bestLI = li[i];
+            leapIndicator = i;
         }
     }
 
@@ -604,7 +653,6 @@ static void updateTracking(struct Server *server) {
         drift /= (float) (uint32_t) (interval >> shift);
         drift /= (float) (1 << shift);
         server->ringDrift[head] = drift;
-        computeMeanVar(server->ringDrift, &(server->meanDrift), &(server->varDrift));
     }
 
     // update server status
@@ -614,6 +662,7 @@ static void updateTracking(struct Server *server) {
     // update stats
     computeMeanVar(server->ringOffset, &(server->meanOffset), &(server->varOffset));
     computeMeanVar(server->ringDelay, &(server->meanDelay), &(server->varDelay));
+    computeMeanVar(server->ringDrift, &(server->meanDrift), &(server->varDrift));
 }
 
 static void processResponse(uint8_t *frame) {
@@ -672,6 +721,7 @@ static void processResponse(uint8_t *frame) {
     // burst is complete, perform update calculations
     server->reach |= 1;
     server->stratum = headerNTP->stratum;
+    server->leapIndicator = headerNTP->status;
 }
 
 static void pollTxCallback(uint8_t *frame, int flen) {
@@ -741,9 +791,11 @@ static void pollServer(struct Server *server, int pingOnly) {
     headerNTP->version = 4;
     headerNTP->mode = 3;
     headerNTP->poll = 4;
+    // set stratum and precision
+    headerNTP->stratum = clockStratum;
     headerNTP->precision = NTP_PRECISION;
     // set reference ID
-    memcpy(headerNTP->refID, "GPS", 4);
+    memcpy(headerNTP->refID, &refId, 4);
     // set reference timestamp
     uint64_t refTime = CLK_TAI() + ntpOffset;
     headerNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
