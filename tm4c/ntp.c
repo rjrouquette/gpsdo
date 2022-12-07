@@ -66,7 +66,6 @@ struct Server {
     uint64_t offset;
     uint64_t update;
     uint32_t nextPoll;
-    uint32_t lastResponse;
     uint32_t attempts;
     uint32_t addr;
     uint8_t mac[6];
@@ -77,6 +76,7 @@ struct Server {
 
 static void processResponse(uint8_t *frame);
 static void pollServer(struct Server *server, int pingOnly);
+static void updateTracking(struct Server *server);
 
 static void processRequest(uint8_t *frame, int flen);
 static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP);
@@ -314,6 +314,10 @@ static void runServer(struct Server *server, uint32_t now) {
         }
     }
 
+    // update timing metrics 3 seconds after polling window
+    if((now & 63) == 11)
+        updateTracking(server);
+
     // verify current time
     uint32_t nextPoll = server->nextPoll;
     if(((int32_t) (now - nextPoll)) < -1)
@@ -349,20 +353,10 @@ static void dnsCallback(uint32_t addr) {
     for (int i = 0; i < SERVER_COUNT; i++) {
         if (servers[i].addr == 0) {
             servers[i].addr = addr;
-            servers[i].lastResponse = CLK_MONOTONIC_INT();
-            servers[i].nextPoll = servers[i].lastResponse + 2;
+            servers[i].nextPoll = CLK_MONOTONIC_INT() + 2;
             break;
         }
     }
-}
-
-static inline int centerOfMass(int reach) {
-    int result = 0;
-    for(int i = 0; i < 16; i++) {
-        if((reach >> i) & 1)
-            result += i;
-    }
-    return result << 2;
 }
 
 static uint32_t nextPoll = 0;
@@ -382,6 +376,9 @@ void NTP_run() {
     for(int i = 0; i < SERVER_COUNT; i++)
         runServer(servers + i, now);
 
+    // update tracking 4 seconds after polling window
+    if((now & 63) != 12) return;
+
     // update server weights
     float norm = 0;
     for(int i = 0; i < SERVER_COUNT; i++) {
@@ -390,7 +387,16 @@ void NTP_run() {
             continue;
         }
 
-        int elapsed = centerOfMass(servers[i].reach) + (int) (CLK_MONOTONIC_INT() & 63);
+        int reach = servers[i].reach;
+        int elapsed = 0, quality = 0;
+        for(int shift = 0; shift < 16; shift++) {
+            if((reach >> shift) & 1) {
+                elapsed += shift;
+                ++quality;
+            }
+        }
+        elapsed <<= 2;
+        elapsed += 2;
         servers[i].currentOffset = servers[i].meanOffset;
         servers[i].currentOffset += servers[i].meanDrift * (float) elapsed;
 
@@ -400,6 +406,7 @@ void NTP_run() {
             weight *= servers[i].varDrift;
             weight = sqrtf(weight);
             weight = 1.0f / weight;
+            weight *= (float) quality;
         }
         servers[i].weight = weight;
         norm += weight;
@@ -544,7 +551,10 @@ void computeMeanVar(const float *ring, float *mean, float *var) {
     *var /= (float) cnt;
 }
 
-static void updateTime(struct Server *server) {
+static void updateTracking(struct Server *server) {
+    // burst must be complete
+    if(server->burst < NTP_BURST) return;
+
     // advance ring
     ++server->head;
     server->head &= NTP_RING_MASK;
@@ -673,8 +683,6 @@ static void processResponse(uint8_t *frame) {
     // burst is complete, perform update calculations
     server->reach |= 1;
     server->stratum = headerNTP->stratum;
-    server->lastResponse = CLK_MONOTONIC_INT();
-    updateTime(server);
 }
 
 static void pollTxCallback(uint8_t *frame, int flen) {
