@@ -365,9 +365,9 @@ void NTP_run() {
     // compute mean offset
     uint64_t offset = servers[0].offset;
     int64_t diff = 0;
-    for(int i = 1; i < SERVER_COUNT; i++)
-        diff += (int64_t) (servers[i].offset - offset);
-    offset += diff >> 3;
+//    for(int i = 1; i < SERVER_COUNT; i++)
+//        diff += (int64_t) (servers[i].offset - offset);
+//    offset += diff >> 3;
 
     diff = (int64_t) (offset - ntpOffset);
     if(((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
@@ -636,7 +636,7 @@ static void pollTxCallback(uint8_t *frame, int flen) {
     if(headerIPv4->proto != IP_PROTO_UDP) return;
     if(headerUDP->portSrc != __builtin_bswap16(NTP_PORT)) return;
     if(headerUDP->portDst != __builtin_bswap16(NTP_PORT)) return;
-//    if(headerNTP->version != 4) return;
+    if(headerNTP->version != 4) return;
 
     // validate remote address
     struct Server *server = NULL;
@@ -692,7 +692,7 @@ static void pollServer(struct Server *server, int pingOnly) {
     headerUDP->portDst = __builtin_bswap16(NTP_PORT);
 
     // set type to client request
-    headerNTP->version = 3;
+    headerNTP->version = 4;
     headerNTP->mode = 3;
     headerNTP->poll = 4;
     headerNTP->precision = NTP_PRECISION;
