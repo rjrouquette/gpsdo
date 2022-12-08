@@ -328,10 +328,6 @@ static void runServer(struct Server *server, uint32_t now) {
         }
     }
 
-    // update timing metrics 3 seconds after polling window
-    if((now & 63) == 11)
-        updateTracking(server);
-
     // verify current time
     uint32_t nextPoll = server->nextPoll;
     if(((int32_t) (now - nextPoll)) < -1)
@@ -373,9 +369,20 @@ static void dnsCallback(uint32_t addr) {
     }
 }
 
+static int nextServer = 0;
 static uint32_t nextPoll = 0;
 void NTP_run() {
     uint32_t now = CLK_MONOTONIC_INT();
+
+    // update timing metrics 3 seconds after polling window
+    if((now & 63) == 10) {
+        if(nextServer < SERVER_COUNT)
+            updateTracking(servers + (nextServer++));
+        return;
+    } else {
+        nextServer = 0;
+    }
+
     if(((int32_t) (now - nextPoll)) < 0) return;
     nextPoll = now + 1;
 
@@ -391,7 +398,7 @@ void NTP_run() {
         runServer(servers + i, now);
 
     // update tracking 4 seconds after polling window
-    if((now & 63) != 12) return;
+    if((now & 63) != 11) return;
 
     // update server weights
     float norm = 0;
@@ -435,6 +442,8 @@ void NTP_run() {
             weight = 1.0f / weight;
             weight *= (float) quality;
         }
+        if(!isfinite(weight))
+            weight = 0;
         servers[i].weight = weight;
         norm += weight;
     }
@@ -512,19 +521,33 @@ void NTP_run() {
     }
 
     // compute mean offset
-    uint64_t offset = servers[0].offset;
-    int64_t diff = 0;
-//    for(int i = 1; i < SERVER_COUNT; i++)
-//        diff += (int64_t) (servers[i].offset - offset);
-//    offset += diff >> 3;
+    int64_t offset = 0;
+    int32_t divisor = 0;
+    for(int i = 0; i < SERVER_COUNT; i++) {
+        int32_t weight = (int32_t) (0x1p24f * servers[i].weight);
+        divisor += weight;
+        int64_t _offset = (int64_t) servers[i].offset;
+        _offset >>= 24;
+        _offset *= weight;
+        offset += _offset;
+    }
+    // correct for integer truncation
+    int64_t twiddle = offset;
+    twiddle >>= 24;
+    twiddle *= (1<<24) - divisor;
+    offset += twiddle;
 
-    diff = (int64_t) (offset - ntpOffset);
-    if(((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
-        ((int32_t *) &diff)[1] -= 1;
-    else if(((uint32_t *) &diff)[0] >= (1 << 31))
-        ((int32_t *) &diff)[1] += 1;
-    if(((int32_t *) &diff)[1] != 0)
+    if(offset != 0) {
+        // compute offset adjustment
+        int64_t diff = offset - (int64_t) ntpOffset;
+        // round to whole seconds
+        if (((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
+            ((int32_t *) &diff)[1] -= 1;
+        else if (((uint32_t *) &diff)[0] >= (1 << 31))
+            ((int32_t *) &diff)[1] += 1;
+        // apply offset adjustment
         ((uint32_t *) &ntpOffset)[1] += ((int32_t *) &diff)[1];
+    }
 }
 
 char* NTP_servers(char *tail) {
@@ -634,8 +657,13 @@ void computeMeanVar(const float *ring, float *mean, float *var) {
             ++cnt;
         }
     }
-    *mean /= (float) cnt;
-    *var /= (float) cnt;
+    if(cnt == 0) {
+        *mean = 0;
+        *var = 0;
+    } else {
+        *mean /= (float) cnt;
+        *var /= (float) cnt;
+    }
 }
 
 static void updateTracking(struct Server *server) {
@@ -673,7 +701,7 @@ static void updateTracking(struct Server *server) {
     server->ringOffset[head] = 0x1p-32f * (float) (int32_t) (offset - ntpOffset);
     server->ringDelay[head] = 0x1p-32f * (float) (uint32_t) _delay;
     // bootstrap ring with first sample
-    if(server->update == 0) {
+    if(server->reach == 1) {
         for(int i = 0; i < NTP_RING_SIZE; i++) {
             server->ringOffset[i] = server->ringOffset[head];
             server->ringDelay[i] = server->ringDelay[head];
