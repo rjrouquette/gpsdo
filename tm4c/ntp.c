@@ -438,6 +438,33 @@ void NTP_run() {
         servers[i].weight = weight;
         norm += weight;
     }
+    if(norm > 0) {
+        float mean = 0;
+        for(int i = 0; i < SERVER_COUNT; i++)
+            mean += servers[i].currentOffset * servers[i].weight;
+        mean /= norm;
+
+        float var = 0;
+        for(int i = 0; i < SERVER_COUNT; i++) {
+            float diff = servers[i].currentOffset - mean;
+            diff *= diff;
+            var += diff * servers[i].weight;
+        }
+        var /= norm;
+        var *= 4;
+
+        norm = 0;
+        for(int i = 0; i < SERVER_COUNT; i++) {
+            // drop server if offset is too high
+            float diff = servers[i].currentOffset - mean;
+            diff *= diff;
+            if(diff < var)
+                norm += servers[i].weight;
+            else
+                servers[i].weight = 0;
+        }
+    }
+
     refId = 0;
     clockDrift = 0;
     clockOffset = 0;
@@ -645,11 +672,11 @@ static void updateTracking(struct Server *server) {
     // update ring
     server->ringOffset[head] = 0x1p-32f * (float) (int32_t) (offset - ntpOffset);
     server->ringDelay[head] = 0x1p-32f * (float) (uint32_t) _delay;
-    if(server->reach == 1) {
+    // bootstrap ring with first sample
+    if(server->update == 0) {
         for(int i = 0; i < NTP_RING_SIZE; i++) {
-            int j = (i + head) & NTP_RING_MASK;
-            server->ringOffset[j] = server->ringOffset[head];
-            server->ringDelay[j] = server->ringDelay[head];
+            server->ringOffset[i] = server->ringOffset[head];
+            server->ringDelay[i] = server->ringDelay[head];
         }
     }
 
