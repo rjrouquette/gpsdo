@@ -283,6 +283,12 @@ unsigned statusNTP(char *body) {
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
+    end = append(end, "leap indicator: ");
+    tmp[toBase(NTP_leapIndicator(), 10, tmp)] = 0;
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+
     // return size
     return end - body;
 }

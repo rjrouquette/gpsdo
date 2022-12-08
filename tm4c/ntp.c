@@ -94,7 +94,7 @@ void NTP_init() {
     UDP_register(NTP_PORT, processRequest);
     // explicitly include some local stratum 1 servers for testing
     servers[0].addr = 0xC803A8C0; // local network GPS timeserver
-    servers[1].addr = 0x87188F68; // nearby GPS timeserver on same ISP
+    servers[1].addr = 0x87188f6b; // nearby GPS timeserver on same ISP
 }
 
 uint64_t NTP_offset() {
@@ -111,6 +111,10 @@ float NTP_clockDrift() {
 
 int NTP_clockStratum() {
     return clockStratum;
+}
+
+int NTP_leapIndicator() {
+    return leapIndicator;
 }
 
 void NTP_date(uint64_t clkMono, uint32_t *ntpDate) {
@@ -439,22 +443,23 @@ void NTP_run() {
     clockOffset = 0;
     float _stratum = 0;
     float best = 0;
-    int li[4];
+    int li[4] = {0,0,0,0};
     if(norm > 0) {
         norm = 1.0f / norm;
         for(int i = 0; i < SERVER_COUNT; i++) {
             servers[i].weight *= norm;
-            clockDrift += servers[i].weight * servers[i].meanDrift;
-            clockOffset += servers[i].weight * servers[i].currentOffset;
-            _stratum += servers[i].weight * (float) servers[i].stratum;
+            const float weight = servers[i].weight;
+            clockDrift += weight * servers[i].meanDrift;
+            clockOffset += weight * servers[i].currentOffset;
+            _stratum += weight * (float) servers[i].stratum;
             // set reference ID to server with best weight
-            if(servers[i].weight > best) {
-                best = servers[i].weight;
+            if(weight > best) {
+                best = weight;
                 refId = servers[i].addr;
             }
             // tally leap indicator votes
-            if(servers[i].weight > 0.05f)
-                ++li[servers->leapIndicator];
+            if(weight > 0.05f)
+                ++li[servers[i].leapIndicator];
         }
     }
     // update clock stratum

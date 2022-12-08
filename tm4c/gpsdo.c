@@ -33,7 +33,7 @@ static float pllCorr;
 
 static float ppsOffsetMean;
 static float ppsOffsetVar;
-static float ppsOffsetRms;
+static float ppsOffsetRms = STAT_LOCK_RMS * 2;
 static float ppsSkewVar;
 static float ppsSkewRms;
 
