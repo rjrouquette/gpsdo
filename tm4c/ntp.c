@@ -573,6 +573,13 @@ static void runPrune() {
     // verify that server is configured
     if(server->addr == 0)
         return;
+
+    // check if server has alarm
+    if(server->leapIndicator == NTP_LI_ALARM) {
+        memset(server, 0, sizeof(struct Server));
+        return;
+    }
+
     // check if server has any missed polls
     if(server->attempts < 16) return;
     if(server->reach == 0xFFFF)  return;
