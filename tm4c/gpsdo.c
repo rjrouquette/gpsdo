@@ -310,10 +310,13 @@ int GPSDO_ntpUpdate(float offset, float drift) {
         return 1;
     }
     // soft adjustment
-    float step = drift * 0x1p-1f;
-    step += offset * 0x1p-10f;
-    pllCorr = step;
-    pllBias += step * 0x1p-10f;
+    drift += offset * 0x1p-10f;
+    pllCorr = drift;
+    pllBias += drift * 0x1p-10f;
+    // update feedback
+    setFeedback(currCompensation + pllCorr + pllBias);
+    // update temperature compensation
+    updateTempComp(currFeedback);
     return 0;
 }
 
