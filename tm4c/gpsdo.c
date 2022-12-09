@@ -310,9 +310,8 @@ int GPSDO_ntpUpdate(float offset, float drift) {
         return 1;
     }
     // soft adjustment
-    drift += offset * 0x1p-10f;
-    pllCorr = drift;
-    pllBias += drift * 0x1p-10f;
+    pllCorr = (drift * 0x1p-1f) + (offset * 0x1p-8f);
+    pllBias += (drift * 0x1p-8f) + (offset * 0x1p-12f);
     // update feedback
     setFeedback(currCompensation + pllCorr + pllBias);
     // update temperature compensation
