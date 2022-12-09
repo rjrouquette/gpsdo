@@ -363,10 +363,30 @@ static void dnsCallback(uint32_t addr) {
     for (int i = 0; i < SERVER_COUNT; i++) {
         if (servers[i].addr == 0) {
             servers[i].addr = addr;
-            servers[i].nextPoll = CLK_MONOTONIC_INT() + 2;
+            // schedule next poll
+            servers[i].nextPoll = CLK_MONOTONIC_INT();
+            servers[i].nextPoll &= ~63;
+            servers[i].nextPoll += 64;
+            servers[i].nextPoll += (STCURRENT.CURRENT >> 8) & 7;
             break;
         }
     }
+}
+
+static void resetServer(struct Server *server) {
+    uint32_t nextPoll;
+    uint32_t addr;
+    uint8_t mac[6];
+    // preserve critical fields
+    nextPoll = server->nextPoll;
+    addr = server->addr;
+    copyMAC(mac, server->mac);
+    // clear server
+    memset(server, 0, sizeof(struct Server));
+    // restore ip address
+    server->nextPoll = nextPoll;
+    server->addr = addr;
+    copyMAC(server->mac, mac);
 }
 
 static int nextServer = 0;
@@ -554,12 +574,7 @@ void NTP_run() {
         if (GPSDO_ntpUpdate(clockOffset, clockDrift)) {
             // reset servers if clock was hard stepped
             for (int i = 0; i < SERVER_COUNT; i++) {
-                // preserve ip address
-                uint32_t addr = servers[i].addr;
-                // clear server
-                memset(servers + i, 0, sizeof(struct Server));
-                // restore ip address
-                servers[i].addr = addr;
+                resetServer(servers + 1);
             }
         }
     }
