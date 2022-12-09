@@ -83,6 +83,7 @@ struct Server {
 static void processResponse(uint8_t *frame);
 static void pollServer(struct Server *server, int pingOnly);
 static void updateTracking(struct Server *server);
+static void updateStateTracking();
 
 static void processRequest(uint8_t *frame, int flen);
 static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP);
@@ -364,54 +365,52 @@ static void dnsCallback(uint32_t addr) {
         if (servers[i].addr == 0) {
             servers[i].addr = addr;
             // schedule next poll
-            servers[i].nextPoll = CLK_MONOTONIC_INT();
-            servers[i].nextPoll &= ~63;
-            servers[i].nextPoll += 64;
-            servers[i].nextPoll += (STCURRENT.CURRENT >> 8) & 7;
+            uint32_t nextPoll = CLK_MONOTONIC_INT();
+            nextPoll &= ~63;
+            nextPoll += 64;
+            nextPoll += (STCURRENT.CURRENT >> 8) & 7;
+            servers[i].nextPoll = nextPoll;
             break;
         }
     }
 }
 
 static void resetServer(struct Server *server) {
-    uint32_t nextPoll;
-    uint32_t addr;
-    uint8_t mac[6];
-    // preserve critical fields
-    nextPoll = server->nextPoll;
-    addr = server->addr;
-    copyMAC(mac, server->mac);
-    // clear server
-    memset(server, 0, sizeof(struct Server));
-    // restore ip address
-    server->nextPoll = nextPoll;
-    server->addr = addr;
-    copyMAC(server->mac, mac);
+    // clear ring data
+    memset(server->ringOffset, 0, sizeof(server->ringOffset));
+    memset(server->ringDelay, 0, sizeof(server->ringDelay));
+    memset(server->ringDrift, 0, sizeof(server->ringDrift));
+    // clear poll tracking
+    server->attempts = 0;
+    server->offset = 0;
+    server->update = 0;
+    server->reach = 0;
 }
 
-static int nextServer = 0;
+static int nextServerUpdate = 0;
 static uint32_t nextPoll = 0;
 void NTP_run() {
     uint32_t now = CLK_MONOTONIC_INT();
 
     // update timing metrics 3 seconds after polling window
     if((now & 63) == 10) {
-        if(nextServer < SERVER_COUNT)
-            updateTracking(servers + (nextServer++));
+        if(nextServerUpdate < SERVER_COUNT)
+            updateTracking(servers + (nextServerUpdate++));
         return;
     } else {
-        nextServer = 0;
+        nextServerUpdate = 0;
     }
 
     if(((int32_t) (now - nextPoll)) < 0) return;
     nextPoll = now + 1;
 
     // search for additional NTP servers
-    int empty = 0;
-    for(int i = 0; i < SERVER_COUNT; i++)
-        if(servers[i].addr == 0) ++empty;
-    if(empty > 0)
-        DNS_lookup(NTP_POOL_FQDN, dnsCallback);
+    for(int i = 0; i < SERVER_COUNT; i++) {
+        if (servers[i].addr == 0) {
+            DNS_lookup(NTP_POOL_FQDN, dnsCallback);
+            break;
+        }
+    }
 
     // process existing servers
     for(int i = 0; i < SERVER_COUNT; i++)
@@ -419,165 +418,7 @@ void NTP_run() {
 
     // update tracking 4 seconds after polling window
     if((now & 63) != 11) return;
-
-    // update server weights
-    float norm = 0;
-    for(int i = 0; i < SERVER_COUNT; i++) {
-        // skip servers that are still initializing
-        if(servers[i].reach == 0) {
-            servers[i].weight = 0;
-            continue;
-        }
-
-        // check for failure states
-        if(
-                servers[i].leapIndicator == NTP_LI_ALARM ||
-                servers[i].stratum == 0 ||
-                servers[i].stratum > NTP_MAX_STRATUM
-        ) {
-            // unset reach bit if server stratum is too poor
-            servers[i].reach &= 0xFFFE;
-            servers[i].weight = 0;
-            continue;
-        }
-
-        int reach = servers[i].reach;
-        int elapsed = 0, quality = 0;
-        for(int shift = 0; shift < 16; shift++) {
-            if((reach >> shift) & 1) {
-                elapsed += shift;
-                ++quality;
-            }
-        }
-        elapsed <<= 2;
-        elapsed += 2;
-        servers[i].currentOffset = servers[i].meanOffset;
-        servers[i].currentOffset += servers[i].meanDrift * (float) elapsed;
-
-        float weight = 0;
-        if(servers[i].varDrift > 0) {
-            weight = (float) elapsed;
-            weight *= servers[i].varDrift;
-            weight = sqrtf(weight);
-            weight = 1.0f / weight;
-            weight *= (float) quality;
-        }
-        if(!isfinite(weight))
-            weight = 0;
-        servers[i].weight = weight;
-        norm += weight;
-    }
-    if(norm > 0) {
-        float mean = 0;
-        for(int i = 0; i < SERVER_COUNT; i++)
-            mean += servers[i].currentOffset * servers[i].weight;
-        mean /= norm;
-
-        float var = 0;
-        for(int i = 0; i < SERVER_COUNT; i++) {
-            float diff = servers[i].currentOffset - mean;
-            diff *= diff;
-            var += diff * servers[i].weight;
-        }
-        var /= norm;
-        var *= 4;
-
-        norm = 0;
-        for(int i = 0; i < SERVER_COUNT; i++) {
-            // drop server if offset is too high
-            float diff = servers[i].currentOffset - mean;
-            diff *= diff;
-            if(diff < var)
-                norm += servers[i].weight;
-            else
-                servers[i].weight = 0;
-        }
-    }
-
-    refId = 0;
-    clockDrift = 0;
-    clockOffset = 0;
-    float _stratum = 0;
-    float best = 0;
-    int li[4] = {0,0,0,0};
-    if(norm > 0) {
-        norm = 1.0f / norm;
-        for(int i = 0; i < SERVER_COUNT; i++) {
-            servers[i].weight *= norm;
-            const float weight = servers[i].weight;
-            clockDrift += weight * servers[i].meanDrift;
-            clockOffset += weight * servers[i].currentOffset;
-            _stratum += weight * (float) servers[i].stratum;
-            // set reference ID to server with best weight
-            if(weight > best) {
-                best = weight;
-                refId = servers[i].addr;
-            }
-            // tally leap indicator votes
-            if(weight > 0.05f)
-                ++li[servers[i].leapIndicator];
-        }
-    }
-    // update clock stratum
-    if(GPSDO_isLocked())
-        clockStratum = 1;
-    else if(_stratum == 0)
-        clockStratum = 16;
-    else
-        clockStratum = (int) roundf(_stratum) + 1;
-
-    // set reference ID to GPS if stratum is 1
-    if(clockStratum == 1)
-        refId = NTP_REF_GPS;
-
-    // tally leap indicator votes
-    leapIndicator = 0;
-    int bestLI = 0;
-    for(int i = 0; i < 3; i++) {
-        if(li[i] > bestLI) {
-            bestLI = li[i];
-            leapIndicator = i;
-        }
-    }
-
-    // compute mean offset
-    int64_t offset = 0;
-    int32_t divisor = 0;
-    for(int i = 0; i < SERVER_COUNT; i++) {
-        int32_t weight = (int32_t) (0x1p24f * servers[i].weight);
-        divisor += weight;
-        int64_t _offset = (int64_t) servers[i].offset;
-        _offset >>= 24;
-        _offset *= weight;
-        offset += _offset;
-    }
-    // correct for integer truncation
-    int64_t twiddle = offset;
-    twiddle >>= 24;
-    twiddle *= (1<<24) - divisor;
-    offset += twiddle;
-
-    if(offset != 0) {
-        // compute offset adjustment
-        int64_t diff = offset - (int64_t) ntpOffset;
-        // round to whole seconds
-        if (((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
-            ((int32_t *) &diff)[1] -= 1;
-        else if (((uint32_t *) &diff)[0] >= (1 << 31))
-            ((int32_t *) &diff)[1] += 1;
-        // apply offset adjustment
-        ((uint32_t *) &ntpOffset)[1] += ((int32_t *) &diff)[1];
-    }
-
-    // notify GPSDO of ntp status for fail-over purposes
-    if(norm > 0) {
-        if (GPSDO_ntpUpdate(clockOffset, clockDrift)) {
-            // reset servers if clock was hard stepped
-            for (int i = 0; i < SERVER_COUNT; i++) {
-                resetServer(servers + 1);
-            }
-        }
-    }
+    updateStateTracking();
 }
 
 char* NTP_servers(char *tail) {
@@ -728,7 +569,7 @@ static void updateTracking(struct Server *server) {
     update += ((int64_t) (server->stamps[0] - update)) >> 1;
 
     // update ring
-    server->ringOffset[head] = 0x1p-32f * (float) (int32_t) (offset - ntpOffset);
+    server->ringOffset[head] = 0x1p-32f * (float) (int32_t) offset;
     server->ringDelay[head] = 0x1p-32f * (float) (uint32_t) _delay;
     // bootstrap ring with first sample
     if(server->reach == 1) {
@@ -909,4 +750,164 @@ static void pollServer(struct Server *server, int pingOnly) {
     UDP_finalize(frame, NTP4_SIZE);
     IPv4_finalize(frame, NTP4_SIZE);
     NET_transmit(txDesc, NTP4_SIZE);
+}
+
+static void updateStateTracking() {
+    // update server weights
+    float norm = 0;
+    for(int i = 0; i < SERVER_COUNT; i++) {
+        // skip servers that are still initializing
+        if(servers[i].reach == 0) {
+            servers[i].weight = 0;
+            continue;
+        }
+
+        // check for failure states
+        if(
+                servers[i].leapIndicator == NTP_LI_ALARM ||
+                servers[i].stratum == 0 ||
+                servers[i].stratum > NTP_MAX_STRATUM
+                ) {
+            // unset reach bit if server stratum is too poor
+            servers[i].reach &= 0xFFFE;
+            servers[i].weight = 0;
+            continue;
+        }
+
+        int reach = servers[i].reach;
+        int elapsed = 0, quality = 0;
+        for(int shift = 0; shift < 16; shift++) {
+            if((reach >> shift) & 1) {
+                elapsed += shift;
+                ++quality;
+            }
+        }
+        elapsed <<= 2;
+        elapsed += 2;
+        servers[i].currentOffset = servers[i].meanOffset;
+        servers[i].currentOffset += servers[i].meanDrift * (float) elapsed;
+
+        float weight = 0;
+        if(servers[i].varDrift > 0) {
+            weight = (float) elapsed;
+            weight *= servers[i].varDrift;
+            weight = sqrtf(weight);
+            weight = 1.0f / weight;
+            weight *= (float) quality;
+        }
+        if(!isfinite(weight))
+            weight = 0;
+        servers[i].weight = weight;
+        norm += weight;
+    }
+    if(norm > 0) {
+        float mean = 0;
+        for(int i = 0; i < SERVER_COUNT; i++)
+            mean += servers[i].currentOffset * servers[i].weight;
+        mean /= norm;
+
+        float var = 0;
+        for(int i = 0; i < SERVER_COUNT; i++) {
+            float diff = servers[i].currentOffset - mean;
+            diff *= diff;
+            var += diff * servers[i].weight;
+        }
+        var /= norm;
+        var *= 4;
+
+        norm = 0;
+        for(int i = 0; i < SERVER_COUNT; i++) {
+            // drop server if offset is too high
+            float diff = servers[i].currentOffset - mean;
+            diff *= diff;
+            if(diff < var)
+                norm += servers[i].weight;
+            else
+                servers[i].weight = 0;
+        }
+    }
+
+    refId = 0;
+    clockDrift = 0;
+    clockOffset = 0;
+    float _stratum = 0;
+    float best = 0;
+    int li[4] = {0,0,0,0};
+    if(norm > 0) {
+        norm = 1.0f / norm;
+        for(int i = 0; i < SERVER_COUNT; i++) {
+            servers[i].weight *= norm;
+            const float weight = servers[i].weight;
+            clockDrift += weight * servers[i].meanDrift;
+            clockOffset += weight * servers[i].currentOffset;
+            _stratum += weight * (float) servers[i].stratum;
+            // set reference ID to server with best weight
+            if(weight > best) {
+                best = weight;
+                refId = servers[i].addr;
+            }
+            // tally leap indicator votes
+            if(weight > 0.05f)
+                ++li[servers[i].leapIndicator];
+        }
+    }
+    // update clock stratum
+    if(GPSDO_isLocked())
+        clockStratum = 1;
+    else if(_stratum == 0)
+        clockStratum = 16;
+    else
+        clockStratum = (int) roundf(_stratum) + 1;
+
+    // set reference ID to GPS if stratum is 1
+    if(clockStratum == 1)
+        refId = NTP_REF_GPS;
+
+    // tally leap indicator votes
+    leapIndicator = 0;
+    int bestLI = 0;
+    for(int i = 0; i < 3; i++) {
+        if(li[i] > bestLI) {
+            bestLI = li[i];
+            leapIndicator = i;
+        }
+    }
+
+    // compute mean offset
+    int64_t offset = 0;
+    int32_t divisor = 0;
+    for(int i = 0; i < SERVER_COUNT; i++) {
+        int32_t weight = (int32_t) (0x1p24f * servers[i].weight);
+        divisor += weight;
+        int64_t _offset = (int64_t) servers[i].offset;
+        _offset >>= 24;
+        _offset *= weight;
+        offset += _offset;
+    }
+    // correct for integer truncation
+    int64_t twiddle = offset;
+    twiddle >>= 24;
+    twiddle *= (1<<24) - divisor;
+    offset += twiddle;
+
+    if(offset != 0) {
+        // compute offset adjustment
+        int64_t diff = offset - (int64_t) ntpOffset;
+        // round to whole seconds
+        if (((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
+            ((int32_t *) &diff)[1] -= 1;
+        else if (((uint32_t *) &diff)[0] >= (1 << 31))
+            ((int32_t *) &diff)[1] += 1;
+        // apply offset adjustment
+        ((uint32_t *) &ntpOffset)[1] += ((int32_t *) &diff)[1];
+    }
+
+    // notify GPSDO of ntp status for fail-over purposes
+    if(norm > 0) {
+        if (GPSDO_ntpUpdate(clockOffset, clockDrift)) {
+            // reset server stats if clock was hard stepped
+            for (int i = 0; i < SERVER_COUNT; i++)
+                resetServer(servers + i);
+        }
+    }
 }
