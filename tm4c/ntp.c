@@ -31,6 +31,9 @@
 #define NTP_MAX_STRATUM (4)
 #define NTP_REF_GPS (0x00535047) // "GPS"
 #define NTP_LI_ALARM (3)
+#define NTP_POLL_MASK (63)
+#define NTP_POLL_INTV (64)
+#define NTP_POLL_RAND ((STCURRENT.CURRENT >> 8) & 7)
 
 struct PACKED HEADER_NTPv4 {
     uint16_t mode: 3;
@@ -340,9 +343,9 @@ static void runServer(struct Server *server, uint32_t now) {
     }
 
     // schedule next poll
-    nextPoll &= ~63;
-    nextPoll += 64;
-    nextPoll += (STCURRENT.CURRENT >> 8) & 7;
+    nextPoll &= ~NTP_POLL_MASK;
+    nextPoll += NTP_POLL_INTV;
+    nextPoll += NTP_POLL_RAND;
     server->nextPoll = nextPoll;
 
     // advance reach window
@@ -366,9 +369,9 @@ static void dnsCallback(uint32_t addr) {
             servers[i].addr = addr;
             // schedule next poll
             uint32_t nextPoll = CLK_MONOTONIC_INT();
-            nextPoll &= ~63;
-            nextPoll += 64;
-            nextPoll += (STCURRENT.CURRENT >> 8) & 7;
+            nextPoll &= ~NTP_POLL_MASK;
+            nextPoll += NTP_POLL_INTV;
+            nextPoll += NTP_POLL_RAND;
             servers[i].nextPoll = nextPoll;
             break;
         }
@@ -393,7 +396,7 @@ void NTP_run() {
     uint32_t now = CLK_MONOTONIC_INT();
 
     // update timing metrics 3 seconds after polling window
-    if((now & 63) == 10) {
+    if((now & NTP_POLL_MASK) == 10) {
         if(nextServerUpdate < SERVER_COUNT)
             updateTracking(servers + (nextServerUpdate++));
         return;
@@ -417,7 +420,7 @@ void NTP_run() {
         runServer(servers + i, now);
 
     // update tracking 4 seconds after polling window
-    if((now & 63) != 11) return;
+    if((now & NTP_POLL_MASK) != 11) return;
     updateStateTracking();
 }
 
