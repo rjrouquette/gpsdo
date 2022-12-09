@@ -80,8 +80,6 @@ struct Server {
     uint8_t head;
 } servers[SERVER_COUNT];
 
-static void resetServer(struct Server *server);
-
 static void processResponse(uint8_t *frame);
 static void pollServer(struct Server *server, int pingOnly);
 static void updateTracking(struct Server *server);
@@ -555,8 +553,14 @@ void NTP_run() {
     if(norm > 0) {
         if (GPSDO_ntpUpdate(clockOffset, clockDrift)) {
             // reset servers if clock was hard stepped
-            for (int i = 0; i < SERVER_COUNT; i++)
-                resetServer(servers + i);
+            for (int i = 0; i < SERVER_COUNT; i++) {
+                // preserve ip address
+                uint32_t addr = servers[i].addr;
+                // clear server
+                memset(servers + i, 0, sizeof(struct Server));
+                // restore ip address
+                servers[i].addr = addr;
+            }
         }
     }
 }
@@ -890,13 +894,4 @@ static void pollServer(struct Server *server, int pingOnly) {
     UDP_finalize(frame, NTP4_SIZE);
     IPv4_finalize(frame, NTP4_SIZE);
     NET_transmit(txDesc, NTP4_SIZE);
-}
-
-static void resetServer(struct Server *server) {
-    // preserve ip address
-    uint32_t addr = server->addr;
-    // clear server
-    memset(server, 0, sizeof(struct Server));
-    // restore ip address
-    server->addr = addr;
 }
