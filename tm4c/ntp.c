@@ -98,7 +98,7 @@ static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress);
 static void callbackDNS(uint32_t addr);
 
 
-// time slot tasks
+// NTP tasks
 static void runPoll();
 static void runShuffle();
 static void runStats();
@@ -109,7 +109,7 @@ static void runDNS();
 static void runARP();
 static void runPing();
 
-// time slot task assignments
+// time-slot task assignments
 typedef void (*SlotTask) (void);
 struct TaskSlot {
     SlotTask task;
