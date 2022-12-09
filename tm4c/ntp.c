@@ -88,6 +88,7 @@ static void processResponse(uint8_t *frame);
 static void pollServer(struct Server *server, int pingOnly);
 static void resetServer(struct Server *server);
 static void computeMeanVar(const float *ring, float *mean, float *var);
+static void updateStats(struct Server *server);
 static void updateTracking(struct Server *server);
 
 static void processRequest(uint8_t *frame, int flen);
@@ -141,7 +142,7 @@ void NTP_init() {
     taskSlot[8].end = SERVER_COUNT;
     // update tracking stats
     taskSlot[10].task = slotTracking;
-    taskSlot[10].end = SERVER_COUNT + 1;
+    taskSlot[10].end = (SERVER_COUNT * 2) + 1;
     // prune erratic server
     taskSlot[11].task = slotPrune;
     taskSlot[11].end = SERVER_COUNT;
@@ -318,9 +319,17 @@ static void slotShuffle() {
 }
 
 static void slotTracking() {
-    // update server tracking states
+    // update server tracking statistics
     if(ntpProcess.iter < SERVER_COUNT) {
         struct Server *server = servers + ntpProcess.iter;
+        if(server->addr == 0) return;
+        updateStats(server);
+        return;
+    }
+
+    // update server tracking states
+    if(ntpProcess.iter < SERVER_COUNT*2) {
+        struct Server *server = servers + (ntpProcess.iter - SERVER_COUNT);
         if(server->addr == 0) return;
         updateTracking(server);
         return;
@@ -881,7 +890,7 @@ static void resetServer(struct Server *server) {
     server->reach = 0;
 }
 
-static void updateTracking(struct Server *server) {
+static void updateStats(struct Server *server) {
     // burst must be complete
     if(server->burst < NTP_BURST) {
         // discard late arrivals
@@ -947,7 +956,9 @@ static void updateTracking(struct Server *server) {
     computeMeanVar(server->ringOffset, &(server->meanOffset), &(server->varOffset));
     computeMeanVar(server->ringDelay, &(server->meanDelay), &(server->varDelay));
     computeMeanVar(server->ringDrift, &(server->meanDrift), &(server->varDrift));
+}
 
+static void updateTracking(struct Server *server) {
     // analyze connection quality
     int reach = server->reach;
     int elapsed = 0, quality = 0;
