@@ -7,6 +7,7 @@
 
 void GPSDO_init();
 void GPSDO_run();
+int GPSDO_ntpUpdate(float offset, float drift);
 int GPSDO_isLocked();
 int GPSDO_offsetNano();
 float GPSDO_offsetMean();

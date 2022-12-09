@@ -123,13 +123,13 @@ static void initPTP() {
     EMAC0.TIMSTCTRL.ALLF = 1;
     EMAC0.TIMSTCTRL.DGTLBIN = 1;
     EMAC0.TIMSTCTRL.TSEN = 1;
-    // 25MHz = 40ns
-    EMAC0.SUBSECINC.SSINC = 40;
+    // 25MHz / 2 = 80ns
+    EMAC0.SUBSECINC.SSINC = 80;
     // init timer
     EMAC0.TIMSECU = 0;
     EMAC0.TIMNANOU.VALUE = 0;
     // frequency correction
-    EMAC0.TIMADD = 0xFFFFFFFF;
+    EMAC0.TIMADD = 0x80000000;
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     EMAC0.TIMSTCTRL.TSFCUPDT = 1;
     // start timer

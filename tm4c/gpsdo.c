@@ -16,14 +16,15 @@
 #define STAT_TIME_CONST (16)
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_COMP_RMS (200e-9f)
-#define BIAS_ALPHA (0x1p-16f)
-#define COEF_ALPHA (0x1p-12f)
+#define BIAS_ALPHA (0x1p-17f)
+#define COEF_ALPHA (0x1p-15f)
 
 // temperature compensation state
 static float currTemp;
 static float tcompCoeff, tcompBias, tcompOffset;
 
 
+static int32_t ppsGpsEdgePrev;
 static int32_t ppsGpsEdge;
 static int32_t ppsOutEdge;
 static int32_t ppsOffsetNano;
@@ -33,11 +34,12 @@ static float pllCorr;
 
 static float ppsOffsetMean;
 static float ppsOffsetVar;
-static float ppsOffsetRms = STAT_LOCK_RMS * 2;
+static float ppsOffsetRms;
 static float ppsSkewVar;
 static float ppsSkewRms;
 
 static int ppsReady;
+static int ppsPresent;
 
 // current correction values
 static float currFeedback;
@@ -224,9 +226,12 @@ void GPSDO_run() {
     // clear ready flag
     ppsReady = 0;
 
-    // return if GPS not ready or more than 1 second stale
-    if(now - ppsGpsEdge > 150000000)
+    // return if GPS PPS not present or is more than 1 second stale
+    if(ppsGpsEdge == ppsGpsEdgePrev || now - ppsGpsEdge > 150000000) {
+        ppsPresent = 0;
         return;
+    }
+    ppsPresent = 1;
 
     // compute offset
     int32_t offset = ppsOutEdge - ppsGpsEdge;
@@ -237,9 +242,9 @@ void GPSDO_run() {
         // limit slew rate (10ms)
         if(offset > 1250000)
             offset = 1250000;
-        // truncate to 40 ns resolution
-        offset /= 5;
-        offset *= 40;
+        // truncate to 80 ns resolution
+        offset /= 10;
+        offset *= 80;
         // set update registers
         EMAC0.TIMNANOU.NEG = 1;
         EMAC0.TIMNANOU.VALUE = offset;
@@ -284,8 +289,36 @@ void GPSDO_run() {
         updateTempComp(currFeedback);
 }
 
+int GPSDO_ntpUpdate(float offset, float drift) {
+    if(ppsPresent) return 0;
+    if(fabsf(offset) > 100e-3f) {
+        // hard step
+        int32_t _offset = (int32_t) roundf(offset * 12.5e6f);
+        _offset *= 80;
+        // check sign
+        if(_offset < 0) {
+            _offset = -_offset;
+            EMAC0.TIMNANOU.NEG = 1;
+        }
+        // set update registers
+        EMAC0.TIMNANOU.VALUE = _offset;
+        EMAC0.TIMSECU = 0;
+        // wait for hardware ready state
+        while(EMAC0.TIMSTCTRL.TSUPDT);
+        // start update
+        EMAC0.TIMSTCTRL.TSUPDT = 1;
+        return 1;
+    }
+    // soft adjustment
+    float step = drift * 0x1p-1f;
+    step += offset * 0x1p-10f;
+    pllCorr = step;
+    pllBias += step * 0x1p-10f;
+    return 0;
+}
+
 int GPSDO_isLocked() {
-    if(!GPS_hasLock()) return 0;
+    if(!ppsPresent) return 0;
     return (ppsOffsetRms < STAT_LOCK_RMS);
 }
 
@@ -335,16 +368,16 @@ float GPSDO_pllTrim() {
 
 static void setFeedback(float feedback) {
     // convert to correction factor
-    int32_t correction = lroundf(feedback * 0x1p32f);
-    // correction factor must always be negative
-    if(correction > -1) correction = -1;
+    int32_t correction = lroundf(feedback * 0x1p31f);
     // correction factor must not exceed 1 part-per-thousand
-    if(correction < -(1 << 22)) correction = -(1 << 22);
+    if(correction < -(1 << 21)) correction = -(1 << 21);
+    if(correction >  (1 << 21)) correction =  (1 << 21);
+    correction += (1 << 31);
     // apply correction update
     EMAC0.TIMADD = correction;
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     // update current feedback value
-    currFeedback = (float)correction * 0x1p-32f;
+    currFeedback = 0x1p-31f * (float) (correction - (1 << 31));
 }
 
 static void updateTempComp(float target) {
