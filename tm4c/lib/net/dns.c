@@ -61,13 +61,13 @@ void DNS_init() {
     UDP_register(DNS_CLIENT_PORT, processFrame);
 }
 
-static void arpCallback(uint32_t remoteAddress, uint8_t *macAddress) {
+static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress) {
     if(remoteAddress == ipDNS)
         copyMAC(dnsMAC, macAddress);
 }
 
 int DNS_lookup(const char *hostname, CallbackDNS callback) {
-    ARP_request(ipDNS, arpCallback);
+    ARP_request(ipDNS, callbackARP);
     if(isNullMAC(dnsMAC)) {
         return -2;
     }

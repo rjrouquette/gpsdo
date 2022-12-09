@@ -31,6 +31,7 @@
 #define NTP_MAX_STRATUM (4)
 #define NTP_REF_GPS (0x00535047) // "GPS"
 #define NTP_LI_ALARM (3)
+#define NTP_POLL_BITS (6)
 #define NTP_POLL_MASK (63)
 #define NTP_POLL_INTV (64)
 #define NTP_POLL_RAND ((STCURRENT.CURRENT >> 8) & 7)
@@ -72,7 +73,7 @@ struct Server {
     uint64_t stamps[NTP_BURST << 2];
     uint64_t offset;
     uint64_t update;
-    uint32_t nextPoll;
+    int pollSlot;
     uint32_t attempts;
     uint32_t addr;
     uint16_t reach;
@@ -85,20 +86,78 @@ struct Server {
 
 static void processResponse(uint8_t *frame);
 static void pollServer(struct Server *server, int pingOnly);
+static void resetServer(struct Server *server);
+static void computeMeanVar(const float *ring, float *mean, float *var);
 static void updateTracking(struct Server *server);
-static void updateStateTracking();
 
 static void processRequest(uint8_t *frame, int flen);
 static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP);
 static void followupRequest0(uint8_t *frame, int flen);
 static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP);
 
+static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress);
+static void callbackDNS(uint32_t addr);
+
+
+// time slot tasks
+static void slotPoll();
+static void slotShuffle();
+static void slotTracking();
+static void slotPrune();
+static void slotDNS();
+static void slotARP();
+static void slotPing();
+
+// time slot task assignments
+typedef void (*SlotTask) (void);
+struct TaskSlot {
+    SlotTask task;
+    int end;
+} taskSlot[NTP_POLL_INTV];
+
+// NTP process state
+static struct NtpProcess {
+    uint32_t nowMono;
+    int timeSlot;
+    int iter;
+    int end;
+} ntpProcess;
+
+
+
 void NTP_init() {
     memset(servers, 0, sizeof(servers));
     UDP_register(NTP_PORT, processRequest);
+
+    // configure state machine schedule
+    memset(taskSlot, 0, sizeof(taskSlot));
+    // polling tasks
+    for(int i = 0; i < 8; i++) {
+        taskSlot[i].task = slotPoll;
+        taskSlot[i].end = SERVER_COUNT;
+    }
+    // shuffle poll time slots
+    taskSlot[8].task = slotShuffle;
+    taskSlot[8].end = SERVER_COUNT;
+    // update tracking stats
+    taskSlot[10].task = slotTracking;
+    taskSlot[10].end = SERVER_COUNT + 1;
+    // prune erratic server
+    taskSlot[11].task = slotPrune;
+    taskSlot[11].end = SERVER_COUNT;
+    // expand server list
+    taskSlot[12].task = slotDNS;
+    taskSlot[12].end = 1;
+    // MAC address resolution
+    taskSlot[18].task = slotARP;
+    taskSlot[18].end = SERVER_COUNT;
+    // pre-poll server ping
+    taskSlot[63].task = slotPing;
+    taskSlot[63].end = SERVER_COUNT;
+
     // explicitly include some local stratum 1 servers for testing
-    servers[0].addr = 0xC803A8C0; // local network GPS timeserver
-    servers[1].addr = 0x87188f6b; // nearby GPS timeserver on same ISP
+//    servers[0].addr = 0xC803A8C0; // local network GPS timeserver
+//    servers[1].addr = 0x87188f6b; // nearby GPS timeserver on same ISP
 }
 
 uint64_t NTP_offset() {
@@ -129,6 +188,314 @@ void NTP_date(uint64_t clkMono, uint32_t *ntpDate) {
     ntpDate[1] = __builtin_bswap32(((uint32_t *)&clkMono)[1]);
     ntpDate[2] = __builtin_bswap32(((uint32_t *)&clkMono)[0]);
     ntpDate[3] = 0;
+}
+
+char* NTP_servers(char *tail) {
+    char tmp[32];
+
+    tail = append(tail, "ntp servers: ");
+    tail = append(tail, NTP_POOL_FQDN);
+    tail = append(tail, "\n");
+
+    // header
+    tail = append(tail, "    ");
+    tail = append(tail, "address        ");
+    tail = append(tail, "  ");
+    tail = append(tail, "stratum");
+    tail = append(tail, "  ");
+    tail = append(tail, "leap");
+    tail = append(tail, "  ");
+    tail = append(tail, "reach");
+    tail = append(tail, "  ");
+    tail = append(tail, "next");
+    tail = append(tail, "  ");
+    tail = append(tail, "offset (ms)");
+    tail = append(tail, "  ");
+    tail = append(tail, "delay (ms)");
+    tail = append(tail, "  ");
+    tail = append(tail, "jitter (ms)");
+    tail = append(tail, "  ");
+    tail = append(tail, "drift (ppm)");
+    tail = append(tail, "  ");
+    tail = append(tail, "skew (ppm)");
+    tail = append(tail, "  ");
+    tail = append(tail, "weight");
+    tail = append(tail, "\n");
+
+    uint32_t now = CLK_MONOTONIC_INT();
+    for(int i = 0; i < SERVER_COUNT; i++) {
+        if(servers[i].addr == 0) continue;
+
+        tail = append(tail, "  - ");
+        char *pad = tail + 17;
+        tail = addrToStr(servers[i].addr, tail);
+        while(tail < pad)
+            *(tail++) = ' ';
+
+        tmp[toDec(servers[i].stratum, 7, ' ', tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
+        tmp[toDec(servers[i].leapIndicator, 4, ' ', tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
+        tmp[toOct(servers[i].reach & 077777, 5, '0', tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
+        tmp[toDec((servers[i].pollSlot - now) & NTP_POLL_MASK, 4, ' ', tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
+        tmp[fmtFloat(1e3f * servers[i].currentOffset, 11, 3, tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
+        tmp[fmtFloat(servers[i].meanDelay * 1e3f, 10, 3, tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
+        tmp[fmtFloat(sqrtf(servers[i].varDelay) * 1e3f, 11, 3, tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
+        tmp[fmtFloat(servers[i].meanDrift * 1e6f, 11, 3, tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
+        tmp[fmtFloat(sqrtf(servers[i].varDrift) * 1e6f, 10, 3, tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "  ");
+
+        tmp[fmtFloat(servers[i].weight, 6, 4, tmp)] = 0;
+        tail = append(tail, tmp);
+        tail = append(tail, "\n");
+    }
+    return tail;
+}
+
+// main process entry point
+void NTP_run() {
+    // set current system time
+    ntpProcess.nowMono = CLK_MONOTONIC_INT();
+    int timeSlot = (int) ntpProcess.nowMono & NTP_POLL_MASK;
+    // advance process state
+    struct TaskSlot *slot = taskSlot + timeSlot;
+    if(timeSlot != ntpProcess.timeSlot) {
+        ntpProcess.iter = 0;
+        ntpProcess.end = slot->end;
+        ntpProcess.timeSlot = timeSlot;
+    }
+    // dispatch appropriate task
+    if(ntpProcess.iter < ntpProcess.end) {
+        (*slot->task)();
+        ++ntpProcess.iter;
+    }
+}
+
+static void slotPoll() {
+    // verify server poll slot
+    struct Server *server = servers + ntpProcess.iter;
+    if(server->pollSlot != ntpProcess.timeSlot)
+        return;
+    // verify that server is configured
+    if(server->addr == 0)
+        return;
+    // advance reach window
+    server->reach <<= 1;
+    ++(server->attempts);
+    // send poll request
+    server->burst = 0;
+    memset(server->stamps, 0, sizeof(server->stamps));
+    pollServer(server, 0);
+}
+
+static void slotShuffle() {
+    // shuffle server poll slot
+    struct Server *server = servers + ntpProcess.iter;
+    server->pollSlot = NTP_POLL_RAND;
+}
+
+static void slotTracking() {
+    // update server tracking states
+    if(ntpProcess.iter < SERVER_COUNT) {
+        struct Server *server = servers + ntpProcess.iter;
+        if(server->addr == 0) return;
+        updateTracking(server);
+        return;
+    }
+
+    // normalize server weights
+    float norm = 0;
+    for(int i = 0; i < SERVER_COUNT; i++)
+        norm += servers[i].weight;
+    if(norm > 0) {
+        float mean = 0;
+        for(int i = 0; i < SERVER_COUNT; i++)
+            mean += servers[i].currentOffset * servers[i].weight;
+        mean /= norm;
+
+        float var = 0;
+        for(int i = 0; i < SERVER_COUNT; i++) {
+            float diff = servers[i].currentOffset - mean;
+            diff *= diff;
+            var += diff * servers[i].weight;
+        }
+        var /= norm;
+        var *= 4;
+
+        norm = 0;
+        for(int i = 0; i < SERVER_COUNT; i++) {
+            // drop server if offset is too high
+            float diff = servers[i].currentOffset - mean;
+            diff *= diff;
+            if(diff < var)
+                norm += servers[i].weight;
+            else
+                servers[i].weight = 0;
+        }
+    }
+
+    refId = 0;
+    clockDrift = 0;
+    clockOffset = 0;
+    float _stratum = 0;
+    float best = 0;
+    int li[4] = {0,0,0,0};
+    if(norm > 0) {
+        norm = 1.0f / norm;
+        for(int i = 0; i < SERVER_COUNT; i++) {
+            servers[i].weight *= norm;
+            const float weight = servers[i].weight;
+            clockDrift += weight * servers[i].meanDrift;
+            clockOffset += weight * servers[i].currentOffset;
+            _stratum += weight * (float) servers[i].stratum;
+            // set reference ID to server with best weight
+            if(weight > best) {
+                best = weight;
+                refId = servers[i].addr;
+            }
+            // tally leap indicator votes
+            if(weight > 0.05f)
+                ++li[servers[i].leapIndicator];
+        }
+    }
+    // update clock stratum
+    if(GPSDO_isLocked())
+        clockStratum = 1;
+    else if(_stratum == 0)
+        clockStratum = 16;
+    else
+        clockStratum = (int) roundf(_stratum) + 1;
+
+    // set reference ID to GPS if stratum is 1
+    if(clockStratum == 1)
+        refId = NTP_REF_GPS;
+
+    // tally leap indicator votes
+    leapIndicator = 0;
+    int bestLI = 0;
+    for(int i = 0; i < 3; i++) {
+        if(li[i] > bestLI) {
+            bestLI = li[i];
+            leapIndicator = i;
+        }
+    }
+
+    // compute mean offset
+    int64_t offset = 0;
+    int32_t divisor = 0;
+    for(int i = 0; i < SERVER_COUNT; i++) {
+        int32_t weight = (int32_t) (0x1p24f * servers[i].weight);
+        divisor += weight;
+        int64_t _offset = (int64_t) servers[i].offset;
+        _offset >>= 24;
+        _offset *= weight;
+        offset += _offset;
+    }
+    // correct for integer truncation
+    int64_t twiddle = offset;
+    twiddle >>= 24;
+    twiddle *= (1<<24) - divisor;
+    offset += twiddle;
+
+    if(offset != 0) {
+        // compute offset adjustment
+        int64_t diff = offset - (int64_t) ntpOffset;
+        // round to whole seconds
+        if (((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
+            ((int32_t *) &diff)[1] -= 1;
+        else if (((uint32_t *) &diff)[0] >= (1 << 31))
+            ((int32_t *) &diff)[1] += 1;
+        // apply offset adjustment
+        ((uint32_t *) &ntpOffset)[1] += ((int32_t *) &diff)[1];
+    }
+
+    // notify GPSDO of ntp status for fail-over purposes
+    if(norm > 0) {
+        if (GPSDO_ntpUpdate(clockOffset, clockDrift)) {
+            // reset server stats if clock was hard stepped
+            for (int i = 0; i < SERVER_COUNT; i++)
+                resetServer(servers + i);
+        }
+    }
+}
+
+static void slotPrune() {
+    // examine sever connection quality
+    struct Server *server = servers + ntpProcess.iter;
+    // verify that server is configured
+    if(server->addr == 0)
+        return;
+    // check if server has any missed polls
+    if(server->attempts < 16) return;
+    if(server->reach == 0xFFFF)  return;
+    // tally successful poll attempts
+    uint32_t cnt = server->reach;
+    cnt -= (cnt >> 1) & 0x55555555;
+    cnt = (cnt & 0x33333333) + ((cnt >> 2) & 0x33333333);
+    cnt += cnt >> 4; cnt &= 0x0F0F0F0F;
+    cnt += cnt >> 8; cnt &= 0xFF;
+    // remove server if too many lost packets
+    if(cnt < 11)
+        memset(server, 0, sizeof(struct Server));
+}
+
+static void slotDNS() {
+    for(int i = 0; i < SERVER_COUNT; i++) {
+        if (servers[i].addr == 0) {
+            DNS_lookup(NTP_POOL_FQDN, callbackDNS);
+            break;
+        }
+    }
+}
+
+static void slotARP() {
+    // update server tracking stats
+    struct Server *server = servers + ntpProcess.iter;
+    // verify that server is configured
+    if(server->addr == 0)
+        return;
+    // perform ARP request if MAC address is missing
+    if(!isNullMAC(server->mac)) return;
+    // determine if server is outside of current subnet
+    if((server->addr ^ ipAddress) & ipSubnet)
+        ARP_request(ipGateway, callbackARP);
+    else
+        ARP_request(server->addr, callbackARP);
+}
+
+static void slotPing() {
+    // verify server poll slot
+    struct Server *server = servers + ntpProcess.iter;
+    if(server->pollSlot != ntpProcess.timeSlot)
+        return;
+    // verify that server is configured
+    if(server->addr == 0)
+        return;
+    // ping server in advance of poll request
+    pollServer(server, 1);
 }
 
 void processRequest(uint8_t *frame, int flen) {
@@ -283,7 +650,7 @@ static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     headerNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
 }
 
-static void arpCallback(uint32_t remoteAddress, uint8_t *macAddress) {
+static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress) {
     // special case for external addresses
     if(remoteAddress == ipGateway) {
         for(int i = 0; i < SERVER_COUNT; i++) {
@@ -293,7 +660,7 @@ static void arpCallback(uint32_t remoteAddress, uint8_t *macAddress) {
         }
         return;
     }
-
+    // find matching server
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == remoteAddress) {
             copyMAC(servers[i].mac, macAddress);
@@ -302,62 +669,7 @@ static void arpCallback(uint32_t remoteAddress, uint8_t *macAddress) {
     }
 }
 
-static void runServer(struct Server *server, uint32_t now) {
-    // poll client if configured
-    if(server->addr == 0)
-        return;
-
-    // perform ARP request if MAC address is missing
-    if(isNullMAC(server->mac)) {
-        // determine if server is outside of current subnet
-        if((server->addr ^ ipAddress) & ipSubnet)
-            ARP_request(ipGateway, arpCallback);
-        else
-            ARP_request(server->addr, arpCallback);
-        return;
-    }
-
-    // remove the server if it has high packet loss
-    if(server->attempts > 16 && server->reach != 0xFFFF) {
-        // count bits
-        uint32_t cnt = server->reach;
-        cnt -= (cnt >> 1) & 0x55555555;
-        cnt = (cnt & 0x33333333) + ((cnt >> 2) & 0x33333333);
-        cnt += cnt >> 4; cnt &= 0x0F0F0F0F;
-        cnt += cnt >> 8; cnt &= 0xFF;
-        // remove server if too many lost packets
-        if(cnt < 9) {
-            memset(server, 0, sizeof(struct Server));
-            return;
-        }
-    }
-
-    // verify current time
-    uint32_t nextPoll = server->nextPoll;
-    if(((int32_t) (now - nextPoll)) < -1)
-        return;
-    if(((int32_t) (now - nextPoll)) == -1) {
-        // ping server in advance of actual poll request (reduces jitter)
-        pollServer(server, 1);
-        return;
-    }
-
-    // schedule next poll
-    nextPoll &= ~NTP_POLL_MASK;
-    nextPoll += NTP_POLL_INTV;
-    nextPoll += NTP_POLL_RAND;
-    server->nextPoll = nextPoll;
-
-    // advance reach window
-    server->reach <<= 1;
-    ++(server->attempts);
-    // send poll request
-    server->burst = 0;
-    memset(server->stamps, 0, sizeof(server->stamps));
-    pollServer(server, 0);
-}
-
-static void dnsCallback(uint32_t addr) {
+static void callbackDNS(uint32_t addr) {
     // prevent duplicate entries
     for (int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == addr)
@@ -367,241 +679,9 @@ static void dnsCallback(uint32_t addr) {
     for (int i = 0; i < SERVER_COUNT; i++) {
         if (servers[i].addr == 0) {
             servers[i].addr = addr;
-            // schedule next poll
-            uint32_t nextPoll = CLK_MONOTONIC_INT();
-            nextPoll &= ~NTP_POLL_MASK;
-            nextPoll += NTP_POLL_INTV;
-            nextPoll += NTP_POLL_RAND;
-            servers[i].nextPoll = nextPoll;
             break;
         }
     }
-}
-
-static void resetServer(struct Server *server) {
-    // clear ring data
-    memset(server->ringOffset, 0, sizeof(server->ringOffset));
-    memset(server->ringDelay, 0, sizeof(server->ringDelay));
-    memset(server->ringDrift, 0, sizeof(server->ringDrift));
-    // clear poll tracking
-    server->attempts = 0;
-    server->offset = 0;
-    server->update = 0;
-    server->reach = 0;
-}
-
-static int nextServerUpdate = 0;
-static uint32_t nextPoll = 0;
-void NTP_run() {
-    uint32_t now = CLK_MONOTONIC_INT();
-
-    // update timing metrics 3 seconds after polling window
-    if((now & NTP_POLL_MASK) == 10) {
-        if(nextServerUpdate < SERVER_COUNT)
-            updateTracking(servers + (nextServerUpdate++));
-        return;
-    } else {
-        nextServerUpdate = 0;
-    }
-
-    if(((int32_t) (now - nextPoll)) < 0) return;
-    nextPoll = now + 1;
-
-    // search for additional NTP servers
-    for(int i = 0; i < SERVER_COUNT; i++) {
-        if (servers[i].addr == 0) {
-            DNS_lookup(NTP_POOL_FQDN, dnsCallback);
-            break;
-        }
-    }
-
-    // process existing servers
-    for(int i = 0; i < SERVER_COUNT; i++)
-        runServer(servers + i, now);
-
-    // update tracking 4 seconds after polling window
-    if((now & NTP_POLL_MASK) != 11) return;
-    updateStateTracking();
-}
-
-char* NTP_servers(char *tail) {
-    char tmp[32];
-
-    tail = append(tail, "ntp servers: ");
-    tail = append(tail, NTP_POOL_FQDN);
-    tail = append(tail, "\n");
-
-    // header
-    tail = append(tail, "    ");
-    tail = append(tail, "address        ");
-    tail = append(tail, "  ");
-    tail = append(tail, "stratum");
-    tail = append(tail, "  ");
-    tail = append(tail, "leap");
-    tail = append(tail, "  ");
-    tail = append(tail, "reach");
-    tail = append(tail, "  ");
-    tail = append(tail, "next");
-    tail = append(tail, "  ");
-    tail = append(tail, "offset (ms)");
-    tail = append(tail, "  ");
-    tail = append(tail, "delay (ms)");
-    tail = append(tail, "  ");
-    tail = append(tail, "jitter (ms)");
-    tail = append(tail, "  ");
-    tail = append(tail, "drift (ppm)");
-    tail = append(tail, "  ");
-    tail = append(tail, "skew (ppm)");
-    tail = append(tail, "  ");
-    tail = append(tail, "weight");
-    tail = append(tail, "\n");
-
-    uint32_t now = CLK_MONOTONIC_INT();
-    for(int i = 0; i < SERVER_COUNT; i++) {
-        if(servers[i].addr == 0) continue;
-
-        tail = append(tail, "  - ");
-        char *pad = tail + 17;
-        tail = addrToStr(servers[i].addr, tail);
-        while(tail < pad)
-            *(tail++) = ' ';
-
-        tmp[toDec(servers[i].stratum, 7, ' ', tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-        tmp[toDec(servers[i].leapIndicator, 4, ' ', tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-        tmp[toOct(servers[i].reach & 077777, 5, '0', tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-        tmp[toDec(servers[i].nextPoll - now, 4, ' ', tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-
-        tmp[fmtFloat(1e3f * servers[i].currentOffset, 11, 3, tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-
-        tmp[fmtFloat(servers[i].meanDelay * 1e3f, 10, 3, tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-
-        tmp[fmtFloat(sqrtf(servers[i].varDelay) * 1e3f, 11, 3, tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-
-        tmp[fmtFloat(servers[i].meanDrift * 1e6f, 11, 3, tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-
-        tmp[fmtFloat(sqrtf(servers[i].varDrift) * 1e6f, 10, 3, tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "  ");
-
-        tmp[fmtFloat(servers[i].weight, 6, 4, tmp)] = 0;
-        tail = append(tail, tmp);
-        tail = append(tail, "\n");
-    }
-    return tail;
-}
-
-void computeMeanVar(const float *ring, float *mean, float *var) {
-    float _mean = 0;
-    for(int i = 0; i < NTP_RING_SIZE; i++)
-        _mean += ring[i];
-    _mean /= NTP_RING_SIZE;
-
-    float _var = 0;
-    for(int i = 0; i < NTP_RING_SIZE; i++) {
-        float diff = ring[i] - _mean;
-        _var += diff * diff;
-    }
-    _var /= NTP_RING_SIZE;
-    _var *= 4;
-
-    int cnt = 0;
-    *mean = 0, *var = 0;
-    for(int i = 0; i < NTP_RING_SIZE; i++) {
-        float diff = ring[i] - _mean;
-        diff *= diff;
-        if(diff < _var) {
-            *mean += ring[i];
-            *var += diff;
-            ++cnt;
-        }
-    }
-    if(cnt == 0) {
-        *mean = 0;
-        *var = 0;
-    } else {
-        *mean /= (float) cnt;
-        *var /= (float) cnt;
-    }
-}
-
-static void updateTracking(struct Server *server) {
-    // burst must be complete
-    if(server->burst < NTP_BURST) return;
-
-    // advance ring
-    ++server->head;
-    server->head &= NTP_RING_MASK;
-    const int head = server->head;
-
-    // compute delay and offset
-    int64_t _adjust = 0;
-    uint64_t _delay = 0;
-    uint64_t offset = server->stamps[1] - server->stamps[0];
-    for(int i = 0; i < NTP_BURST; i++) {
-        const uint64_t *set = server->stamps + (i << 2);
-        // accumulate delay
-        _delay += set[3] - set[2];
-        _delay += set[1] - set[0];
-        // accumulate offset adjustment
-        _adjust += (int64_t) ((set[1] - set[0]) - offset);
-        _adjust += (int64_t) ((set[2] - set[3]) - offset);
-    }
-    // normalize delay
-    _delay >>= NTP_BURST_BITS + 1;
-    // adjust offset
-    offset += _adjust >> (NTP_BURST_BITS + 1);
-
-    // compute update time
-    uint64_t update = server->stamps[(NTP_BURST << 2) - 1];
-    update += ((int64_t) (server->stamps[0] - update)) >> 1;
-
-    // update ring
-    server->ringOffset[head] = 0x1p-32f * (float) (int32_t) offset;
-    server->ringDelay[head] = 0x1p-32f * (float) (uint32_t) _delay;
-    // bootstrap ring with first sample
-    if(server->reach == 1) {
-        for(int i = 0; i < NTP_RING_SIZE; i++) {
-            server->ringOffset[i] = server->ringOffset[head];
-            server->ringDelay[i] = server->ringDelay[head];
-        }
-    }
-
-    // compute drift
-    if(server->update != 0) {
-        uint64_t interval = update - server->update;
-        uint32_t ipart = ((uint32_t *) &interval)[1];
-        uint8_t shift = 0;
-        while(ipart >> shift) ++shift;
-        float drift = (float) (int32_t) (offset - server->offset);
-        drift /= (float) (uint32_t) (interval >> shift);
-        drift /= (float) (1 << shift);
-        server->ringDrift[head] = drift;
-    }
-
-    // update server status
-    server->offset = offset;
-    server->update = update;
-
-    // update stats
-    computeMeanVar(server->ringOffset, &(server->meanOffset), &(server->varOffset));
-    computeMeanVar(server->ringDelay, &(server->meanDelay), &(server->varDelay));
-    computeMeanVar(server->ringDrift, &(server->meanDrift), &(server->varDrift));
 }
 
 static void processResponse(uint8_t *frame) {
@@ -729,7 +809,7 @@ static void pollServer(struct Server *server, int pingOnly) {
     // set type to client request
     headerNTP->version = 4;
     headerNTP->mode = 3;
-    headerNTP->poll = 4;
+    headerNTP->poll = NTP_POLL_BITS;
     // set stratum and precision
     headerNTP->stratum = clockStratum;
     headerNTP->precision = NTP_PRECISION;
@@ -755,162 +835,166 @@ static void pollServer(struct Server *server, int pingOnly) {
     NET_transmit(txDesc, NTP4_SIZE);
 }
 
-static void updateStateTracking() {
-    // update server weights
-    float norm = 0;
-    for(int i = 0; i < SERVER_COUNT; i++) {
-        // skip servers that are still initializing
-        if(servers[i].reach == 0) {
-            servers[i].weight = 0;
-            continue;
-        }
+static void computeMeanVar(const float *ring, float *mean, float *var) {
+    float _mean = 0;
+    for(int i = 0; i < NTP_RING_SIZE; i++)
+        _mean += ring[i];
+    _mean /= NTP_RING_SIZE;
 
-        // check for failure states
-        if(
-                servers[i].leapIndicator == NTP_LI_ALARM ||
-                servers[i].stratum == 0 ||
-                servers[i].stratum > NTP_MAX_STRATUM
-                ) {
-            // unset reach bit if server stratum is too poor
-            servers[i].reach &= 0xFFFE;
-            servers[i].weight = 0;
-            continue;
-        }
-
-        int reach = servers[i].reach;
-        int elapsed = 0, quality = 0;
-        for(int shift = 0; shift < 16; shift++) {
-            if((reach >> shift) & 1) {
-                elapsed += shift;
-                ++quality;
-            }
-        }
-        elapsed <<= 2;
-        elapsed += 2;
-        servers[i].currentOffset = servers[i].meanOffset;
-        servers[i].currentOffset += servers[i].meanDrift * (float) elapsed;
-
-        float weight = 0;
-        if(servers[i].varDrift > 0) {
-            weight = (float) elapsed;
-            weight *= servers[i].varDrift;
-            weight = sqrtf(weight);
-            weight = 1.0f / weight;
-            weight *= (float) quality;
-        }
-        if(!isfinite(weight))
-            weight = 0;
-        servers[i].weight = weight;
-        norm += weight;
+    float _var = 0;
+    for(int i = 0; i < NTP_RING_SIZE; i++) {
+        float diff = ring[i] - _mean;
+        _var += diff * diff;
     }
-    if(norm > 0) {
-        float mean = 0;
-        for(int i = 0; i < SERVER_COUNT; i++)
-            mean += servers[i].currentOffset * servers[i].weight;
-        mean /= norm;
+    _var /= NTP_RING_SIZE;
+    _var *= 4;
 
-        float var = 0;
-        for(int i = 0; i < SERVER_COUNT; i++) {
-            float diff = servers[i].currentOffset - mean;
-            diff *= diff;
-            var += diff * servers[i].weight;
-        }
-        var /= norm;
-        var *= 4;
-
-        norm = 0;
-        for(int i = 0; i < SERVER_COUNT; i++) {
-            // drop server if offset is too high
-            float diff = servers[i].currentOffset - mean;
-            diff *= diff;
-            if(diff < var)
-                norm += servers[i].weight;
-            else
-                servers[i].weight = 0;
+    int cnt = 0;
+    *mean = 0, *var = 0;
+    for(int i = 0; i < NTP_RING_SIZE; i++) {
+        float diff = ring[i] - _mean;
+        diff *= diff;
+        if(diff < _var) {
+            *mean += ring[i];
+            *var += diff;
+            ++cnt;
         }
     }
-
-    refId = 0;
-    clockDrift = 0;
-    clockOffset = 0;
-    float _stratum = 0;
-    float best = 0;
-    int li[4] = {0,0,0,0};
-    if(norm > 0) {
-        norm = 1.0f / norm;
-        for(int i = 0; i < SERVER_COUNT; i++) {
-            servers[i].weight *= norm;
-            const float weight = servers[i].weight;
-            clockDrift += weight * servers[i].meanDrift;
-            clockOffset += weight * servers[i].currentOffset;
-            _stratum += weight * (float) servers[i].stratum;
-            // set reference ID to server with best weight
-            if(weight > best) {
-                best = weight;
-                refId = servers[i].addr;
-            }
-            // tally leap indicator votes
-            if(weight > 0.05f)
-                ++li[servers[i].leapIndicator];
-        }
+    if(cnt == 0) {
+        *mean = 0;
+        *var = 0;
+    } else {
+        *mean /= (float) cnt;
+        *var /= (float) cnt;
     }
-    // update clock stratum
-    if(GPSDO_isLocked())
-        clockStratum = 1;
-    else if(_stratum == 0)
-        clockStratum = 16;
-    else
-        clockStratum = (int) roundf(_stratum) + 1;
+}
 
-    // set reference ID to GPS if stratum is 1
-    if(clockStratum == 1)
-        refId = NTP_REF_GPS;
+static void resetServer(struct Server *server) {
+    // clear ring data
+    memset(server->ringOffset, 0, sizeof(server->ringOffset));
+    memset(server->ringDelay, 0, sizeof(server->ringDelay));
+    memset(server->ringDrift, 0, sizeof(server->ringDrift));
+    // clear poll tracking
+    server->attempts = 0;
+    server->offset = 0;
+    server->update = 0;
+    server->reach = 0;
+}
 
-    // tally leap indicator votes
-    leapIndicator = 0;
-    int bestLI = 0;
-    for(int i = 0; i < 3; i++) {
-        if(li[i] > bestLI) {
-            bestLI = li[i];
-            leapIndicator = i;
+static void updateTracking(struct Server *server) {
+    // burst must be complete
+    if(server->burst < NTP_BURST) {
+        // discard late arrivals
+        server->burst = NTP_BURST;
+        return;
+    }
+
+    // advance ring
+    ++server->head;
+    server->head &= NTP_RING_MASK;
+    const int head = server->head;
+
+    // compute delay and offset
+    int64_t _adjust = 0;
+    uint64_t _delay = 0;
+    uint64_t offset = server->stamps[1] - server->stamps[0];
+    for(int i = 0; i < NTP_BURST; i++) {
+        const uint64_t *set = server->stamps + (i << 2);
+        // accumulate delay
+        _delay += set[3] - set[2];
+        _delay += set[1] - set[0];
+        // accumulate offset adjustment
+        _adjust += (int64_t) ((set[1] - set[0]) - offset);
+        _adjust += (int64_t) ((set[2] - set[3]) - offset);
+    }
+    // normalize delay
+    _delay >>= NTP_BURST_BITS + 1;
+    // adjust offset
+    offset += _adjust >> (NTP_BURST_BITS + 1);
+
+    // compute update time
+    uint64_t update = server->stamps[(NTP_BURST << 2) - 1];
+    update += ((int64_t) (server->stamps[0] - update)) >> 1;
+
+    // update ring
+    server->ringOffset[head] = 0x1p-32f * (float) (int32_t) offset;
+    server->ringDelay[head] = 0x1p-32f * (float) (uint32_t) _delay;
+    // bootstrap ring with first sample
+    if(server->reach == 1) {
+        for(int i = 0; i < NTP_RING_SIZE; i++) {
+            server->ringOffset[i] = server->ringOffset[head];
+            server->ringDelay[i] = server->ringDelay[head];
         }
     }
 
-    // compute mean offset
-    int64_t offset = 0;
-    int32_t divisor = 0;
-    for(int i = 0; i < SERVER_COUNT; i++) {
-        int32_t weight = (int32_t) (0x1p24f * servers[i].weight);
-        divisor += weight;
-        int64_t _offset = (int64_t) servers[i].offset;
-        _offset >>= 24;
-        _offset *= weight;
-        offset += _offset;
-    }
-    // correct for integer truncation
-    int64_t twiddle = offset;
-    twiddle >>= 24;
-    twiddle *= (1<<24) - divisor;
-    offset += twiddle;
-
-    if(offset != 0) {
-        // compute offset adjustment
-        int64_t diff = offset - (int64_t) ntpOffset;
-        // round to whole seconds
-        if (((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
-            ((int32_t *) &diff)[1] -= 1;
-        else if (((uint32_t *) &diff)[0] >= (1 << 31))
-            ((int32_t *) &diff)[1] += 1;
-        // apply offset adjustment
-        ((uint32_t *) &ntpOffset)[1] += ((int32_t *) &diff)[1];
+    // compute drift
+    if(server->update != 0) {
+        uint64_t interval = update - server->update;
+        uint32_t ipart = ((uint32_t *) &interval)[1];
+        uint8_t shift = 0;
+        while(ipart >> shift) ++shift;
+        float drift = (float) (int32_t) (offset - server->offset);
+        drift /= (float) (uint32_t) (interval >> shift);
+        drift /= (float) (1 << shift);
+        server->ringDrift[head] = drift;
     }
 
-    // notify GPSDO of ntp status for fail-over purposes
-    if(norm > 0) {
-        if (GPSDO_ntpUpdate(clockOffset, clockDrift)) {
-            // reset server stats if clock was hard stepped
-            for (int i = 0; i < SERVER_COUNT; i++)
-                resetServer(servers + i);
+    // update server status
+    server->offset = offset;
+    server->update = update;
+
+    // update stats
+    computeMeanVar(server->ringOffset, &(server->meanOffset), &(server->varOffset));
+    computeMeanVar(server->ringDelay, &(server->meanDelay), &(server->varDelay));
+    computeMeanVar(server->ringDrift, &(server->meanDrift), &(server->varDrift));
+
+    // analyze connection quality
+    int reach = server->reach;
+    int elapsed = 0, quality = 0;
+    for(int shift = 0; shift < 16; shift++) {
+        if((reach >> shift) & 1) {
+            elapsed += shift;
+            ++quality;
         }
     }
+    // normalize quality
+    if(server->attempts < 16) {
+        quality <<= 4;
+        quality /= (int) server->attempts;
+    }
+
+    // estimate current offset
+    elapsed <<= 2;
+    elapsed += 7;
+    server->currentOffset = server->meanOffset;
+    server->currentOffset += server->meanDrift * (float) elapsed;
+
+    // de-weight servers that are still initializing or have poor connections
+    if(server->attempts < 7 || quality < 10) {
+        server->weight = 0;
+        return;
+    }
+
+    // check for failure states
+    if(
+            server->leapIndicator == NTP_LI_ALARM ||
+            server->stratum == 0 ||
+            server->stratum > NTP_MAX_STRATUM
+            ) {
+        // unset reach bit if server stratum is too poor
+        server->reach &= 0xFFFE;
+        server->weight = 0;
+        return;
+    }
+
+    float weight = 0;
+    if(server->varDrift > 0) {
+        weight = (float) elapsed;
+        weight *= server->varDrift;
+        weight = 1.0f / sqrtf(weight);
+        weight *= (float) quality;
+    }
+    if(!isfinite(weight))
+        weight = 0;
+    server->weight = weight;
 }
