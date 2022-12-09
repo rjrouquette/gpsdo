@@ -88,8 +88,6 @@ static void processResponse(uint8_t *frame);
 static void pollServer(struct Server *server, int pingOnly);
 static void resetServer(struct Server *server);
 static void computeMeanVar(const float *ring, float *mean, float *var);
-static void updateStats(struct Server *server);
-static void updateTracking(struct Server *server);
 
 static void processRequest(uint8_t *frame, int flen);
 static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP);
@@ -101,13 +99,15 @@ static void callbackDNS(uint32_t addr);
 
 
 // time slot tasks
-static void slotPoll();
-static void slotShuffle();
-static void slotTracking();
-static void slotPrune();
-static void slotDNS();
-static void slotARP();
-static void slotPing();
+static void runPoll();
+static void runShuffle();
+static void runStats();
+static void runTracking();
+static void runAggregate();
+static void runPrune();
+static void runDNS();
+static void runARP();
+static void runPing();
 
 // time slot task assignments
 typedef void (*SlotTask) (void);
@@ -134,26 +134,32 @@ void NTP_init() {
     memset(taskSlot, 0, sizeof(taskSlot));
     // polling tasks
     for(int i = 0; i < 8; i++) {
-        taskSlot[i].task = slotPoll;
+        taskSlot[i].task = runPoll;
         taskSlot[i].end = SERVER_COUNT;
     }
     // shuffle poll time slots
-    taskSlot[8].task = slotShuffle;
+    taskSlot[8].task = runShuffle;
     taskSlot[8].end = SERVER_COUNT;
     // update tracking stats
-    taskSlot[10].task = slotTracking;
-    taskSlot[10].end = (SERVER_COUNT * 2) + 1;
-    // prune erratic server
-    taskSlot[11].task = slotPrune;
+    taskSlot[10].task = runStats;
+    taskSlot[10].end = SERVER_COUNT;
+    // update tracking stats
+    taskSlot[11].task = runTracking;
     taskSlot[11].end = SERVER_COUNT;
-    // expand server list
-    taskSlot[12].task = slotDNS;
+    // update tracking stats
+    taskSlot[12].task = runAggregate;
     taskSlot[12].end = 1;
+    // prune erratic servers
+    taskSlot[13].task = runPrune;
+    taskSlot[13].end = SERVER_COUNT;
+    // expand server list
+    taskSlot[14].task = runDNS;
+    taskSlot[14].end = 1;
     // MAC address resolution
-    taskSlot[18].task = slotARP;
-    taskSlot[18].end = SERVER_COUNT;
+    taskSlot[20].task = runARP;
+    taskSlot[20].end = SERVER_COUNT;
     // pre-poll server ping
-    taskSlot[63].task = slotPing;
+    taskSlot[63].task = runPing;
     taskSlot[63].end = SERVER_COUNT;
 
     // explicitly include some local stratum 1 servers for testing
@@ -295,7 +301,7 @@ void NTP_run() {
     }
 }
 
-static void slotPoll() {
+static void runPoll() {
     // verify server poll slot
     struct Server *server = servers + ntpProcess.iter;
     if(server->pollSlot != ntpProcess.timeSlot)
@@ -312,29 +318,139 @@ static void slotPoll() {
     pollServer(server, 0);
 }
 
-static void slotShuffle() {
+static void runShuffle() {
     // shuffle server poll slot
     struct Server *server = servers + ntpProcess.iter;
     server->pollSlot = NTP_POLL_RAND;
 }
 
-static void slotTracking() {
-    // update server tracking statistics
-    if(ntpProcess.iter < SERVER_COUNT) {
-        struct Server *server = servers + ntpProcess.iter;
-        if(server->addr == 0) return;
-        updateStats(server);
+static void runStats() {
+    struct Server *server = servers + ntpProcess.iter;
+    if(server->addr == 0) return;
+
+    // burst must be complete
+    if(server->burst < NTP_BURST) {
+        // discard late arrivals
+        server->burst = NTP_BURST;
         return;
     }
 
-    // update server tracking states
-    if(ntpProcess.iter < SERVER_COUNT*2) {
-        struct Server *server = servers + (ntpProcess.iter - SERVER_COUNT);
-        if(server->addr == 0) return;
-        updateTracking(server);
+    // advance ring
+    ++server->head;
+    server->head &= NTP_RING_MASK;
+    const int head = server->head;
+
+    // compute delay and offset
+    int64_t _adjust = 0;
+    uint64_t _delay = 0;
+    uint64_t offset = server->stamps[1] - server->stamps[0];
+    for(int i = 0; i < NTP_BURST; i++) {
+        const uint64_t *set = server->stamps + (i << 2);
+        // accumulate delay
+        _delay += set[3] - set[2];
+        _delay += set[1] - set[0];
+        // accumulate offset adjustment
+        _adjust += (int64_t) ((set[1] - set[0]) - offset);
+        _adjust += (int64_t) ((set[2] - set[3]) - offset);
+    }
+    // normalize delay
+    _delay >>= NTP_BURST_BITS + 1;
+    // adjust offset
+    offset += _adjust >> (NTP_BURST_BITS + 1);
+
+    // compute update time
+    uint64_t update = server->stamps[(NTP_BURST << 2) - 1];
+    update += ((int64_t) (server->stamps[0] - update)) >> 1;
+
+    // update ring
+    server->ringOffset[head] = 0x1p-32f * (float) (int32_t) offset;
+    server->ringDelay[head] = 0x1p-32f * (float) (uint32_t) _delay;
+    // bootstrap ring with first sample
+    if(server->reach == 1) {
+        for(int i = 0; i < NTP_RING_SIZE; i++) {
+            server->ringOffset[i] = server->ringOffset[head];
+            server->ringDelay[i] = server->ringDelay[head];
+        }
+    }
+
+    // compute drift
+    if(server->update != 0) {
+        uint64_t interval = update - server->update;
+        uint32_t ipart = ((uint32_t *) &interval)[1];
+        uint8_t shift = 0;
+        while(ipart >> shift) ++shift;
+        float drift = (float) (int32_t) (offset - server->offset);
+        drift /= (float) (uint32_t) (interval >> shift);
+        drift /= (float) (1 << shift);
+        server->ringDrift[head] = drift;
+    }
+
+    // update server status
+    server->offset = offset;
+    server->update = update;
+
+    // update stats
+    computeMeanVar(server->ringOffset, &(server->meanOffset), &(server->varOffset));
+    computeMeanVar(server->ringDelay, &(server->meanDelay), &(server->varDelay));
+    computeMeanVar(server->ringDrift, &(server->meanDrift), &(server->varDrift));
+}
+
+static void runTracking() {
+    struct Server *server = servers + ntpProcess.iter;
+    if(server->addr == 0) return;
+
+    // analyze connection quality
+    int reach = server->reach;
+    int elapsed = 0, quality = 0;
+    for(int shift = 0; shift < 16; shift++) {
+        if((reach >> shift) & 1) {
+            elapsed += shift;
+            ++quality;
+        }
+    }
+    // normalize quality
+    if(server->attempts < 16) {
+        quality <<= 4;
+        quality /= (int) server->attempts;
+    }
+
+    // estimate current offset
+    elapsed <<= 2;
+    elapsed += 7;
+    server->currentOffset = server->meanOffset;
+    server->currentOffset += server->meanDrift * (float) elapsed;
+
+    // de-weight servers that are still initializing or have poor connections
+    if(server->attempts < 7 || quality < 10) {
+        server->weight = 0;
         return;
     }
 
+    // check for failure states
+    if(
+            server->leapIndicator == NTP_LI_ALARM ||
+            server->stratum == 0 ||
+            server->stratum > NTP_MAX_STRATUM
+            ) {
+        // unset reach bit if server stratum is too poor
+        server->reach &= 0xFFFE;
+        server->weight = 0;
+        return;
+    }
+
+    float weight = 0;
+    if(server->varDrift > 0) {
+        weight = (float) elapsed;
+        weight *= server->varDrift;
+        weight = 1.0f / sqrtf(weight);
+        weight *= (float) quality;
+    }
+    if(!isfinite(weight))
+        weight = 0;
+    server->weight = weight;
+}
+
+static void runAggregate() {
     // normalize server weights
     float norm = 0;
     for(int i = 0; i < SERVER_COUNT; i++)
@@ -451,7 +567,7 @@ static void slotTracking() {
     }
 }
 
-static void slotPrune() {
+static void runPrune() {
     // examine sever connection quality
     struct Server *server = servers + ntpProcess.iter;
     // verify that server is configured
@@ -471,7 +587,7 @@ static void slotPrune() {
         memset(server, 0, sizeof(struct Server));
 }
 
-static void slotDNS() {
+static void runDNS() {
     for(int i = 0; i < SERVER_COUNT; i++) {
         if (servers[i].addr == 0) {
             DNS_lookup(NTP_POOL_FQDN, callbackDNS);
@@ -480,7 +596,7 @@ static void slotDNS() {
     }
 }
 
-static void slotARP() {
+static void runARP() {
     // update server tracking stats
     struct Server *server = servers + ntpProcess.iter;
     // verify that server is configured
@@ -495,7 +611,7 @@ static void slotARP() {
         ARP_request(server->addr, callbackARP);
 }
 
-static void slotPing() {
+static void runPing() {
     // verify server poll slot
     struct Server *server = servers + ntpProcess.iter;
     if(server->pollSlot != ntpProcess.timeSlot)
@@ -888,124 +1004,4 @@ static void resetServer(struct Server *server) {
     server->offset = 0;
     server->update = 0;
     server->reach = 0;
-}
-
-static void updateStats(struct Server *server) {
-    // burst must be complete
-    if(server->burst < NTP_BURST) {
-        // discard late arrivals
-        server->burst = NTP_BURST;
-        return;
-    }
-
-    // advance ring
-    ++server->head;
-    server->head &= NTP_RING_MASK;
-    const int head = server->head;
-
-    // compute delay and offset
-    int64_t _adjust = 0;
-    uint64_t _delay = 0;
-    uint64_t offset = server->stamps[1] - server->stamps[0];
-    for(int i = 0; i < NTP_BURST; i++) {
-        const uint64_t *set = server->stamps + (i << 2);
-        // accumulate delay
-        _delay += set[3] - set[2];
-        _delay += set[1] - set[0];
-        // accumulate offset adjustment
-        _adjust += (int64_t) ((set[1] - set[0]) - offset);
-        _adjust += (int64_t) ((set[2] - set[3]) - offset);
-    }
-    // normalize delay
-    _delay >>= NTP_BURST_BITS + 1;
-    // adjust offset
-    offset += _adjust >> (NTP_BURST_BITS + 1);
-
-    // compute update time
-    uint64_t update = server->stamps[(NTP_BURST << 2) - 1];
-    update += ((int64_t) (server->stamps[0] - update)) >> 1;
-
-    // update ring
-    server->ringOffset[head] = 0x1p-32f * (float) (int32_t) offset;
-    server->ringDelay[head] = 0x1p-32f * (float) (uint32_t) _delay;
-    // bootstrap ring with first sample
-    if(server->reach == 1) {
-        for(int i = 0; i < NTP_RING_SIZE; i++) {
-            server->ringOffset[i] = server->ringOffset[head];
-            server->ringDelay[i] = server->ringDelay[head];
-        }
-    }
-
-    // compute drift
-    if(server->update != 0) {
-        uint64_t interval = update - server->update;
-        uint32_t ipart = ((uint32_t *) &interval)[1];
-        uint8_t shift = 0;
-        while(ipart >> shift) ++shift;
-        float drift = (float) (int32_t) (offset - server->offset);
-        drift /= (float) (uint32_t) (interval >> shift);
-        drift /= (float) (1 << shift);
-        server->ringDrift[head] = drift;
-    }
-
-    // update server status
-    server->offset = offset;
-    server->update = update;
-
-    // update stats
-    computeMeanVar(server->ringOffset, &(server->meanOffset), &(server->varOffset));
-    computeMeanVar(server->ringDelay, &(server->meanDelay), &(server->varDelay));
-    computeMeanVar(server->ringDrift, &(server->meanDrift), &(server->varDrift));
-}
-
-static void updateTracking(struct Server *server) {
-    // analyze connection quality
-    int reach = server->reach;
-    int elapsed = 0, quality = 0;
-    for(int shift = 0; shift < 16; shift++) {
-        if((reach >> shift) & 1) {
-            elapsed += shift;
-            ++quality;
-        }
-    }
-    // normalize quality
-    if(server->attempts < 16) {
-        quality <<= 4;
-        quality /= (int) server->attempts;
-    }
-
-    // estimate current offset
-    elapsed <<= 2;
-    elapsed += 7;
-    server->currentOffset = server->meanOffset;
-    server->currentOffset += server->meanDrift * (float) elapsed;
-
-    // de-weight servers that are still initializing or have poor connections
-    if(server->attempts < 7 || quality < 10) {
-        server->weight = 0;
-        return;
-    }
-
-    // check for failure states
-    if(
-            server->leapIndicator == NTP_LI_ALARM ||
-            server->stratum == 0 ||
-            server->stratum > NTP_MAX_STRATUM
-            ) {
-        // unset reach bit if server stratum is too poor
-        server->reach &= 0xFFFE;
-        server->weight = 0;
-        return;
-    }
-
-    float weight = 0;
-    if(server->varDrift > 0) {
-        weight = (float) elapsed;
-        weight *= server->varDrift;
-        weight = 1.0f / sqrtf(weight);
-        weight *= (float) quality;
-    }
-    if(!isfinite(weight))
-        weight = 0;
-    server->weight = weight;
 }
