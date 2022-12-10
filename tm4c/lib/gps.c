@@ -21,6 +21,7 @@ static uint8_t msgBuff[256];
 static int rxHead, rxTail;
 static int txHead, txTail;
 static int lenNEMA, lenUBX;
+static int endUBX;
 
 static float locLat, locLon, locAlt;
 
@@ -109,18 +110,24 @@ void GPS_run() {
     // process UBX message
     if(lenUBX) {
         // determine end of UBX block
-        int end = sizeof(msgBuff);
-        if(lenNEMA > 5)
-            end = 8 + *(uint16_t*) (msgBuff + 4);
+        if(lenUBX == 6) {
+            // validate second sync byte
+            if(msgBuff[1] != 0x62) {
+                lenUBX = 0;
+                return;
+            }
+            endUBX = 8 + *(uint16_t *) (msgBuff + 4);
+        }
         // append character to message buffer
         if(lenUBX < sizeof(msgBuff))
             msgBuff[lenUBX] = byte;
         // end of message
-        if(++lenUBX >= end) {
+        if(++lenUBX >= endUBX) {
             if(lenUBX > sizeof(msgBuff))
                 lenUBX = sizeof(msgBuff);
             processUBX(msgBuff, lenUBX);
             lenUBX = 0;
+            endUBX = 0;
         }
         return;
     }
@@ -145,9 +152,9 @@ void GPS_run() {
         msgBuff[lenNEMA++] = byte;
         return;
     }
-
     // search for UBX message start
     if(byte == 0xB5) {
+        endUBX = 8;
         msgBuff[lenUBX++] = byte;
         return;
     }
@@ -235,6 +242,8 @@ static void processNEMA(char *msg, int len) {
 }
 
 static void processUBX(uint8_t *msg, const int len) {
+    char tmp[44];
+
     // initialize checksum
     uint8_t chkA = 0, chkB = 0;
     // compute checksum
@@ -244,7 +253,6 @@ static void processUBX(uint8_t *msg, const int len) {
     }
     // verify checksum
     if(chkA != msg[len - 2] || chkB != msg[len - 1]) {
-        char tmp[44];
         debugLog("UBX checksum error:");
         for(int i = 0; i < len; i += 8) {
             char *tail = append(tmp, "  ");
@@ -258,10 +266,33 @@ static void processUBX(uint8_t *msg, const int len) {
         return;
     }
 
-    char tmp[44];
-    char *tail = toHexBytes(tmp, msg, 12);
-    *tail = 0;
-    debugLog(tmp);
+    uint8_t _class = msg[2];
+    uint8_t _id = msg[3];
+    uint16_t size = *(uint16_t *)(msg+4);
+    // ack/nack
+    if(_class == 0x05) {
+        if(size != 2) return;
+        char *tail;
+        if(_id == 1)
+            tail = append(tmp, "UBX ACK: ");
+        else
+            tail = append(tmp, "UBX NACK: ");
+        tail = toHexBytes(tail, msg + 6, 2);
+        *tail = 0;
+        debugLog(tmp);
+        return;
+    }
+
+    debugLog("UBX MSG:");
+    for(int i = 0; i < len; i += 8) {
+        char *tail = append(tmp, "  ");
+        if(len - i < 8)
+            tail = toHexBytes(tail, msg + i, len - i);
+        else
+            tail = toHexBytes(tail, msg + i, 8);
+        *tail = 0;
+        debugLog(tmp);
+    }
 }
 
 static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload) {
