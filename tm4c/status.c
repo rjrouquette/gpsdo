@@ -18,6 +18,7 @@
 #include "lib/net/dhcp.h"
 #include "hw/sys.h"
 #include "ntp.h"
+#include "lib/gps.h"
 
 #define STATUS_PORT (23) // telnet port
 
@@ -158,7 +159,8 @@ unsigned statusETH(char *body) {
 }
 
 unsigned statusGPS(char *body) {
-    return 0;
+    char *end = GPS_log(body);
+    return end - body;
 }
 
 unsigned statusGPSDO(char *body) {

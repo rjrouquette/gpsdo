@@ -5,7 +5,7 @@
 #include <math.h>
 #include "format.h"
 
-const char lut_base[16] = "0123456789ABCDEF";
+const char lutBase[16] = "0123456789ABCDEF";
 
 char* append(char *dst, const char *src) {
     for(;;) {
@@ -14,6 +14,15 @@ char* append(char *dst, const char *src) {
         ++dst; ++src;
     }
     return dst;
+}
+
+char* toHexBytes(char *tail, const uint8_t *bytes, int size) {
+    for(int i = 0; i < size; i++) {
+        *(tail++) = lutBase[bytes[i] >> 4];
+        *(tail++) = lutBase[bytes[i] & 15];
+        *(tail++) = ' ';
+    }
+    return --tail;
 }
 
 int padCopy(int width, char pad,  char *dst, const char *src, int len) {
@@ -40,11 +49,11 @@ int toBase(uint32_t value, char base, char *result) {
     char digits[32];
     int cnt = 0;
     while(value > 0) {
-        digits[cnt++] = lut_base[value % base];
+        digits[cnt++] = lutBase[value % base];
         value /= base;
     }
     if(cnt < 1) {
-        result[0] = lut_base[0];
+        result[0] = lutBase[0];
         return 1;
     }
     for(int i = 0; i < cnt; i++)

@@ -163,8 +163,9 @@ void NTP_init() {
     taskSlot[63].end = SERVER_COUNT;
 
     // explicitly include some local stratum 1 servers for testing
-//    servers[0].addr = 0xC803A8C0; // local network GPS timeserver
-//    servers[1].addr = 0x87188f6b; // nearby GPS timeserver on same ISP
+//    servers[0].addr = 0xF603A8C0; // local network GPS timeserver
+//    servers[1].addr = 0xC803A8C0; // local network GPS timeserver
+//    servers[2].addr = 0x87188f6b; // nearby GPS timeserver on same ISP
 }
 
 uint64_t NTP_offset() {
