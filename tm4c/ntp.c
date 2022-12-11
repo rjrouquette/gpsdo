@@ -19,7 +19,6 @@
 #include "lib/net/arp.h"
 #include "lib/format.h"
 #include "lib/net/dns.h"
-#include "lib/gps.h"
 
 #define NTP4_SIZE (UDP_DATA_OFFSET + 48)
 #define NTP_PORT (123)
