@@ -159,7 +159,57 @@ unsigned statusETH(char *body) {
 }
 
 unsigned statusGPS(char *body) {
-    return 0;
+    char tmp[32];
+    char *end = body;
+
+    // gps fix
+    end = append(end, "fix good: ");
+    end = append(end, GPS_hasFix() ? "yes" : "no");
+    end = append(end, "\n");
+
+    // latitude
+    tmp[fmtFloat(GPS_locLat(), 0, 7, tmp)] = 0;
+    end = append(end, "latitude: ");
+    end = append(end, tmp);
+    end = append(end, " deg\n");
+
+    // longitude
+    tmp[fmtFloat(GPS_locLon(), 0, 7, tmp)] = 0;
+    end = append(end, "longitude: ");
+    end = append(end, tmp);
+    end = append(end, " deg\n");
+
+    // altitude
+    tmp[fmtFloat(GPS_locAlt(), 0, 2, tmp)] = 0;
+    end = append(end, "altitude: ");
+    end = append(end, tmp);
+    end = append(end, " m\n");
+
+    // clock bias
+    tmp[fmtFloat((float) GPS_clkBias(), 0, 0, tmp)] = 0;
+    end = append(end, "clock bias: ");
+    end = append(end, tmp);
+    end = append(end, " ns\n");
+
+    // clock drift
+    tmp[fmtFloat((float) GPS_clkDrift(), 0, 0, tmp)] = 0;
+    end = append(end, "clock drift: ");
+    end = append(end, tmp);
+    end = append(end, " ns/s\n");
+
+    // time accuracy
+    tmp[toBase(GPS_accTime(), 10, tmp)] = 0;
+    end = append(end, "time accuracy: ");
+    end = append(end, tmp);
+    end = append(end, " ns\n");
+
+    // frequency accuracy
+    tmp[toBase(GPS_accTime(), 10, tmp)] = 0;
+    end = append(end, "frequency accuracy: ");
+    end = append(end, tmp);
+    end = append(end, " ps/s\n");
+
+    return end - body;
 }
 
 unsigned statusGPSDO(char *body) {

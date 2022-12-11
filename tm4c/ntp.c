@@ -19,6 +19,7 @@
 #include "lib/net/arp.h"
 #include "lib/format.h"
 #include "lib/net/dns.h"
+#include "lib/gps.h"
 
 #define NTP4_SIZE (UDP_DATA_OFFSET + 48)
 #define NTP_PORT (123)
@@ -550,16 +551,18 @@ static void runAggregate() {
     twiddle *= (1<<24) - divisor;
     offset += twiddle;
 
-    if(offset != 0) {
-        // compute offset adjustment
-        int64_t diff = offset - (int64_t) ntpOffset;
-        // round to whole seconds
-        if (((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
-            ((int32_t *) &diff)[1] -= 1;
-        else if (((uint32_t *) &diff)[0] >= (1 << 31))
-            ((int32_t *) &diff)[1] += 1;
-        // apply offset adjustment
-        ((uint32_t *) &ntpOffset)[1] += ((int32_t *) &diff)[1];
+    if(!GPSDO_isLocked()) {
+        if (offset != 0) {
+            // compute offset adjustment
+            int64_t diff = offset - (int64_t) ntpOffset;
+            // round to whole seconds
+            if (((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
+                ((int32_t *) &diff)[1] -= 1;
+            else if (((uint32_t *) &diff)[0] >= (1 << 31))
+                ((int32_t *) &diff)[1] += 1;
+            // apply offset adjustment
+            ((uint32_t *) &ntpOffset)[1] += ((int32_t *) &diff)[1];
+        }
     }
 
     // notify GPSDO of ntp status for fail-over purposes

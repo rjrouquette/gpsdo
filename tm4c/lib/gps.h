@@ -13,6 +13,11 @@ float GPS_locLat();
 float GPS_locLon();
 float GPS_locAlt();
 
-int GPS_hasLock();
+int GPS_clkBias();
+int GPS_clkDrift();
+int GPS_accTime();
+int GPS_accFreq();
+
+int GPS_hasFix();
 
 #endif //GPSDO_GPS_H

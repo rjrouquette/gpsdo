@@ -6,7 +6,6 @@
 #include "../hw/uart.h"
 #include "delay.h"
 #include "gps.h"
-#include "format.h"
 #include "clk.h"
 #include "../hw/emac.h"
 #include "../ntp.h"
@@ -21,14 +20,18 @@ static int rxHead, rxTail;
 static int txHead, txTail;
 static int lenNEMA, lenUBX;
 static int endUBX;
-static int confIter = 64;
-static int gpsOffset;
 
+static int fixGood;
 static float locLat, locLon, locAlt;
+static int clkBias, clkDrift, accTime, accFreq;
+static int gpsOffset;
 
 static void processNEMA(char *msg, int len);
 
 static void processUBX(uint8_t *msg, int len);
+static void processUbxClock(const uint8_t *payload);
+static void processUbxPosition(const uint8_t *payload);
+static void processUbxStatus(const uint8_t *payload);
 static void processUbxGpsTime(const uint8_t *payload);
 static void processUbxUtcTime(const uint8_t *payload);
 
@@ -75,10 +78,11 @@ void GPS_init() {
 
 uint32_t prevSecond = 0;
 void GPS_run() {
-    uint32_t now = CLK_GPS_INT();
+    uint32_t now = CLK_MONOTONIC_INT();
     if(prevSecond != now) {
         prevSecond = now;
-        configureGPS();
+        if((now & 15) == 0)
+            configureGPS();
     }
 
     // read GPS serial data
@@ -165,8 +169,24 @@ float GPS_locAlt() {
     return locAlt;
 }
 
-int GPS_hasLock() {
-    return 1;
+int GPS_clkBias() {
+    return clkBias;
+}
+
+int GPS_clkDrift() {
+    return clkDrift;
+}
+
+int GPS_accTime() {
+    return accTime;
+}
+
+int GPS_accFreq() {
+    return accFreq;
+}
+
+int GPS_hasFix() {
+    return fixGood;
 }
 
 static uint8_t fromHex(char c) {
@@ -176,8 +196,6 @@ static uint8_t fromHex(char c) {
 }
 
 static void processNEMA(char *msg, int len) {
-//    debugLog(msg);
-
     uint8_t csum = 0;
     char *chksum = NULL;
     char *parts[64];
@@ -212,13 +230,10 @@ static void processNEMA(char *msg, int len) {
             return;
     }
 
-    // NMEA messages should be disabled, (re)configure GPS
-    confIter = 0;
+    // no NMEA messages are expected
 }
 
 static void processUBX(uint8_t *msg, const int len) {
-    char tmp[44];
-
     // initialize checksum
     uint8_t chkA = 0, chkB = 0;
     // compute checksum
@@ -236,6 +251,16 @@ static void processUBX(uint8_t *msg, const int len) {
     uint16_t size = *(uint16_t *)(msg+4);
     // NAV class
     if(_class == 0x01) {
+        // position message
+        if(_id == 0x02 && size == 28) {
+            processUbxPosition(msg + 6);
+            return;
+        }
+        // status message
+        if(_id == 0x03 && size == 16) {
+            processUbxStatus(msg + 6);
+            return;
+        }
         // GPS time message
         if(_id == 0x20 && size == 16) {
             processUbxGpsTime(msg + 6);
@@ -244,6 +269,11 @@ static void processUBX(uint8_t *msg, const int len) {
         // UTC time message
         if(_id == 0x21 && size == 20) {
             processUbxUtcTime(msg + 6);
+            return;
+        }
+        // UTC time message
+        if(_id == 0x22 && size == 20) {
+            processUbxClock(msg + 6);
             return;
         }
     }
@@ -311,6 +341,20 @@ static const uint8_t payloadDisableNMEA[] = {
 };
 _Static_assert(sizeof(payloadDisableNMEA) == 20, "payloadDisableNMEA must be 20 bytes");
 
+static const uint8_t payloadEnablePosition[] = {
+        0x01, // NAV class
+        0x02, // position
+        0x01  // every update
+};
+_Static_assert(sizeof(payloadEnablePosition) == 3, "payloadEnablePosition must be 3 bytes");
+
+static const uint8_t payloadEnableStatus[] = {
+        0x01, // NAV class
+        0x03, // fix status
+        0x01  // every update
+};
+_Static_assert(sizeof(payloadEnableStatus) == 3, "payloadEnableStatus must be 3 bytes");
+
 static const uint8_t payloadEnableGpsTime[] = {
         0x01, // NAV class
         0x20, // GPS time
@@ -325,24 +369,41 @@ static const uint8_t payloadEnableUtcTime[] = {
 };
 _Static_assert(sizeof(payloadEnableUtcTime) == 3, "payloadEnableUtcTime must be 3 bytes");
 
+static const uint8_t payloadEnableClock[] = {
+        0x01, // NAV class
+        0x22, // clock status
+        0x01  // every update
+};
+_Static_assert(sizeof(payloadEnableClock) == 3, "payloadEnableClock must be 3 bytes");
+
 static void configureGPS() {
     // wait for empty TX buffer
     if(txHead != txTail) return;
-    // return if configuration complete
-    if(confIter > 5) return;
-    int iter = confIter++;
 
-    // disable NMEA messages on UART
-    if(iter == 0) {
-        sendUBX(0x06, 0x00, sizeof(payloadDisableNMEA), payloadDisableNMEA);
-        return;
-    }
-    // enable time messages
-    if(iter == 1) {
-        sendUBX(0x06, 0x01, sizeof(payloadEnableGpsTime), payloadEnableGpsTime);
-        sendUBX(0x06, 0x01, sizeof(payloadEnableUtcTime), payloadEnableUtcTime);
-        return;
-    }
+    // transmit configuration stanzas
+    sendUBX(0x06, 0x00, sizeof(payloadDisableNMEA), payloadDisableNMEA);
+    sendUBX(0x06, 0x01, sizeof(payloadEnablePosition), payloadEnablePosition);
+    sendUBX(0x06, 0x01, sizeof(payloadEnableStatus), payloadEnableStatus);
+    sendUBX(0x06, 0x01, sizeof(payloadEnableGpsTime), payloadEnableGpsTime);
+    sendUBX(0x06, 0x01, sizeof(payloadEnableUtcTime), payloadEnableUtcTime);
+    sendUBX(0x06, 0x01, sizeof(payloadEnableClock), payloadEnableClock);
+}
+
+static void processUbxClock(const uint8_t *payload) {
+    clkBias = *(int32_t *)(payload + 4);
+    clkDrift = *(int32_t *)(payload + 8);
+    accTime = *(int32_t *)(payload + 12);
+    accFreq = *(int32_t *)(payload + 16);
+}
+
+static void processUbxPosition(const uint8_t *payload) {
+    locLon = 1e-7f * (float) *(int32_t *)(payload + 4);
+    locLat = 1e-7f * (float) *(int32_t *)(payload + 8);
+    locAlt = 1e-3f * (float) *(int32_t *)(payload + 16);
+}
+
+static void processUbxStatus(const uint8_t *payload) {
+    fixGood = payload[4] & 1;
 }
 
 static void processUbxGpsTime(const uint8_t *payload) {
