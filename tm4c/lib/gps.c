@@ -403,7 +403,7 @@ static void processUbxPosition(const uint8_t *payload) {
 }
 
 static void processUbxStatus(const uint8_t *payload) {
-    fixGood = payload[4] & 1;
+    fixGood = payload[5] & 1;
 }
 
 static void processUbxGpsTime(const uint8_t *payload) {
