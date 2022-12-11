@@ -26,14 +26,14 @@ static float locLat, locLon, locAlt;
 static int clkBias, clkDrift, accTime, accFreq;
 static int gpsOffset;
 
+static int hasNema, hasPvt, hasGpsTime, hasClock;
+
 static void processNEMA(char *msg, int len);
 
 static void processUBX(uint8_t *msg, int len);
 static void processUbxClock(const uint8_t *payload);
-static void processUbxPosition(const uint8_t *payload);
-static void processUbxStatus(const uint8_t *payload);
+static void processUbxPVT(const uint8_t *payload);
 static void processUbxGpsTime(const uint8_t *payload);
-static void processUbxUtcTime(const uint8_t *payload);
 
 static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload);
 
@@ -81,7 +81,7 @@ void GPS_run() {
     uint32_t now = CLK_MONOTONIC_INT();
     if(prevSecond != now) {
         prevSecond = now;
-        if((now & 15) == 0)
+        if((now & 3) == 0)
             configureGPS();
     }
 
@@ -230,7 +230,8 @@ static void processNEMA(char *msg, int len) {
             return;
     }
 
-    // no NMEA messages are expected
+    // no NMEA messages are expected, tell configuration check to disable them
+    hasNema = 1;
 }
 
 static void processUBX(uint8_t *msg, const int len) {
@@ -252,23 +253,13 @@ static void processUBX(uint8_t *msg, const int len) {
     // NAV class
     if(_class == 0x01) {
         // position message
-        if(_id == 0x02 && size == 28) {
-            processUbxPosition(msg + 6);
-            return;
-        }
-        // status message
-        if(_id == 0x03 && size == 16) {
-            processUbxStatus(msg + 6);
+        if(_id == 0x07 && size == 92) {
+            processUbxPVT(msg + 6);
             return;
         }
         // GPS time message
         if(_id == 0x20 && size == 16) {
             processUbxGpsTime(msg + 6);
-            return;
-        }
-        // UTC time message
-        if(_id == 0x21 && size == 20) {
-            processUbxUtcTime(msg + 6);
             return;
         }
         // UTC time message
@@ -341,19 +332,12 @@ static const uint8_t payloadDisableNMEA[] = {
 };
 _Static_assert(sizeof(payloadDisableNMEA) == 20, "payloadDisableNMEA must be 20 bytes");
 
-static const uint8_t payloadEnablePosition[] = {
+static const uint8_t payloadEnablePVT[] = {
         0x01, // NAV class
-        0x02, // position
+        0x07, // position, velocity, time
         0x01  // every update
 };
-_Static_assert(sizeof(payloadEnablePosition) == 3, "payloadEnablePosition must be 3 bytes");
-
-static const uint8_t payloadEnableStatus[] = {
-        0x01, // NAV class
-        0x03, // fix status
-        0x01  // every update
-};
-_Static_assert(sizeof(payloadEnableStatus) == 3, "payloadEnableStatus must be 3 bytes");
+_Static_assert(sizeof(payloadEnablePVT) == 3, "payloadEnablePVT must be 3 bytes");
 
 static const uint8_t payloadEnableGpsTime[] = {
         0x01, // NAV class
@@ -361,13 +345,6 @@ static const uint8_t payloadEnableGpsTime[] = {
         0x01  // every update
 };
 _Static_assert(sizeof(payloadEnableGpsTime) == 3, "payloadEnableGpsTime must be 3 bytes");
-
-static const uint8_t payloadEnableUtcTime[] = {
-        0x01, // NAV class
-        0x21, // UTC time
-        0x01  // every update
-};
-_Static_assert(sizeof(payloadEnableUtcTime) == 3, "payloadEnableUtcTime must be 3 bytes");
 
 static const uint8_t payloadEnableClock[] = {
         0x01, // NAV class
@@ -381,32 +358,35 @@ static void configureGPS() {
     if(txHead != txTail) return;
 
     // transmit configuration stanzas
-    sendUBX(0x06, 0x00, sizeof(payloadDisableNMEA), payloadDisableNMEA);
-    sendUBX(0x06, 0x01, sizeof(payloadEnablePosition), payloadEnablePosition);
-    sendUBX(0x06, 0x01, sizeof(payloadEnableStatus), payloadEnableStatus);
-    sendUBX(0x06, 0x01, sizeof(payloadEnableGpsTime), payloadEnableGpsTime);
-    sendUBX(0x06, 0x01, sizeof(payloadEnableUtcTime), payloadEnableUtcTime);
-    sendUBX(0x06, 0x01, sizeof(payloadEnableClock), payloadEnableClock);
+    if(hasNema)
+        sendUBX(0x06, 0x00, sizeof(payloadDisableNMEA), payloadDisableNMEA);
+    if(!hasClock)
+        sendUBX(0x06, 0x01, sizeof(payloadEnableClock), payloadEnableClock);
+    if(!hasGpsTime)
+        sendUBX(0x06, 0x01, sizeof(payloadEnableGpsTime), payloadEnableGpsTime);
+    if(!hasPvt)
+        sendUBX(0x06, 0x01, sizeof(payloadEnablePVT), payloadEnablePVT);
+
+    hasNema = 0;
+    hasClock = 0;
+    hasGpsTime = 0;
+    hasPvt = 0;
 }
 
 static void processUbxClock(const uint8_t *payload) {
+    // clock status message received, no conf update needed
+    hasClock = 1;
+    // update GPS receiver clock stats
     clkBias = *(int32_t *)(payload + 4);
     clkDrift = *(int32_t *)(payload + 8);
     accTime = *(int32_t *)(payload + 12);
     accFreq = *(int32_t *)(payload + 16);
 }
 
-static void processUbxPosition(const uint8_t *payload) {
-    locLon = 1e-7f * (float) *(int32_t *)(payload + 4);
-    locLat = 1e-7f * (float) *(int32_t *)(payload + 8);
-    locAlt = 1e-3f * (float) *(int32_t *)(payload + 16);
-}
-
-static void processUbxStatus(const uint8_t *payload) {
-    fixGood = payload[5] & 1;
-}
-
 static void processUbxGpsTime(const uint8_t *payload) {
+    // gps time received, no conf update needed
+    hasGpsTime = 1;
+
     // data must be valid
     if((payload[11] & 3) != 3)
         return;
@@ -422,13 +402,22 @@ static const int lutDays366[16] = {
         0, 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366
 };
 
-static void processUbxUtcTime(const uint8_t *payload) {
-    // data must be valid
-    if((payload[19] & 3) != 3)
+static void processUbxPVT(const uint8_t *payload) {
+    // PVT message received, no conf update needed
+    hasPvt = 1;
+    // fix status
+    fixGood = payload[21] & 1;
+    // location data
+    locLon = 1e-7f * (float) *(int32_t *)(payload + 24);
+    locLat = 1e-7f * (float) *(int32_t *)(payload + 28);
+    locAlt = 1e-3f * (float) *(int32_t *)(payload + 36);
+
+    // time data must be valid
+    if((payload[11] & 3) != 3)
         return;
 
     // years
-    uint32_t offset = *(uint16_t*) (payload + 12);
+    uint32_t offset = *(uint16_t*) (payload + 4);
     offset -= 1900;
     // determine leap-year status
     int isLeap = ((offset & 3) == 0);
@@ -441,18 +430,18 @@ static void processUbxUtcTime(const uint8_t *payload) {
     offset += leap;
 
     // months
-    offset += (isLeap ? lutDays366 : lutDays365)[payload[14]];
+    offset += (isLeap ? lutDays366 : lutDays365)[payload[6]];
     // days
-    offset += payload[15];
+    offset += payload[7];
     // hours
     offset *= 24;
-    offset += payload[16];
+    offset += payload[8];
     // minutes
     offset *= 60;
-    offset += payload[17];
+    offset += payload[9];
     // seconds
     offset *= 60;
-    offset += payload[18];
+    offset += payload[10];
 
     // compare with current counter value
     offset += gpsOffset;

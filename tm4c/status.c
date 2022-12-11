@@ -168,13 +168,13 @@ unsigned statusGPS(char *body) {
     end = append(end, "\n");
 
     // latitude
-    tmp[fmtFloat(GPS_locLat(), 0, 7, tmp)] = 0;
+    tmp[fmtFloat(GPS_locLat(), 0, 5, tmp)] = 0;
     end = append(end, "latitude: ");
     end = append(end, tmp);
     end = append(end, " deg\n");
 
     // longitude
-    tmp[fmtFloat(GPS_locLon(), 0, 7, tmp)] = 0;
+    tmp[fmtFloat(GPS_locLon(), 0, 5, tmp)] = 0;
     end = append(end, "longitude: ");
     end = append(end, tmp);
     end = append(end, " deg\n");
