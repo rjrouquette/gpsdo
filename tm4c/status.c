@@ -159,8 +159,7 @@ unsigned statusETH(char *body) {
 }
 
 unsigned statusGPS(char *body) {
-    char *end = GPS_log(body);
-    return end - body;
+    return 0;
 }
 
 unsigned statusGPSDO(char *body) {
@@ -247,13 +246,13 @@ unsigned statusNTP(char *body) {
     char *end = body;
 
     // TAI time
-    uint64_t tai = CLK_TAI();
+    uint64_t tai = CLK_GPS();
     strcpy(tmp, "0x");
     toHex(tai>>32, 8, '0', tmp+2);
     tmp[10] = '.';
     toHex(tai, 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "tai:         ");
+    end = append(end, "gps epoch:   ");
     end = append(end, tmp);
     end = append(end, "\n");
 

@@ -12,6 +12,7 @@
 void NTP_init();
 void NTP_run();
 uint64_t NTP_offset();
+void NTP_setEpochOffset(uint32_t offset);
 float NTP_clockOffset();
 float NTP_clockDrift();
 int NTP_clockStratum();

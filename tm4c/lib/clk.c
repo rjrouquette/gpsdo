@@ -100,11 +100,11 @@ uint64_t CLK_MONOTONIC() {
     return result;
 }
 
-uint32_t CLK_TAI_INT() {
+uint32_t CLK_GPS_INT() {
     return EMAC0.TIMSEC;
 }
 
-uint64_t CLK_TAI() {
+uint64_t CLK_GPS() {
     // get current TAI
     uint32_t sa = EMAC0.TIMSEC;
     uint32_t na = EMAC0.TIMNANO;

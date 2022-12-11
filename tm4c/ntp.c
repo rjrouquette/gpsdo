@@ -172,6 +172,10 @@ uint64_t NTP_offset() {
     return ntpOffset;
 }
 
+void NTP_setEpochOffset(uint32_t offset) {
+    ((uint32_t *) &ntpOffset)[1] = offset;
+}
+
 float NTP_clockOffset() {
     return clockOffset;
 }
@@ -771,14 +775,14 @@ static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     headerNTP->origTime[0] = headerNTP->txTime[0];
     headerNTP->origTime[1] = headerNTP->txTime[1];
     // set reference timestamp
-    uint64_t refTime = CLK_TAI() + ntpOffset;
+    uint64_t refTime = CLK_GPS() + ntpOffset;
     headerNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
     headerNTP->refTime[1] = 0;
     // set RX time
     headerNTP->rxTime[0] = __builtin_bswap32(((uint32_t *) &rxTime)[1]);
     headerNTP->rxTime[1] = __builtin_bswap32(((uint32_t *) &rxTime)[0]);
     // set TX time
-    uint64_t txTime = CLK_TAI() + ntpOffset;
+    uint64_t txTime = CLK_GPS() + ntpOffset;
     headerNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
     headerNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
 }
@@ -949,13 +953,13 @@ static void pollServer(struct Server *server, int pingOnly) {
     // set reference ID
     memcpy(headerNTP->refID, &refId, 4);
     // set reference timestamp
-    uint64_t refTime = CLK_TAI() + ntpOffset;
+    uint64_t refTime = CLK_GPS() + ntpOffset;
     headerNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
     headerNTP->refTime[1] = 0;
     // set TX time
     if(pingOnly == 0) {
         uint64_t *stamps = server->stamps + (server->burst << 2);
-        stamps[0] = CLK_TAI();
+        stamps[0] = CLK_GPS();
         stamps[1] = stamps[0];
         headerNTP->txTime[0] = __builtin_bswap32(((uint32_t *) stamps)[1]);
         headerNTP->txTime[1] = __builtin_bswap32(((uint32_t *) stamps)[0]);

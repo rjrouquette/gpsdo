@@ -13,8 +13,6 @@ float GPS_locLat();
 float GPS_locLon();
 float GPS_locAlt();
 
-char* GPS_log(char *tail);
-
 int GPS_hasLock();
 
 #endif //GPSDO_GPS_H

@@ -8,12 +8,11 @@
 #include "gps.h"
 #include "format.h"
 #include "clk.h"
+#include "../hw/emac.h"
+#include "../ntp.h"
 
 #define GPS_RING_MASK (1023)
 #define GPS_RING_SIZE (1024)
-
-static int ptrDebug;
-static char debug[32][44];
 
 static uint8_t rxBuff[GPS_RING_SIZE];
 static uint8_t txBuff[GPS_RING_SIZE];
@@ -22,19 +21,20 @@ static int rxHead, rxTail;
 static int txHead, txTail;
 static int lenNEMA, lenUBX;
 static int endUBX;
+static int confIter = 64;
+static int gpsOffset;
 
 static float locLat, locLon, locAlt;
-
-static void debugLog(const char *msg) {
-    ++ptrDebug ;
-    ptrDebug &= 31;
-    strncpy(debug[ptrDebug], msg, 44);
-}
 
 static void processNEMA(char *msg, int len);
 
 static void processUBX(uint8_t *msg, int len);
+static void processUbxGpsTime(const uint8_t *payload);
+static void processUbxUtcTime(const uint8_t *payload);
+
 static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload);
+
+static void configureGPS();
 
 void GPS_init() {
     // enable GPIO A
@@ -71,21 +71,14 @@ void GPS_init() {
     UART3.CTL.RXE = 1;
     UART3.CTL.TXE = 1;
     UART3.CTL.UARTEN = 1;
-
-    debugLog("initialized GPS UART for 9600 baud");
 }
 
 uint32_t prevSecond = 0;
 void GPS_run() {
-    uint32_t now = CLK_MONOTONIC_INT();
+    uint32_t now = CLK_GPS_INT();
     if(prevSecond != now) {
         prevSecond = now;
-        char sep[20] = "---- #### ----";
-        toDec(now % 10000, 4, '0', sep + 5);
-        debugLog(sep);
-
-        uint8_t ubx[] = { 0 };
-        sendUBX(0x06, 0x02, sizeof(ubx), ubx);
+        configureGPS();
     }
 
     // read GPS serial data
@@ -172,19 +165,6 @@ float GPS_locAlt() {
     return locAlt;
 }
 
-char* GPS_log(char *tail) {
-    char line[48];
-    int ptr = (ptrDebug + 1) & 31;
-    for(int i = 0; i < 32; i++) {
-        strncpy(line, debug[ptr], 44);
-        line[44] = 0;
-        tail = append(tail, line);
-        tail = append(tail, "\n");
-        ptr = (ptr + 1) & 31;
-    }
-    return tail;
-}
-
 int GPS_hasLock() {
     return 1;
 }
@@ -228,17 +208,12 @@ static void processNEMA(char *msg, int len) {
         uint8_t test = fromHex(chksum[0]);
         test <<= 4;
         test |= fromHex(chksum[1]);
-        if(csum != test) {
-            char tmp[44];
-            char *tail = append(tmp, "NEMA checksum error: ");
-            tail = append(tail, msg);
-            *tail = 0;
-            debugLog(tmp);
+        if(csum != test)
             return;
-        }
     }
 
-    // TODO process NEMA messages
+    // NMEA messages should be disabled, (re)configure GPS
+    confIter = 0;
 }
 
 static void processUBX(uint8_t *msg, const int len) {
@@ -253,45 +228,24 @@ static void processUBX(uint8_t *msg, const int len) {
     }
     // verify checksum
     if(chkA != msg[len - 2] || chkB != msg[len - 1]) {
-        debugLog("UBX checksum error:");
-        for(int i = 0; i < len; i += 8) {
-            char *tail = append(tmp, "  ");
-            if(len - i < 8)
-                tail = toHexBytes(tail, msg + i, len - i);
-            else
-                tail = toHexBytes(tail, msg + i, 8);
-            *tail = 0;
-            debugLog(tmp);
-        }
         return;
     }
 
     uint8_t _class = msg[2];
     uint8_t _id = msg[3];
     uint16_t size = *(uint16_t *)(msg+4);
-    // ack/nack
-    if(_class == 0x05) {
-        if(size != 2) return;
-        char *tail;
-        if(_id == 1)
-            tail = append(tmp, "UBX ACK: ");
-        else
-            tail = append(tmp, "UBX NACK: ");
-        tail = toHexBytes(tail, msg + 6, 2);
-        *tail = 0;
-        debugLog(tmp);
-        return;
-    }
-
-    debugLog("UBX MSG:");
-    for(int i = 0; i < len; i += 8) {
-        char *tail = append(tmp, "  ");
-        if(len - i < 8)
-            tail = toHexBytes(tail, msg + i, len - i);
-        else
-            tail = toHexBytes(tail, msg + i, 8);
-        *tail = 0;
-        debugLog(tmp);
+    // NAV class
+    if(_class == 0x01) {
+        // GPS time message
+        if(_id == 0x20 && size == 16) {
+            processUbxGpsTime(msg + 6);
+            return;
+        }
+        // UTC time message
+        if(_id == 0x21 && size == 20) {
+            processUbxUtcTime(msg + 6);
+            return;
+        }
     }
 }
 
@@ -341,4 +295,114 @@ static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload
     txHead &= GPS_RING_MASK;
     txBuff[txHead++] = chkB;
     txHead &= GPS_RING_MASK;
+}
+
+static const uint8_t payloadDisableNMEA[] = {
+        0x01, // UART port
+        0x00, // reserved
+        0x00, 0x00, // TX ready mode
+        0xC0, 0x08, 0x00, 0x00, // UART mode (8-bit, no parity, 1 stop bit)
+        0x80, 0x25, 0x00, 0x00, // 9600 baud
+        0x01, 0x00, // UBX input
+        0x01, 0x00, // UBX output
+        0x00, 0x00, // TX timeout
+        0x00, 0x00 // reserved
+
+};
+_Static_assert(sizeof(payloadDisableNMEA) == 20, "payloadDisableNMEA must be 20 bytes");
+
+static const uint8_t payloadEnableGpsTime[] = {
+        0x01, // NAV class
+        0x20, // GPS time
+        0x01  // every update
+};
+_Static_assert(sizeof(payloadEnableGpsTime) == 3, "payloadEnableGpsTime must be 3 bytes");
+
+static const uint8_t payloadEnableUtcTime[] = {
+        0x01, // NAV class
+        0x21, // UTC time
+        0x01  // every update
+};
+_Static_assert(sizeof(payloadEnableUtcTime) == 3, "payloadEnableUtcTime must be 3 bytes");
+
+static void configureGPS() {
+    // wait for empty TX buffer
+    if(txHead != txTail) return;
+    // return if configuration complete
+    if(confIter > 5) return;
+    int iter = confIter++;
+
+    // disable NMEA messages on UART
+    if(iter == 0) {
+        sendUBX(0x06, 0x00, sizeof(payloadDisableNMEA), payloadDisableNMEA);
+        return;
+    }
+    // enable time messages
+    if(iter == 1) {
+        sendUBX(0x06, 0x01, sizeof(payloadEnableGpsTime), payloadEnableGpsTime);
+        sendUBX(0x06, 0x01, sizeof(payloadEnableUtcTime), payloadEnableUtcTime);
+        return;
+    }
+}
+
+static void processUbxGpsTime(const uint8_t *payload) {
+    // data must be valid
+    if((payload[11] & 3) != 3)
+        return;
+
+    gpsOffset = (char) payload[10];
+}
+
+static const int lutDays365[16] = {
+        0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365
+};
+
+static const int lutDays366[16] = {
+        0, 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366
+};
+
+static void processUbxUtcTime(const uint8_t *payload) {
+    // data must be valid
+    if((payload[19] & 3) != 3)
+        return;
+
+    // years
+    uint32_t offset = *(uint16_t*) (payload + 12);
+    offset -= 1900;
+    // determine leap-year status
+    int isLeap = ((offset & 3) == 0);
+    if(offset % 100 == 0) isLeap = 0;
+    // correct for leap-years
+    uint32_t leap = offset >> 2;
+    leap -= leap / 25;
+    // rescale
+    offset *= 365;
+    offset += leap;
+
+    // months
+    offset += (isLeap ? lutDays366 : lutDays365)[payload[14]];
+    // days
+    offset += payload[15];
+    // hours
+    offset *= 24;
+    offset += payload[16];
+    // minutes
+    offset *= 60;
+    offset += payload[17];
+    // seconds
+    offset *= 60;
+    offset += payload[18];
+
+    // compare with current counter value
+    offset += gpsOffset;
+    offset -= EMAC0.TIMSEC;
+    // set update registers
+    EMAC0.TIMNANOU.raw = 0;
+    EMAC0.TIMSECU = offset;
+    // wait for hardware ready state
+    while(EMAC0.TIMSTCTRL.TSUPDT);
+    // start update
+    EMAC0.TIMSTCTRL.TSUPDT = 1;
+    // set NTP offset
+    NTP_setEpochOffset(-gpsOffset);
 }
