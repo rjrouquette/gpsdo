@@ -39,7 +39,7 @@ static float ppsSkewVar;
 static float ppsSkewRms;
 
 static int ppsReady;
-static int ppsPresent;
+static uint32_t ppsPresent;
 
 // current correction values
 static float currFeedback;
@@ -227,11 +227,11 @@ void GPSDO_run() {
     ppsReady = 0;
 
     // return if GPS PPS not present or is more than 1 second stale
+    ppsPresent <<= 1;
     if(ppsGpsEdge == ppsGpsEdgePrev || now - ppsGpsEdge > 150000000) {
-        ppsPresent = 0;
         return;
     }
-    ppsPresent = 1;
+    ppsPresent |= 1;
 
     // compute offset
     int32_t offset = ppsOutEdge - ppsGpsEdge;
