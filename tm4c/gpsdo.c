@@ -18,6 +18,7 @@
 #define STAT_COMP_RMS (200e-9f)
 #define BIAS_ALPHA (0x1p-17f)
 #define COEF_ALPHA (0x1p-15f)
+#define NTP_RATE (0x1p6f)
 
 // temperature compensation state
 static float currTemp;
@@ -47,6 +48,7 @@ static float currCompensation;
 
 static void setFeedback(float feedback);
 static void updateTempComp(float target);
+static void updateTempCompNtp(float target);
 
 // ISR for temperature measurement
 void ISR_ADC0Sequence3(void) {
@@ -315,7 +317,7 @@ int GPSDO_ntpUpdate(float offset, float drift) {
     // update feedback
     setFeedback(currCompensation + pllCorr + pllBias);
     // update temperature compensation
-    updateTempComp(currFeedback);
+    updateTempCompNtp(currFeedback);
     return 0;
 }
 
@@ -402,6 +404,31 @@ static void updateTempComp(float target) {
     float error = target - tcompOffset;
     error -= tcompCoeff * temp;
     error *= COEF_ALPHA;
+
+    // update compensation coefficient
+    tcompCoeff += error * temp;
+}
+
+static void updateTempCompNtp(float target) {
+    float temp = currTemp;
+
+    // simple bootstrap to improve stability
+    if(tcompBias == 0)
+        tcompBias = temp;
+
+    // simple bootstrap to improve stability
+    if(tcompOffset == 0)
+        tcompOffset = target;
+
+    // update temperature bias
+    tcompOffset += (target - tcompOffset) * (BIAS_ALPHA * NTP_RATE);
+    tcompBias += (temp - tcompBias) * (BIAS_ALPHA * NTP_RATE);
+    temp -= tcompBias;
+
+    // compute error
+    float error = target - tcompOffset;
+    error -= tcompCoeff * temp;
+    error *= (COEF_ALPHA * NTP_RATE);
 
     // update compensation coefficient
     tcompCoeff += error * temp;
