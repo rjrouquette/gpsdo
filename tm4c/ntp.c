@@ -363,8 +363,8 @@ static void runStats() {
     update += ((int64_t) (server->stamps[0] - update)) >> 1;
 
     // update ring
-    server->ringOffset[head] = 0x1p-32f * (float) (int32_t) offset;
-    server->ringDelay[head] = 0x1p-32f * (float) (uint32_t) _delay;
+    server->ringOffset[head] = 0x1p-32f * (float) *(int32_t *) &offset;
+    server->ringDelay[head] = 0x1p-32f * (float) *(uint32_t *) &_delay;
     // bootstrap ring with first sample
     if(server->reach == 1) {
         for(int i = 0; i < NTP_RING_SIZE; i++) {

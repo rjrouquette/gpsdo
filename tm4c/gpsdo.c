@@ -19,6 +19,10 @@
 #define BIAS_ALPHA (0x1p-17f)
 #define COEF_ALPHA (0x1p-15f)
 #define NTP_RATE (0x1p6f)
+#define NTP_DRIFT_CORR (0x1p-1f)
+#define NTP_DRIFT_BIAS (0x1p-10f)
+#define NTP_OFFSET_CORR (0x1p-10f)
+#define NTP_OFFSET_BIAS (0x1p-14f)
 
 // temperature compensation state
 static float currTemp;
@@ -299,11 +303,13 @@ int GPSDO_ntpUpdate(float offset, float drift) {
         _offset *= 80;
         // check sign
         if(_offset < 0) {
-            _offset = -_offset;
             EMAC0.TIMNANOU.NEG = 1;
+            EMAC0.TIMNANOU.VALUE = -_offset;
+        } else {
+            EMAC0.TIMNANOU.NEG = 0;
+            EMAC0.TIMNANOU.VALUE = _offset;
         }
         // set update registers
-        EMAC0.TIMNANOU.VALUE = _offset;
         EMAC0.TIMSECU = 0;
         // wait for hardware ready state
         while(EMAC0.TIMSTCTRL.TSUPDT);
@@ -311,9 +317,12 @@ int GPSDO_ntpUpdate(float offset, float drift) {
         EMAC0.TIMSTCTRL.TSUPDT = 1;
         return 1;
     }
+    // clamp offset error
+    if      (offset >  25e-3f) offset =  25e-3f;
+    else if (offset < -25e-3f) offset = -25e-3f;
     // soft adjustment
-    pllCorr = (drift * 0x1p-1f) + (offset * 0x1p-8f);
-    pllBias += (drift * 0x1p-8f) + (offset * 0x1p-12f);
+    pllCorr = (drift * NTP_DRIFT_CORR) + (offset * NTP_OFFSET_CORR);
+    pllBias += (drift * NTP_DRIFT_BIAS) + (offset * NTP_OFFSET_BIAS);
     // update feedback
     setFeedback(currCompensation + pllCorr + pllBias);
     // update temperature compensation
