@@ -185,9 +185,9 @@ static void processFrame(uint8_t *frame, int flen) {
         return;
 
     // relevant options
-    uint32_t optSubnet = -1;
-    uint32_t optRouter = 0;
-    uint32_t optDNS = 0;
+    uint32_t optSubnet = ipSubnet;
+    uint32_t optRouter = ipGateway;
+    uint32_t optDNS = ipDNS;
     uint32_t optDHCP = 0;
     uint32_t optLease = 0;
     uint8_t optMsgType = 0;
