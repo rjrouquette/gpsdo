@@ -216,13 +216,19 @@ unsigned statusGPSDO(char *body) {
     char tmp[32];
     char *end = body;
 
+    // current offset
+    tmp[toOct(GPSDO_ppsPresent(), 11, '0', tmp)] = 0;
+    end = append(end, "pps present: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
     // pll lock
     end = append(end, "pps locked: ");
     end = append(end, GPSDO_isLocked() ? "yes" : "no");
     end = append(end, "\n");
 
     // current offset
-    tmp[fmtFloat((float) GPSDO_offsetNano(), 0, 0, tmp)] = 0;
+    tmp[toBase(GPSDO_offsetNano(), 10, tmp)] = 0;
     end = append(end, "current offset: ");
     end = append(end, tmp);
     end = append(end, " ns\n");

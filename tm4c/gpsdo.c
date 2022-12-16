@@ -330,6 +330,10 @@ int GPSDO_ntpUpdate(float offset, float drift) {
     return 0;
 }
 
+uint32_t GPSDO_ppsPresent() {
+    return ppsPresent;
+}
+
 int GPSDO_isLocked() {
     if(!ppsPresent) return 0;
     return (ppsOffsetRms < STAT_LOCK_RMS);
