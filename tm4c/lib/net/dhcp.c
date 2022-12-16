@@ -13,7 +13,6 @@
 #include "ip.h"
 #include "udp.h"
 #include "util.h"
-#include "../format.h"
 
 
 struct PACKED HEADER_DHCP {
