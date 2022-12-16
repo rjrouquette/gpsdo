@@ -5,6 +5,8 @@
 #ifndef GPSDO_GPSDO_H
 #define GPSDO_GPSDO_H
 
+#include <stdint.h>
+
 void GPSDO_init();
 void GPSDO_run();
 int GPSDO_ntpUpdate(float offset, float drift);
