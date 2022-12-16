@@ -508,7 +508,7 @@ static void runAggregate() {
 
     // notify GPSDO of ntp status for fail-over purposes
     if(norm > 0) {
-        if (GPSDO_ntpUpdate(clockOffset, clockDrift)) {
+        if (GPSDO_ntpUpdate(clockOffset)) {
             // reset server stats if clock was hard stepped
             for (int i = 0; i < SERVER_COUNT; i++)
                 resetServer(servers + i);

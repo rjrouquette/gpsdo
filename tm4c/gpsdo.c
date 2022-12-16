@@ -19,8 +19,6 @@
 #define BIAS_ALPHA (0x1p-17f)
 #define COEF_ALPHA (0x1p-15f)
 #define NTP_RATE (0x1p6f)
-#define NTP_DRIFT_CORR (0x1p-1f)
-#define NTP_DRIFT_BIAS (0x1p-10f)
 #define NTP_OFFSET_CORR (0x1p-10f)
 #define NTP_OFFSET_BIAS (0x1p-14f)
 
@@ -295,7 +293,7 @@ void GPSDO_run() {
         updateTempComp(currFeedback);
 }
 
-int GPSDO_ntpUpdate(float offset, float drift) {
+int GPSDO_ntpUpdate(float offset) {
     if(ppsPresent) return 0;
     if(fabsf(offset) > 100e-3f) {
         // hard step
@@ -321,8 +319,8 @@ int GPSDO_ntpUpdate(float offset, float drift) {
     if      (offset >  25e-3f) offset =  25e-3f;
     else if (offset < -25e-3f) offset = -25e-3f;
     // soft adjustment
-    pllCorr = (drift * NTP_DRIFT_CORR) + (offset * NTP_OFFSET_CORR);
-    pllBias += (drift * NTP_DRIFT_BIAS) + (offset * NTP_OFFSET_BIAS);
+    pllCorr = offset * NTP_OFFSET_CORR;
+    pllBias += offset * NTP_OFFSET_BIAS;
     // update feedback
     setFeedback(currCompensation + pllCorr + pllBias);
     // update temperature compensation
