@@ -40,7 +40,7 @@ static uint32_t dhcpXID = 0;
 static uint32_t dhcpLeaseExpire = 0;
 
 static const char lut_hex[] = "0123456789abcdef";
-static char hostname[16] = "gpsdo-";
+static char hostname[16] = { 0 };
 static int lenHostname = 0;
 
 static const uint8_t DHCP_OPT_DISCOVER[] = { 0x35, 0x01, 0x01 };
@@ -88,6 +88,7 @@ void DHCP_init() {
     for(int i = 1; i < 4; i++)
         dhcpUUID += UNIQUEID.WORD[i];
     // create "unique" hostname
+    strcpy(hostname, "gpsdo-");
     for(int i = 0; i < 4; i++) {
         hostname[6 + i] = lut_hex[(dhcpUUID >> (i * 4)) & 0xF];
     }
