@@ -26,8 +26,6 @@
 #define NTP_BURST_BITS (2)
 #define NTP_POOL_FQDN ("pool.ntp.org")
 #define NTP_PRECISION (-24)
-#define NTP_RING_MASK (15)
-#define NTP_RING_SIZE (16)
 #define NTP_MAX_STRATUM (4)
 #define NTP_REF_GPS (0x00535047) // "GPS"
 #define NTP_LI_ALARM (3)
@@ -63,10 +61,6 @@ static int leapIndicator;
 
 #define SERVER_COUNT (8)
 struct Server {
-    float ringOffset[NTP_RING_SIZE];
-    float ringDelay[NTP_RING_SIZE];
-    float ringDrift[NTP_RING_SIZE];
-    float meanOffset, varOffset;
     float meanDelay, varDelay;
     float meanDrift, varDrift;
     float weight, currentOffset;
@@ -81,13 +75,12 @@ struct Server {
     uint8_t leapIndicator;
     uint8_t stratum;
     uint8_t burst;
-    uint8_t head;
 } servers[SERVER_COUNT];
 
 static void processResponse(uint8_t *frame);
 static void pollServer(struct Server *server, int pingOnly);
 static void resetServer(struct Server *server);
-static void computeMeanVar(const float *ring, float *mean, float *var);
+static void updateMeanVar(float rate, float value, float *mean, float *var);
 
 static void processRequest(uint8_t *frame, int flen);
 static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP);
@@ -335,11 +328,6 @@ static void runStats() {
         return;
     }
 
-    // advance ring
-    ++server->head;
-    server->head &= NTP_RING_MASK;
-    const int head = server->head;
-
     // compute delay and offset
     int64_t _adjust = 0;
     uint64_t _delay = 0;
@@ -362,16 +350,10 @@ static void runStats() {
     uint64_t update = server->stamps[(NTP_BURST << 2) - 1];
     update += ((int64_t) (server->stamps[0] - update)) >> 1;
 
-    // update ring
-    server->ringOffset[head] = 0x1p-32f * (float) *(int32_t *) &offset;
-    server->ringDelay[head] = 0x1p-32f * (float) *(uint32_t *) &_delay;
-    // bootstrap ring with first sample
-    if(server->reach == 1) {
-        for(int i = 0; i < NTP_RING_SIZE; i++) {
-            server->ringOffset[i] = server->ringOffset[head];
-            server->ringDelay[i] = server->ringDelay[head];
-        }
-    }
+    // update offset and delay
+    server->currentOffset = 0x1p-32f * (float) *(int32_t *) &offset;
+    const float delay = 0x1p-32f * (float) *(uint32_t *) &_delay;
+    updateMeanVar(0x1p-2f, delay, &(server->meanDelay), &(server->varDelay));
 
     // compute drift
     if(server->update != 0) {
@@ -382,49 +364,17 @@ static void runStats() {
         float drift = (float) (int32_t) (offset - server->offset);
         drift /= (float) (uint32_t) (interval >> shift);
         drift /= (float) (1 << shift);
-        server->ringDrift[head] = drift;
+        updateMeanVar(0x1p-2f, drift, &(server->meanDrift), &(server->varDrift));
     }
 
     // update server status
     server->offset = offset;
     server->update = update;
-
-    // update stats
-    computeMeanVar(server->ringOffset, &(server->meanOffset), &(server->varOffset));
-    computeMeanVar(server->ringDelay, &(server->meanDelay), &(server->varDelay));
-    computeMeanVar(server->ringDrift, &(server->meanDrift), &(server->varDrift));
 }
 
 static void runTracking() {
     struct Server *server = servers + ntpProcess.iter;
     if(server->addr == 0) return;
-
-    // analyze connection quality
-    int reach = server->reach;
-    int elapsed = 0, quality = 0;
-    for(int shift = 0; shift < 16; shift++) {
-        if((reach >> shift) & 1) {
-            elapsed += shift;
-            ++quality;
-        }
-    }
-    // normalize quality
-    if(server->attempts < 16) {
-        quality <<= 4;
-        quality /= (int) server->attempts;
-    }
-
-    // estimate current offset
-    elapsed <<= 2;
-    elapsed += 7;
-    server->currentOffset = server->meanOffset;
-    server->currentOffset += server->meanDrift * (float) elapsed;
-
-    // de-weight servers that are still initializing or have poor connections
-    if(server->attempts < 7 || quality < 10) {
-        server->weight = 0;
-        return;
-    }
 
     // check for failure states
     if(
@@ -439,11 +389,8 @@ static void runTracking() {
     }
 
     float weight = 0;
-    if(server->varDrift > 0) {
-        weight = (float) elapsed;
-        weight *= server->varDrift;
-        weight = 1.0f / sqrtf(weight);
-        weight *= (float) quality;
+    if((server->reach & 1) && server->varDrift > 0) {
+        weight = 1.0f / sqrtf(server->varDrift);
     }
     if(!isfinite(weight))
         weight = 0;
@@ -969,45 +916,21 @@ static void pollServer(struct Server *server, int pingOnly) {
     NET_transmit(txDesc, NTP4_SIZE);
 }
 
-static void computeMeanVar(const float *ring, float *mean, float *var) {
-    float _mean = 0;
-    for(int i = 0; i < NTP_RING_SIZE; i++)
-        _mean += ring[i];
-    _mean /= NTP_RING_SIZE;
-
-    float _var = 0;
-    for(int i = 0; i < NTP_RING_SIZE; i++) {
-        float diff = ring[i] - _mean;
-        _var += diff * diff;
-    }
-    _var /= NTP_RING_SIZE;
-    _var *= 4;
-
-    int cnt = 0;
-    *mean = 0, *var = 0;
-    for(int i = 0; i < NTP_RING_SIZE; i++) {
-        float diff = ring[i] - _mean;
-        diff *= diff;
-        if(diff < _var) {
-            *mean += ring[i];
-            *var += diff;
-            ++cnt;
-        }
-    }
-    if(cnt == 0) {
-        *mean = 0;
-        *var = 0;
+static void updateMeanVar(float rate, float value, float *mean, float *var) {
+    if(mean[0] == 0 && var[0] == 0) {
+        mean[0] = value;
+        var[0] = value * value;
     } else {
-        *mean /= (float) cnt;
-        *var /= (float) cnt;
+        float diff = value - mean[0];
+        diff *= diff;
+        if(diff <= var[0] * 4) {
+            mean[0] += (value - mean[0]) * rate;
+        }
+        var[0] += (diff - var[0]) * rate;
     }
 }
 
 static void resetServer(struct Server *server) {
-    // clear ring data
-    memset(server->ringOffset, 0, sizeof(server->ringOffset));
-    memset(server->ringDelay, 0, sizeof(server->ringDelay));
-    memset(server->ringDrift, 0, sizeof(server->ringDrift));
     // clear poll tracking
     server->attempts = 0;
     server->offset = 0;
