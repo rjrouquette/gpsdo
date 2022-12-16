@@ -228,7 +228,7 @@ unsigned statusGPSDO(char *body) {
     end = append(end, "\n");
 
     // current offset
-    tmp[toBase(GPSDO_offsetNano(), 10, tmp)] = 0;
+    tmp[fmtFloat((float) GPSDO_offsetNano(), 0, 0, tmp)] = 0;
     end = append(end, "current offset: ");
     end = append(end, tmp);
     end = append(end, " ns\n");
