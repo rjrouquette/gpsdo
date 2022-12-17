@@ -224,16 +224,18 @@ void GPSDO_run() {
         tcompBias = temp;
         tcompCoeff = compBins[bin].coeff;
         tcompOffset = compBins[bin].offset;
-        newComp = compBins[bin].coeff * (temp - (float) hi) + compBins[bin].offset;
+        const float wh = (float) hi - temp;
+        newComp = compBins[bin].offset - compBins[bin].coeff * wh;
         if(hi != lo) {
-            bin = lo & 63;
-            tcompCoeff *= ((float) hi - temp);
-            tcompCoeff += (temp - (float) lo) * compBins[bin].coeff;
-            tcompOffset *= ((float) hi - temp);
-            tcompOffset += (temp - (float) lo) * compBins[bin].offset;
+            tcompCoeff *= wh;
+            tcompOffset *= wh;
+            newComp *= wh;
 
-            newComp *= ((float) hi - temp);
-            newComp += (temp - (float) lo) * (compBins[bin].coeff * (temp - (float) lo) + compBins[bin].offset);
+            const float wl = temp - (float) lo;
+            bin = lo & 63;
+            tcompCoeff += wl * compBins[bin].coeff;
+            tcompOffset += wl * compBins[bin].offset;
+            newComp += wl * (compBins[bin].offset + compBins[bin].coeff * wl);
         }
     }
     // prevent large correction impulses
