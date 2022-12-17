@@ -28,7 +28,7 @@ static float tcompCoeff, tcompBias, tcompOffset;
 static struct {
     float coeff;
     float offset;
-} compBins[64];
+} compBins[256];
 
 
 static int32_t ppsGpsEdgePrev;
