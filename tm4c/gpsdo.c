@@ -443,6 +443,8 @@ static void updateTempComp(float alpha, float target) {
     updateCompBin(hi & 63, alpha, temp - (float) hi, target);
     if(hi != lo)
         updateCompBin(lo & 63, alpha, temp - (float) lo, target);
+    updateCompBin((hi + 1) & 63, alpha * 0x1p-1f, temp - (float) (hi + 1), target);
+    updateCompBin((lo - 1) & 63, alpha * 0x1p-1f, temp - (float) (lo - 1), target);
 }
 
 static void updateTempCompNtp(float target) {
