@@ -221,13 +221,12 @@ void GPSDO_run() {
         int hi = (int) ceilf(temp);
         int lo = (int) floorf(temp);
         int bin = hi & 63;
-        tcompBias = (float) hi;
+        tcompBias = temp;
         tcompCoeff = compBins[bin].coeff;
         tcompOffset = compBins[bin].offset;
         newComp = compBins[bin].coeff * (temp - (float) hi) + compBins[bin].offset;
         if(hi != lo) {
             bin = lo & 63;
-            tcompBias = temp;
             tcompCoeff *= ((float) hi - temp);
             tcompCoeff += (temp - (float) lo) * compBins[bin].coeff;
             tcompOffset *= ((float) hi - temp);
