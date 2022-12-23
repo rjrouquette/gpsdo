@@ -24,12 +24,6 @@
 // temperature compensation state
 static float currTemp;
 static float tcompCoeff, tcompBias, tcompOffset;
-// temperature compensation bins
-static struct {
-    float coeff;
-    float offset;
-} compBins[256];
-
 
 static int32_t ppsGpsEdgePrev;
 static int32_t ppsGpsEdge;
@@ -53,8 +47,7 @@ static float currFeedback;
 static float currCompensation;
 
 static void setFeedback(float feedback);
-static void updateTempComp(float alpha, float target);
-static void updateTempCompNtp(float target);
+static void updateTempComp(float rate, float target);
 
 // ISR for temperature measurement
 void ISR_ADC0Sequence3(void) {
@@ -213,29 +206,10 @@ void GPSDO_init() {
 
 void GPSDO_run() {
     // update temperature compensation
-    float newComp;
-    {
-        const float temp = currTemp;
-        int hi = (int) ceilf(temp);
-        int lo = (int) floorf(temp);
-        int bin = hi & 63;
-        tcompBias = temp;
-        tcompCoeff = compBins[bin].coeff;
-        tcompOffset = compBins[bin].offset;
-        const float wh = (float) hi - temp;
-        newComp = compBins[bin].offset - compBins[bin].coeff * wh;
-        if(hi != lo) {
-            tcompCoeff *= wh;
-            tcompOffset *= wh;
-            newComp *= wh;
-
-            const float wl = temp - (float) lo;
-            bin = lo & 63;
-            tcompCoeff += wl * compBins[bin].coeff;
-            tcompOffset += wl * compBins[bin].offset;
-            newComp += wl * (compBins[bin].offset + compBins[bin].coeff * wl);
-        }
-    }
+    float newComp = currTemp;
+    newComp -= tcompBias;
+    newComp *= tcompCoeff;
+    newComp += tcompOffset;
     // prevent large correction impulses
     if(fabsf(newComp - currCompensation) > 100e-9f)
         pllBias -= (newComp - currCompensation);
@@ -318,7 +292,7 @@ void GPSDO_run() {
 
     // update temperature compensation
     if(ppsSkewRms < STAT_COMP_RMS)
-        updateTempComp(TCOMP_ALPHA, currFeedback);
+        updateTempComp(1.0f, currFeedback);
 }
 
 int GPSDO_ntpUpdate(float offset) {
@@ -352,7 +326,7 @@ int GPSDO_ntpUpdate(float offset) {
     // update feedback
     setFeedback(currCompensation + pllCorr + pllBias);
     // update temperature compensation
-    updateTempCompNtp(currFeedback);
+    updateTempComp(NTP_RATE, currFeedback);
     return 0;
 }
 
@@ -423,30 +397,22 @@ static void setFeedback(float feedback) {
     currFeedback = 0x1p-31f * (float) (correction - (1 << 31));
 }
 
-static void updateCompBin(int bin, float alpha, float x, float y) {
-    if(compBins[bin].coeff == 0 && compBins[bin].offset == 0) {
-        compBins[bin].offset = y;
+static void updateTempComp(float rate, float target) {
+    if(tcompBias == 0 && tcompOffset == 0) {
+        tcompBias = currTemp;
+        tcompOffset = target;
         return;
     }
 
-    // compute error term
-    float error = y - compBins[bin].offset;
-    error -= x * compBins[bin].coeff;
-    error *= alpha;
-    // update bin coefficient and offset
-    compBins[bin].coeff += error * x;
-    compBins[bin].offset += error;
-}
+    rate *= TCOMP_ALPHA;
+    const float temp = currTemp;
+    tcompBias += (temp - tcompBias) * rate;
+    tcompOffset += (target - tcompOffset) * rate;
 
-static void updateTempComp(float alpha, float target) {
-    float temp = currTemp;
-    int bin = (int) roundf(temp);
-    // update affected bins
-    updateCompBin((bin - 1) & 63, alpha * 0.125f, temp - (float) (bin - 1), target);
-    updateCompBin((bin + 0) & 63, alpha * 1.000f, temp - (float) (bin + 0), target);
-    updateCompBin((bin + 1) & 63, alpha * 0.125f, temp - (float) (bin + 1), target);
-}
-
-static void updateTempCompNtp(float target) {
-    updateTempComp(TCOMP_ALPHA * NTP_RATE, target);
+    float error = target;
+    error -= tcompOffset;
+    error -= tcompCoeff * (temp - tcompBias);
+    error *= rate;
+    error *= temp - tcompBias;
+    tcompCoeff += error;
 }
