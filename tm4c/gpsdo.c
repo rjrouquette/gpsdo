@@ -33,6 +33,7 @@ static struct {
 
 static int32_t ppsGpsEdgePrev;
 static int32_t ppsGpsEdge;
+static int32_t ppsOutEdgePrev;
 static int32_t ppsOutEdge;
 static int32_t ppsOffsetNano;
 
@@ -45,7 +46,6 @@ static float ppsOffsetRms;
 static float ppsSkewVar;
 static float ppsSkewRms;
 
-static int ppsReady;
 static uint32_t ppsPresent;
 
 // current correction values
@@ -81,8 +81,6 @@ void ISR_Timer5A() {
     ppsOutEdge = now - delta;
     // clear interrupt flag
     GPTM5.ICR.CAE = 1;
-    // indicate that PPS is ready
-    ppsReady = 1;
 }
 
 // capture rising edge of GPS PPS for offset measurement
@@ -247,14 +245,15 @@ void GPSDO_run() {
     // run GPS state machine
     GPS_run();
 
-    // wait for pps output
-    if(!ppsReady) return;
     // wait for window to expire
     const int32_t now = ((int32_t) GPTM4.TAV.raw);
-    if(now - ppsOutEdge < OFFSET_COARSE_ALIGN)
+    if((now - ppsOutEdge) < OFFSET_COARSE_ALIGN)
         return;
-    // clear ready flag
-    ppsReady = 0;
+    // sanity check pps output interval
+    int32_t ppsOutDelta = ppsOutEdge - ppsOutEdgePrev;
+    ppsOutEdgePrev = ppsOutEdge;
+    if(ppsOutDelta < 110000000) return;
+    if(ppsOutDelta > 140000000) return;
 
     // return if GPS PPS not present or is more than 1 second stale
     ppsPresent <<= 1;
@@ -266,17 +265,20 @@ void GPSDO_run() {
     // compute offset
     int32_t offset = ppsOutEdge - ppsGpsEdge;
     // perform coarse realignment if offset is too large
-    if(offset < -OFFSET_COARSE_ALIGN)
+    if(offset < -OFFSET_COARSE_ALIGN) {
+        ppsOffsetNano = offset << 3;
         return;
+    }
     if(offset > OFFSET_COARSE_ALIGN) {
-        // limit slew rate (10ms)
-        if(offset > 1250000)
-            offset = 1250000;
+        ppsOffsetNano = offset << 3;
+        // limit slew rate (100ms/s)
+        if(offset > 12500000)
+            offset = 12500000;
         // truncate to 80 ns resolution
         offset /= 10;
         offset *= 80;
         // set update registers
-        EMAC0.TIMNANOU.NEG = 1;
+        EMAC0.TIMNANOU.NEG = 0;
         EMAC0.TIMNANOU.VALUE = offset;
         EMAC0.TIMSECU = 0;
         // wait for hardware ready state
