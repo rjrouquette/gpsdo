@@ -438,13 +438,10 @@ static void updateCompBin(int bin, float alpha, float x, float y) {
 
 static void updateTempComp(float alpha, float target) {
     const float temp = currTemp;
-    int hi = (int) ceilf(temp);
-    int lo = (int) floorf(temp);
-    updateCompBin(hi & 63, alpha, temp - (float) hi, target);
-    if(hi != lo)
-        updateCompBin(lo & 63, alpha, temp - (float) lo, target);
-    updateCompBin((hi + 1) & 63, alpha * 0x1p-1f, temp - (float) (hi + 1), target);
-    updateCompBin((lo - 1) & 63, alpha * 0x1p-1f, temp - (float) (lo - 1), target);
+    int bin = (int) floorf(temp);
+    updateCompBin(bin & 63, alpha, temp - (float) bin - 0.5f, target);
+    updateCompBin((bin + 1) & 63, alpha * 0.125f, temp - (float) (bin + 1) - 0.5f, target);
+    updateCompBin((bin - 1) & 63, alpha * 0.125f, temp - (float) (bin - 1) - 0.5f, target);
 }
 
 static void updateTempCompNtp(float target) {
