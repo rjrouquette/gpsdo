@@ -438,8 +438,7 @@ static void updateCompBin(int bin, float alpha, float x, float y) {
 
 static void updateTempComp(float alpha, float target) {
     float temp = currTemp;
-    int bin = (int) floorf(temp);
-    temp -= 0.5f;
+    int bin = (int) roundf(temp);
     // update affected bins
     updateCompBin((bin - 1) & 63, alpha * 0.125f, temp - (float) (bin - 1), target);
     updateCompBin((bin + 0) & 63, alpha * 1.000f, temp - (float) (bin + 0), target);
