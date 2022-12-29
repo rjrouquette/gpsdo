@@ -13,7 +13,7 @@
 
 
 #define OFFSET_COARSE_ALIGN (125000) // 1 millisecond
-#define STAT_TIME_CONST (16)
+#define STAT_ALPHA (0x1p-4f)
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_COMP_RMS (200e-9f)
 #define TCOMP_ALPHA (0x1p-14f)
@@ -279,15 +279,15 @@ void GPSDO_run() {
     pllBias += fltOffset * 0x1p-8f;
 
     // update PPS stats
-    ppsOffsetMean += (fltOffset - ppsOffsetMean) / STAT_TIME_CONST;
+    ppsOffsetMean += (fltOffset - ppsOffsetMean) * STAT_ALPHA;
     fltOffset *= fltOffset;
-    ppsOffsetVar += (fltOffset - ppsOffsetVar) / STAT_TIME_CONST;
+    ppsOffsetVar += (fltOffset - ppsOffsetVar) * STAT_ALPHA;
     ppsOffsetRms = sqrtf(ppsOffsetVar);
     // update skew stats
     ppsSkew *= ppsSkew;
     // restrict skew
     if(ppsSkew > 1e-8f) ppsSkew = 1e-8f;
-    ppsSkewVar += (ppsSkew - ppsSkewVar) / STAT_TIME_CONST;
+    ppsSkewVar += (ppsSkew - ppsSkewVar) * STAT_ALPHA;
     ppsSkewRms = sqrtf(ppsSkewVar);
 
     // update temperature compensation
