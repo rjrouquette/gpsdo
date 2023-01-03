@@ -631,8 +631,7 @@ void processRequest(uint8_t *frame, int flen) {
 
 static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP) {
     // retrieve rx time
-    uint32_t rxTime[2];
-    NET_getRxTimeRaw(frame, rxTime);
+    uint64_t rxTime = NET_getRxTime(frame);
 
     // set type to server response
     headerNTP->mode = 4;
@@ -653,12 +652,9 @@ static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     headerNTP->rxTime[0] = ((uint32_t *) &rxTime)[0];
     headerNTP->rxTime[1] = ((uint32_t *) &rxTime)[1];
     // set reference time
-    uint32_t refTime[2] = {EMAC0.TIMSEC, EMAC0.TIMNANO };
-    if((int32_t)(refTime[1] - rxTime[1]) < 0) {
-        if(refTime[0] == rxTime[0]) ++refTime[0];
-    }
-    headerNTP->refTime[0] = refTime[0];
-    headerNTP->refTime[1] = refTime[1];
+    uint64_t refTime = CLK_GPS();
+    headerNTP->refTime[0] = ((uint32_t *) &refTime)[0];
+    headerNTP->refTime[1] = ((uint32_t *) &refTime)[1];
     // no TX time
     headerNTP->txTime[0] = 0;
     headerNTP->txTime[1] = 0;
@@ -679,10 +675,9 @@ static void followupRequest0(uint8_t *frame, int flen) {
     if(headerNTP->version != 0) return;
 
     // append hardware transmit time
-    uint32_t txTime[2];
-    NET_getTxTimeRaw(frame, txTime);
-    headerNTP->txTime[0] = txTime[0];
-    headerNTP->txTime[1] = txTime[1];
+    uint64_t txTime = NET_getTxTime(frame);
+    headerNTP->txTime[0] = ((uint32_t *) &txTime)[0];
+    headerNTP->txTime[1] = ((uint32_t *) &txTime)[1];
 
     // send packet
     UDP_finalize(frame, flen);

@@ -105,15 +105,25 @@ uint32_t CLK_GPS_INT() {
 }
 
 uint64_t CLK_GPS() {
-    // get current TAI
-    uint32_t sa = EMAC0.TIMSEC;
-    uint32_t na = EMAC0.TIMNANO;
-    uint32_t sb = EMAC0.TIMSEC;
-    uint32_t nb = EMAC0.TIMNANO;
-    // correct for access skew at second boundary
-    if(nb < na && sb == sa) ++sb;
+    // result structure
+    register union {
+        struct {
+            uint32_t fpart;
+            uint32_t ipart;
+        };
+        uint64_t full;
+    } a, b;
 
-    return timeFrom125Mhz(sb, nb >> 3);
+    // get current TAI
+    a.ipart = EMAC0.TIMSEC;
+    a.fpart = EMAC0.TIMNANO;
+    b.ipart = EMAC0.TIMSEC;
+    b.fpart = EMAC0.TIMNANO;
+    // correct for access skew at second boundary
+    if(b.fpart < a.fpart && b.ipart == a.ipart) ++b.ipart;
+
+    b.fpart <<= 1;
+    return b.full;
 }
 
 /**

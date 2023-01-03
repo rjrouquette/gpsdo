@@ -10,6 +10,7 @@
 #include "hw/timer.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
+#include "lib/clk.h"
 
 
 #define OFFSET_COARSE_ALIGN (125000) // 1 millisecond
@@ -248,12 +249,9 @@ void GPSDO_run() {
         // limit slew rate (100ms/s)
         if(offset > 12500000)
             offset = 12500000;
-        // truncate to 80 ns resolution
-        offset /= 10;
-        offset *= 80;
         // set update registers
         EMAC0.TIMNANOU.NEG = 0;
-        EMAC0.TIMNANOU.VALUE = offset;
+        EMAC0.TIMNANOU.VALUE = (uint32_t) timeFrom125Mhz(0, offset);
         EMAC0.TIMSECU = 0;
         // wait for hardware ready state
         while(EMAC0.TIMSTCTRL.TSUPDT);
@@ -299,8 +297,7 @@ int GPSDO_ntpUpdate(float offset) {
     if(ppsPresent) return 0;
     if(fabsf(offset) > 100e-3f) {
         // hard step
-        int32_t _offset = (int32_t) roundf(offset * 12.5e6f);
-        _offset *= 80;
+        int32_t _offset = (int32_t) roundf(offset * 0x1p31f);
         // check sign
         if(_offset < 0) {
             EMAC0.TIMNANOU.NEG = 1;
@@ -385,16 +382,15 @@ float GPSDO_pllTrim() {
 
 static void setFeedback(float feedback) {
     // convert to correction factor
-    int32_t correction = lroundf(feedback * 0x1p31f);
+    int32_t correction = lroundf(feedback * 0x1p32f);
     // correction factor must not exceed 1 part-per-thousand
     if(correction < -(1 << 21)) correction = -(1 << 21);
     if(correction >  (1 << 21)) correction =  (1 << 21);
-    correction += (1 << 31);
     // apply correction update
-    EMAC0.TIMADD = correction;
+    EMAC0.TIMADD = 0xFFB34C02 + correction;
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     // update current feedback value
-    currFeedback = 0x1p-31f * (float) (correction - (1 << 31));
+    currFeedback = 0x1p-32f * (float) correction;
 }
 
 static void updateTempComp(float rate, float target) {

@@ -121,15 +121,15 @@ static void initPTP() {
     EMAC0.CC.PTPCEN = 1;
     // configure PTP
     EMAC0.TIMSTCTRL.ALLF = 1;
-    EMAC0.TIMSTCTRL.DGTLBIN = 1;
+    EMAC0.TIMSTCTRL.DGTLBIN = 0;
     EMAC0.TIMSTCTRL.TSEN = 1;
-    // 25MHz / 2 = 80ns
-    EMAC0.SUBSECINC.SSINC = 80;
+    // 2^31 / 25MHz = 85.899
+    EMAC0.SUBSECINC.SSINC = 86;
     // init timer
     EMAC0.TIMSECU = 0;
     EMAC0.TIMNANOU.VALUE = 0;
     // frequency correction
-    EMAC0.TIMADD = 0x80000000;
+    EMAC0.TIMADD = 0xFFB34C02;
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     EMAC0.TIMSTCTRL.TSFCUPDT = 1;
     // start timer
@@ -314,31 +314,37 @@ void NET_transmit(int desc, int len) {
 }
 
 uint64_t NET_getRxTime(const uint8_t *rxFrame) {
-    uint32_t raw[2] = { 0, 0 };
-    NET_getRxTimeRaw(rxFrame, raw);
-    return timeFrom125Mhz(raw[0], raw[1] >> 3);
-}
-
-void NET_getRxTimeRaw(const uint8_t *rxFrame, uint32_t *rxTime) {
     // compute descriptor offset
     uint32_t rxId = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
-    if(rxId >= RX_RING_SIZE) return;
-    // retrieve raw timestamp
-    rxTime[0] = rxDesc[rxId].RTSH;
-    rxTime[1] = rxDesc[rxId].RTSL;
+    if(rxId >= RX_RING_SIZE) return 0;
+    // retrieve timestamp
+    register union {
+        struct {
+            uint32_t fpart;
+            uint32_t ipart;
+        };
+        uint64_t full;
+    } result;
+    result.fpart = rxDesc[rxId].RTSL;
+    result.ipart = rxDesc[rxId].RTSH;
+    result.fpart <<= 1;
+    return result.full;
 }
 
 uint64_t NET_getTxTime(const uint8_t *txFrame) {
-    uint32_t raw[2] = { 0, 0 };
-    NET_getTxTimeRaw(txFrame, raw);
-    return timeFrom125Mhz(raw[0], raw[1] >> 3);
-}
-
-void NET_getTxTimeRaw(const uint8_t *txFrame, uint32_t *txTime) {
     // compute descriptor offset
     uint32_t txId = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
-    if(txId >= TX_RING_SIZE) return;
-    // retrieve raw timestamp
-    txTime[0] = txDesc[txId].TTSH;
-    txTime[1] = txDesc[txId].TTSL;
+    if(txId >= TX_RING_SIZE) return 0;
+    // retrieve timestamp
+    register union {
+        struct {
+            uint32_t fpart;
+            uint32_t ipart;
+        };
+        uint64_t full;
+    } result;
+    result.fpart = txDesc[txId].TTSL;
+    result.ipart = txDesc[txId].TTSH;
+    result.fpart <<= 1;
+    return result.full;
 }
