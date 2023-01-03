@@ -384,8 +384,8 @@ static void setFeedback(float feedback) {
     // convert to correction factor
     int32_t correction = lroundf(feedback * 0x1p32f);
     // correction factor must not exceed 1 part-per-thousand
-    if(correction < -(1 << 21)) correction = -(1 << 21);
-    if(correction >  (1 << 21)) correction =  (1 << 21);
+    if(correction < -(1 << 22)) correction = -(1 << 22);
+    if(correction >  (1 << 22)) correction =  (1 << 22);
     // apply correction update
     EMAC0.TIMADD = 0xFFB34C02 + correction;
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
