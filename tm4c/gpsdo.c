@@ -251,7 +251,7 @@ void GPSDO_run() {
             offset = 12500000;
         // set update registers
         EMAC0.TIMNANOU.NEG = 0;
-        EMAC0.TIMNANOU.VALUE = (uint32_t) timeFrom125Mhz(0, offset);
+        EMAC0.TIMNANOU.VALUE = ((uint32_t) timeFrom125Mhz(0, offset)) >> 1;
         EMAC0.TIMSECU = 0;
         // wait for hardware ready state
         while(EMAC0.TIMSTCTRL.TSUPDT);
