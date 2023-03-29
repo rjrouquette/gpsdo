@@ -387,7 +387,7 @@ static void setFeedback(float feedback) {
     if(correction < -(1 << 22)) correction = -(1 << 22);
     if(correction >  (1 << 22)) correction =  (1 << 22);
     // apply correction update
-    EMAC0.TIMADD = 0xFFB33500 + correction;
+    EMAC0.TIMADD = 0xFFB34C02 + correction;
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     // update current feedback value
     currFeedback = 0x1p-32f * (float) correction;
