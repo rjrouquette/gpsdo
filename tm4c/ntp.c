@@ -400,8 +400,8 @@ static void runTracking() {
     }
 
     float weight = 0;
-    if((server->reach & 1) && server->varDrift > 0) {
-        weight = 1.0f / sqrtf(server->varDrift);
+    if((server->reach & 1) && server->varDelay > 0) {
+        weight = 1.0f / sqrtf(server->varDelay * (float) server->stratum);
     }
     if(!isfinite(weight))
         weight = 0;
