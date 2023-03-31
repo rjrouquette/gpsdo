@@ -12,10 +12,25 @@
 #include "lib/led.h"
 
 
-#define PTP_PORT_EVENT (319)
-#define PTP_PORT_GENERAL (320)
-
+#define PTP2_PORT_EVENT (319)
+#define PTP2_PORT_GENERAL (320)
 #define PTP2_MIN_SIZE (UDP_DATA_OFFSET + 34)
+
+
+// PTP message yypes
+enum PTP2_MTYPE {
+    PTP2_MT_SYNC = 0x0,
+    PTP2_MT_DELAY_REQ,
+    PTP2_MT_PDELAY_REQ,
+    PTP2_MT_PDELAY_RESP,
+
+    PTP2_MT_FOLLOW_UP = 0x8,
+    PTP2_MT_DELAY_RESP,
+    PTP2_MT_PDELAY_RESP_FOLLOW_UP,
+    PTP2_MT_ANNOUNCE,
+    PTP2_MT_SIGNALING,
+    PTP2_MT_MANAGEMENT
+};
 
 struct PACKED PTP2_SRC_IDENT {
     uint8_t identity[8];
@@ -92,11 +107,12 @@ _Static_assert(sizeof(struct PTP2_PDELAY_RESP) == 20, "PTP2_PDELAY_FOLLOW_UP mus
 
 
 static void processMessage(uint8_t *frame, int flen);
-
+static void processDelayRequest(uint8_t *frame, int flen);
+static void processPDelayRequest(uint8_t *frame, int flen);
 
 void PTP_init() {
-    UDP_register(PTP_PORT_EVENT, processMessage);
-    UDP_register(PTP_PORT_GENERAL, processMessage);
+    UDP_register(PTP2_PORT_EVENT, processMessage);
+    UDP_register(PTP2_PORT_GENERAL, processMessage);
 }
 
 void PTP_run() {
@@ -114,9 +130,22 @@ void processMessage(uint8_t *frame, int flen) {
 
     // verify destination
     if(headerIPv4->dst != ipAddress) return;
+    // ignore unsupported versions
+    if(headerPTP->versionPTP != 2) return;
 
     // indicate time-server activity
     LED_act0();
 
+    if(headerPTP->messageType == PTP2_MT_DELAY_REQ)
+        return processDelayRequest(frame, flen);
+    if(headerPTP->messageType == PTP2_MT_PDELAY_REQ)
+        return processPDelayRequest(frame, flen);
+}
+
+static void processDelayRequest(uint8_t *frame, int flen) {
+
+}
+
+static void processPDelayRequest(uint8_t *frame, int flen) {
 
 }
