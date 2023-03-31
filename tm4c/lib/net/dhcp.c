@@ -252,6 +252,7 @@ static void processFrame(uint8_t *frame, int flen) {
     if(optMsgType == 5) {
         ipAddress = headerDHCP->YIADDR;
         ipSubnet = optSubnet;
+        ipBroadcast = (ipAddress & ipSubnet) | (~ipSubnet);
         ipGateway = optRouter;
         ipDNS = optDNS;
         // set time of expiration (10% early)

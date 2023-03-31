@@ -14,7 +14,6 @@
 #include "lib/net/util.h"
 #include "lib/led.h"
 #include "gpsdo.h"
-#include "hw/emac.h"
 #include "hw/sys.h"
 #include "lib/net/arp.h"
 #include "lib/format.h"
@@ -32,7 +31,7 @@
 #define NTP_POLL_BITS (6)
 #define NTP_POLL_MASK (63)
 #define NTP_POLL_INTV (64)
-#define NTP_POLL_RAND ((STCURRENT.CURRENT >> 8) & 7)
+#define NTP_POLL_RAND ((STCURRENT.CURRENT >> 8) & 7) // employs scheduling uncertainty
 
 struct PACKED HEADER_NTPv4 {
     uint16_t mode: 3;
@@ -56,6 +55,8 @@ static uint64_t ntpOffset = 0;
 static float clockOffset;
 static float clockDrift;
 static int clockStratum = 16;
+static int32_t rootDelay;
+static int32_t rootDispersion;
 static uint32_t refId;
 static int leapIndicator;
 
@@ -67,6 +68,8 @@ struct Server {
     uint64_t stamps[NTP_BURST << 2];
     uint64_t offset;
     uint64_t update;
+    int32_t rootDelay;
+    int32_t rootDispersion;
     int pollSlot;
     uint32_t attempts;
     uint32_t addr;
@@ -178,6 +181,14 @@ int NTP_clockStratum() {
 
 int NTP_leapIndicator() {
     return leapIndicator;
+}
+
+float NTP_rootDelay() {
+    return 0x1p-16f * (float) rootDelay;
+}
+
+float NTP_rootDispersion() {
+    return 0x1p-16f * (float) rootDispersion;
 }
 
 void NTP_date(uint64_t clkMono, uint32_t *ntpDate) {
@@ -433,6 +444,8 @@ static void runAggregate() {
     clockDrift = 0;
     clockOffset = 0;
     float _stratum = 0;
+    float _delay = 0;
+    float _dispersion = 0;
     float best = 0;
     int li[4] = {0,0,0,0};
     if(norm > 0) {
@@ -443,6 +456,8 @@ static void runAggregate() {
             clockDrift += weight * servers[i].meanDrift;
             clockOffset += weight * servers[i].currentOffset;
             _stratum += weight * (float) servers[i].stratum;
+            _delay += weight * (((float) servers[i].rootDelay) + (0x1p16f * servers[i].meanDelay));
+            _dispersion += weight * (((float) servers[i].rootDispersion) + (0x1p16f * sqrtf(servers[i].varDelay)));
             // set reference ID to server with best weight
             if(weight > best) {
                 best = weight;
@@ -454,12 +469,21 @@ static void runAggregate() {
         }
     }
     // update clock stratum
-    if(GPSDO_isLocked())
+    if(GPSDO_isLocked()) {
         clockStratum = 1;
-    else if(_stratum == 0)
+        rootDelay = 0;
+        rootDispersion = 0;
+    }
+    else if(_stratum == 0) {
         clockStratum = 16;
-    else
-        clockStratum = (int) roundf(_stratum) + 1;
+        rootDelay = 0;
+        rootDispersion = 0;
+    }
+    else {
+        clockStratum = 1 + (int) roundf(_stratum);
+        rootDelay = (int32_t) roundf(_delay);
+        rootDispersion = (int32_t) roundf(_dispersion);
+    }
 
     // set reference ID to GPS if stratum is 1
     if(clockStratum == 1)
@@ -642,9 +666,9 @@ static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     // set reference ID
     memcpy(headerNTP->refID, &refId, 4);
     // set root delay
-    headerNTP->rootDelay = 0;
+    headerNTP->rootDelay = rootDelay;
     // set root dispersion
-    headerNTP->rootDispersion = 0;
+    headerNTP->rootDispersion = rootDispersion;
     // set origin timestamp
     headerNTP->origTime[0] = headerNTP->txTime[0];
     headerNTP->origTime[1] = headerNTP->txTime[1];
@@ -707,9 +731,9 @@ static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     // set reference ID
     memcpy(headerNTP->refID, &refId, 4);
     // set root delay
-    headerNTP->rootDelay = 0;
+    headerNTP->rootDelay = __builtin_bswap32(rootDelay);
     // set root dispersion
-    headerNTP->rootDispersion = 0;
+    headerNTP->rootDispersion = __builtin_bswap32(rootDispersion);
     // set origin timestamp
     headerNTP->origTime[0] = headerNTP->txTime[0];
     headerNTP->origTime[1] = headerNTP->txTime[1];
@@ -816,6 +840,8 @@ static void processResponse(uint8_t *frame) {
     // burst is complete, perform update calculations
     server->reach |= 1;
     server->stratum = headerNTP->stratum;
+    server->rootDelay = (int32_t) __builtin_bswap32(headerNTP->rootDelay);
+    server->rootDispersion = (int32_t) __builtin_bswap32(headerNTP->rootDispersion);
     server->leapIndicator = headerNTP->status;
 }
 

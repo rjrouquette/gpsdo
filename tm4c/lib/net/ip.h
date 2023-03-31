@@ -37,6 +37,7 @@ struct PACKED HEADER_IPv4 {
 };
 _Static_assert(sizeof(struct HEADER_IPv4) == 20, "HEADER_IPv4 must be 20 bytes");
 
+extern volatile uint32_t ipBroadcast;
 extern volatile uint32_t ipAddress;
 extern volatile uint32_t ipSubnet;
 extern volatile uint32_t ipGateway;

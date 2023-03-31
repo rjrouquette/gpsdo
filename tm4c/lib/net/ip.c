@@ -7,6 +7,7 @@
 #include "ip.h"
 #include "udp.h"
 
+volatile uint32_t ipBroadcast = 0;
 volatile uint32_t ipAddress = 0;
 volatile uint32_t ipSubnet = -1;
 volatile uint32_t ipGateway = 0;

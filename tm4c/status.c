@@ -345,6 +345,15 @@ unsigned statusNTP(char *body) {
     end = append(end, tmp);
     end = append(end, "\n");
 
+    end = append(end, "root delay: ");
+    tmp[fmtFloat(NTP_rootDelay() * 1e3f, 0, 3, tmp)] = 0;
+    end = append(end, tmp);
+    end = append(end, " ms\n");
+
+    end = append(end, "root dispersion: ");
+    tmp[fmtFloat(NTP_rootDispersion() * 1e3f, 0, 3, tmp)] = 0;
+    end = append(end, tmp);
+    end = append(end, " ms\n");
 
     // return size
     return end - body;
