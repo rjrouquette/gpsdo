@@ -456,8 +456,9 @@ static void runAggregate() {
             clockDrift += weight * servers[i].meanDrift;
             clockOffset += weight * servers[i].currentOffset;
             _stratum += weight * (float) servers[i].stratum;
-            _delay += weight * (((float) servers[i].rootDelay) + (0x1p16f * servers[i].meanDelay));
-            _dispersion += weight * (((float) servers[i].rootDispersion) + (0x1p16f * sqrtf(servers[i].varDelay)));
+            _delay += weight * (servers[i].meanDelay + (0x1p-16f * (float) servers[i].rootDelay));
+            const float z = 0x1p-16f * (float) servers[i].rootDispersion;
+            _dispersion += weight * (servers[i].varDelay + (z * z));
             // set reference ID to server with best weight
             if(weight > best) {
                 best = weight;
@@ -481,8 +482,8 @@ static void runAggregate() {
     }
     else {
         clockStratum = 1 + (int) roundf(_stratum);
-        rootDelay = (int32_t) roundf(_delay);
-        rootDispersion = (int32_t) roundf(_dispersion);
+        rootDelay = (int32_t) roundf(0x1p16f * _delay);
+        rootDispersion = (int32_t) roundf(0x1p16f * sqrtf(_dispersion));
     }
 
     // set reference ID to GPS if stratum is 1
