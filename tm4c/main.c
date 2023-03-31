@@ -12,11 +12,11 @@
 
 #include "gpsdo.h"
 #include "ntp.h"
+#include "ptp.h"
 #include "snmp.h"
 #include "status.h"
 
 int main(void) {
-    char temp[32];
     // enable FPU
     CPAC.CP10 = 3;
     CPAC.CP11 = 3;
@@ -30,6 +30,7 @@ int main(void) {
     // initialize networking
     NET_init();
     NTP_init();
+    PTP_init();
     SNMP_init();
     STATUS_init();
     // initialize GPSDO
@@ -41,6 +42,7 @@ int main(void) {
         LED_run();
         NET_run();
         NTP_run();
+        PTP_run();
     }
 }
 

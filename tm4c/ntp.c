@@ -621,7 +621,7 @@ void processRequest(uint8_t *frame, int flen) {
             processResponse(frame);
         return;
     }
-    // time-server activity
+    // indicate time-server activity
     LED_act0();
 
     // modify ethernet frame header

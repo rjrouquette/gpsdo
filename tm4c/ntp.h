@@ -7,8 +7,6 @@
 
 #include <stdint.h>
 
-#define NTP_UTC_OFFSET (2208988800)
-
 void NTP_init();
 void NTP_run();
 uint64_t NTP_offset();
