@@ -124,7 +124,7 @@ static void sendSync();
 
 void PTP_init() {
     // set clock ID to MAC address
-    getMAC(clockId);
+    getMAC(clockId + 2);
     // register UDP listening ports
     UDP_register(PTP2_PORT_EVENT, processMessage);
     UDP_register(PTP2_PORT_GENERAL, processMessage);
