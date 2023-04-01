@@ -151,7 +151,7 @@ static void initHwAddr() {
     EMAC0.ADDR0.HI.ADDR = ((CRC.SEED & 0xFF) << 8) | ((CRC.SEED  >> 8) & 0xFF);
     EMAC0.ADDR0.LO = (((CRC.SEED >> 16) & 0xFF) << 24) | 0x585554;
     // disable CRC module
-    RCGCCCM.EN = 1;
+    RCGCCCM.EN = 0;
 }
 
 static void initMAC() {
