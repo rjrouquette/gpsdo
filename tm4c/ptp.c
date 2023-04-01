@@ -2,6 +2,9 @@
 // Created by robert on 3/31/23.
 //
 
+#include <memory.h>
+#include <math.h>
+
 #include "ptp.h"
 #include "lib/clk.h"
 #include "lib/net.h"
@@ -17,6 +20,8 @@
 #define PTP2_MIN_SIZE (UDP_DATA_OFFSET + 34)
 #define PTP2_ANNOUNCE_INTERVAL (1ull << (32 - 0))
 #define PTP2_SYNC_INTERVAL (1ull << (32 - 4))
+#define PTP2_MULTICAST (0x810100E0) // 224.0.1.129
+#define PTP2_MULTICAST_PEER (0x6B0000E0) // 224.0.0.107
 
 
 // PTP message yypes
@@ -177,9 +182,71 @@ static void processPDelayRequest(uint8_t *frame, int flen) {
 }
 
 static void sendAnnounce() {
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    // allocate and clear frame buffer
+    const int flen = PTP2_MIN_SIZE + sizeof(struct PTP2_ANNOUNCE);
+    uint8_t *frame = NET_getTxBuff(txDesc);
+    memset(frame, 0, flen);
 
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
+
+    // EtherType = IPv4
+    headerEth->ethType = ETHTYPE_IPv4;
+
+    // IPv4 Header
+    IPv4_init(frame);
+    IPv4_setMulticast(frame, PTP2_MULTICAST);
+    headerIPv4->src = ipAddress;
+    headerIPv4->proto = IP_PROTO_UDP;
+
+    // UDP Header
+    headerUDP->portSrc = __builtin_bswap16(PTP2_PORT_EVENT);
+    headerUDP->portDst = __builtin_bswap16(PTP2_PORT_EVENT);
+
+    // TODO set payload
+
+    // transmit request
+    UDP_finalize(frame, flen);
+    IPv4_finalize(frame, flen);
+    NET_transmit(txDesc, flen);
 }
 
 static void sendSync() {
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    // allocate and clear frame buffer
+    const int flen = PTP2_MIN_SIZE + sizeof(PTP2_SYNC);
+    uint8_t *frame = NET_getTxBuff(txDesc);
+    memset(frame, 0, flen);
 
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
+
+    // EtherType = IPv4
+    headerEth->ethType = ETHTYPE_IPv4;
+
+    // IPv4 Header
+    IPv4_init(frame);
+    IPv4_setMulticast(frame, PTP2_MULTICAST);
+    headerIPv4->src = ipAddress;
+    headerIPv4->proto = IP_PROTO_UDP;
+
+    // UDP Header
+    headerUDP->portSrc = __builtin_bswap16(PTP2_PORT_EVENT);
+    headerUDP->portDst = __builtin_bswap16(PTP2_PORT_EVENT);
+
+    // TODO set payload
+
+    // transmit request
+    UDP_finalize(frame, flen);
+    IPv4_finalize(frame, flen);
+    NET_transmit(txDesc, flen);
 }

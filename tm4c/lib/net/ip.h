@@ -46,6 +46,7 @@ extern volatile uint32_t ipDNS;
 void IPv4_process(uint8_t *frame, int flen);
 void IPv4_init(uint8_t *frame);
 void IPv4_finalize(uint8_t *frame, int flen);
+void IPv4_setMulticast(uint8_t *frame, uint32_t groupAddress);
 
 uint16_t RFC1071_checksum(volatile const void *buffer, int len);
 
