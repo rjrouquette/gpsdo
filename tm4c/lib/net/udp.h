@@ -25,6 +25,7 @@ typedef void (*CallbackUDP)(uint8_t *frame, int flen);
 
 void UDP_process(uint8_t *frame, int flen);
 void UDP_finalize(uint8_t *frame, int flen);
+void UDP_returnToSender(uint8_t *frame, uint32_t ipAddr, uint16_t port);
 
 int UDP_register(uint16_t port, CallbackUDP callback);
 int UDP_deregister(uint16_t port);

@@ -624,18 +624,20 @@ void processRequest(uint8_t *frame, int flen) {
     // indicate time-server activity
     LED_act0();
 
-    // modify ethernet frame header
-    copyMAC(headerEth->macDst, headerEth->macSrc);
-    // modify IP header
-    headerIPv4->dst = headerIPv4->src;
-    headerIPv4->src = ipAddress;
-    // modify UDP header
-    headerUDP->portDst = headerUDP->portSrc;
-    headerUDP->portSrc = __builtin_bswap16(NTP_PORT);
-
     // get TX descriptor
     int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
+    // duplicate packet for sending
+    uint8_t *temp = NET_getTxBuff(txDesc);
+    memcpy(temp, frame, flen);
+    frame = temp;
+    // return the response directly to the sender
+    UDP_returnToSender(frame, ipAddress, NTP_PORT);
+    // remap headers
+    headerEth = (struct FRAME_ETH *) frame;
+    headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
     // process message
     if(headerNTP->version == 0) {
@@ -650,7 +652,6 @@ void processRequest(uint8_t *frame, int flen) {
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
     // transmit packet
-    memcpy(NET_getTxBuff(txDesc), frame, flen);
     NET_transmit(txDesc, flen);
 }
 

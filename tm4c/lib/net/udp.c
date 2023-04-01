@@ -7,6 +7,7 @@
 #include "eth.h"
 #include "ip.h"
 #include "udp.h"
+#include "util.h"
 
 #define MAX_ENTRIES (8)
 static volatile uint16_t registryPort[MAX_ENTRIES];
@@ -72,6 +73,22 @@ void UDP_finalize(uint8_t *frame, int flen) {
 
     // finalize checksum calculation
     headerUDP->chksum = RFC1071_checksum(&chkbuf, sizeof(chkbuf));
+}
+
+void UDP_returnToSender(uint8_t *frame, uint32_t ipAddr, uint16_t port) {
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+
+    // modify ethernet frame header
+    copyMAC(headerEth->macDst, headerEth->macSrc);
+    // modify IP header
+    headerIPv4->dst = headerIPv4->src;
+    headerIPv4->src = ipAddr;
+    // modify UDP header
+    headerUDP->portDst = headerUDP->portSrc;
+    headerUDP->portSrc = __builtin_bswap16(port);
 }
 
 int UDP_register(uint16_t port, CallbackUDP callback) {

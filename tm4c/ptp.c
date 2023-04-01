@@ -15,6 +15,8 @@
 #define PTP2_PORT_EVENT (319)
 #define PTP2_PORT_GENERAL (320)
 #define PTP2_MIN_SIZE (UDP_DATA_OFFSET + 34)
+#define PTP2_ANNOUNCE_INTERVAL (1ull << (32 - 0))
+#define PTP2_SYNC_INTERVAL (1ull << (32 - 4))
 
 
 // PTP message yypes
@@ -105,18 +107,42 @@ struct PACKED PTP2_PDELAY_FOLLOW_UP {
 _Static_assert(sizeof(struct PTP2_PDELAY_RESP) == 20, "PTP2_PDELAY_FOLLOW_UP must be 34 bytes");
 
 
+static uint64_t nextSync, nextAnnounce;
+static uint8_t clockId[8];
 
 static void processMessage(uint8_t *frame, int flen);
 static void processDelayRequest(uint8_t *frame, int flen);
 static void processPDelayRequest(uint8_t *frame, int flen);
 
+static void sendAnnounce();
+static void sendSync();
+
 void PTP_init() {
+    // set clock ID to MAC address
+    getMAC(clockId);
+    // register UDP listening ports
     UDP_register(PTP2_PORT_EVENT, processMessage);
     UDP_register(PTP2_PORT_GENERAL, processMessage);
+    // set next update event
+    uint64_t now = CLK_MONOTONIC();
+    nextAnnounce = now + PTP2_ANNOUNCE_INTERVAL;
+    nextSync = now + PTP2_SYNC_INTERVAL;
 }
 
 void PTP_run() {
+    const uint64_t now = CLK_MONOTONIC();
 
+    // check for sync event
+    if(((int64_t)(now - nextSync)) >= 0) {
+        nextSync += PTP2_SYNC_INTERVAL;
+        sendSync();
+    }
+
+    // check for announce event
+    if(((int64_t)(now - nextAnnounce)) >= 0) {
+        nextAnnounce += PTP2_ANNOUNCE_INTERVAL;
+        sendAnnounce();
+    }
 }
 
 void processMessage(uint8_t *frame, int flen) {
@@ -147,5 +173,13 @@ static void processDelayRequest(uint8_t *frame, int flen) {
 }
 
 static void processPDelayRequest(uint8_t *frame, int flen) {
+
+}
+
+static void sendAnnounce() {
+
+}
+
+static void sendSync() {
 
 }
