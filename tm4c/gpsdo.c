@@ -17,7 +17,7 @@
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_COMP_RMS (200e-9f)
 #define TCOMP_ALPHA (0x1p-14f)
-#define NTP_MAX_SKEW (5e-6)
+#define NTP_MAX_SKEW (5e-6f)
 #define NTP_RATE (0x1p6f)
 #define NTP_OFFSET_CORR (0x1p-10f)
 #define NTP_OFFSET_BIAS (0x1p-14f)
