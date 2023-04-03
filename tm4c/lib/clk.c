@@ -91,13 +91,33 @@ uint64_t CLK_MONOTONIC() {
     register uint32_t snapI = cntMonotonic;
     register uint32_t snapF = GPTM0.TAV.raw;
 
-    uint64_t result = timeFrom125Mhz(0, snapF);
+    // scratch structure
+    register union {
+        struct {
+            uint32_t fpart;
+            uint32_t ipart;
+        };
+        uint64_t full;
+    } scratch;
+
+    // initialize scratch
+    scratch.fpart = snapF;
+    scratch.ipart = 0;
+
+    // compute fractional adjustment
+    scratch.full *= 45443074;
+    scratch.fpart = scratch.ipart;
+    scratch.ipart = 0;
+
+    // compute final result
+    scratch.full += snapF;
+    scratch.full *= 34;
 
     // merge with full integer count
-    ((uint32_t *) &result)[1] ^= snapI;
-    ((uint32_t *) &result)[1] &= 1;
-    ((uint32_t *) &result)[1] += snapI;
-    return result;
+    scratch.ipart ^= snapI;
+    scratch.ipart &= 1;
+    scratch.ipart += snapI;
+    return scratch.full;
 }
 
 uint32_t CLK_GPS_INT() {
@@ -114,7 +134,7 @@ uint64_t CLK_GPS() {
         uint64_t full;
     } a, b;
 
-    // get current TAI
+    // get current GPS time
     a.ipart = EMAC0.TIMSEC;
     a.fpart = EMAC0.TIMNANO;
     b.ipart = EMAC0.TIMSEC;
@@ -124,36 +144,4 @@ uint64_t CLK_GPS() {
 
     b.fpart <<= 1;
     return b.full;
-}
-
-/**
- * Constructs fixed-point time value from seconds and fractional counter ticks
- * @return 64-bit fixed-point format (32.32)
- */
-uint64_t timeFrom125Mhz(uint32_t seconds, uint32_t fracTicks) {
-    // result structure
-    register union {
-        struct {
-            uint32_t fpart;
-            uint32_t ipart;
-        };
-        uint64_t full;
-    } result;
-
-    // initialize scratch
-    result.fpart = fracTicks;
-    result.ipart = 0;
-
-    // compute fractional adjustment
-    result.full *= 45443074;
-    result.fpart = result.ipart;
-    result.ipart = 0;
-
-    // compute final result
-    result.full += fracTicks;
-    result.full *= 34;
-
-    // add full seconds to result
-    result.ipart += seconds;
-    return result.full;
 }
