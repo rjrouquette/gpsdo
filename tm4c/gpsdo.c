@@ -323,7 +323,7 @@ int GPSDO_ntpUpdate(float offset) {
     // update feedback
     setFeedback(currCompensation + pllCorr + pllBias);
     // update temperature compensation
-    updateTempComp(NTP_RATE, currFeedback);
+//    updateTempComp(NTP_RATE, currFeedback);
     return 0;
 }
 
