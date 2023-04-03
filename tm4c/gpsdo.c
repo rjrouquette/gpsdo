@@ -276,6 +276,8 @@ void GPSDO_run() {
     pllCorr = fltOffset * rate;
     setFeedback(currCompensation + pllCorr + pllBias);
     pllBias += fltOffset * 0x1p-8f;
+    // set update timestamp
+    timeTrimmed = CLK_TAI();
 
     // update PPS stats
     ppsOffsetMean += (fltOffset - ppsOffsetMean) * STAT_ALPHA;
@@ -324,6 +326,8 @@ int GPSDO_ntpUpdate(float offset, float skew) {
     pllBias += offset * NTP_OFFSET_BIAS;
     // update feedback
     setFeedback(currCompensation + pllCorr + pllBias);
+    // set update timestamp
+    timeTrimmed = CLK_TAI();
     // update temperature compensation
     if(skew < NTP_MAX_SKEW && skew > 0)
         updateTempComp(NTP_RATE, currFeedback);
@@ -398,8 +402,6 @@ static void setFeedback(float feedback) {
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     // update current feedback value
     currFeedback = 0x1p-32f * (float) correction;
-    // set update timestamp
-    timeTrimmed = CLK_TAI();
 }
 
 static void updateTempComp(float rate, float target) {
