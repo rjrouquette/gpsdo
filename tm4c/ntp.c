@@ -33,6 +33,7 @@
 #define NTP_POLL_INTV (64)
 #define NTP_POLL_RAND ((STCURRENT.CURRENT >> 8) & 7) // employs scheduling uncertainty
 #define NTP_UTC_OFFSET (2208988800)
+#define NTP_STAT_RATE (0x1p-2f)
 
 struct PACKED HEADER_NTPv4 {
     uint16_t mode: 3;
@@ -370,7 +371,7 @@ static void runStats() {
     // update offset and delay
     server->currentOffset = 0x1p-32f * (float) *(int32_t *) &offset;
     const float delay = 0x1p-32f * (float) *(uint32_t *) &_delay;
-    updateMeanVar(0x1p-2f, delay, &(server->meanDelay), &(server->varDelay));
+    updateMeanVar(NTP_STAT_RATE, delay, &(server->meanDelay), &(server->varDelay));
 
     // compute drift
     if(server->update != 0) {
@@ -381,7 +382,7 @@ static void runStats() {
         float drift = (float) (int32_t) (offset - server->offset);
         drift /= (float) (uint32_t) (interval >> shift);
         drift /= (float) (1 << shift);
-        updateMeanVar(0x1p-2f, drift, &(server->meanDrift), &(server->varDrift));
+        updateMeanVar(NTP_STAT_RATE, drift, &(server->meanDrift), &(server->varDrift));
     }
 
     // update server status
