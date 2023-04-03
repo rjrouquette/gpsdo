@@ -55,6 +55,7 @@ static uint32_t ntpEra = 0;
 static uint64_t ntpOffset = 0;
 static float clockOffset;
 static float clockDrift;
+static float clockSkew;
 static int clockStratum = 16;
 static int32_t rootDelay;
 static int32_t rootDispersion;
@@ -174,6 +175,10 @@ float NTP_clockOffset() {
 
 float NTP_clockDrift() {
     return clockDrift;
+}
+
+float NTP_clockSkew() {
+    return clockSkew;
 }
 
 int NTP_clockStratum() {
@@ -444,6 +449,7 @@ static void runAggregate() {
     refId = 0;
     clockDrift = 0;
     clockOffset = 0;
+    clockSkew = 0;
     float _stratum = 0;
     float _delay = 0;
     float _dispersion = 0;
@@ -454,6 +460,7 @@ static void runAggregate() {
         for(int i = 0; i < SERVER_COUNT; i++) {
             servers[i].weight *= norm;
             const float weight = servers[i].weight;
+            clockSkew += weight * servers[i].varDrift;
             clockDrift += weight * servers[i].meanDrift;
             clockOffset += weight * servers[i].currentOffset;
             _stratum += weight * (float) servers[i].stratum;
@@ -470,6 +477,8 @@ static void runAggregate() {
                 ++li[servers[i].leapIndicator];
         }
     }
+    clockSkew = sqrtf(clockSkew);
+
     // update clock stratum
     if(GPSDO_isLocked()) {
         clockStratum = 1;
@@ -534,7 +543,7 @@ static void runAggregate() {
 
     // notify GPSDO of ntp status for fail-over purposes
     if(norm > 0) {
-        if (GPSDO_ntpUpdate(clockOffset)) {
+        if (GPSDO_ntpUpdate(clockOffset, clockSkew)) {
             // reset server stats if clock was hard stepped
             for (int i = 0; i < SERVER_COUNT; i++)
                 resetServer(servers + i);

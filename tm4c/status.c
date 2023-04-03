@@ -340,6 +340,11 @@ unsigned statusNTP(char *body) {
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
+    end = append(end, "clock skew: ");
+    tmp[fmtFloat(NTP_clockDrift() * 1e6f, 0, 3, tmp)] = 0;
+    end = append(end, tmp);
+    end = append(end, " ppm\n");
+
     end = append(end, "leap indicator: ");
     tmp[toBase(NTP_leapIndicator(), 10, tmp)] = 0;
     end = append(end, tmp);

@@ -10,7 +10,6 @@
 #include "hw/timer.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
-#include "lib/clk.h"
 
 
 #define OFFSET_COARSE_ALIGN (125000) // 1 millisecond
@@ -18,14 +17,14 @@
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_COMP_RMS (200e-9f)
 #define TCOMP_ALPHA (0x1p-14f)
+#define NTP_MAX_SKEW (5e-6)
 #define NTP_RATE (0x1p6f)
 #define NTP_OFFSET_CORR (0x1p-10f)
 #define NTP_OFFSET_BIAS (0x1p-14f)
 
 // temperature compensation state
 static float currTemp;
-//static float tcompCoeff, tcompBias, tcompOffset;
-static float tcompCoeff, tcompOffset;
+static float tcompCoeff, tcompBias, tcompOffset;
 
 static int32_t ppsGpsEdgePrev;
 static int32_t ppsGpsEdge;
@@ -209,7 +208,7 @@ void GPSDO_init() {
 void GPSDO_run() {
     // update temperature compensation
     float newComp = currTemp;
-//    newComp -= tcompBias;
+    newComp -= tcompBias;
     newComp *= tcompCoeff;
     newComp += tcompOffset;
     // prevent large correction impulses
@@ -293,7 +292,7 @@ void GPSDO_run() {
         updateTempComp(1.0f, currFeedback);
 }
 
-int GPSDO_ntpUpdate(float offset) {
+int GPSDO_ntpUpdate(float offset, float skew) {
     if(ppsPresent) return 0;
     if(fabsf(offset) > 100e-3f) {
         // hard step
@@ -323,7 +322,8 @@ int GPSDO_ntpUpdate(float offset) {
     // update feedback
     setFeedback(currCompensation + pllCorr + pllBias);
     // update temperature compensation
-//    updateTempComp(NTP_RATE, currFeedback);
+    if(skew < NTP_MAX_SKEW)
+        updateTempComp(NTP_RATE, currFeedback);
     return 0;
 }
 
@@ -361,7 +361,7 @@ float GPSDO_temperature() {
 }
 
 float GPSDO_compBias() {
-    return 0;//tcompBias;
+    return tcompBias;
 }
 
 float GPSDO_compOffset() {
@@ -394,25 +394,21 @@ static void setFeedback(float feedback) {
 }
 
 static void updateTempComp(float rate, float target) {
-//    if(tcompBias == 0 && tcompOffset == 0) {
-//        tcompBias = currTemp;
-//        tcompOffset = target;
-//        return;
-//    }
-    if(tcompOffset == 0) {
+    if(tcompBias == 0 && tcompOffset == 0) {
+        tcompBias = currTemp;
         tcompOffset = target;
         return;
     }
 
     rate *= TCOMP_ALPHA;
     const float temp = currTemp;
-//    tcompBias += (temp - tcompBias) * rate;
+    tcompBias += (temp - tcompBias) * rate;
     tcompOffset += (target - tcompOffset) * rate;
 
     float error = target;
     error -= tcompOffset;
-    error -= tcompCoeff * temp;//(temp - tcompBias);
+    error -= tcompCoeff * (temp - tcompBias);
     error *= rate;
-    error *= temp;// - tcompBias;
+    error *= temp - tcompBias;
     tcompCoeff += error;
 }

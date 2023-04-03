@@ -9,7 +9,7 @@
 
 void GPSDO_init();
 void GPSDO_run();
-int GPSDO_ntpUpdate(float offset);
+int GPSDO_ntpUpdate(float offset, float skew);
 uint32_t GPSDO_ppsPresent();
 int GPSDO_isLocked();
 int GPSDO_offsetNano();
