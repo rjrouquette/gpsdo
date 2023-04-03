@@ -341,7 +341,7 @@ unsigned statusNTP(char *body) {
     end = append(end, " ppm\n");
 
     end = append(end, "clock skew: ");
-    tmp[fmtFloat(NTP_clockDrift() * 1e6f, 0, 3, tmp)] = 0;
+    tmp[fmtFloat(NTP_clockSkew() * 1e6f, 0, 3, tmp)] = 0;
     end = append(end, tmp);
     end = append(end, " ppm\n");
 

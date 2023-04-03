@@ -33,7 +33,7 @@
 #define NTP_POLL_INTV (64)
 #define NTP_POLL_RAND ((STCURRENT.CURRENT >> 8) & 7) // employs scheduling uncertainty
 #define NTP_UTC_OFFSET (2208988800)
-#define NTP_STAT_RATE (0x1p-2f)
+#define NTP_STAT_RATE (0x1p-8f)
 
 struct PACKED HEADER_NTPv4 {
     uint16_t mode: 3;
