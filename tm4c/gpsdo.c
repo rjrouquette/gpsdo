@@ -261,6 +261,9 @@ void GPSDO_run() {
         return;
     }
 
+    // set update timestamp
+    timeTrimmed = CLK_TAI();
+
     // convert to nano seconds
     offset <<= 3;
     // update PPS offset
@@ -276,8 +279,6 @@ void GPSDO_run() {
     pllCorr = fltOffset * rate;
     setFeedback(currCompensation + pllCorr + pllBias);
     pllBias += fltOffset * 0x1p-8f;
-    // set update timestamp
-    timeTrimmed = CLK_TAI();
 
     // update PPS stats
     ppsOffsetMean += (fltOffset - ppsOffsetMean) * STAT_ALPHA;
@@ -298,8 +299,12 @@ void GPSDO_run() {
 
 int GPSDO_ntpUpdate(float offset, float skew) {
     if(ppsPresent) return 0;
+
+    // set update timestamp
+    timeTrimmed = CLK_TAI();
+
+    // hard adjustment
     if(fabsf(offset) > 50e-3f) {
-        // hard step
         int32_t _offset = (int32_t) roundf(offset * 0x1p31f);
         // check sign
         if(_offset < 0) {
@@ -317,17 +322,14 @@ int GPSDO_ntpUpdate(float offset, float skew) {
         EMAC0.TIMSTCTRL.TSUPDT = 1;
         // wait for hardware ready state
         while(EMAC0.TIMSTCTRL.TSUPDT);
-        // set update timestamp
-        timeTrimmed = CLK_TAI();
         return 1;
     }
+
     // soft adjustment
     pllCorr = offset * NTP_OFFSET_CORR;
     pllBias += offset * NTP_OFFSET_BIAS;
     // update feedback
     setFeedback(currCompensation + pllCorr + pllBias);
-    // set update timestamp
-    timeTrimmed = CLK_TAI();
     // update temperature compensation
     if(skew < NTP_MAX_SKEW && skew > 0)
         updateTempComp(NTP_RATE, currFeedback);
