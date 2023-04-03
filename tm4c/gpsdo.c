@@ -294,7 +294,7 @@ void GPSDO_run() {
 
 int GPSDO_ntpUpdate(float offset, float skew) {
     if(ppsPresent) return 0;
-    if(fabsf(offset) > 100e-3f) {
+    if(fabsf(offset) > 50e-3f) {
         // hard step
         int32_t _offset = (int32_t) roundf(offset * 0x1p31f);
         // check sign
