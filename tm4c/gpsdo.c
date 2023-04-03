@@ -322,7 +322,7 @@ int GPSDO_ntpUpdate(float offset, float skew) {
     // update feedback
     setFeedback(currCompensation + pllCorr + pllBias);
     // update temperature compensation
-    if(skew < NTP_MAX_SKEW)
+    if(skew < NTP_MAX_SKEW && skew > 0)
         updateTempComp(NTP_RATE, currFeedback);
     return 0;
 }
