@@ -442,7 +442,7 @@ static void processUbxPVT(const uint8_t *payload) {
     // seconds
     offset *= 60;
     offset += payload[10];
-    // realign as TAI (1970 epoch)
+    // realign as TAI (PTP 1970 epoch)
     offset -= 2208988800;
     offset += taiOffset;
 
