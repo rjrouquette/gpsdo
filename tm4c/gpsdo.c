@@ -313,9 +313,6 @@ int GPSDO_ntpUpdate(float offset, float skew) {
         EMAC0.TIMSTCTRL.TSUPDT = 1;
         return 1;
     }
-    // clamp offset error
-    if      (offset >  25e-3f) offset =  25e-3f;
-    else if (offset < -25e-3f) offset = -25e-3f;
     // soft adjustment
     pllCorr = offset * NTP_OFFSET_CORR;
     pllBias += offset * NTP_OFFSET_BIAS;
