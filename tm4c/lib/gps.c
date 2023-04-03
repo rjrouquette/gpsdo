@@ -391,7 +391,8 @@ static void processUbxGpsTime(const uint8_t *payload) {
     if((payload[11] & 3) != 3)
         return;
 
-    taiOffset = ((int8_t) payload[10]) - 19;
+    // set TAI offset (GPS offset + 19s)
+    taiOffset = ((signed char) payload[10]) + 19;
 }
 
 static const int lutDays365[16] = {
