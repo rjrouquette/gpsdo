@@ -24,7 +24,7 @@ static int endUBX;
 static int fixGood;
 static float locLat, locLon, locAlt;
 static int clkBias, clkDrift, accTime, accFreq;
-static int gpsOffset;
+static int taiOffset;
 
 static int hasNema, hasPvt, hasGpsTime, hasClock;
 
@@ -391,7 +391,7 @@ static void processUbxGpsTime(const uint8_t *payload) {
     if((payload[11] & 3) != 3)
         return;
 
-    gpsOffset = (char) payload[10];
+    taiOffset = ((int8_t) payload[10]) - 19;
 }
 
 static const int lutDays365[16] = {
@@ -442,9 +442,11 @@ static void processUbxPVT(const uint8_t *payload) {
     // seconds
     offset *= 60;
     offset += payload[10];
+    // realign as TAI (1970 epoch)
+    offset -= 2208988800;
+    offset += taiOffset;
 
     // compare with current counter value
-    offset += gpsOffset;
     offset -= EMAC0.TIMSEC;
     // set update registers
     EMAC0.TIMNANOU.raw = 0;
@@ -454,5 +456,5 @@ static void processUbxPVT(const uint8_t *payload) {
     // start update
     EMAC0.TIMSTCTRL.TSUPDT = 1;
     // set NTP offset
-    NTP_setEpochOffset(-gpsOffset);
+    NTP_setEpochOffset(-taiOffset);
 }

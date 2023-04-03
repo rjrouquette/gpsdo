@@ -25,15 +25,15 @@ uint32_t CLK_MONOTONIC_INT();
 uint64_t CLK_MONOTONIC();
 
 /**
- * Returns the current value of GPS clock (1s resolution)
+ * Returns the current value of TAI clock (1s resolution)
  * @return 32-bit count of 1s ticks
  */
-uint32_t CLK_GPS_INT();
+uint32_t CLK_TAI_INT();
 
 /**
- * Returns the current value of GPS clock (~0.232ns resolution)
+ * Returns the current value of TAI clock (~0.232ns resolution)
  * @return 64-bit fixed-point format (32.32)
  */
-uint64_t CLK_GPS();
+uint64_t CLK_TAI();
 
 #endif //GPSDO_CLK_H

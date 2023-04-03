@@ -120,11 +120,11 @@ uint64_t CLK_MONOTONIC() {
     return scratch.full;
 }
 
-uint32_t CLK_GPS_INT() {
+uint32_t CLK_TAI_INT() {
     return EMAC0.TIMSEC;
 }
 
-uint64_t CLK_GPS() {
+uint64_t CLK_TAI() {
     // result structure
     register union {
         struct {
@@ -134,7 +134,7 @@ uint64_t CLK_GPS() {
         uint64_t full;
     } a, b;
 
-    // get current GPS time
+    // load current TAI value
     a.ipart = EMAC0.TIMSEC;
     a.fpart = EMAC0.TIMNANO;
     b.ipart = EMAC0.TIMSEC;

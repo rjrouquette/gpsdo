@@ -302,7 +302,7 @@ unsigned statusNTP(char *body) {
     char *end = body;
 
     // TAI time
-    uint64_t tai = CLK_GPS();
+    uint64_t tai = CLK_TAI();
     strcpy(tmp, "0x");
     toHex(tai>>32, 8, '0', tmp+2);
     tmp[10] = '.';

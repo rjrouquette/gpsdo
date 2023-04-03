@@ -119,7 +119,7 @@ int writeNtpStatus(uint8_t *buffer) {
     );
 
     uint32_t ntpDate[4];
-    NTP_date(CLK_GPS(), ntpDate);
+    NTP_date(CLK_TAI(), ntpDate);
     dlen = writeValueBytes(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_NTP_DATE,
