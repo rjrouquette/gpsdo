@@ -24,7 +24,8 @@
 
 // temperature compensation state
 static float currTemp;
-static float tcompCoeff, tcompBias, tcompOffset;
+//static float tcompCoeff, tcompBias, tcompOffset;
+static float tcompCoeff, tcompOffset;
 
 static int32_t ppsGpsEdgePrev;
 static int32_t ppsGpsEdge;
@@ -360,7 +361,7 @@ float GPSDO_temperature() {
 }
 
 float GPSDO_compBias() {
-    return tcompBias;
+    return 0;//tcompBias;
 }
 
 float GPSDO_compOffset() {
