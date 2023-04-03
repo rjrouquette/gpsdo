@@ -208,7 +208,7 @@ void GPSDO_init() {
 void GPSDO_run() {
     // update temperature compensation
     float newComp = currTemp;
-    newComp -= tcompBias;
+//    newComp -= tcompBias;
     newComp *= tcompCoeff;
     newComp += tcompOffset;
     // prevent large correction impulses
@@ -393,21 +393,25 @@ static void setFeedback(float feedback) {
 }
 
 static void updateTempComp(float rate, float target) {
-    if(tcompBias == 0 && tcompOffset == 0) {
-        tcompBias = currTemp;
+//    if(tcompBias == 0 && tcompOffset == 0) {
+//        tcompBias = currTemp;
+//        tcompOffset = target;
+//        return;
+//    }
+    if(tcompOffset == 0) {
         tcompOffset = target;
         return;
     }
 
     rate *= TCOMP_ALPHA;
     const float temp = currTemp;
-    tcompBias += (temp - tcompBias) * rate;
+//    tcompBias += (temp - tcompBias) * rate;
     tcompOffset += (target - tcompOffset) * rate;
 
     float error = target;
     error -= tcompOffset;
-    error -= tcompCoeff * (temp - tcompBias);
+    error -= tcompCoeff * temp;//(temp - tcompBias);
     error *= rate;
-    error *= temp - tcompBias;
+    error *= temp;// - tcompBias;
     tcompCoeff += error;
 }
