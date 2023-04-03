@@ -249,9 +249,8 @@ void GPSDO_run() {
         // limit slew rate (100ms/s)
         if(offset > 12500000)
             offset = 12500000;
-        // set update registers
-        EMAC0.TIMNANOU.NEG = 0;
-        EMAC0.TIMNANOU.VALUE = ((uint32_t) timeFrom125Mhz(0, offset)) >> 1;
+        // set update registers (truncate offset to same resolution as sub-second timer)
+        EMAC0.TIMNANOU.raw = 86 * (offset / 5);
         EMAC0.TIMSECU = 0;
         // wait for hardware ready state
         while(EMAC0.TIMSTCTRL.TSUPDT);

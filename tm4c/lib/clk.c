@@ -140,24 +140,18 @@ uint64_t timeFrom125Mhz(uint32_t seconds, uint32_t fracTicks) {
         uint64_t full;
     } result;
 
-    // load TX timestamp
+    // initialize scratch
     result.fpart = fracTicks;
-    result.ipart = result.fpart;
+    result.ipart = 0;
 
-    // split fractional time into fraction and remainder
-    result.ipart /= 1953125;
-    result.fpart -= 1953125 * result.ipart;
+    // compute fractional adjustment
+    result.full *= 45443074;
+    result.fpart = result.ipart;
+    result.ipart = 0;
 
-    // compute twiddle for fractional conversion
-    register uint32_t twiddle = result.fpart;
-    twiddle *= 1524;
-    twiddle >>= 16;
-    // apply fractional coefficient
-    result.fpart *= 2199;
-    // apply fraction twiddle
-    result.fpart += twiddle;
-    // adjust bit alignment
-    result.full >>= 6;
+    // compute final result
+    result.full += fracTicks;
+    result.full *= 34;
 
     // add full seconds to result
     result.ipart += seconds;
