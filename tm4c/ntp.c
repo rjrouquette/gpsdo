@@ -686,7 +686,7 @@ static void respond0(struct HEADER_NTPv4 *headerNTP, uint64_t rxTime) {
     // set RX time
     headerNTP->rxTime = rxTime;
     // set reference time
-    headerNTP->refTime = CLK_TAI();
+    headerNTP->refTime = GPSDO_timeTrimmed();
     // no TX time
     headerNTP->txTime = 0;
 }
@@ -739,7 +739,7 @@ static void respond4(struct HEADER_NTPv4 *headerNTP, uint64_t rxTime) {
     // set origin timestamp
     headerNTP->origTime = headerNTP->txTime;
     // set reference timestamp
-    headerNTP->refTime = __builtin_bswap64(CLK_TAI() + ntpOffset);
+    headerNTP->refTime = __builtin_bswap64(GPSDO_timeTrimmed() + ntpOffset);
     // set RX time
     headerNTP->rxTime = __builtin_bswap64(rxTime + ntpOffset);
     // set TX time

@@ -10,6 +10,7 @@
 #include "hw/timer.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
+#include "lib/clk.h"
 
 
 #define OFFSET_COARSE_ALIGN (125000) // 1 millisecond
@@ -44,6 +45,7 @@ static float ppsSkewRms;
 static uint32_t ppsPresent;
 
 // current correction values
+static uint64_t timeTrimmed;
 static float currFeedback;
 static float currCompensation;
 
@@ -311,6 +313,10 @@ int GPSDO_ntpUpdate(float offset, float skew) {
         while(EMAC0.TIMSTCTRL.TSUPDT);
         // start update
         EMAC0.TIMSTCTRL.TSUPDT = 1;
+        // wait for hardware ready state
+        while(EMAC0.TIMSTCTRL.TSUPDT);
+        // set update timestamp
+        timeTrimmed = CLK_TAI();
         return 1;
     }
     // soft adjustment
@@ -377,6 +383,10 @@ float GPSDO_pllTrim() {
     return pllBias + pllCorr;
 }
 
+uint64_t GPSDO_timeTrimmed() {
+    return timeTrimmed;
+}
+
 static void setFeedback(float feedback) {
     // convert to correction factor
     int32_t correction = lroundf(feedback * 0x1p32f);
@@ -388,6 +398,8 @@ static void setFeedback(float feedback) {
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     // update current feedback value
     currFeedback = 0x1p-32f * (float) correction;
+    // set update timestamp
+    timeTrimmed = CLK_TAI();
 }
 
 static void updateTempComp(float rate, float target) {
