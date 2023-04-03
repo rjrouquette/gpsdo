@@ -89,9 +89,9 @@ static void resetServer(struct Server *server);
 static void updateMeanVar(float rate, float value, float *mean, float *var);
 
 static void processRequest(uint8_t *frame, int flen);
-static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP);
+static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP, uint64_t rxTime);
 static void followupRequest0(uint8_t *frame, int flen);
-static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP);
+static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP, uint64_t rxTime);
 
 static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress);
 static void callbackDNS(uint32_t addr);
@@ -635,6 +635,8 @@ void processRequest(uint8_t *frame, int flen) {
     // indicate time-server activity
     LED_act0();
 
+    // retrieve rx time
+    uint64_t rxTime = NET_getRxTime(frame);
     // get TX descriptor
     int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
@@ -652,11 +654,11 @@ void processRequest(uint8_t *frame, int flen) {
 
     // process message
     if(headerNTP->version == 0) {
-        processRequest0(frame, headerNTP);
+        processRequest0(frame, headerNTP, rxTime);
         NET_setTxCallback(txDesc, followupRequest0);
     }
     else {
-        processRequest4(frame, headerNTP);
+        processRequest4(frame, headerNTP, rxTime);
     }
 
     // finalize packet
@@ -666,10 +668,7 @@ void processRequest(uint8_t *frame, int flen) {
     NET_transmit(txDesc, flen);
 }
 
-static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP) {
-    // retrieve rx time
-    uint64_t rxTime = NET_getRxTime(frame);
-
+static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP, uint64_t rxTime) {
     // set type to server response
     headerNTP->mode = 4;
     headerNTP->status = leapIndicator;
@@ -725,10 +724,7 @@ static void followupRequest0(uint8_t *frame, int flen) {
     NET_transmit(txDesc, flen);
 }
 
-static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP) {
-    // retrieve rx time
-    uint64_t rxTime = NET_getRxTime(frame) + ntpOffset;
-
+static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP, uint64_t rxTime) {
     // set type to server response
     headerNTP->mode = 4;
     headerNTP->status = leapIndicator;
@@ -744,14 +740,11 @@ static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     // set origin timestamp
     headerNTP->origTime = headerNTP->txTime;
     // set reference timestamp
-    uint64_t refTime = CLK_TAI() + ntpOffset;
-    ((uint32_t *) &refTime)[0] = 0;
-    headerNTP->refTime = __builtin_bswap64(refTime);
+    headerNTP->refTime = __builtin_bswap64(CLK_TAI() + ntpOffset);
     // set RX time
-    headerNTP->rxTime = __builtin_bswap64(rxTime);
+    headerNTP->rxTime = __builtin_bswap64(rxTime + ntpOffset);
     // set TX time
-    uint64_t txTime = CLK_TAI() + ntpOffset;
-    headerNTP->txTime = __builtin_bswap64(txTime);
+    headerNTP->txTime = __builtin_bswap64(CLK_TAI() + ntpOffset);
 }
 
 static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress) {
