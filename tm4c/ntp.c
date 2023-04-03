@@ -89,9 +89,9 @@ static void resetServer(struct Server *server);
 static void updateMeanVar(float rate, float value, float *mean, float *var);
 
 static void processRequest(uint8_t *frame, int flen);
-static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP, uint64_t rxTime);
+static void processRequest0(struct HEADER_NTPv4 *headerNTP, uint64_t rxTime);
 static void followupRequest0(uint8_t *frame, int flen);
-static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP, uint64_t rxTime);
+static void processRequest4(struct HEADER_NTPv4 *headerNTP, uint64_t rxTime);
 
 static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress);
 static void callbackDNS(uint32_t addr);
@@ -654,11 +654,11 @@ void processRequest(uint8_t *frame, int flen) {
 
     // process message
     if(headerNTP->version == 0) {
-        processRequest0(frame, headerNTP, rxTime);
+        processRequest0(headerNTP, rxTime);
         NET_setTxCallback(txDesc, followupRequest0);
     }
     else {
-        processRequest4(frame, headerNTP, rxTime);
+        processRequest4(headerNTP, rxTime);
     }
 
     // finalize packet
@@ -668,7 +668,7 @@ void processRequest(uint8_t *frame, int flen) {
     NET_transmit(txDesc, flen);
 }
 
-static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP, uint64_t rxTime) {
+static void processRequest0(struct HEADER_NTPv4 *headerNTP, uint64_t rxTime) {
     // set type to server response
     headerNTP->mode = 4;
     headerNTP->status = leapIndicator;
@@ -686,7 +686,6 @@ static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     // set RX time
     headerNTP->rxTime = rxTime;
     // set reference time
-    uint64_t refTime = CLK_TAI();
     headerNTP->refTime = CLK_TAI();
     // no TX time
     headerNTP->txTime = 0;
@@ -724,7 +723,7 @@ static void followupRequest0(uint8_t *frame, int flen) {
     NET_transmit(txDesc, flen);
 }
 
-static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP, uint64_t rxTime) {
+static void processRequest4(struct HEADER_NTPv4 *headerNTP, uint64_t rxTime) {
     // set type to server response
     headerNTP->mode = 4;
     headerNTP->status = leapIndicator;
