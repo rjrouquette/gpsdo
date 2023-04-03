@@ -44,11 +44,11 @@ struct PACKED HEADER_NTPv4 {
     int8_t precision;
     uint32_t rootDelay;
     uint32_t rootDispersion;
-    uint8_t refID[4];
-    uint32_t refTime[2];
-    uint32_t origTime[2];
-    uint32_t rxTime[2];
-    uint32_t txTime[2];
+    uint32_t refID;
+    uint64_t refTime;
+    uint64_t origTime;
+    uint64_t rxTime;
+    uint64_t txTime;
 };
 _Static_assert(sizeof(struct HEADER_NTPv4) == 48, "HEADER_NTPv4 must be 48 bytes");
 
@@ -399,7 +399,7 @@ static void runTracking() {
             server->leapIndicator == NTP_LI_ALARM ||
             server->stratum == 0 ||
             server->stratum > NTP_MAX_STRATUM
-            ) {
+    ) {
         // unset reach bit if server stratum is too poor
         server->reach &= 0xFFFE;
         server->weight = 0;
@@ -677,24 +677,20 @@ static void processRequest0(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     headerNTP->stratum = clockStratum;
     headerNTP->precision = NTP_PRECISION;
     // set reference ID
-    memcpy(headerNTP->refID, &refId, 4);
+    headerNTP->refID = refId;
     // set root delay
     headerNTP->rootDelay = rootDelay;
     // set root dispersion
     headerNTP->rootDispersion = rootDispersion;
     // set origin timestamp
-    headerNTP->origTime[0] = headerNTP->txTime[0];
-    headerNTP->origTime[1] = headerNTP->txTime[1];
+    headerNTP->origTime = headerNTP->txTime;
     // set RX time
-    headerNTP->rxTime[0] = ((uint32_t *) &rxTime)[0];
-    headerNTP->rxTime[1] = ((uint32_t *) &rxTime)[1];
+    headerNTP->rxTime = rxTime;
     // set reference time
     uint64_t refTime = CLK_TAI();
-    headerNTP->refTime[0] = ((uint32_t *) &refTime)[0];
-    headerNTP->refTime[1] = ((uint32_t *) &refTime)[1];
+    headerNTP->refTime = CLK_TAI();
     // no TX time
-    headerNTP->txTime[0] = 0;
-    headerNTP->txTime[1] = 0;
+    headerNTP->txTime = 0;
 }
 
 static void followupRequest0(uint8_t *frame, int flen) {
@@ -712,9 +708,7 @@ static void followupRequest0(uint8_t *frame, int flen) {
     if(headerNTP->version != 0) return;
 
     // append hardware transmit time
-    uint64_t txTime = NET_getTxTime(frame);
-    headerNTP->txTime[0] = ((uint32_t *) &txTime)[0];
-    headerNTP->txTime[1] = ((uint32_t *) &txTime)[1];
+    headerNTP->txTime = NET_getTxTime(frame);
 
     // send packet
     UDP_finalize(frame, flen);
@@ -742,25 +736,22 @@ static void processRequest4(const uint8_t *frame, struct HEADER_NTPv4 *headerNTP
     headerNTP->stratum = clockStratum;
     headerNTP->precision = NTP_PRECISION;
     // set reference ID
-    memcpy(headerNTP->refID, &refId, 4);
+    headerNTP->refID = refId;
     // set root delay
     headerNTP->rootDelay = __builtin_bswap32(rootDelay);
     // set root dispersion
     headerNTP->rootDispersion = __builtin_bswap32(rootDispersion);
     // set origin timestamp
-    headerNTP->origTime[0] = headerNTP->txTime[0];
-    headerNTP->origTime[1] = headerNTP->txTime[1];
+    headerNTP->origTime = headerNTP->txTime;
     // set reference timestamp
     uint64_t refTime = CLK_TAI() + ntpOffset;
-    headerNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
-    headerNTP->refTime[1] = 0;
+    ((uint32_t *) &refTime)[0] = 0;
+    headerNTP->refTime = __builtin_bswap64(refTime);
     // set RX time
-    headerNTP->rxTime[0] = __builtin_bswap32(((uint32_t *) &rxTime)[1]);
-    headerNTP->rxTime[1] = __builtin_bswap32(((uint32_t *) &rxTime)[0]);
+    headerNTP->rxTime = __builtin_bswap64(rxTime);
     // set TX time
     uint64_t txTime = CLK_TAI() + ntpOffset;
-    headerNTP->txTime[0] = __builtin_bswap32(((uint32_t *) &txTime)[1]);
-    headerNTP->txTime[1] = __builtin_bswap32(((uint32_t *) &txTime)[0]);
+    headerNTP->txTime = __builtin_bswap64(txTime);
 }
 
 static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress) {
@@ -819,9 +810,7 @@ static void processResponse(uint8_t *frame) {
     uint64_t *stamps = server->stamps + (server->burst << 2);
 
     // verify client TX timestamp
-    uint64_t txTime;
-    ((uint32_t *)&txTime)[1] = __builtin_bswap32(headerNTP->origTime[0]);
-    ((uint32_t *)&txTime)[0] = __builtin_bswap32(headerNTP->origTime[1]);
+    uint64_t txTime = __builtin_bswap64(headerNTP->origTime);
     // discard ping responses
     if(txTime == 0) return;
     // discard stale or duplicate packets
@@ -830,11 +819,9 @@ static void processResponse(uint8_t *frame) {
     stamps[0] = stamps[1];
 
     // copy server TX timestamp
-    ((uint32_t *)(stamps + 1))[1] = __builtin_bswap32(headerNTP->rxTime[0]);
-    ((uint32_t *)(stamps + 1))[0] = __builtin_bswap32(headerNTP->rxTime[1]);
+    stamps[1] = __builtin_bswap64(headerNTP->rxTime);
     // copy server TX timestamp
-    ((uint32_t *)(stamps + 2))[1] = __builtin_bswap32(headerNTP->txTime[0]);
-    ((uint32_t *)(stamps + 2))[0] = __builtin_bswap32(headerNTP->txTime[1]);
+    stamps[2] = __builtin_bswap64(headerNTP->txTime);
     // record client RX timestamp
     stamps[3] = NET_getRxTime(frame);
 
@@ -879,9 +866,7 @@ static void pollTxCallback(uint8_t *frame, int flen) {
     if(server == NULL) return;
 
     // locate timestamp record
-    uint64_t txTime;
-    ((uint32_t *)&txTime)[1] = __builtin_bswap32(headerNTP->origTime[0]);
-    ((uint32_t *)&txTime)[0] = __builtin_bswap32(headerNTP->origTime[1]);
+    uint64_t txTime = __builtin_bswap32(headerNTP->origTime);
     for(int i = 0; i < NTP_BURST; i++) {
         uint64_t *set = server->stamps + (i << 2);
         if(set[0] == txTime) {
@@ -929,18 +914,16 @@ static void pollServer(struct Server *server, int pingOnly) {
     headerNTP->stratum = clockStratum;
     headerNTP->precision = NTP_PRECISION;
     // set reference ID
-    memcpy(headerNTP->refID, &refId, 4);
+    headerNTP->refID = refId;
     // set reference timestamp
     uint64_t refTime = CLK_TAI() + ntpOffset;
-    headerNTP->refTime[0] = __builtin_bswap32(((uint32_t *) &refTime)[1]);
-    headerNTP->refTime[1] = 0;
+    headerNTP->refTime = __builtin_bswap64(refTime);
     // set TX time
     if(pingOnly == 0) {
         uint64_t *stamps = server->stamps + (server->burst << 2);
         stamps[0] = CLK_TAI();
         stamps[1] = stamps[0];
-        headerNTP->txTime[0] = __builtin_bswap32(((uint32_t *) stamps)[1]);
-        headerNTP->txTime[1] = __builtin_bswap32(((uint32_t *) stamps)[0]);
+        headerNTP->txTime = __builtin_bswap64(stamps[0]);
         NET_setTxCallback(txDesc, pollTxCallback);
     }
 
