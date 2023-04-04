@@ -63,7 +63,7 @@ static int32_t rootDispersion;
 static uint32_t refId;
 static int leapIndicator;
 
-#define SERVER_COUNT (16)
+#define SERVER_COUNT (8)
 struct Server {
     float meanDelay, varDelay;
     float meanDrift, varDrift;
