@@ -13,7 +13,9 @@
 #include "lib/clk.h"
 
 
-#define OFFSET_COARSE_ALIGN (62500) // 500 us
+#define CLK_FREQ (125000000) // 125 MHz
+#define PPS_GRACE_PERIOD (125000) // 1 ms
+#define PPS_COARSE_ALIGN (62500) // 500 us
 #define STAT_ALPHA (0x1p-4f)
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_COMP_RMS (200e-9f)
@@ -224,13 +226,13 @@ void GPSDO_run() {
 
     // wait for window to expire
     const int32_t now = ((int32_t) GPTM4.TAV.raw);
-    if((now - ppsOutEdge) < OFFSET_COARSE_ALIGN)
+    if((now - ppsOutEdge) < PPS_GRACE_PERIOD)
         return;
     // sanity check pps output interval
     int32_t ppsOutDelta = ppsOutEdge - ppsOutEdgePrev;
     ppsOutEdgePrev = ppsOutEdge;
-    if(ppsOutDelta < 110000000) return;
-    if(ppsOutDelta > 140000000) return;
+    if(ppsOutDelta < CLK_FREQ - PPS_COARSE_ALIGN) return;
+    if(ppsOutDelta > CLK_FREQ + PPS_COARSE_ALIGN) return;
 
     // return if GPS PPS not present or is more than 1 second stale
     ppsPresent <<= 1;
@@ -243,17 +245,18 @@ void GPSDO_run() {
     int32_t offset = ppsOutEdge - ppsGpsEdge;
     // perform coarse realignment if offset is too large
     if(
-            offset < -OFFSET_COARSE_ALIGN ||
-            offset >  OFFSET_COARSE_ALIGN
+            offset >  PPS_COARSE_ALIGN ||
+            offset < -PPS_COARSE_ALIGN
     ) {
         // clamp offset to +/- 0.5 seconds
         if(offset >  62500000) offset -= 125000000;
-        if(offset < -62500000) offset += 125000000;
+        // record current offset
         ppsOffsetNano = offset << 3;
+        // extract sign
         uint32_t sign = 0;
         if(offset < 0) {
-            sign = 1 << 31;
             offset = -offset;
+            sign = 1 << 31;
         }
         // set update registers (truncate offset to same resolution as sub-second timer)
         EMAC0.TIMNANOU.raw = (86 * (offset / 5)) | sign;
