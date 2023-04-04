@@ -2,6 +2,7 @@
 // Created by robert on 4/15/22.
 //
 
+#include <math.h>
 #include "../hw/sys.h"
 #include "../hw/timer.h"
 #include "clk.h"
@@ -144,4 +145,51 @@ uint64_t CLK_TAI() {
 
     b.fpart <<= 1;
     return b.full;
+}
+
+void CLK_TAI_align(int32_t fraction) {
+    // wait for hardware ready state
+    while(EMAC0.TIMSTCTRL.TSUPDT);
+    // set fractional register (convert from two's complement form)
+    if(fraction < 0)
+        EMAC0.TIMNANOU.raw = (1 << 31) -fraction;
+    else
+        EMAC0.TIMNANOU.raw = fraction;
+    // clear seconds register
+    EMAC0.TIMSECU = 0;
+    // start update
+    EMAC0.TIMSTCTRL.TSUPDT = 1;
+    // wait for update to complete
+    while(EMAC0.TIMSTCTRL.TSUPDT);
+}
+
+void CLK_TAI_set(uint32_t seconds) {
+    // wait for hardware ready state
+    while(EMAC0.TIMSTCTRL.TSUPDT);
+    // compare with current counter value
+    int32_t delta = (int32_t) (seconds - EMAC0.TIMSEC);
+    // set update registers
+    if(delta < 0) {
+        EMAC0.TIMNANOU.raw = (1 << 31);
+        EMAC0.TIMSECU = seconds;
+    } else {
+        EMAC0.TIMNANOU.raw = 0;
+        EMAC0.TIMSECU = seconds;
+    }
+    // start update
+    EMAC0.TIMSTCTRL.TSUPDT = 1;
+    // wait for update to complete
+    while(EMAC0.TIMSTCTRL.TSUPDT);
+}
+
+float CLK_TAI_trim(float trim) {
+    // convert to correction factor
+    int32_t correction = lroundf(trim * 0x1p32f);
+    // correction factor must not exceed 1 part-per-thousand
+    if(correction < -(1 << 22)) correction = -(1 << 22);
+    if(correction >  (1 << 22)) correction =  (1 << 22);
+    // apply correction update
+    EMAC0.TIMADD = 0xFFB34C02 + correction;
+    EMAC0.TIMSTCTRL.ADDREGUP = 1;
+    return 0x1p-32f * (float) correction;
 }

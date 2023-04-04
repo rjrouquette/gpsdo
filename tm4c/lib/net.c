@@ -134,6 +134,28 @@ static void initPTP() {
     EMAC0.TIMSTCTRL.TSFCUPDT = 1;
     // start timer
     EMAC0.TIMSTCTRL.TSINIT = 1;
+
+    // configure PPS output pin
+    RCGCGPIO.EN_PORTG = 1;
+    delay_cycles_4();
+    // unlock GPIO config
+    PORTG.LOCK = GPIO_LOCK_KEY;
+    PORTG.CR = 0x01u;
+    // configure pins
+    PORTG.DIR = 0x01u;
+    PORTG.DR8R = 0x01u;
+    PORTG.PCTL.PMC0 = 0x5;
+    PORTG.AFSEL.ALT0 = 1;
+    PORTG.DEN = 0x01u;
+    // lock GPIO config
+    PORTG.CR = 0;
+    PORTG.LOCK = 0;
+
+    // use PPS free-running mode
+    EMAC0.PPSCTRL.TRGMODS0 = 3;
+    // start 1 Hz PPS output
+    EMAC0.PPSCTRL.PPSEN0 = 0;
+    EMAC0.PPSCTRL.PPSCTRL = 0;
 }
 
 static void initHwAddr() {

@@ -7,7 +7,6 @@
 #include "delay.h"
 #include "gps.h"
 #include "clk.h"
-#include "../hw/emac.h"
 #include "../ntp.h"
 
 #define GPS_RING_MASK (1023)
@@ -447,15 +446,8 @@ static void processUbxPVT(const uint8_t *payload) {
     offset -= 2208988800;
     offset += taiOffset;
 
-    // compare with current counter value
-    offset -= EMAC0.TIMSEC;
-    // set update registers
-    EMAC0.TIMNANOU.raw = 0;
-    EMAC0.TIMSECU = offset;
-    // wait for hardware ready state
-    while(EMAC0.TIMSTCTRL.TSUPDT);
-    // start update
-    EMAC0.TIMSTCTRL.TSUPDT = 1;
+    // set TAI clock
+    CLK_TAI_set(offset);
     // set NTP offset
     NTP_setEpochOffset(-taiOffset);
 }

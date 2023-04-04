@@ -5,7 +5,6 @@
 #include <math.h>
 #include "gpsdo.h"
 #include "hw/adc.h"
-#include "hw/emac.h"
 #include "hw/gpio.h"
 #include "hw/timer.h"
 #include "lib/delay.h"
@@ -112,30 +111,6 @@ void initTempComp() {
     ADC0.PSSI.SS3 = 1;
 }
 
-void initPPS() {
-    // configure PPS output pin
-    RCGCGPIO.EN_PORTG = 1;
-    delay_cycles_4();
-    // unlock GPIO config
-    PORTG.LOCK = GPIO_LOCK_KEY;
-    PORTG.CR = 0x01u;
-    // configure pins
-    PORTG.DIR = 0x01u;
-    PORTG.DR8R = 0x01u;
-    PORTG.PCTL.PMC0 = 0x5;
-    PORTG.AFSEL.ALT0 = 1;
-    PORTG.DEN = 0x01u;
-    // lock GPIO config
-    PORTG.CR = 0;
-    PORTG.LOCK = 0;
-
-    // use PPS free-running mode
-    EMAC0.PPSCTRL.TRGMODS0 = 3;
-    // start 1 Hz PPS output
-    EMAC0.PPSCTRL.PPSEN0 = 0;
-    EMAC0.PPSCTRL.PPSCTRL = 0;
-}
-
 void initEdgeComp() {
     // Enable Timer 4
     RCGCTIMER.EN_GPTM4 = 1;
@@ -201,7 +176,6 @@ void initEdgeComp() {
 }
 
 void GPSDO_init() {
-    initPPS();
     initEdgeComp();
     initTempComp();
 
@@ -252,19 +226,8 @@ void GPSDO_run() {
         if(offset >  62500000) offset -= 125000000;
         // record current offset
         ppsOffsetNano = offset << 3;
-        // extract sign
-        uint32_t sign = 0;
-        if(offset < 0) {
-            offset = -offset;
-            sign = 1 << 31;
-        }
-        // set update registers (truncate offset to same resolution as sub-second timer)
-        EMAC0.TIMNANOU.raw = (86 * (offset / 5)) | sign;
-        EMAC0.TIMSECU = 0;
-        // wait for hardware ready state
-        while(EMAC0.TIMSTCTRL.TSUPDT);
-        // start update
-        EMAC0.TIMSTCTRL.TSUPDT = 1;
+        // trim TAI alignment
+        CLK_TAI_align(86 * (offset / 5));
         return;
     }
 
@@ -313,22 +276,8 @@ int GPSDO_ntpUpdate(float offset, float skew) {
     // hard adjustment
     if(fabsf(offset) > 50e-3f) {
         int32_t _offset = (int32_t) roundf(offset * 0x1p31f);
-        // check sign
-        if(_offset < 0) {
-            EMAC0.TIMNANOU.NEG = 1;
-            EMAC0.TIMNANOU.VALUE = -_offset;
-        } else {
-            EMAC0.TIMNANOU.NEG = 0;
-            EMAC0.TIMNANOU.VALUE = _offset;
-        }
-        // set update registers
-        EMAC0.TIMSECU = 0;
-        // wait for hardware ready state
-        while(EMAC0.TIMSTCTRL.TSUPDT);
-        // start update
-        EMAC0.TIMSTCTRL.TSUPDT = 1;
-        // wait for hardware ready state
-        while(EMAC0.TIMSTCTRL.TSUPDT);
+        // trim TAI alignment (truncate precision)
+        CLK_TAI_align((_offset / 86) * 86);
         return 1;
     }
 
@@ -401,16 +350,8 @@ uint64_t GPSDO_timeTrimmed() {
 }
 
 static void setFeedback(float feedback) {
-    // convert to correction factor
-    int32_t correction = lroundf(feedback * 0x1p32f);
-    // correction factor must not exceed 1 part-per-thousand
-    if(correction < -(1 << 22)) correction = -(1 << 22);
-    if(correction >  (1 << 22)) correction =  (1 << 22);
-    // apply correction update
-    EMAC0.TIMADD = 0xFFB34C02 + correction;
-    EMAC0.TIMSTCTRL.ADDREGUP = 1;
     // update current feedback value
-    currFeedback = 0x1p-32f * (float) correction;
+    currFeedback = CLK_TAI_trim(feedback);
 }
 
 static void updateTempComp(float rate, float target) {
