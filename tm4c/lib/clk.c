@@ -105,12 +105,12 @@ uint64_t CLK_MONOTONIC() {
     scratch.fpart = snapF;
     scratch.ipart = 0;
 
-    // compute fractional adjustment
+    // apply fractional adjustment
     scratch.full *= 45443074;
     scratch.fpart = scratch.ipart;
     scratch.ipart = 0;
 
-    // compute final result
+    // apply final scaling
     scratch.full += snapF;
     scratch.full *= 34;
 
