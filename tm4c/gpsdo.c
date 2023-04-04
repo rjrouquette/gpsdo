@@ -214,6 +214,8 @@ void GPSDO_run() {
     if(ppsGpsEdge == ppsGpsEdgePrev) return;
     // ignore if PPS event is stale
     if(now - ppsGpsEdge > CLK_FREQ + PPS_GRACE_PERIOD) return;
+    // ignore if GPS has no fix
+    if(!GPS_hasFix()) return;
     // mark PPS as present
     ppsPresent |= 1;
 
