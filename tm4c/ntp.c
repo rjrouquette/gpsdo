@@ -34,6 +34,8 @@
 #define NTP_POLL_RAND ((STCURRENT.CURRENT >> 8) & 7) // employs scheduling uncertainty
 #define NTP_UTC_OFFSET (2208988800)
 #define NTP_STAT_RATE (0x1p-3f)
+#define NTP_ACTIVE_THRESH (0.005f)
+#define NTP_ACTIVE_TIMEOUT (1024)
 
 struct PACKED HEADER_NTPv4 {
     uint16_t mode: 3;
@@ -74,6 +76,7 @@ struct Server {
     int32_t rootDelay;
     int32_t rootDispersion;
     int pollSlot;
+    uint32_t lastActive;
     uint32_t attempts;
     uint32_t addr;
     uint16_t reach;
@@ -395,10 +398,12 @@ static void runTracking() {
     if(server->addr == 0) return;
 
     // check for failure states
+    int32_t stale = (int32_t) (CLK_MONOTONIC_INT() - server->lastActive);
     if(
             server->leapIndicator == NTP_LI_ALARM ||
             server->stratum == 0 ||
-            server->stratum > NTP_MAX_STRATUM
+            server->stratum > NTP_MAX_STRATUM ||
+            stale > NTP_ACTIVE_TIMEOUT
     ) {
         // unset reach bit if server stratum is too poor
         server->reach &= 0xFFFE;
@@ -476,6 +481,9 @@ static void runAggregate() {
             // tally leap indicator votes
             if(weight > 0.05f)
                 ++li[servers[i].leapIndicator];
+            // mark active servers
+            if(weight >= NTP_ACTIVE_THRESH)
+                servers[i].lastActive = CLK_MONOTONIC_INT();
         }
     }
     clockSkew = sqrtf(clockSkew);
@@ -775,6 +783,7 @@ static void callbackDNS(uint32_t addr) {
     for (int i = 0; i < SERVER_COUNT; i++) {
         if (servers[i].addr == 0) {
             servers[i].addr = addr;
+            servers[i].lastActive = CLK_MONOTONIC_INT();
             break;
         }
     }
