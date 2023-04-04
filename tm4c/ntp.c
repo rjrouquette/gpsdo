@@ -481,7 +481,7 @@ static void runAggregate() {
     clockSkew = sqrtf(clockSkew);
 
     // update clock stratum
-    if(GPSDO_isLocked()) {
+    if(GPSDO_ppsPresent()) {
         clockStratum = 1;
         rootDelay = 0;
         rootDispersion = 0;
@@ -528,7 +528,7 @@ static void runAggregate() {
     twiddle *= (1<<24) - divisor;
     offset += twiddle;
 
-    if(!GPSDO_isLocked()) {
+    if(!GPSDO_ppsPresent()) {
         if (offset != 0) {
             // compute offset adjustment
             int64_t diff = offset - (int64_t) ntpOffset;

@@ -80,7 +80,7 @@ int writeNtpStatus(uint8_t *buffer) {
     dlen = writeValueInt8(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_STRATUM,
-            isLocked ? 1 : 16
+            NTP_clockStratum()
     );
     dlen = writeValueInt8(
             buffer, dlen,
@@ -119,7 +119,7 @@ int writeNtpStatus(uint8_t *buffer) {
     );
 
     uint32_t ntpDate[4];
-    NTP_date(CLK_TAI(), ntpDate);
+    NTP_date(CLK_TAI() + NTP_offset(), ntpDate);
     dlen = writeValueBytes(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_NTP_DATE,

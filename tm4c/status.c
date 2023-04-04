@@ -308,7 +308,7 @@ unsigned statusNTP(char *body) {
     tmp[10] = '.';
     toHex(tai, 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "gps epoch:   ");
+    end = append(end, "tai epoch:   ");
     end = append(end, tmp);
     end = append(end, "\n");
 
