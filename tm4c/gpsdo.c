@@ -208,11 +208,13 @@ void GPSDO_run() {
     if(ppsOutDelta < CLK_FREQ - PPS_COARSE_ALIGN) return;
     if(ppsOutDelta > CLK_FREQ + PPS_COARSE_ALIGN) return;
 
-    // return if GPS PPS not present or is more than 1 second stale
+    // advance PPS tracker
     ppsPresent <<= 1;
-    if(ppsGpsEdge == ppsGpsEdgePrev || now - ppsGpsEdge > 150000000) {
-        return;
-    }
+    // verify PPS event occurred
+    if(ppsGpsEdge == ppsGpsEdgePrev) return;
+    // ignore if PPS event is stale
+    if(now - ppsGpsEdge > CLK_FREQ + PPS_GRACE_PERIOD) return;
+    // mark PPS as present
     ppsPresent |= 1;
 
     // compute offset
