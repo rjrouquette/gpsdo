@@ -166,15 +166,16 @@ void CLK_TAI_align(int32_t fraction) {
 void CLK_TAI_set(uint32_t seconds) {
     // wait for hardware ready state
     while(EMAC0.TIMSTCTRL.TSUPDT);
-    // compare with current counter value
-    int32_t delta = (int32_t) (seconds - EMAC0.TIMSEC);
+    uint32_t now = EMAC0.TIMSEC;
+    // skip if clock is already set
+    if(now == seconds) return;
     // set update registers
-    if(delta < 0) {
+    if(seconds < now) {
         EMAC0.TIMNANOU.raw = (1 << 31);
-        EMAC0.TIMSECU = seconds;
+        EMAC0.TIMSECU = now - seconds;
     } else {
         EMAC0.TIMNANOU.raw = 0;
-        EMAC0.TIMSECU = seconds;
+        EMAC0.TIMSECU = seconds - now;
     }
     // start update
     EMAC0.TIMSTCTRL.TSUPDT = 1;
