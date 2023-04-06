@@ -199,7 +199,7 @@ void GPSDO_run() {
     GPS_run();
 
     // wait for window to expire
-    const int32_t now = ((int32_t) GPTM4.TAV.raw);
+    const int32_t now = (int32_t) GPTM4.TAV.raw;
     if((now - ppsOutEdge) < PPS_GRACE_PERIOD)
         return;
     // sanity check pps output interval
