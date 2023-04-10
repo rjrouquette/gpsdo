@@ -35,7 +35,7 @@
 #define NTP_UTC_OFFSET (2208988800)
 #define NTP_STAT_RATE (0x1p-3f)
 #define NTP_ACTIVE_THRESH (0.005f)
-#define NTP_ACTIVE_TIMEOUT (1024)
+#define NTP_ACTIVE_TIMEOUT (2048)
 
 struct PACKED HEADER_NTPv4 {
     uint16_t mode: 3;
