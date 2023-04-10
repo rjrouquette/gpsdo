@@ -21,8 +21,8 @@
 #define TCOMP_ALPHA (0x1p-14f)
 #define NTP_MAX_SKEW (5e-6f)
 #define NTP_RATE (0x1p6f)
-#define NTP_OFFSET_CORR (0x1p-10f)
-#define NTP_OFFSET_BIAS (0x1p-14f)
+#define NTP_OFFSET_CORR (0x1p-11f)
+#define NTP_OFFSET_BIAS (0x1p-15f)
 
 // temperature compensation state
 static float currTemp;
@@ -50,7 +50,10 @@ static uint64_t timeTrimmed;
 static float currFeedback;
 static float currCompensation;
 
-static void setFeedback(float feedback);
+static inline void setFeedback(float feedback) {
+    currFeedback = CLK_TAI_trim(feedback);
+}
+
 static void updateTempComp(float rate, float target);
 
 // ISR for temperature measurement
@@ -351,11 +354,6 @@ float GPSDO_pllTrim() {
 
 uint64_t GPSDO_timeTrimmed() {
     return timeTrimmed;
-}
-
-static void setFeedback(float feedback) {
-    // update current feedback value
-    currFeedback = CLK_TAI_trim(feedback);
 }
 
 static void updateTempComp(float rate, float target) {
