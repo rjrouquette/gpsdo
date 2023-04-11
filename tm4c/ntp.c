@@ -66,7 +66,7 @@ static uint32_t refId;
 static int leapIndicator;
 
 #define SERVER_COUNT (8)
-struct Server {
+static struct Server {
     float meanDelay, varDelay;
     float meanDrift, varDrift;
     float weight, currentOffset;
@@ -469,9 +469,7 @@ static void runAggregate() {
     }
 
     refId = 0;
-    clockDrift = 0;
-    clockOffset = 0;
-    clockSkew = 0;
+    float _clockOffset = 0;
     float _stratum = 0;
     float _delay = 0;
     float _dispersion = 0;
@@ -482,9 +480,7 @@ static void runAggregate() {
         for(int i = 0; i < SERVER_COUNT; i++) {
             servers[i].weight *= norm;
             const float weight = servers[i].weight;
-            clockSkew += weight * servers[i].varDrift;
-            clockDrift += weight * servers[i].meanDrift;
-            clockOffset += weight * servers[i].currentOffset;
+            _clockOffset += weight * servers[i].currentOffset;
             _stratum += weight * (float) servers[i].stratum;
             _delay += weight * (servers[i].meanDelay + (0x1p-16f * (float) servers[i].rootDelay));
             const float z = 0x1p-16f * (float) servers[i].rootDispersion;
@@ -502,7 +498,6 @@ static void runAggregate() {
                 servers[i].lastActive = CLK_MONOTONIC_INT();
         }
     }
-    clockSkew = sqrtf(clockSkew);
 
     // update clock stratum
     if(GPSDO_ppsPresent()) {
@@ -534,6 +529,19 @@ static void runAggregate() {
             leapIndicator = i;
         }
     }
+
+    // update clock stats
+    if(clockOffset != 0) {
+        float _drift = (_clockOffset - clockOffset) / NTP_POLL_INTV;
+        float _skew = _drift - clockDrift;
+        // update skew
+        float _clockSkew = clockSkew * clockSkew;
+        _clockSkew += ((_skew * _skew) - _clockSkew) * NTP_STAT_RATE;
+        clockSkew = sqrtf(_clockSkew);
+        // update drift
+        clockDrift += (_drift - clockDrift) * NTP_STAT_RATE;
+    }
+    clockOffset = _clockOffset;
 
     // compute mean offset
     int64_t offset = 0;
@@ -572,6 +580,10 @@ static void runAggregate() {
             // reset server stats if clock was hard stepped
             for (int i = 0; i < SERVER_COUNT; i++)
                 resetServer(servers + i);
+            // reset clock stats
+            clockDrift = 0;
+            clockOffset = 0;
+            clockSkew = 0;
         }
     }
 }
