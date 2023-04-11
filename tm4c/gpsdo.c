@@ -21,8 +21,8 @@
 #define TCOMP_ALPHA (0x1p-14f)
 #define NTP_MAX_SKEW (5e-6f)
 #define NTP_RATE (0x1p6f)
-#define NTP_OFFSET_CORR (0x1p-11f)
-#define NTP_OFFSET_BIAS (0x1p-15f)
+#define NTP_OFFSET_CORR (0x1p-10f)
+#define NTP_OFFSET_BIAS (0x1p-16f)
 
 // temperature compensation state
 static float currTemp;

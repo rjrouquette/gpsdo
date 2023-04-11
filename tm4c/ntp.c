@@ -412,12 +412,28 @@ static void runTracking() {
     }
 
     float weight = 0;
-    if((server->reach & 1) && server->varDelay > 0) {
-        weight = 1.0f / sqrtf(server->varDelay * (float) server->stratum);
+    if(server->reach & 1) {
+        float maxError = server->meanDelay + (0x1p-16f * (float) server->rootDelay);
+        maxError += sqrtf(server->varDelay + (0x1p-16f * (float) server->rootDispersion));
+        weight = 1.0f / maxError;
     }
     if(!isfinite(weight))
         weight = 0;
     server->weight = weight;
+}
+
+static float toFloatU(uint64_t value) {
+    uint32_t *parts = (uint32_t *) &value;
+    float temp = 0x1p32f * (float) parts[1];
+    temp += (float) parts[0];
+    return temp;
+}
+
+static float toFloat(int64_t value) {
+    if(value < 0)
+        return -toFloatU((uint64_t) -value);
+    else
+        return toFloatU((uint64_t) value);
 }
 
 static void runAggregate() {
