@@ -9,7 +9,7 @@
 #include "udp.h"
 #include "util.h"
 
-#define MAX_ENTRIES (8)
+#define MAX_ENTRIES (16)
 static volatile uint16_t registryPort[MAX_ENTRIES];
 static volatile CallbackUDP registryCallback[MAX_ENTRIES];
 

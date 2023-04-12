@@ -20,7 +20,8 @@
 #include "lib/net/dns.h"
 
 #define NTP4_SIZE (UDP_DATA_OFFSET + 48)
-#define NTP_PORT (123)
+#define NTP_SRV_PORT (123)
+#define NTP_CLI_PORT (12345)
 #define NTP_BURST (4)
 #define NTP_BURST_BITS (2)
 #define NTP_POOL_FQDN ("pool.ntp.org")
@@ -70,6 +71,7 @@ static struct Server {
     float meanDelay, varDelay;
     float meanDrift, varDrift;
     float weight, currentOffset;
+    uint64_t prevTxSrv, prevRx;
     uint64_t stamps[NTP_BURST << 2];
     uint64_t offset;
     uint64_t update;
@@ -86,19 +88,25 @@ static struct Server {
     uint8_t burst;
 } servers[SERVER_COUNT];
 
-static void processResponse(uint8_t *frame);
+// client records for interleaved mode
+#define CLIENT_COUNT (256)
+static struct Client {
+    uint32_t addr;
+    uint64_t rxTime;
+    uint64_t txTime;
+} clients[CLIENT_COUNT];
+
 static void pollServer(struct Server *server, int pingOnly);
 static void resetServer(struct Server *server);
 static void updateMeanVar(float rate, float value, float *mean, float *var);
 
 static void processRequest(uint8_t *frame, int flen);
-static void respond0(struct HEADER_NTPv4 *headerNTP, uint64_t rxTime);
-static void followup0(uint8_t *frame, int flen);
-static void respond4(struct HEADER_NTPv4 *headerNTP, uint64_t rxTime);
+static void processResponse(uint8_t *frame, int flen);
 
 static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress);
 static void callbackDNS(uint32_t addr);
 
+static uint16_t hashAddr16(uint32_t addr);
 
 // NTP tasks
 static void runPoll();
@@ -130,7 +138,8 @@ static struct NtpProcess {
 
 void NTP_init() {
     memset(servers, 0, sizeof(servers));
-    UDP_register(NTP_PORT, processRequest);
+    UDP_register(NTP_SRV_PORT, processRequest);
+    UDP_register(NTP_CLI_PORT, processResponse);
 
     // configure state machine schedule
     memset(taskSlot, 0, sizeof(taskSlot));
@@ -562,15 +571,14 @@ static void runAggregate() {
 
     if(!GPSDO_ppsPresent()) {
         if (offset != 0) {
-            // compute offset adjustment
-            int64_t diff = offset - (int64_t) ntpOffset;
-            // round to whole seconds
-            if (((int32_t *) &diff)[1] < 0 && ((uint32_t *) &diff)[0] <= (1 << 31))
-                ((int32_t *) &diff)[1] -= 1;
-            else if (((uint32_t *) &diff)[0] >= (1 << 31))
-                ((int32_t *) &diff)[1] += 1;
+            uint32_t *parts = (uint32_t *) &offset;
+            // correct truncation for negative values
+            if(
+                parts[1] & (1u << 31u) &&
+                parts[0] & (1u << 31u)
+            ) ++parts[1];
             // apply offset adjustment
-            ((uint32_t *) &ntpOffset)[1] += ((int32_t *) &diff)[1];
+            ((uint32_t *) &ntpOffset)[1] += parts[1];
         }
     }
 
@@ -651,6 +659,27 @@ static void runPing() {
     pollServer(server, 1);
 }
 
+static void requestTxCallback(uint8_t *frame, int flen) {
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+
+    // guard against buffer overruns
+    if(flen < NTP4_SIZE) return;
+    if(headerEth->ethType != ETHTYPE_IPv4) return;
+    if(headerIPv4->proto != IP_PROTO_UDP) return;
+    if(headerUDP->portSrc != __builtin_bswap16(NTP_SRV_PORT)) return;
+    if(headerNTP->mode != 4) return;
+
+    // record hardware transmit time
+    int cell = hashAddr16(headerIPv4->dst) & (CLIENT_COUNT - 1);
+    clients[cell].addr = headerIPv4->dst;
+    clients[cell].rxTime = headerNTP->rxTime;
+    clients[cell].txTime = __builtin_bswap64(NET_getTxTime(frame) + ntpOffset);
+}
+
 void processRequest(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < NTP4_SIZE) return;
@@ -663,38 +692,77 @@ void processRequest(uint8_t *frame, int flen) {
     // verify destination
     if(headerIPv4->dst != ipAddress) return;
     // filter non-client frames
-    if(headerNTP->mode != 3) {
-        if(headerNTP->mode == 4)
-            processResponse(frame);
-        return;
-    }
+    if(headerNTP->mode != 3) return;
     // indicate time-server activity
     LED_act0();
 
     // retrieve rx time
-    uint64_t rxTime = NET_getRxTime(frame);
+    const uint64_t rxTime = NET_getRxTime(frame) + ntpOffset;
+
     // get TX descriptor
     int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
+
+    // set callback for precise TX timestamp
+    NET_setTxCallback(txDesc, requestTxCallback);
+
     // duplicate packet for sending
     uint8_t *temp = NET_getTxBuff(txDesc);
     memcpy(temp, frame, flen);
     frame = temp;
+
     // return the response directly to the sender
-    UDP_returnToSender(frame, ipAddress, NTP_PORT);
+    UDP_returnToSender(frame, ipAddress, NTP_SRV_PORT);
+
     // remap headers
     headerEth = (struct FRAME_ETH *) frame;
     headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
-    // process message
-    if(headerNTP->version == 0) {
-        respond0(headerNTP, rxTime);
-        NET_setTxCallback(txDesc, followup0);
+    // set type to server response
+    headerNTP->mode = 4;
+    headerNTP->status = leapIndicator;
+    // set stratum and precision
+    headerNTP->stratum = clockStratum;
+    headerNTP->precision = NTP_PRECISION;
+    // set root delay
+    headerNTP->rootDelay = __builtin_bswap32(rootDelay);
+    // set root dispersion
+    headerNTP->rootDispersion = __builtin_bswap32(rootDispersion);
+    // set reference ID
+    headerNTP->refID = refId;
+    // set reference timestamp
+    headerNTP->refTime = __builtin_bswap64(GPSDO_timeTrimmed() + ntpOffset);
+
+    // check for interleaved mode
+    int xleave = -1;
+    if(headerNTP->rxTime != headerNTP->txTime) {
+        int cell = hashAddr16(headerIPv4->dst) & (CLIENT_COUNT - 1);
+        if(clients[cell].addr == headerIPv4->dst) {
+            if(clients[cell].rxTime == headerNTP->origTime) {
+                xleave = cell;
+            }
+        }
     }
+
+    // standard response
+    if(xleave < 0) {
+        // set origin timestamp
+        headerNTP->origTime = headerNTP->txTime;
+        // set RX timestamp
+        headerNTP->rxTime = __builtin_bswap64(rxTime);
+        // set TX timestamp
+        headerNTP->txTime = __builtin_bswap64(CLK_TAI() + ntpOffset);
+    }
+    // interleaved response
     else {
-        respond4(headerNTP, rxTime);
+        // set origin timestamp
+        headerNTP->origTime = headerNTP->rxTime;
+        // set RX timestamp
+        headerNTP->rxTime = __builtin_bswap64(rxTime);
+        // set TX timestamp
+        headerNTP->txTime = clients[xleave].txTime;
     }
 
     // finalize packet
@@ -702,84 +770,6 @@ void processRequest(uint8_t *frame, int flen) {
     IPv4_finalize(frame, flen);
     // transmit packet
     NET_transmit(txDesc, flen);
-}
-
-static void respond0(struct HEADER_NTPv4 *headerNTP, uint64_t rxTime) {
-    // set type to server response
-    headerNTP->mode = 4;
-    headerNTP->status = leapIndicator;
-    // set stratum and precision
-    headerNTP->stratum = clockStratum;
-    headerNTP->precision = NTP_PRECISION;
-    // set reference ID
-    headerNTP->refID = refId;
-    // set root delay
-    headerNTP->rootDelay = rootDelay;
-    // set root dispersion
-    headerNTP->rootDispersion = rootDispersion;
-    // set origin timestamp
-    headerNTP->origTime = headerNTP->txTime;
-    // set RX time
-    headerNTP->rxTime = rxTime;
-    // set reference time
-    headerNTP->refTime = GPSDO_timeTrimmed();
-    // no TX time
-    headerNTP->txTime = 0;
-}
-
-static void followup0(uint8_t *frame, int flen) {
-    // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
-
-    // guard against buffer overruns
-    if(flen < NTP4_SIZE) return;
-    if(headerEth->ethType != ETHTYPE_IPv4) return;
-    if(headerIPv4->proto != IP_PROTO_UDP) return;
-    if(headerUDP->portSrc != __builtin_bswap16(NTP_PORT)) return;
-    if(headerNTP->version != 0) return;
-
-    // append hardware transmit time
-    headerNTP->txTime = NET_getTxTime(frame);
-
-    // send packet
-    UDP_finalize(frame, flen);
-    IPv4_finalize(frame, flen);
-    // get TX descriptor
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
-    // get new TX buffer
-    uint8_t *newFrame = NET_getTxBuff(txDesc);
-    // copy frame to new TX buffer (but only if the new buffer has a different address)
-    if(newFrame != frame)
-        memcpy(newFrame, frame, flen);
-    // transmit followup packet
-    NET_transmit(txDesc, flen);
-}
-
-static void respond4(struct HEADER_NTPv4 *headerNTP, uint64_t rxTime) {
-    // set type to server response
-    headerNTP->mode = 4;
-    headerNTP->status = leapIndicator;
-    // set stratum and precision
-    headerNTP->stratum = clockStratum;
-    headerNTP->precision = NTP_PRECISION;
-    // set reference ID
-    headerNTP->refID = refId;
-    // set root delay
-    headerNTP->rootDelay = __builtin_bswap32(rootDelay);
-    // set root dispersion
-    headerNTP->rootDispersion = __builtin_bswap32(rootDispersion);
-    // set origin timestamp
-    headerNTP->origTime = headerNTP->txTime;
-    // set reference timestamp
-    headerNTP->refTime = __builtin_bswap64(GPSDO_timeTrimmed() + ntpOffset);
-    // set RX time
-    headerNTP->rxTime = __builtin_bswap64(rxTime + ntpOffset);
-    // set TX time
-    headerNTP->txTime = __builtin_bswap64(CLK_TAI() + ntpOffset);
 }
 
 static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress) {
@@ -817,12 +807,20 @@ static void callbackDNS(uint32_t addr) {
     }
 }
 
-static void processResponse(uint8_t *frame) {
+static void processResponse(uint8_t *frame, int flen) {
+    // discard malformed packets
+    if(flen < NTP4_SIZE) return;
+
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+
+    // verify destination
+    if(headerIPv4->dst != ipAddress) return;
+    // filter non-server frames
+    if(headerNTP->mode != 4) return;
 
     // validate server address
     struct Server *server = NULL;
@@ -852,7 +850,7 @@ static void processResponse(uint8_t *frame) {
     // copy server TX timestamp
     stamps[2] = __builtin_bswap64(headerNTP->txTime);
     // record client RX timestamp
-    stamps[3] = NET_getRxTime(frame);
+    stamps[3] = NET_getRxTime(frame) + ntpOffset;
 
     // discard responses with aberrant round-trip times
     int64_t roundTrip = (int64_t) (stamps[3] - stamps[0]);
@@ -860,6 +858,10 @@ static void processResponse(uint8_t *frame) {
     // discard responses with aberrant delays
     int64_t delay = ((int64_t) (roundTrip - (stamps[2] - stamps[1]))) >> 1;
     if(((uint32_t *) &delay)[1] != 0) return;
+
+    // update sequence state
+    server->prevTxSrv = headerNTP->txTime;
+    server->prevRx = __builtin_bswap64(stamps[3]);
 
     if(++server->burst < NTP_BURST) {
         pollServer(server, 0);
@@ -895,13 +897,13 @@ static void pollTxCallback(uint8_t *frame, int flen) {
     if(server == NULL) return;
 
     // locate timestamp record
-    uint64_t txTime = __builtin_bswap32(headerNTP->origTime);
+    uint64_t txTime = __builtin_bswap64(headerNTP->txTime);
     for(int i = 0; i < NTP_BURST; i++) {
         uint64_t *set = server->stamps + (i << 2);
         if(set[0] == txTime) {
             // update timestamp if unmodified
             if(set[1] == set[0])
-                set[1] = NET_getTxTime(frame);
+                set[1] = NET_getTxTime(frame) + ntpOffset;
             break;
         }
     }
@@ -932,8 +934,8 @@ static void pollServer(struct Server *server, int pingOnly) {
     headerIPv4->proto = IP_PROTO_UDP;
 
     // UDP Header
-    headerUDP->portSrc = __builtin_bswap16(NTP_PORT);
-    headerUDP->portDst = __builtin_bswap16(NTP_PORT);
+    headerUDP->portSrc = __builtin_bswap16(NTP_CLI_PORT);
+    headerUDP->portDst = __builtin_bswap16(NTP_SRV_PORT);
 
     // set type to client request
     headerNTP->version = 4;
@@ -945,12 +947,15 @@ static void pollServer(struct Server *server, int pingOnly) {
     // set reference ID
     headerNTP->refID = refId;
     // set reference timestamp
-    uint64_t refTime = CLK_TAI() + ntpOffset;
-    headerNTP->refTime = __builtin_bswap64(refTime);
+    headerNTP->refTime = __builtin_bswap64(GPSDO_timeTrimmed() + ntpOffset);
+    // set origin timestamp
+    headerNTP->origTime = server->prevTxSrv;
+    // set rx time timestamp
+    headerNTP->rxTime = server->prevRx;
     // set TX time
     if(pingOnly == 0) {
         uint64_t *stamps = server->stamps + (server->burst << 2);
-        stamps[0] = CLK_TAI();
+        stamps[0] = CLK_TAI() + ntpOffset;
         stamps[1] = stamps[0];
         headerNTP->txTime = __builtin_bswap64(stamps[0]);
         NET_setTxCallback(txDesc, pollTxCallback);
@@ -982,4 +987,19 @@ static void resetServer(struct Server *server) {
     server->offset = 0;
     server->update = 0;
     server->reach = 0;
+}
+
+static uint16_t hash16(uint32_t value) {
+    uint8_t *bytes = (uint8_t *) &value;
+    uint32_t hash = 31531;
+    hash = ((hash + bytes[0]) * 11) + 7;
+    hash = ((hash + bytes[1]) * 11) + 7;
+    hash = ((hash + bytes[2]) * 11) + 7;
+    hash = ((hash + bytes[3]) * 11) + 7;
+    return hash;
+}
+
+// simple 16-bit hash of 32-bit IP address
+static uint16_t hashAddr16(uint32_t addr) {
+    return hash16(addr) + hash16(__builtin_bswap32(addr));
 }
