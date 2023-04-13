@@ -15,6 +15,9 @@
 #define CLK_FREQ (125000000) // 125 MHz
 #define PPS_GRACE_PERIOD (125000) // 1 ms
 #define PPS_COARSE_ALIGN (62500) // 500 us
+#define PLL_RATE_MAX (0xfp-4f) // 0.9375
+#define PLL_RATE_REF (512e-9f) // 512 ns RMSE
+#define PLL_RATE_INT (0x1p-5f) // integration rate
 #define STAT_ALPHA (0x1p-4f)
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_COMP_RMS (200e-9f)
@@ -198,9 +201,6 @@ void GPSDO_run() {
     currCompensation = newComp;
     setFeedback(currCompensation + pllCorr + pllBias);
 
-    // run GPS state machine
-    GPS_run();
-
     // wait for window to expire
     const int32_t now = (int32_t) GPTM4.TAV.raw;
     if((now - ppsOutEdge) < PPS_GRACE_PERIOD)
@@ -250,12 +250,12 @@ void GPSDO_run() {
     // convert PPS offset to float
     float fltOffset = ((float) offset) * 1e-9f;
     // determine compensation rate
-    float rate = ppsOffsetRms / 256e-9f;
-    if(rate > 0.5f) rate = 0.5f;
+    float rate = ppsOffsetRms / PLL_RATE_REF;
+    if(rate > PLL_RATE_MAX) rate = PLL_RATE_MAX;
     // update control loop
     pllCorr = fltOffset * rate;
+    pllBias += pllCorr * PLL_RATE_INT;
     setFeedback(currCompensation + pllCorr + pllBias);
-    pllBias += fltOffset * 0x1p-8f;
 
     // update PPS stats
     ppsOffsetMean += (fltOffset - ppsOffsetMean) * STAT_ALPHA;

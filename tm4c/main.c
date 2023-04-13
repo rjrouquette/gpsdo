@@ -6,6 +6,7 @@
 
 #include "lib/clk.h"
 #include "lib/delay.h"
+#include "lib/gps.h"
 #include "lib/led.h"
 #include "lib/net.h"
 #include "hw/sys.h"
@@ -38,6 +39,7 @@ int main(void) {
 
     // main loop
     for(;;) {
+        GPS_run();
         GPSDO_run();
         LED_run();
         NET_run();
