@@ -90,16 +90,27 @@ static struct Server {
     uint8_t burst;
 } servers[SERVER_COUNT];
 
-// client records for interleaved mode
-#define CLIENT_COUNT (251)  // primes improve entropy
-static struct Client {
-    uint32_t addr;
+// hash table for interleaved timestamps
+#define XLEAVE_COUNT (251)  // primes improve entropy
+static struct TsXLeave {
     uint64_t rxTime;
     uint64_t txTime;
-} clients[CLIENT_COUNT];
+} ts_xleave[XLEAVE_COUNT];
 
-static int addrCell(uint32_t addr) {
-    return (int) (addr % CLIENT_COUNT);
+static inline int getCell(uint32_t ntp_frac) {
+    return (int) (ntp_frac % XLEAVE_COUNT);
+}
+
+static inline uint64_t CLK_NTP() {
+    return CLK_TAI() + ntpOffset;
+}
+
+static inline uint64_t NTP_rxTime(uint8_t *frame) {
+    return NET_getRxTime(frame) + ntpOffset;
+}
+
+static inline uint64_t NTP_txTime(uint8_t *frame) {
+    return NET_getTxTime(frame) + ntpOffset;
 }
 
 static void pollServer(struct Server *server, int pingOnly);
@@ -260,7 +271,7 @@ char* NTP_servers(char *tail) {
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == 0) continue;
 
-        tail = append(tail, "  - ");
+        tail = append(tail, (servers[i].weight == 0) ? "  - " : "  + ");
         char *pad = tail + 17;
         tail = addrToStr(servers[i].addr, tail);
         while(tail < pad)
@@ -588,8 +599,11 @@ static void runAggregate() {
 
     // notify GPSDO of ntp status for fail-over purposes
     if(norm > 0) {
+        // update GPSDO trimming and reset state if clock was hard stepped
         if (GPSDO_ntpUpdate(clockOffset, clockSkew)) {
-            // reset server stats if clock was hard stepped
+            // reset interleave hash table
+            memset(ts_xleave, 0, sizeof(ts_xleave));
+            // reset server stats
             for (int i = 0; i < SERVER_COUNT; i++)
                 resetServer(servers + i);
             // reset clock stats
@@ -678,10 +692,9 @@ static void requestTxCallback(uint8_t *frame, int flen) {
     if(headerNTP->mode != 4) return;
 
     // record hardware transmit time
-    int cell = addrCell(headerIPv4->dst);
-    clients[cell].addr = headerIPv4->dst;
-    clients[cell].rxTime = headerNTP->rxTime;
-    clients[cell].txTime = __builtin_bswap64(NET_getTxTime(frame) + ntpOffset);
+    int cell = getCell(headerNTP->rxTime >> 32);
+    ts_xleave[cell].rxTime = headerNTP->rxTime;
+    ts_xleave[cell].txTime = __builtin_bswap64(NTP_txTime(frame));
 }
 
 void processRequest(uint8_t *frame, int flen) {
@@ -701,15 +714,13 @@ void processRequest(uint8_t *frame, int flen) {
     LED_act0();
 
     // retrieve rx time
-    const uint64_t rxTime = NET_getRxTime(frame) + ntpOffset;
+    const uint64_t rxTime = NTP_rxTime(frame);
 
     // get TX descriptor
-    int txDesc = NET_getTxDesc();
+    const int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
-
     // set callback for precise TX timestamp
     NET_setTxCallback(txDesc, requestTxCallback);
-
     // duplicate packet for sending
     uint8_t *temp = NET_getTxBuff(txDesc);
     memcpy(temp, frame, flen);
@@ -723,6 +734,18 @@ void processRequest(uint8_t *frame, int flen) {
     headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+
+    // check for interleaved request
+    int xleave = -1;
+    if(headerNTP->rxTime != headerNTP->txTime) {
+        const uint64_t orgTime = headerNTP->origTime;
+        if (orgTime != 0) {
+            int cell = getCell(orgTime >> 32);
+            if (ts_xleave[cell].rxTime == orgTime) {
+                xleave = cell;
+            }
+        }
+    }
 
     // set type to server response
     headerNTP->mode = 4;
@@ -738,36 +761,12 @@ void processRequest(uint8_t *frame, int flen) {
     headerNTP->refID = refId;
     // set reference timestamp
     headerNTP->refTime = __builtin_bswap64(GPSDO_timeTrimmed() + ntpOffset);
-
-    // check for interleaved request
-    int xleave = -1;
-    if(headerNTP->rxTime != headerNTP->txTime) {
-        int cell = addrCell(headerIPv4->dst);
-        if(clients[cell].addr == headerIPv4->dst) {
-            if(clients[cell].rxTime == headerNTP->origTime) {
-                xleave = cell;
-            }
-        }
-    }
-
-    // standard response
-    if(xleave < 0) {
-        // set origin timestamp
-        headerNTP->origTime = headerNTP->txTime;
-        // set RX timestamp
-        headerNTP->rxTime = __builtin_bswap64(rxTime);
-        // set TX timestamp
-        headerNTP->txTime = __builtin_bswap64(CLK_TAI() + ntpOffset);
-    }
-    // interleaved response
-    else {
-        // set origin timestamp
-        headerNTP->origTime = headerNTP->rxTime;
-        // set RX timestamp
-        headerNTP->rxTime = __builtin_bswap64(rxTime);
-        // set TX timestamp
-        headerNTP->txTime = clients[xleave].txTime;
-    }
+    // set origin timestamp
+    headerNTP->origTime = (xleave < 0) ? headerNTP->txTime : headerNTP->rxTime;
+    // set RX timestamp
+    headerNTP->rxTime = __builtin_bswap64(rxTime);
+    // set TX timestamp
+    headerNTP->txTime = (xleave < 0) ? __builtin_bswap64(CLK_NTP()) : ts_xleave[xleave].txTime;
 
     // finalize packet
     UDP_finalize(frame, flen);
@@ -854,7 +853,7 @@ static void processResponse(uint8_t *frame, int flen) {
     // copy server TX timestamp
     stamps[2] = __builtin_bswap64(headerNTP->txTime);
     // record client RX timestamp
-    stamps[3] = NET_getRxTime(frame) + ntpOffset;
+    stamps[3] = NTP_rxTime(frame);
 
     // discard responses with aberrant round-trip times
     int64_t roundTrip = (int64_t) (stamps[3] - stamps[0]);
@@ -907,7 +906,7 @@ static void pollTxCallback(uint8_t *frame, int flen) {
         if(set[0] == txTime) {
             // update timestamp if unmodified
             if(set[1] == set[0])
-                set[1] = NET_getTxTime(frame) + ntpOffset;
+                set[1] = NTP_txTime(frame);
             break;
         }
     }
@@ -957,7 +956,7 @@ static void pollServer(struct Server *server, int pingOnly) {
     // set rx time timestamp
     headerNTP->rxTime = server->prevRx;
     // set TX time
-    uint64_t txTime = CLK_TAI() + ntpOffset;
+    uint64_t txTime = CLK_NTP();
     headerNTP->txTime = __builtin_bswap64(txTime);
 
     // record TX timestamp
