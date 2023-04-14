@@ -32,7 +32,9 @@
 #define NTP_POLL_BITS (6)
 #define NTP_POLL_MASK (63)
 #define NTP_POLL_INTV (64)
-#define NTP_POLL_RAND ((STCURRENT.CURRENT >> 8) & 7) // employs scheduling uncertainty
+#define NTP_POLL_SLOTS (8)
+#define NTP_POLL_PING (NTP_POLL_INTV - NTP_POLL_SLOTS)
+#define NTP_POLL_RAND ((STCURRENT.CURRENT >> 8) & (NTP_POLL_SLOTS - 1)) // employs scheduling uncertainty
 #define NTP_UTC_OFFSET (2208988800)
 #define NTP_STAT_RATE (0x1p-3f)
 #define NTP_ACTIVE_THRESH (0.005f)
@@ -89,12 +91,16 @@ static struct Server {
 } servers[SERVER_COUNT];
 
 // client records for interleaved mode
-#define CLIENT_COUNT (256)
+#define CLIENT_COUNT (251)  // primes improve entropy
 static struct Client {
     uint32_t addr;
     uint64_t rxTime;
     uint64_t txTime;
 } clients[CLIENT_COUNT];
+
+static int addrCell(uint32_t addr) {
+    return (int) (addr % CLIENT_COUNT);
+}
 
 static void pollServer(struct Server *server, int pingOnly);
 static void resetServer(struct Server *server);
@@ -105,8 +111,6 @@ static void processResponse(uint8_t *frame, int flen);
 
 static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress);
 static void callbackDNS(uint32_t addr);
-
-static uint16_t hashAddr16(uint32_t addr);
 
 // NTP tasks
 static void runPoll();
@@ -147,6 +151,9 @@ void NTP_init() {
     for(int i = 0; i < 8; i++) {
         taskSlot[i].task = runPoll;
         taskSlot[i].end = SERVER_COUNT;
+        // pre-poll server ping
+        taskSlot[NTP_POLL_PING+i].task = runPing;
+        taskSlot[NTP_POLL_PING+i].end = SERVER_COUNT;
     }
     // shuffle poll time slots
     taskSlot[8].task = runShuffle;
@@ -169,9 +176,6 @@ void NTP_init() {
     // MAC address resolution
     taskSlot[20].task = runARP;
     taskSlot[20].end = SERVER_COUNT;
-    // pre-poll server ping
-    taskSlot[63].task = runPing;
-    taskSlot[63].end = SERVER_COUNT;
 }
 
 uint64_t NTP_offset() {
@@ -650,7 +654,7 @@ static void runARP() {
 static void runPing() {
     // verify server poll slot
     struct Server *server = servers + ntpProcess.iter;
-    if(server->pollSlot != ntpProcess.timeSlot)
+    if((NTP_POLL_PING + server->pollSlot) != ntpProcess.timeSlot)
         return;
     // verify that server is configured
     if(server->addr == 0)
@@ -674,7 +678,7 @@ static void requestTxCallback(uint8_t *frame, int flen) {
     if(headerNTP->mode != 4) return;
 
     // record hardware transmit time
-    int cell = hashAddr16(headerIPv4->dst) & (CLIENT_COUNT - 1);
+    int cell = addrCell(headerIPv4->dst);
     clients[cell].addr = headerIPv4->dst;
     clients[cell].rxTime = headerNTP->rxTime;
     clients[cell].txTime = __builtin_bswap64(NET_getTxTime(frame) + ntpOffset);
@@ -735,10 +739,10 @@ void processRequest(uint8_t *frame, int flen) {
     // set reference timestamp
     headerNTP->refTime = __builtin_bswap64(GPSDO_timeTrimmed() + ntpOffset);
 
-    // check for interleaved mode
+    // check for interleaved request
     int xleave = -1;
     if(headerNTP->rxTime != headerNTP->txTime) {
-        int cell = hashAddr16(headerIPv4->dst) & (CLIENT_COUNT - 1);
+        int cell = addrCell(headerIPv4->dst);
         if(clients[cell].addr == headerIPv4->dst) {
             if(clients[cell].rxTime == headerNTP->origTime) {
                 xleave = cell;
@@ -953,11 +957,14 @@ static void pollServer(struct Server *server, int pingOnly) {
     // set rx time timestamp
     headerNTP->rxTime = server->prevRx;
     // set TX time
+    uint64_t txTime = CLK_TAI() + ntpOffset;
+    headerNTP->txTime = __builtin_bswap64(txTime);
+
+    // record TX timestamp
     if(pingOnly == 0) {
         uint64_t *stamps = server->stamps + (server->burst << 2);
-        stamps[0] = CLK_TAI() + ntpOffset;
-        stamps[1] = stamps[0];
-        headerNTP->txTime = __builtin_bswap64(stamps[0]);
+        stamps[0] = txTime;
+        stamps[1] = txTime;
         NET_setTxCallback(txDesc, pollTxCallback);
     }
 
@@ -987,19 +994,4 @@ static void resetServer(struct Server *server) {
     server->offset = 0;
     server->update = 0;
     server->reach = 0;
-}
-
-static uint16_t hash16(uint32_t value) {
-    uint8_t *bytes = (uint8_t *) &value;
-    uint32_t hash = 31531;
-    hash = ((hash + bytes[0]) * 11) + 7;
-    hash = ((hash + bytes[1]) * 11) + 7;
-    hash = ((hash + bytes[2]) * 11) + 7;
-    hash = ((hash + bytes[3]) * 11) + 7;
-    return hash;
-}
-
-// simple 16-bit hash of 32-bit IP address
-static uint16_t hashAddr16(uint32_t addr) {
-    return hash16(addr) + hash16(__builtin_bswap32(addr));
 }
