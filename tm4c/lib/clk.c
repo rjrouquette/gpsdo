@@ -108,7 +108,7 @@ uint64_t CLK_MONOTONIC() {
         ++snapI;
     }
 
-    // scratch structure
+    // result structure
     register union {
         struct {
             uint32_t fpart;
@@ -117,7 +117,7 @@ uint64_t CLK_MONOTONIC() {
         uint64_t full;
     } result;
 
-    // initialize scratch
+    // assemble result
     result.fpart = nanosToFrac(snapF << 3);
     result.ipart = snapI;
     return result.full;
@@ -199,7 +199,7 @@ float CLK_TAI_trim(float trim) {
 }
 
 uint32_t nanosToFrac(uint32_t nanos) {
-    // result structure
+    // scratch structure
     register union {
         struct {
             uint32_t fpart;
@@ -207,16 +207,21 @@ uint32_t nanosToFrac(uint32_t nanos) {
         };
         uint64_t full;
     } scratch;
+
     // multiply by 4 (integer portion of 4.294967296)
     nanos <<= 2;
+
     // apply correction factor to value
     scratch.ipart = 0;
     scratch.fpart = nanos;
     scratch.full *= 0x12E0BE82;
+
     // combine correction value with base value
     scratch.ipart += nanos;
+
     // round up to decrease reduce error
     scratch.ipart += scratch.fpart >> 31;
+
     // return result
     return scratch.ipart;
 }
