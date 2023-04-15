@@ -208,8 +208,8 @@ void GPSDO_run() {
     // sanity check pps output interval
     int32_t ppsOutDelta = ppsOutEdge - ppsOutEdgePrev;
     ppsOutEdgePrev = ppsOutEdge;
-    if(ppsOutDelta < CLK_FREQ - PPS_COARSE_ALIGN) return;
-    if(ppsOutDelta > CLK_FREQ + PPS_COARSE_ALIGN) return;
+    if(ppsOutDelta < CLK_FREQ - PPS_GRACE_PERIOD) return;
+    if(ppsOutDelta > CLK_FREQ + PPS_GRACE_PERIOD) return;
 
     // advance PPS tracker
     ppsPresent <<= 1;

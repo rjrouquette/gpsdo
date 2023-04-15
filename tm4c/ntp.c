@@ -91,7 +91,7 @@ static struct Server {
 } servers[SERVER_COUNT];
 
 // hash table for interleaved timestamps
-#define XLEAVE_COUNT (64)
+#define XLEAVE_COUNT (1<<6)
 static struct TsXleave {
     uint64_t rxTime;
     uint64_t txTime;
@@ -100,6 +100,10 @@ static int ptrXleave;
 
 static inline uint64_t CLK_NTP() {
     return CLK_TAI() + ntpOffset;
+}
+
+static inline uint64_t NTP_ref() {
+    return GPSDO_timeTrimmed() + ntpOffset;
 }
 
 static inline uint64_t NTP_rxTime(uint8_t *frame) {
@@ -761,7 +765,7 @@ void processRequest(uint8_t *frame, int flen) {
     // set reference ID
     headerNTP->refID = refId;
     // set reference timestamp
-    headerNTP->refTime = __builtin_bswap64(GPSDO_timeTrimmed() + ntpOffset);
+    headerNTP->refTime = __builtin_bswap64(NTP_ref());
     // set origin timestamp
     headerNTP->origTime = (xleave < 0) ? headerNTP->txTime : headerNTP->rxTime;
     // set RX timestamp
@@ -951,7 +955,7 @@ static void pollServer(struct Server *server, int pingOnly) {
     // set reference ID
     headerNTP->refID = refId;
     // set reference timestamp
-    headerNTP->refTime = __builtin_bswap64(GPSDO_timeTrimmed() + ntpOffset);
+    headerNTP->refTime = __builtin_bswap64(NTP_ref());
     // set origin timestamp
     headerNTP->origTime = server->prevTxSrv;
     // set rx time timestamp

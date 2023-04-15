@@ -12,6 +12,7 @@
 #define USE_XTAL 1
 #define CLK_FREQ (125000000)
 #define CLK_MOD (32u*125000000u)
+#define MAX_TRIM (500e-6f)
 
 static volatile uint32_t cntMonotonic = 0;
 
@@ -184,13 +185,14 @@ void CLK_TAI_set(uint32_t seconds) {
 }
 
 float CLK_TAI_trim(float trim) {
+    // restrict trim rate
+    if(trim < -MAX_TRIM) trim = -MAX_TRIM;
+    if(trim >  MAX_TRIM) trim =  MAX_TRIM;
     // convert to correction factor
     int32_t correction = lroundf(trim * 0x1p32f);
-    // correction factor must not exceed 1 part-per-thousand
-    if(correction < -(1 << 22)) correction = -(1 << 22);
-    if(correction >  (1 << 22)) correction =  (1 << 22);
     // apply correction update
     EMAC0.TIMADD = 0xFFB34C02 + correction;
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
+    // return actual value
     return 0x1p-32f * (float) correction;
 }
