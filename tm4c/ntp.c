@@ -91,15 +91,12 @@ static struct Server {
 } servers[SERVER_COUNT];
 
 // hash table for interleaved timestamps
-#define XLEAVE_COUNT (251)  // primes improve entropy
-static struct TsXLeave {
+#define XLEAVE_COUNT (64)
+static struct TsXleave {
     uint64_t rxTime;
     uint64_t txTime;
-} ts_xleave[XLEAVE_COUNT];
-
-static inline int getCell(uint32_t ntp_frac) {
-    return (int) (ntp_frac % XLEAVE_COUNT);
-}
+} tsXleave[XLEAVE_COUNT];
+static int ptrXleave;
 
 static inline uint64_t CLK_NTP() {
     return CLK_TAI() + ntpOffset;
@@ -337,6 +334,13 @@ void NTP_run() {
         (*slot->task)();
         ++ntpProcess.iter;
     }
+
+    // fast return to stratum 1 with PPS presence
+    if(clockStratum != 1 && GPSDO_ppsPresent()) {
+        clockStratum = 1;
+        rootDelay = 0;
+        rootDispersion = 0;
+    }
 }
 
 static void runPoll() {
@@ -523,23 +527,6 @@ static void runAggregate() {
         }
     }
 
-    // update clock stratum
-    if(GPSDO_ppsPresent()) {
-        clockStratum = 1;
-        rootDelay = 0;
-        rootDispersion = 0;
-    }
-    else if(_stratum == 0) {
-        clockStratum = 16;
-        rootDelay = 0;
-        rootDispersion = 0;
-    }
-    else {
-        clockStratum = 1 + (int) roundf(_stratum);
-        rootDelay = (int32_t) roundf(0x1p16f * _delay);
-        rootDispersion = (int32_t) roundf(0x1p16f * sqrtf(_dispersion));
-    }
-
     // set reference ID to GPS if stratum is 1
     if(clockStratum == 1)
         refId = NTP_REF_GPS;
@@ -584,25 +571,24 @@ static void runAggregate() {
     twiddle *= (1<<24) - divisor;
     offset += twiddle;
 
-    if(!GPSDO_ppsPresent()) {
-        if (offset != 0) {
-            uint32_t *parts = (uint32_t *) &offset;
-            // correct truncation for negative values
-            if(
-                parts[1] & (1u << 31u) &&
-                parts[0] & (1u << 31u)
-            ) ++parts[1];
-            // apply offset adjustment
-            ((uint32_t *) &ntpOffset)[1] += parts[1];
-        }
+    // skip clock correction if GPS is locked
+    if(GPSDO_ppsPresent()) return;
+
+    if (offset != 0) {
+        uint32_t *parts = (uint32_t *) &offset;
+        // correct truncation for negative values
+        if(
+            parts[1] & (1u << 31u) &&
+            parts[0] & (1u << 31u)
+        ) ++parts[1];
+        // apply offset adjustment
+        ((uint32_t *) &ntpOffset)[1] += parts[1];
     }
 
     // notify GPSDO of ntp status for fail-over purposes
     if(norm > 0) {
         // update GPSDO trimming and reset state if clock was hard stepped
         if (GPSDO_ntpUpdate(clockOffset, clockSkew)) {
-            // reset interleave hash table
-            memset(ts_xleave, 0, sizeof(ts_xleave));
             // reset server stats
             for (int i = 0; i < SERVER_COUNT; i++)
                 resetServer(servers + i);
@@ -611,6 +597,17 @@ static void runAggregate() {
             clockOffset = 0;
             clockSkew = 0;
         }
+    }
+
+    // set stratum status
+    if(_stratum == 0) {
+        clockStratum = 16;
+        rootDelay = 0;
+        rootDispersion = 0;
+    } else {
+        clockStratum = 1 + (int) roundf(_stratum);
+        rootDelay = (int32_t) roundf(0x1p16f * _delay);
+        rootDispersion = (int32_t) roundf(0x1p16f * sqrtf(_dispersion));
     }
 }
 
@@ -692,9 +689,9 @@ static void requestTxCallback(uint8_t *frame, int flen) {
     if(headerNTP->mode != 4) return;
 
     // record hardware transmit time
-    int cell = getCell(headerNTP->rxTime >> 32);
-    ts_xleave[cell].rxTime = headerNTP->rxTime;
-    ts_xleave[cell].txTime = __builtin_bswap64(NTP_txTime(frame));
+    tsXleave[ptrXleave].rxTime = headerNTP->rxTime;
+    tsXleave[ptrXleave].txTime = __builtin_bswap64(NTP_txTime(frame));
+    ptrXleave = (ptrXleave + 1) & (XLEAVE_COUNT - 1);
 }
 
 void processRequest(uint8_t *frame, int flen) {
@@ -737,13 +734,17 @@ void processRequest(uint8_t *frame, int flen) {
 
     // check for interleaved request
     int xleave = -1;
-    if(headerNTP->rxTime != headerNTP->txTime) {
-        const uint64_t orgTime = headerNTP->origTime;
-        if (orgTime != 0) {
-            int cell = getCell(orgTime >> 32);
-            if (ts_xleave[cell].rxTime == orgTime) {
-                xleave = cell;
-            }
+    const uint64_t orgTime = headerNTP->origTime;
+    if(
+            orgTime != 0 &&
+            headerNTP->rxTime != headerNTP->txTime
+    ) {
+        // scan table for matching timestamp
+        for(int i = 0; i < XLEAVE_COUNT; i++) {
+            if(orgTime != tsXleave[i].rxTime) continue;
+            // match found
+            xleave = i;
+            break;
         }
     }
 
@@ -766,7 +767,7 @@ void processRequest(uint8_t *frame, int flen) {
     // set RX timestamp
     headerNTP->rxTime = __builtin_bswap64(rxTime);
     // set TX timestamp
-    headerNTP->txTime = (xleave < 0) ? __builtin_bswap64(CLK_NTP()) : ts_xleave[xleave].txTime;
+    headerNTP->txTime = (xleave < 0) ? __builtin_bswap64(CLK_NTP()) : tsXleave[xleave].txTime;
 
     // finalize packet
     UDP_finalize(frame, flen);
