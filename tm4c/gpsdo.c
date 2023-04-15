@@ -16,7 +16,7 @@
 #define PPS_GRACE_PERIOD (125000) // 1 ms
 #define PPS_COARSE_ALIGN (62500) // 500 us
 #define PLL_RATE_MAX (0xfp-4f) // 0.9375
-#define PLL_RATE_REF (512e-9f) // 512 ns RMSE
+#define PLL_RATE_REF (256e-9f) // 256 ns RMSE
 #define PLL_RATE_INT (0x1p-5f) // integration rate
 #define STAT_ALPHA (0x1p-4f)
 #define STAT_LOCK_RMS (250e-9f)
