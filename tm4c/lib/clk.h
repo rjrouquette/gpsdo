@@ -55,4 +55,11 @@ void CLK_TAI_set(uint32_t seconds);
  */
 float CLK_TAI_trim(float trim);
 
+/**
+ * Convert nanoseconds into fractional second
+ * @param nanos nanosecond value to convert
+ * @return 32-bit fixed-point format (0.32)
+ */
+uint32_t nanosToFrac(uint32_t nanos);
+
 #endif //GPSDO_CLK_H

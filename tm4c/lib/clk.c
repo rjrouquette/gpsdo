@@ -93,6 +93,21 @@ uint64_t CLK_MONOTONIC() {
     register uint32_t snapI = cntMonotonic;
     register uint32_t snapF = GPTM0.TAV.raw;
 
+    // correct for counter overflow
+    for(;; snapI++) {
+        uint32_t floor = (snapI & 31) * CLK_FREQ;
+        if(floor <= snapF) {
+            snapF -= floor;
+            break;
+        }
+    }
+
+    // correct for access skew
+    while(snapF > CLK_FREQ) {
+        snapF -= CLK_FREQ;
+        ++snapI;
+    }
+
     // scratch structure
     register union {
         struct {
@@ -100,26 +115,12 @@ uint64_t CLK_MONOTONIC() {
             uint32_t ipart;
         };
         uint64_t full;
-    } scratch;
+    } result;
 
     // initialize scratch
-    scratch.fpart = snapF;
-    scratch.ipart = 0;
-
-    // apply fractional adjustment
-    scratch.full *= 45443074;
-    scratch.fpart = scratch.ipart;
-    scratch.ipart = 0;
-
-    // apply final scaling
-    scratch.full += snapF;
-    scratch.full *= 34;
-
-    // merge with full integer count
-    scratch.ipart ^= snapI;
-    scratch.ipart &= 1;
-    scratch.ipart += snapI;
-    return scratch.full;
+    result.fpart = nanosToFrac(snapF << 3);
+    result.ipart = snapI;
+    return result.full;
 }
 
 uint32_t CLK_TAI_INT() {
@@ -195,4 +196,27 @@ float CLK_TAI_trim(float trim) {
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     // return actual value
     return 0x1p-32f * (float) correction;
+}
+
+uint32_t nanosToFrac(uint32_t nanos) {
+    // result structure
+    register union {
+        struct {
+            uint32_t fpart;
+            uint32_t ipart;
+        };
+        uint64_t full;
+    } scratch;
+    // multiply by 4 (integer portion of 4.294967296)
+    nanos <<= 2;
+    // apply correction factor to value
+    scratch.ipart = 0;
+    scratch.fpart = nanos;
+    scratch.full *= 0x12E0BE82;
+    // combine correction value with base value
+    scratch.ipart += nanos;
+    // round up to decrease reduce error
+    scratch.ipart += scratch.fpart >> 31;
+    // return result
+    return scratch.ipart;
 }

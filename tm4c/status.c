@@ -302,6 +302,17 @@ unsigned statusNTP(char *body) {
     char *end = body;
 
     // TAI time
+    uint64_t mono = CLK_MONOTONIC();
+    strcpy(tmp, "0x");
+    toHex(mono>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(mono, 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "clk mono.:   ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // TAI time
     uint64_t tai = CLK_TAI();
     strcpy(tmp, "0x");
     toHex(tai>>32, 8, '0', tmp+2);
