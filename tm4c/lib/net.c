@@ -20,8 +20,8 @@
 #define RX_RING_SIZE (32)
 #define RX_BUFF_SIZE (1520)
 
-#define TX_RING_MASK (15)
-#define TX_RING_SIZE (16)
+#define TX_RING_MASK (31)
+#define TX_RING_SIZE (32)
 #define TX_BUFF_SIZE (1520)
 
 static int ptrRX = 0;
