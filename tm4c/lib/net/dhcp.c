@@ -272,7 +272,7 @@ static void processFrame(uint8_t *frame, int flen) {
         if(lenNTP > 0 && ((lenNTP & 0x3) == 0)) {
             int i = 0;
             for(int j = 0; j < lenNTP; j += 4) {
-                uint32_t addr = *(uint32_t *)(ptr + j);
+                uint32_t addr = *(uint32_t *)(optNTP + j);
                 if(addr != ipAddress)
                     NTP_setServer(i++, addr);
             }
