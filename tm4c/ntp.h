@@ -19,6 +19,7 @@ int NTP_leapIndicator();
 float NTP_rootDelay();
 float NTP_rootDispersion();
 void NTP_date(uint64_t clkMono, uint32_t *ntpDate);
+void NTP_setServer(int i, uint32_t addr);
 
 char* NTP_servers(char *tail);
 

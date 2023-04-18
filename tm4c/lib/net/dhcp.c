@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "../../hw/sys.h"
+#include "../../ntp.h"
 #include "../clk.h"
 #include "../net.h"
 #include "eth.h"
@@ -45,7 +46,7 @@ static int lenHostname = 0;
 
 static const uint8_t DHCP_OPT_DISCOVER[] = { 0x35, 0x01, 0x01 };
 static const uint8_t DHCP_OPT_REQUEST[] = { 0x35, 0x01, 0x03 };
-static const uint8_t DHCP_OPT_PARAM_REQ[] = { 0x37, 0x03, 0x01, 0x03, 0x06 };
+static const uint8_t DHCP_OPT_PARAM_REQ[] = { 0x37, 0x04, 0x01, 0x03, 0x06, 0x2A };
 
 static void processFrame(uint8_t *frame, int flen);
 static void sendReply(struct HEADER_DHCP *response);
@@ -224,6 +225,13 @@ static void processFrame(uint8_t *frame, int flen) {
         // DNS server address
         if(key == 6 && len >= 4)
             memcpy(&optDNS, ptr, 4);
+        // NTP/SNTP server address
+        if(key == 42 && len >= 4) {
+            for(int i = 0; i < (len >> 2); i++) {
+                uint32_t addr = *(uint32_t *)(ptr + (i << 2));
+                NTP_setServer(i, addr);
+            }
+        }
         // message type
         if(key == 53)
             optMsgType = ptr[0];

@@ -236,6 +236,13 @@ void NTP_date(uint64_t clkMono, uint32_t *ntpDate) {
     ntpDate[3] = 0;
 }
 
+void NTP_setServer(int i, uint32_t addr) {
+    for(int j = 0; j < SERVER_COUNT; j++)
+        if(servers[j].addr == addr) return;
+    resetServer(servers + i);
+    servers[i].addr = addr;
+}
+
 char* NTP_servers(char *tail) {
     char tmp[32];
 

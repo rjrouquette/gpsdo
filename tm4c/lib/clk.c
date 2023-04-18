@@ -219,7 +219,7 @@ uint32_t nanosToFrac(uint32_t nanos) {
     // combine correction value with base value
     scratch.ipart += nanos;
 
-    // round up to decrease reduce error
+    // round up to minimize average error
     scratch.ipart += scratch.fpart >> 31;
 
     // return result
