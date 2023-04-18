@@ -18,6 +18,7 @@
 #include "lib/net/arp.h"
 #include "lib/format.h"
 #include "lib/net/dns.h"
+#include "lib/net/dhcp.h"
 
 #define NTP4_SIZE (UDP_DATA_OFFSET + 48)
 #define NTP_SRV_PORT (123)
@@ -234,13 +235,6 @@ void NTP_date(uint64_t clkMono, uint32_t *ntpDate) {
     ntpDate[1] = __builtin_bswap32(((uint32_t *)&clkMono)[1]);
     ntpDate[2] = __builtin_bswap32(((uint32_t *)&clkMono)[0]);
     ntpDate[3] = 0;
-}
-
-void NTP_setServer(int i, uint32_t addr) {
-    for(int j = 0; j < SERVER_COUNT; j++)
-        if(servers[j].addr == addr) return;
-    resetServer(servers + i);
-    servers[i].addr = addr;
 }
 
 char* NTP_servers(char *tail) {
@@ -650,6 +644,15 @@ static void runPrune() {
 }
 
 static void runDNS() {
+    // check DHCP supplied servers first
+    uint32_t *addr;
+    int count;
+    DHCP_ntpAddr(&addr, &count);
+    for(int i = 0; i < count; i++) {
+        callbackDNS(addr[i]);
+    }
+
+    // perform DNS lookup
     for(int i = 0; i < SERVER_COUNT; i++) {
         if (servers[i].addr == 0) {
             DNS_lookup(NTP_POOL_FQDN, callbackDNS);
@@ -716,6 +719,8 @@ void processRequest(uint8_t *frame, int flen) {
 
     // verify destination
     if(headerIPv4->dst != ipAddress) return;
+    // prevent loopback
+    if(headerIPv4->src == ipAddress) return;
     // filter non-client frames
     if(headerNTP->mode != 3) return;
     // indicate time-server activity
@@ -807,6 +812,8 @@ static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress) {
 }
 
 static void callbackDNS(uint32_t addr) {
+    // prevent loop back
+    if(addr == ipAddress) return;
     // prevent duplicate entries
     for (int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == addr)
@@ -834,6 +841,8 @@ static void processResponse(uint8_t *frame, int flen) {
 
     // verify destination
     if(headerIPv4->dst != ipAddress) return;
+    // prevent loopback
+    if(headerIPv4->src == ipAddress) return;
     // filter non-server frames
     if(headerNTP->mode != 4) return;
 

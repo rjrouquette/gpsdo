@@ -14,4 +14,6 @@ void DHCP_renew();
 
 const char * DHCP_hostname();
 
+void DHCP_ntpAddr(uint32_t **addr, int *count);
+
 #endif //GPSDO_DHCP_H

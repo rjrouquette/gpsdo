@@ -48,6 +48,9 @@ static const uint8_t DHCP_OPT_DISCOVER[] = { 0x35, 0x01, 0x01 };
 static const uint8_t DHCP_OPT_REQUEST[] = { 0x35, 0x01, 0x03 };
 static const uint8_t DHCP_OPT_PARAM_REQ[] = { 0x37, 0x04, 0x01, 0x03, 0x06, 0x2A };
 
+static uint32_t ntpAddr[8];
+static int ntpLen;
+
 static void processFrame(uint8_t *frame, int flen);
 static void sendReply(struct HEADER_DHCP *response);
 
@@ -229,8 +232,13 @@ static void processFrame(uint8_t *frame, int flen) {
             memcpy(&optDNS, ptr, 4);
         // NTP/SNTP server address
         if(key == 42 && len >= 4) {
-            optNTP = ptr;
-            lenNTP = len;
+            if((len & 3) == 0) {
+                int size = len & ~3;
+                if(size > sizeof(ntpAddr))
+                    size = sizeof(ntpAddr);
+                memcpy(&ntpAddr, ptr, size);
+                ntpLen = size >> 2;
+            }
         }
         // message type
         if(key == 53)
@@ -268,15 +276,6 @@ static void processFrame(uint8_t *frame, int flen) {
         dhcpLeaseExpire -= optLease / 10;
         if(dhcpLeaseExpire > 86400) dhcpLeaseExpire = 86400;
         dhcpLeaseExpire += CLK_MONOTONIC_INT();
-        // set NTP servers
-        if(lenNTP > 0 && ((lenNTP & 0x3) == 0)) {
-            int i = 0;
-            for(int j = 0; j < lenNTP; j += 4) {
-                uint32_t addr = *(uint32_t *)(optNTP + j);
-                if(addr != ipAddress)
-                    NTP_setServer(i++, addr);
-            }
-        }
         return;
     }
 }
@@ -331,4 +330,9 @@ static void sendReply(struct HEADER_DHCP *response) {
 
 const char * DHCP_hostname() {
     return hostname;
+}
+
+void DHCP_ntpAddr(uint32_t **addr, int *count) {
+    *addr = ntpAddr;
+    *count = ntpLen;
 }
