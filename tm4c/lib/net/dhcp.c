@@ -192,6 +192,8 @@ static void processFrame(uint8_t *frame, int flen) {
     uint32_t optDHCP = 0;
     uint32_t optLease = 0;
     uint8_t optMsgType = 0;
+    uint8_t *optNTP = 0;
+    int lenNTP = 0;
 
     // parse options
     uint8_t *ptr = (uint8_t *) (headerDHCP + 1);
@@ -227,10 +229,8 @@ static void processFrame(uint8_t *frame, int flen) {
             memcpy(&optDNS, ptr, 4);
         // NTP/SNTP server address
         if(key == 42 && len >= 4) {
-            for(int i = 0; i < (len >> 2); i++) {
-                uint32_t addr = *(uint32_t *)(ptr + (i << 2));
-                NTP_setServer(i, addr);
-            }
+            optNTP = ptr;
+            lenNTP = len;
         }
         // message type
         if(key == 53)
@@ -268,6 +268,15 @@ static void processFrame(uint8_t *frame, int flen) {
         dhcpLeaseExpire -= optLease / 10;
         if(dhcpLeaseExpire > 86400) dhcpLeaseExpire = 86400;
         dhcpLeaseExpire += CLK_MONOTONIC_INT();
+        // set NTP servers
+        if(lenNTP > 0 && ((lenNTP & 0x3) == 0)) {
+            int i = 0;
+            for(int j = 0; j < lenNTP; j += 4) {
+                uint32_t addr = *(uint32_t *)(ptr + j);
+                if(addr != ipAddress)
+                    NTP_setServer(i++, addr);
+            }
+        }
         return;
     }
 }
