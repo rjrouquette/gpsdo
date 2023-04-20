@@ -155,6 +155,9 @@ void DHCP_renew() {
         // DHCPREQUEST
         memcpy(frame + flen, DHCP_OPT_REQUEST, sizeof(DHCP_OPT_REQUEST));
         flen += sizeof(DHCP_OPT_REQUEST);
+        // parameter request
+        memcpy(frame + flen, DHCP_OPT_PARAM_REQ, sizeof(DHCP_OPT_PARAM_REQ));
+        flen += sizeof(DHCP_OPT_PARAM_REQ);
         // end mark
         frame[flen++] = 0xFF;
     }
