@@ -11,10 +11,10 @@
 
 #define USE_XTAL 1
 #define CLK_FREQ (125000000)
-#define CLK_MOD (32u*125000000u)
 #define MAX_TRIM (500e-6f)
 
-static volatile uint32_t cntMonotonic = 0;
+static volatile uint32_t monoInt = 0;
+static volatile uint32_t monoOff = 0;
 
 void CLK_init() {
     // Enable external clock
@@ -59,7 +59,7 @@ void CLK_init() {
     RCGCTIMER.EN_GPTM0 = 1;
     delay_cycles_4();
     // Configure Timer 0
-    GPTM0.TAILR = CLK_MOD-1;
+    GPTM0.TAILR = -1;
     GPTM0.TAMATCHR = CLK_FREQ;
     GPTM0.TAMR.MR = 0x2;
     GPTM0.TAMR.CDIR = 1;
@@ -72,40 +72,36 @@ void CLK_init() {
 
 // second boundary comparison
 void ISR_Timer0A() {
-    // clear interrupt flag
-    GPTM0.ICR.TAM = 1;
     // increment counter
-    ++cntMonotonic;
+    __asm volatile("cpsid if");
+    ++monoInt;
+    monoOff = GPTM0.TAMATCHR;
+    __asm volatile("cpsie if");
     // set next second boundary
     GPTM0.TAMATCHR += CLK_FREQ;
-    if (GPTM0.TAMATCHR >= CLK_MOD)
-        GPTM0.TAMATCHR = 0;
+    // clear interrupt flag
+    GPTM0.ICR.TAM = 1;
 }
 
 // return integer part of current time
 uint32_t CLK_MONOTONIC_INT() {
-    return cntMonotonic;
+    return monoInt;
 }
 
 // return current time as 32.32 fixed point value
 uint64_t CLK_MONOTONIC() {
     // capture current time
-    register uint32_t snapI = cntMonotonic;
+    __asm volatile("cpsid if");
+    register uint32_t snapI = monoInt;
+    register uint32_t snapO = monoOff;
     register uint32_t snapF = GPTM0.TAV.raw;
+    __asm volatile("cpsie if");
 
-    // correct for counter overflow
-    for(;; snapI++) {
-        uint32_t floor = (snapI & 31) * CLK_FREQ;
-        if(floor <= snapF) {
-            snapF -= floor;
-            break;
-        }
-    }
-
-    // correct for access skew
-    while(snapF > CLK_FREQ) {
-        snapF -= CLK_FREQ;
+    // adjust for overflow
+    snapF -= snapO;
+    while(snapF >= CLK_FREQ) {
         ++snapI;
+        snapF -= CLK_FREQ;
     }
 
     // result structure

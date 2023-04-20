@@ -77,22 +77,28 @@ void ISR_ADC0Sequence3(void) {
 
 // capture rising edge of output PPS for offset measurement
 void ISR_Timer5A() {
+    // snapshot edge time
+    __asm volatile("cpsid if");
+    register uint32_t a = GPTM0.TAV.raw;
+    register uint32_t b = GPTM5.TAV.raw;
+    register uint32_t c = GPTM5.TAR.raw;
+    __asm volatile("cpsie if");
     // compute edge time
-    int32_t now = GPTM4.TAV.raw;
-    uint16_t delta = GPTM5.TAV.LO;
-    delta -= GPTM5.TAR.LO;
-    ppsOutEdge = now - delta;
+    ppsOutEdge = (int32_t) (a - ((b - c) & 0xFFFF));
     // clear interrupt flag
     GPTM5.ICR.CAE = 1;
 }
 
 // capture rising edge of GPS PPS for offset measurement
 void ISR_Timer5B() {
+    // snapshot edge time
+    __asm volatile("cpsid if");
+    register uint32_t a = GPTM0.TAV.raw;
+    register uint32_t b = GPTM5.TBV.raw;
+    register uint32_t c = GPTM5.TBR.raw;
+    __asm volatile("cpsie if");
     // compute edge time
-    int32_t now = GPTM4.TAV.raw;
-    uint16_t delta = GPTM5.TBV.LO;
-    delta -= GPTM5.TBR.LO;
-    ppsGpsEdge = now - delta;
+    ppsGpsEdge = (int32_t) (a - ((b - c) & 0xFFFF));
     // clear interrupt flag
     GPTM5.ICR.CBE = 1;
 }
@@ -118,17 +124,6 @@ void initTempComp() {
 }
 
 void initEdgeComp() {
-    // Enable Timer 4
-    RCGCTIMER.EN_GPTM4 = 1;
-    delay_cycles_4();
-    // Configure Timer 4 as 32-bit free-running timer
-    GPTM4.TAILR = -1;
-    GPTM4.TAMR.MR = 0x2;
-    GPTM4.TAMR.CDIR = 1;
-    GPTM4.TAMR.CINTD = 0;
-    // start timer
-    GPTM4.CTL.TAEN = 1;
-
     // Enable Timer 5
     RCGCTIMER.EN_GPTM5 = 1;
     delay_cycles_4();
@@ -156,13 +151,9 @@ void initEdgeComp() {
     // interrupts
     GPTM5.IMR.CAE = 1;
     GPTM5.IMR.CBE = 1;
-    GPTM0.TAMR.MIE = 1;
-    GPTM0.TBMR.MIE = 1;
     // start timer
     GPTM5.CTL.TAEN = 1;
     GPTM5.CTL.TBEN = 1;
-    // synchronize timers
-    GPTM0.SYNC = (3 << 10);
 
     // configure capture pins
     RCGCGPIO.EN_PORTM = 1;
@@ -202,7 +193,7 @@ void GPSDO_run() {
     setFeedback(currCompensation + pllCorr + pllBias);
 
     // wait for window to expire
-    const int32_t now = (int32_t) GPTM4.TAV.raw;
+    const int32_t now = (int32_t) GPTM0.TAV.raw;
     if((now - ppsOutEdge) < PPS_GRACE_PERIOD)
         return;
     // sanity check pps output interval
