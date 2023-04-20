@@ -3,11 +3,12 @@
 //
 
 #include <math.h>
+#include "../hw/emac.h"
+#include "../hw/interrupts.h"
 #include "../hw/sys.h"
 #include "../hw/timer.h"
 #include "clk.h"
 #include "delay.h"
-#include "../hw/emac.h"
 
 #define USE_XTAL 1
 #define CLK_FREQ (125000000)
@@ -73,10 +74,10 @@ void CLK_init() {
 // second boundary comparison
 void ISR_Timer0A() {
     // increment counter
-    __asm volatile("cpsid if");
+    cpsid();
     ++monoInt;
     monoOff = GPTM0.TAMATCHR;
-    __asm volatile("cpsie if");
+    cpsie();
     // set next second boundary
     GPTM0.TAMATCHR += CLK_FREQ;
     // clear interrupt flag
@@ -91,11 +92,11 @@ uint32_t CLK_MONOTONIC_INT() {
 // return current time as 32.32 fixed point value
 uint64_t CLK_MONOTONIC() {
     // capture current time
-    __asm volatile("cpsid if");
+    cpsid();
     register uint32_t snapI = monoInt;
     register uint32_t snapO = monoOff;
     register uint32_t snapF = GPTM0.TAV.raw;
-    __asm volatile("cpsie if");
+    cpsie();
 
     // adjust for overflow
     snapF -= snapO;
@@ -134,12 +135,12 @@ uint64_t CLK_TAI() {
     } a, b;
 
     // load current TAI value
-    __asm volatile("cpsid if");
+    cpsid();
     a.ipart = EMAC0.TIMSEC;
     a.fpart = EMAC0.TIMNANO;
     b.ipart = EMAC0.TIMSEC;
     b.fpart = EMAC0.TIMNANO;
-    __asm volatile("cpsie if");
+    cpsie();
     // correct for access skew at second boundary
     if(b.fpart < a.fpart && b.ipart == a.ipart) ++b.ipart;
     // adjust fraction point

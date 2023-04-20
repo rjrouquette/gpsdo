@@ -6,6 +6,7 @@
 #include "gpsdo.h"
 #include "hw/adc.h"
 #include "hw/gpio.h"
+#include "hw/interrupts.h"
 #include "hw/timer.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
@@ -78,11 +79,11 @@ void ISR_ADC0Sequence3(void) {
 // capture rising edge of output PPS for offset measurement
 void ISR_Timer5A() {
     // snapshot edge time
-    __asm volatile("cpsid if");
+    cpsid();
     register uint32_t a = GPTM0.TAV.raw;
     register uint32_t b = GPTM5.TAV.raw;
     register uint32_t c = GPTM5.TAR.raw;
-    __asm volatile("cpsie if");
+    cpsie();
     // compute edge time
     ppsOutEdge = (int32_t) (a - ((b - c) & 0xFFFF));
     // clear interrupt flag
@@ -92,11 +93,11 @@ void ISR_Timer5A() {
 // capture rising edge of GPS PPS for offset measurement
 void ISR_Timer5B() {
     // snapshot edge time
-    __asm volatile("cpsid if");
+    cpsid();
     register uint32_t a = GPTM0.TAV.raw;
     register uint32_t b = GPTM5.TBV.raw;
     register uint32_t c = GPTM5.TBR.raw;
-    __asm volatile("cpsie if");
+    cpsie();
     // compute edge time
     ppsGpsEdge = (int32_t) (a - ((b - c) & 0xFFFF));
     // clear interrupt flag
