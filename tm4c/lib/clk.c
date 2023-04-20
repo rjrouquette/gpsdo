@@ -134,13 +134,15 @@ uint64_t CLK_TAI() {
     } a, b;
 
     // load current TAI value
+    __asm volatile("cpsid if");
     a.ipart = EMAC0.TIMSEC;
     a.fpart = EMAC0.TIMNANO;
     b.ipart = EMAC0.TIMSEC;
     b.fpart = EMAC0.TIMNANO;
+    __asm volatile("cpsie if");
     // correct for access skew at second boundary
     if(b.fpart < a.fpart && b.ipart == a.ipart) ++b.ipart;
-
+    // adjust fraction point
     b.fpart <<= 1;
     return b.full;
 }
