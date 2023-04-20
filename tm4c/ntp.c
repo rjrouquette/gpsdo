@@ -248,23 +248,23 @@ char* NTP_servers(char *tail) {
     tail = append(tail, "    ");
     tail = append(tail, "address        ");
     tail = append(tail, "  ");
-    tail = append(tail, "stratum");
+    tail = append(tail, "st");
     tail = append(tail, "  ");
-    tail = append(tail, "leap");
+    tail = append(tail, "li");
     tail = append(tail, "  ");
     tail = append(tail, "reach");
     tail = append(tail, "  ");
     tail = append(tail, "next");
     tail = append(tail, "  ");
-    tail = append(tail, "offset (ms)");
+    tail = append(tail, "offset  ");
     tail = append(tail, "  ");
-    tail = append(tail, "delay (ms)");
+    tail = append(tail, "delay   ");
     tail = append(tail, "  ");
-    tail = append(tail, "jitter (ms)");
+    tail = append(tail, "jitter  ");
     tail = append(tail, "  ");
-    tail = append(tail, "drift (ppm)");
+    tail = append(tail, "drift   ");
     tail = append(tail, "  ");
-    tail = append(tail, "skew (ppm)");
+    tail = append(tail, "skew    ");
     tail = append(tail, "  ");
     tail = append(tail, "weight");
     tail = append(tail, "\n");
@@ -279,11 +279,11 @@ char* NTP_servers(char *tail) {
         while(tail < pad)
             *(tail++) = ' ';
 
-        tmp[toDec(servers[i].stratum, 7, ' ', tmp)] = 0;
+        tmp[toDec(servers[i].stratum, 2, ' ', tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[toDec(servers[i].leapIndicator, 4, ' ', tmp)] = 0;
+        tmp[toDec(servers[i].leapIndicator, 2, ' ', tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
@@ -295,23 +295,23 @@ char* NTP_servers(char *tail) {
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(1e3f * servers[i].currentOffset, 11, 3, tmp)] = 0;
+        tmp[fmtFloat(1e3f * servers[i].currentOffset, 8, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(servers[i].meanDelay * 1e3f, 10, 3, tmp)] = 0;
+        tmp[fmtFloat(servers[i].meanDelay * 1e3f, 8, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(sqrtf(servers[i].varDelay) * 1e3f, 11, 3, tmp)] = 0;
+        tmp[fmtFloat(sqrtf(servers[i].varDelay) * 1e3f, 8, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(servers[i].meanDrift * 1e6f, 11, 3, tmp)] = 0;
+        tmp[fmtFloat(servers[i].meanDrift * 1e6f, 8, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
-        tmp[fmtFloat(sqrtf(servers[i].varDrift) * 1e6f, 10, 3, tmp)] = 0;
+        tmp[fmtFloat(sqrtf(servers[i].varDrift) * 1e6f, 8, 3, tmp)] = 0;
         tail = append(tail, tmp);
         tail = append(tail, "  ");
 
@@ -446,8 +446,11 @@ static void runTracking() {
 
     float weight = 0;
     if(server->reach & 1) {
-        float maxError = server->meanDelay + (0x1p-16f * (float) server->rootDelay);
-        maxError += sqrtf(server->varDelay + (0x1p-16f * (float) server->rootDispersion));
+        float maxError = 0x1p-16f * (float) server->rootDispersion;
+        maxError *= maxError;
+        maxError = sqrtf(maxError + server->varDelay);
+        maxError += server->meanDelay;
+        maxError += (0x1p-16f * (float) server->rootDelay);
         weight = 1.0f / maxError;
     }
     if(!isfinite(weight))
