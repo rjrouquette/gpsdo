@@ -38,9 +38,9 @@ uint64_t CLK_TAI();
 
 /**
  * Trim fractional part of TAI reference
- * @param fraction 32-bit fixed-point format (0.31)
+ * @param nanos nanoseconds by which to trim alignment
  */
-void CLK_TAI_align(int32_t fraction);
+void CLK_TAI_align(int32_t nanos);
 
 /**
  * Set integer part of TAI reference

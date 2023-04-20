@@ -226,7 +226,7 @@ void GPSDO_run() {
         // record current offset
         ppsOffsetNano = offset << 3;
         // trim TAI alignment
-        CLK_TAI_align(86 * (offset / 5));
+        CLK_TAI_align(ppsOffsetNano);
         return;
     }
 
@@ -274,9 +274,8 @@ int GPSDO_ntpUpdate(float offset, float skew) {
 
     // hard adjustment
     if(fabsf(offset) > 50e-3f) {
-        int32_t _offset = (int32_t) roundf(offset * 0x1p31f);
-        // trim TAI alignment (truncate precision)
-        CLK_TAI_align((_offset / 86) * 86);
+        // trim TAI alignment
+        CLK_TAI_align((int32_t) roundf(offset * 1e9f));
         return 1;
     }
 

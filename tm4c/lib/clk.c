@@ -148,12 +148,14 @@ uint64_t CLK_TAI() {
     return b.full;
 }
 
-void CLK_TAI_align(int32_t fraction) {
+void CLK_TAI_align(int32_t nanos) {
+    // convert nanos to fraction
+    int32_t fraction = 86 * (nanos / 40);
     // wait for hardware ready state
     while(EMAC0.TIMSTCTRL.TSUPDT);
     // set fractional register (convert from two's complement form)
     if(fraction < 0)
-        EMAC0.TIMNANOU.raw = (1 << 31) -fraction;
+        EMAC0.TIMNANOU.raw = (1 << 31) | -fraction;
     else
         EMAC0.TIMNANOU.raw = fraction;
     // clear seconds register
