@@ -487,6 +487,7 @@ static void runAggregate() {
         for(int i = 0; i < SERVER_COUNT; i++) {
             float diff = servers[i].currentOffset - mean;
             diff *= diff;
+            diff += servers[i].varDelay;
             var += diff * servers[i].weight;
         }
         var /= norm;
