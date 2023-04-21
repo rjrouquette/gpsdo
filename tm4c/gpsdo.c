@@ -79,11 +79,11 @@ void ISR_ADC0Sequence3(void) {
 // capture rising edge of output PPS for offset measurement
 void ISR_Timer5A() {
     // snapshot edge time
-    cpsid();
+    __disable_irq();
     register uint32_t a = GPTM0.TAV.raw;
     register uint32_t b = GPTM5.TAV.raw;
     register uint32_t c = GPTM5.TAR.raw;
-    cpsie();
+    __enable_irq();
     // compute edge time
     ppsOutEdge = (int32_t) (a - ((b - c) & 0xFFFF));
     // clear interrupt flag
@@ -93,11 +93,11 @@ void ISR_Timer5A() {
 // capture rising edge of GPS PPS for offset measurement
 void ISR_Timer5B() {
     // snapshot edge time
-    cpsid();
+    __disable_irq();
     register uint32_t a = GPTM0.TAV.raw;
     register uint32_t b = GPTM5.TBV.raw;
     register uint32_t c = GPTM5.TBR.raw;
-    cpsie();
+    __enable_irq();
     // compute edge time
     ppsGpsEdge = (int32_t) (a - ((b - c) & 0xFFFF));
     // clear interrupt flag

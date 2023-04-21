@@ -74,12 +74,12 @@ void CLK_init() {
 // second boundary comparison
 void ISR_Timer0A() {
     // increment counter
-    cpsid();
+    __disable_irq();
     ++monoInt;
-    monoOff = GPTM0.TAMATCHR;
-    cpsie();
+    monoOff += CLK_FREQ;
+    __enable_irq();
     // set next second boundary
-    GPTM0.TAMATCHR += CLK_FREQ;
+    GPTM0.TAMATCHR = monoOff + CLK_FREQ;
     // clear interrupt flag
     GPTM0.ICR.TAM = 1;
 }
@@ -92,11 +92,11 @@ uint32_t CLK_MONOTONIC_INT() {
 // return current time as 32.32 fixed point value
 uint64_t CLK_MONOTONIC() {
     // capture current time
-    cpsid();
+    __disable_irq();
     register uint32_t snapI = monoInt;
     register uint32_t snapO = monoOff;
     register uint32_t snapF = GPTM0.TAV.raw;
-    cpsie();
+    __enable_irq();
 
     // adjust for overflow
     snapF -= snapO;
@@ -135,12 +135,12 @@ uint64_t CLK_TAI() {
     } a, b;
 
     // load current TAI value
-    cpsid();
+    __disable_irq();
     a.ipart = EMAC0.TIMSEC;
     a.fpart = EMAC0.TIMNANO;
     b.ipart = EMAC0.TIMSEC;
     b.fpart = EMAC0.TIMNANO;
-    cpsie();
+    __enable_irq();
     // correct for access skew at second boundary
     if(b.fpart < a.fpart && b.ipart == a.ipart) ++b.ipart;
     // adjust fraction point
