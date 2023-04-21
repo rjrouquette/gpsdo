@@ -6,7 +6,6 @@
 #include <stdint.h>
 
 #include "../../hw/sys.h"
-#include "../../ntp.h"
 #include "../clk.h"
 #include "../net.h"
 #include "eth.h"
@@ -198,8 +197,6 @@ static void processFrame(uint8_t *frame, int flen) {
     uint32_t optDHCP = 0;
     uint32_t optLease = 0;
     uint8_t optMsgType = 0;
-    uint8_t *optNTP = 0;
-    int lenNTP = 0;
 
     // parse options
     uint8_t *ptr = (uint8_t *) (headerDHCP + 1);
