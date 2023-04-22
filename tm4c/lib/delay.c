@@ -5,9 +5,9 @@
 #include "../hw/timer.h"
 #include "delay.h"
 
-#define CLK_KHZ (125000)
-#define CLK_MHZ (125)
-#define DELAY_MAX (1<<14)
+#define CLK_KHZ (125000)    // 125 MHz
+#define CLK_MHZ (125)       // 125 MHz
+#define DELAY_MAX (1<<14)   // 16.384 ms
 
 void delay_us(uint16_t delay) {
     // get current time
