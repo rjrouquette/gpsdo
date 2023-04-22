@@ -28,14 +28,14 @@ int main(void) {
     LED_init();
     // initialize system clock
     CLK_init();
+    // initialize GPSDO
+    GPSDO_init();
     // initialize networking
     NET_init();
     NTP_init();
     PTP_init();
     SNMP_init();
     STATUS_init();
-    // initialize GPSDO
-    GPSDO_init();
 
     // main loop
     for(;;) {

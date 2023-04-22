@@ -81,11 +81,10 @@ void ISR_Timer5A() {
     // snapshot edge time
     __disable_irq();
     uint32_t a = GPTM0.TAV.raw;
-    uint32_t b = GPTM5.TAV.raw;
-    uint32_t c = GPTM5.TAR.raw;
+    uint32_t b = GPTM5.TAR.raw;
     __enable_irq();
     // compute edge time
-    ppsOutEdge = (int32_t) (a - ((b - c) & 0xFFFF));
+    ppsOutEdge = (int32_t) (a - ((a - b) & 0xFFFF));
     // clear interrupt flag
     GPTM5.ICR.CAE = 1;
 }
@@ -95,11 +94,10 @@ void ISR_Timer5B() {
     // snapshot edge time
     __disable_irq();
     uint32_t a = GPTM0.TAV.raw;
-    uint32_t b = GPTM5.TBV.raw;
-    uint32_t c = GPTM5.TBR.raw;
+    uint32_t b = GPTM5.TBR.raw;
     __enable_irq();
     // compute edge time
-    ppsGpsEdge = (int32_t) (a - ((b - c) & 0xFFFF));
+    ppsGpsEdge = (int32_t) (a - ((a - b) & 0xFFFF));
     // clear interrupt flag
     GPTM5.ICR.CBE = 1;
 }
@@ -144,17 +142,17 @@ void initEdgeComp() {
     // disable overflow interrupt
     GPTM5.TAMR.CINTD = 0;
     GPTM5.TBMR.CINTD = 0;
-    // full 24-bit count
-    GPTM5.TAILR = 0xFFFF;
-    GPTM5.TBILR = 0xFFFF;
-    GPTM5.TAPR = 0xFF;
-    GPTM5.TBPR = 0xFF;
+    // full count range
+    GPTM5.TAILR = -1;
+    GPTM5.TBILR = -1;
     // interrupts
     GPTM5.IMR.CAE = 1;
     GPTM5.IMR.CBE = 1;
     // start timer
     GPTM5.CTL.TAEN = 1;
     GPTM5.CTL.TBEN = 1;
+    // synchronize with monotonic clock
+    GPTM0.SYNC = 0x0c03;
 
     // configure capture pins
     RCGCGPIO.EN_PORTM = 1;

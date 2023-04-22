@@ -449,5 +449,5 @@ static void processUbxPVT(const uint8_t *payload) {
     // set TAI clock
     CLK_TAI_set(offset);
     // set NTP offset
-    NTP_setEpochOffset(-taiOffset);
+    NTP_setOffsetTai(-taiOffset);
 }

@@ -10,7 +10,7 @@
 void NTP_init();
 void NTP_run();
 uint64_t NTP_offset();
-void NTP_setEpochOffset(uint32_t offset);
+void NTP_setOffsetTai(int offsetFromTai);
 float NTP_clockOffset();
 float NTP_clockDrift();
 float NTP_clockSkew();
@@ -18,7 +18,7 @@ int NTP_clockStratum();
 int NTP_leapIndicator();
 float NTP_rootDelay();
 float NTP_rootDispersion();
-void NTP_date(uint64_t clkMono, uint32_t *ntpDate);
+void NTP_date(uint32_t *ntpDate);
 
 char* NTP_servers(char *tail);
 

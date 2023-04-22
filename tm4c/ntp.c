@@ -195,8 +195,8 @@ uint64_t NTP_offset() {
     return ntpOffset;
 }
 
-void NTP_setEpochOffset(uint32_t offset) {
-    ((uint32_t *) &ntpOffset)[1] = offset + NTP_UTC_OFFSET;
+void NTP_setOffsetTai(int offsetFromTai) {
+    ((uint32_t *) &ntpOffset)[1] = offsetFromTai + NTP_UTC_OFFSET;
 }
 
 float NTP_clockOffset() {
@@ -227,13 +227,12 @@ float NTP_rootDispersion() {
     return 0x1p-16f * (float) rootDispersion;
 }
 
-void NTP_date(uint64_t clkMono, uint32_t *ntpDate) {
-    uint64_t rollover = ((uint32_t *)&clkMono)[1];
-    rollover += ((uint32_t *)&ntpOffset)[1];
-    clkMono += ntpOffset;
-    ntpDate[0] = ntpEra + ((uint32_t *)&rollover)[1];
-    ntpDate[1] = __builtin_bswap32(((uint32_t *)&clkMono)[1]);
-    ntpDate[2] = __builtin_bswap32(((uint32_t *)&clkMono)[0]);
+void NTP_date(uint32_t *ntpDate) {
+    union fixed_32_32 now;
+    now.full = CLK_NTP();
+    ntpDate[0] = ntpEra;
+    ntpDate[1] = __builtin_bswap32(now.ipart);
+    ntpDate[2] = __builtin_bswap32(now.fpart);
     ntpDate[3] = 0;
 }
 
