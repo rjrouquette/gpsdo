@@ -14,6 +14,8 @@
 #include "udp.h"
 #include "util.h"
 
+#define DHCP_MAGIC (0x63538263)
+#define REATTEMPT_INTVL (10)
 
 struct PACKED HEADER_DHCP {
     uint8_t OP;
@@ -34,7 +36,6 @@ struct PACKED HEADER_DHCP {
 };
 _Static_assert(sizeof(struct HEADER_DHCP) == 240, "HEADER_DHCP must be 240 bytes");
 
-#define DHCP_MAGIC (0x63538263)
 static uint32_t dhcpUUID;
 static uint32_t dhcpXID = 0;
 static uint32_t dhcpLeaseExpire = 0;
@@ -104,9 +105,9 @@ void DHCP_init() {
 
 void DHCP_run() {
     const uint32_t now = CLK_MONOTONIC_INT();
-    if(((int32_t)(dhcpLeaseExpire - now)) <= 0) {
-        // re-attempt in 10 seconds if renewal fails
-        dhcpLeaseExpire = now + 10;
+    if(((int32_t)(now - dhcpLeaseExpire)) >= 0) {
+        // re-attempt if renewal fails
+        dhcpLeaseExpire += REATTEMPT_INTVL;
         DHCP_renew();
     }
 }

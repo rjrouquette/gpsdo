@@ -23,6 +23,6 @@ float GPSDO_compOffset();
 float GPSDO_compCoeff();
 float GPSDO_compValue();
 float GPSDO_pllTrim();
-uint64_t GPSDO_timeTrimmed();
+uint64_t GPSDO_updated();
 
 #endif //GPSDO_GPSDO_H

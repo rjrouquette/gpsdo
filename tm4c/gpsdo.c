@@ -337,7 +337,7 @@ float GPSDO_pllTrim() {
     return pllBias + pllCorr;
 }
 
-uint64_t GPSDO_timeTrimmed() {
+uint64_t GPSDO_updated() {
     return timeTrimmed;
 }
 

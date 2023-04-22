@@ -260,42 +260,34 @@ int NET_getPhyStatus() {
 }
 
 void NET_run() {
+    // check for completed transmissions
+    while ((endTX != ptrTX) && !txDesc[endTX].TDES0.OWN) {
+        // invoke callback
+        CallbackNetTX pCall = txCallback[endTX];
+        if(pCall) { (*pCall) (txBuffer[endTX], txDesc[endTX].TDES1.TBS1); }
+        // clear callback
+        txCallback[endTX] = 0;
+        // advance pointer
+        endTX = (endTX + 1) & TX_RING_MASK;
+    }
+
+    // check for completed receptions
     for(;;) {
-        // check for completed transmissions
-        if ((endTX != ptrTX) && !txDesc[endTX].TDES0.OWN) {
-            // invoke callback
-            CallbackNetTX callback = txCallback[endTX];
-            if(callback) {
-                (*callback) (txBuffer[endTX], txDesc[endTX].TDES1.TBS1);
-            }
-            // clear callback
-            txCallback[endTX] = 0;
-            // advance pointer
-            ++endTX;
-            endTX &= TX_RING_MASK;
-            continue;
+        struct EMAC_RX_DESC *pRxDesc = rxDesc + ptrRX;
+        // test for ownership
+        if (pRxDesc->RDES0.OWN) break;
+        // process frame if there was no error
+        if (!pRxDesc->RDES0.ES) {
+            uint8_t *buffer = (uint8_t *) pRxDesc->BUFF1;
+            if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_ARP)
+                ARP_process(buffer, pRxDesc->RDES0.FL);
+            else if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_IPv4)
+                IPv4_process(buffer, pRxDesc->RDES0.FL);
         }
-
-        // check for completed receptions
-        struct EMAC_RX_DESC *emacRxDesc = rxDesc + ptrRX;
-        if (!emacRxDesc->RDES0.OWN) {
-            if (!emacRxDesc->RDES0.ES) {
-                uint8_t *buffer = (uint8_t *) emacRxDesc->BUFF1;
-                if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_ARP) {
-                    ARP_process(buffer, emacRxDesc->RDES0.FL);
-                } else if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_IPv4) {
-                    IPv4_process(buffer, emacRxDesc->RDES0.FL);
-                }
-            }
-            emacRxDesc->RDES0.OWN = 1;
-            // advance pointer
-            ++ptrRX;
-            ptrRX &= RX_RING_MASK;
-            continue;
-        }
-
-        // no pending tasks
-        break;
+        // restore ownership to DMA
+        pRxDesc->RDES0.OWN = 1;
+        // advance pointer
+        ptrRX = (ptrRX + 1) & RX_RING_MASK;
     }
 
     // if link is up, poll ARP and DHCP state
