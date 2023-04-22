@@ -80,9 +80,9 @@ void ISR_ADC0Sequence3(void) {
 void ISR_Timer5A() {
     // snapshot edge time
     __disable_irq();
-    register uint32_t a = GPTM0.TAV.raw;
-    register uint32_t b = GPTM5.TAV.raw;
-    register uint32_t c = GPTM5.TAR.raw;
+    uint32_t a = GPTM0.TAV.raw;
+    uint32_t b = GPTM5.TAV.raw;
+    uint32_t c = GPTM5.TAR.raw;
     __enable_irq();
     // compute edge time
     ppsOutEdge = (int32_t) (a - ((b - c) & 0xFFFF));
@@ -94,9 +94,9 @@ void ISR_Timer5A() {
 void ISR_Timer5B() {
     // snapshot edge time
     __disable_irq();
-    register uint32_t a = GPTM0.TAV.raw;
-    register uint32_t b = GPTM5.TBV.raw;
-    register uint32_t c = GPTM5.TBR.raw;
+    uint32_t a = GPTM0.TAV.raw;
+    uint32_t b = GPTM5.TBV.raw;
+    uint32_t c = GPTM5.TBR.raw;
     __enable_irq();
     // compute edge time
     ppsGpsEdge = (int32_t) (a - ((b - c) & 0xFFFF));

@@ -7,6 +7,7 @@
 #include "../hw/interrupts.h"
 #include "../hw/gpio.h"
 #include "../hw/sys.h"
+#include "../lib/clk.h"
 #include "../lib/delay.h"
 #include "net.h"
 #include "net/arp.h"
@@ -339,15 +340,9 @@ uint64_t NET_getRxTime(const uint8_t *rxFrame) {
     uint32_t rxId = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
     if(rxId >= RX_RING_SIZE) return 0;
     // retrieve timestamp
-    register union {
-        struct {
-            uint32_t fpart;
-            uint32_t ipart;
-        };
-        uint64_t full;
-    } result;
-    result.fpart = rxDesc[rxId].RTSL;
+    register union fixed_32_32 result;
     result.ipart = rxDesc[rxId].RTSH;
+    result.fpart = rxDesc[rxId].RTSL;
     result.fpart <<= 1;
     return result.full;
 }
@@ -357,15 +352,9 @@ uint64_t NET_getTxTime(const uint8_t *txFrame) {
     uint32_t txId = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
     if(txId >= TX_RING_SIZE) return 0;
     // retrieve timestamp
-    register union {
-        struct {
-            uint32_t fpart;
-            uint32_t ipart;
-        };
-        uint64_t full;
-    } result;
-    result.fpart = txDesc[txId].TTSL;
+    register union fixed_32_32 result;
     result.ipart = txDesc[txId].TTSH;
+    result.fpart = txDesc[txId].TTSL;
     result.fpart <<= 1;
     return result.full;
 }

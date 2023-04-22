@@ -8,6 +8,17 @@
 #include <stdint.h>
 
 /**
+ * fixed-point 32.32 timestamp structure
+ */
+union fixed_32_32 {
+    struct {
+        uint32_t fpart;
+        uint32_t ipart;
+    };
+    uint64_t full;
+};
+
+/**
  * Initialize system clock and timers
  */
 void CLK_init();

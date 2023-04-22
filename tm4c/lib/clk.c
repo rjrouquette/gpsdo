@@ -75,8 +75,8 @@ void CLK_init() {
 void ISR_Timer0A() {
     // increment counter
     __disable_irq();
-    ++monoInt;
     monoOff += CLK_FREQ;
+    ++monoInt;
     __enable_irq();
     // set next second boundary
     GPTM0.TAMATCHR = monoOff + CLK_FREQ;
@@ -93,9 +93,9 @@ uint32_t CLK_MONOTONIC_INT() {
 uint64_t CLK_MONOTONIC() {
     // capture current time
     __disable_irq();
-    register uint32_t snapI = monoInt;
-    register uint32_t snapO = monoOff;
-    register uint32_t snapF = GPTM0.TAV.raw;
+    uint32_t snapF = GPTM0.TAV.raw;
+    uint32_t snapI = monoInt;
+    uint32_t snapO = monoOff;
     __enable_irq();
 
     // adjust for overflow
@@ -105,16 +105,8 @@ uint64_t CLK_MONOTONIC() {
         snapF -= CLK_FREQ;
     }
 
-    // result structure
-    register union {
-        struct {
-            uint32_t fpart;
-            uint32_t ipart;
-        };
-        uint64_t full;
-    } result;
-
     // assemble result
+    union fixed_32_32 result;
     result.fpart = nanosToFrac(snapF << 3);
     result.ipart = snapI;
     return result.full;
@@ -126,13 +118,7 @@ uint32_t CLK_TAI_INT() {
 
 uint64_t CLK_TAI() {
     // result structure
-    register union {
-        struct {
-            uint32_t fpart;
-            uint32_t ipart;
-        };
-        uint64_t full;
-    } a, b;
+    union fixed_32_32 a, b;
 
     // load current TAI value
     __disable_irq();
@@ -201,13 +187,7 @@ float CLK_TAI_trim(float trim) {
 
 uint32_t nanosToFrac(uint32_t nanos) {
     // scratch structure
-    register union {
-        struct {
-            uint32_t fpart;
-            uint32_t ipart;
-        };
-        uint64_t full;
-    } scratch;
+    union fixed_32_32 scratch;
 
     // multiply by 4 (integer portion of 4.294967296)
     nanos <<= 2;
