@@ -50,12 +50,6 @@ void CLK_init() {
     RSCLKCFG.PSYSDIV = 2;
     RSCLKCFG.USEPLL = 1;
 
-    // Configure SysTick Timer
-    STRELOAD.RELOAD = 0xFFFFFF;
-    STCTRL.CLK_SRC = 1;
-    STCTRL.INTEN = 0;
-    STCTRL.ENABLE = 1;
-
     // Enable Timer 0
     RCGCTIMER.EN_GPTM0 = 1;
     delay_cycles_4();

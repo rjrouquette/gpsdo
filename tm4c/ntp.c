@@ -14,7 +14,7 @@
 #include "lib/net/util.h"
 #include "lib/led.h"
 #include "gpsdo.h"
-#include "hw/sys.h"
+#include "hw/timer.h"
 #include "lib/net/arp.h"
 #include "lib/format.h"
 #include "lib/net/dns.h"
@@ -35,7 +35,7 @@
 #define NTP_POLL_INTV (64)
 #define NTP_POLL_SLOTS (8)
 #define NTP_POLL_PING (NTP_POLL_INTV - NTP_POLL_SLOTS)
-#define NTP_POLL_RAND ((STCURRENT.CURRENT >> 8) & (NTP_POLL_SLOTS - 1)) // employs scheduling uncertainty
+#define NTP_POLL_RAND ((GPTM0.TAV.raw >> 8) & (NTP_POLL_SLOTS - 1)) // employs scheduling uncertainty
 #define NTP_UTC_OFFSET (2208988800)
 #define NTP_STAT_RATE (0x1p-3f)
 #define NTP_ACTIVE_THRESH (0.005f)

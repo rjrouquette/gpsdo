@@ -3,14 +3,13 @@
 //
 
 #include "../hw/gpio.h"
-#include "../hw/sys.h"
+#include "../hw/timer.h"
 #include "delay.h"
 #include "led.h"
 
-#define UPDATE_INTERVAL (1953125) // 64 Hz
+#define UPDATE_INTERVAL (7812500) // 16 Hz
 
 static uint32_t nextUpdate = 0;
-static uint8_t state = 0;
 static uint8_t status = 0;
 
 void LED_init() {
@@ -40,16 +39,13 @@ void LED1_TGL() { PORTN.DATA[0x02u] ^= 0x02u; }
 
 void LED_run() {
     // wait for next update time
-    if((nextUpdate - STCURRENT.CURRENT) & (1u << 23u))
+    if(((int32_t) (nextUpdate - GPTM0.TAV.raw)) > 0)
         return;
     // set next update time
     nextUpdate += UPDATE_INTERVAL;
-    // update led state
-    if(((++state) & 0xF) == 0) {
-        // set LED state
-        PORTN.DATA[0x03u] = status;
-        status = 0;
-    }
+    // set LED state
+    PORTN.DATA[0x03u] = status;
+    status = 0;
 }
 
 void LED_act0() {
