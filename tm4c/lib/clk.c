@@ -74,10 +74,8 @@ void CLK_init() {
 // second boundary comparison
 void ISR_Timer0A() {
     // increment counter
-    __disable_irq();
     monoOff += CLK_FREQ;
     ++monoInt;
-    __enable_irq();
     // set next second boundary
     GPTM0.TAMATCHR = monoOff + CLK_FREQ;
     // clear interrupt flag
