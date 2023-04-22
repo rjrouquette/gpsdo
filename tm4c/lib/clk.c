@@ -117,10 +117,9 @@ uint32_t CLK_TAI_INT() {
 }
 
 uint64_t CLK_TAI() {
-    // result structure
-    union fixed_32_32 a, b;
-
     // load current TAI value
+    // read twice to correct for access skew
+    union fixed_32_32 a, b;
     __disable_irq();
     a.ipart = EMAC0.TIMSEC;
     a.fpart = EMAC0.TIMNANO;
@@ -186,23 +185,15 @@ float CLK_TAI_trim(float trim) {
 }
 
 uint32_t nanosToFrac(uint32_t nanos) {
-    // scratch structure
-    union fixed_32_32 scratch;
-
     // multiply by 4 (integer portion of 4.294967296)
     nanos <<= 2;
-
-    // apply correction factor to value
+    // compute correction value
+    union fixed_32_32 scratch;
     scratch.ipart = 0;
     scratch.fpart = nanos;
     scratch.full *= 0x12E0BE82;
-
-    // combine correction value with base value
-    scratch.ipart += nanos;
-
     // round up to minimize average error
     scratch.ipart += scratch.fpart >> 31;
-
-    // return result
-    return scratch.ipart;
+    // combine correction value with base value
+    return nanos + scratch.ipart;
 }
