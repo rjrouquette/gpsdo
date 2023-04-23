@@ -4,26 +4,30 @@
 
 #include <string.h>
 
-#include "status.h"
+#include "hw/eeprom.h"
+#include "hw/emac.h"
+#include "hw/sys.h"
 #include "lib/clk.h"
 #include "lib/format.h"
+#include "lib/gps.h"
 #include "lib/led.h"
 #include "lib/net.h"
 #include "lib/net/eth.h"
 #include "lib/net/ip.h"
 #include "lib/net/udp.h"
 #include "lib/net/util.h"
-#include "gpsdo.h"
-#include "hw/emac.h"
 #include "lib/net/dhcp.h"
-#include "hw/sys.h"
+
+#include "gitversion.h"
+#include "gpsdo.h"
 #include "ntp.h"
-#include "lib/gps.h"
+#include "status.h"
 
 #define STATUS_PORT (23) // telnet port
 
 void STATUS_process(uint8_t *frame, int flen);
 
+unsigned statusEEPROM(int block, char *body);
 unsigned statusETH(char *body);
 unsigned statusGPS(char *body);
 unsigned statusGPSDO(char *body);
@@ -69,7 +73,9 @@ void STATUS_process(uint8_t *frame, int flen) {
     char *body = (char *) (headerUDP + 1);
     // force null termination
     body[size] = 0;
-    if(strncmp(body, "ethernet", 8) == 0 && hasTerminus(body, 8)) {
+    if(strncmp(body, "eeprom", 6) == 0 && hasTerminus(body, 8)) {
+        size = statusEEPROM((int) fromHex(body + 6, 2), body);
+    } else if(strncmp(body, "ethernet", 8) == 0 && hasTerminus(body, 8)) {
         size = statusETH(body);
     } else if(strncmp(body, "gps", 3) == 0 && hasTerminus(body, 3)) {
         size = statusGPS(body);
@@ -293,6 +299,12 @@ unsigned statusGPSDO(char *body) {
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
+    // temperature offset
+    tmp[toBase(CLK_MONOTONIC_INT() - GPSDO_compSaved(), 10, tmp)] = 0;
+    end = append(end, "  - last saved: ");
+    end = append(end, tmp);
+    end = append(end, " s\n");
+
     // return size
     return end - body;
 }
@@ -375,13 +387,12 @@ unsigned statusNTP(char *body) {
     return end - body;
 }
 
-#include "gitversion.h"
 unsigned statusSystem(char *body) {
     char tmp[32];
     char *end = body;
 
     // firmware version
-    strncpy(tmp, VERSION_GIT, 8);
+    toHex(VERSION_FW, 8, '0', tmp);
     tmp[8] = 0;
     end = append(end, "firmware: 0x");
     end = append(end, tmp);
@@ -424,6 +435,47 @@ unsigned statusSystem(char *body) {
     end = append(end, "flash size: ");
     end = append(end, tmp);
     end = append(end, "\n");
+
+    // eeprom status
+    EEPROM_seek(0);
+    uint32_t eeprom_format = EEPROM_read();
+    uint32_t eeprom_version = EEPROM_read();
+
+    // eeprom format
+    toHex(eeprom_format, 8, '0', tmp);
+    tmp[8] = 0;
+    end = append(end, "eeprom format: 0x");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // eeprom version
+    toHex(eeprom_version, 8, '0', tmp);
+    tmp[8] = 0;
+    end = append(end, "eeprom version: 0x");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // return size
+    return end - body;
+}
+
+unsigned statusEEPROM(int block, char *body) {
+    char tmp[32];
+    char *end = body;
+
+    strcpy(tmp, "block 0x");
+    toHex(block, 2, '0', tmp+8);
+    tmp[10] = '\n';
+    tmp[11] = 0;
+    end = append(end, tmp);
+
+    EEPROM_seek(block << 4);
+    for(int i = 0; i < 16; i++) {
+        uint32_t word = EEPROM_read();
+        end = append(end, "  ");
+        end = toHexBytes(end, (uint8_t *) &word, sizeof(word));
+        end = append(end, "\n");
+    }
 
     // return size
     return end - body;

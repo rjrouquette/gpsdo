@@ -131,3 +131,19 @@ int fmtFloat(float value, int width, int digits, char *origin) {
     len += digits;
     return padCopy(width, ' ', origin, result, len);
 }
+
+uint32_t fromHex(const char *str, int len) {
+    uint32_t result = 0;
+    for(int i = 0; i < len; i++) {
+        if(str[i] == 0) break;
+        result <<= 4;
+        if(str[i] >= '0' && str[i] <= '9') {
+            result += str[i] - '0';
+        } else if(str[i] >= 'A' && str[i] <= 'F') {
+            result += str[i] - 'A';
+        } else if(str[i] >= 'a' && str[i] <= 'a') {
+            result += str[i] - 'a';
+        }
+    }
+    return result;
+}

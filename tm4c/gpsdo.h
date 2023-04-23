@@ -22,6 +22,7 @@ float GPSDO_compBias();
 float GPSDO_compOffset();
 float GPSDO_compCoeff();
 float GPSDO_compValue();
+uint32_t GPSDO_compSaved();
 float GPSDO_pllTrim();
 uint64_t GPSDO_updated();
 

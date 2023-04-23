@@ -26,4 +26,6 @@ int toHMS(uint32_t value, char *origin);
 
 int fmtFloat(float value, int width, int digits, char *origin);
 
+uint32_t fromHex(const char *str, int len);
+
 #endif //GPSDO_FORMAT_H

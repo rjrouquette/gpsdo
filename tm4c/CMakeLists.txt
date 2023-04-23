@@ -32,6 +32,7 @@ add_executable(
         ptp.c
         snmp.c
         status.c
+        hw/eeprom.c
         hw/emac.c
         hw/interrupts.c
         hw/sys.c

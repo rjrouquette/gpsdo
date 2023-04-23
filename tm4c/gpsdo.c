@@ -11,6 +11,7 @@
 #include "lib/delay.h"
 #include "lib/gps.h"
 #include "lib/clk.h"
+#include "hw/eeprom.h"
 
 
 #define CLK_FREQ (125000000) // 125 MHz
@@ -23,6 +24,8 @@
 #define STAT_LOCK_RMS (250e-9f)
 #define STAT_COMP_RMS (200e-9f)
 #define TCOMP_ALPHA (0x1p-14f)
+#define TCOMP_EEPROM_BLOCK (0x0010)
+#define TCOMP_SAVE_INTV (3600)
 #define NTP_MAX_SKEW (5e-6f)
 #define NTP_RATE (0x1p6f)
 #define NTP_OFFSET_CORR (0x1p-10f)
@@ -31,6 +34,7 @@
 // temperature compensation state
 static float currTemp;
 static float tcompCoeff, tcompBias, tcompOffset;
+static uint32_t tcompSaved;
 
 static int32_t ppsGpsEdgePrev;
 static int32_t ppsGpsEdge;
@@ -116,6 +120,27 @@ void initTempComp() {
     ADC0.ACTSS.ASEN3 = 1;
     // trigger temperature measurement
     ADC0.PSSI.SS3 = 1;
+
+    // load temperature compensation parameters
+    uint32_t word;
+    EEPROM_seek(TCOMP_EEPROM_BLOCK);
+    word = EEPROM_read();
+    if(word != -1u) {
+        // set temperature coefficient
+        tcompCoeff = *(float *) &word;
+        // load temperature bias
+        word = EEPROM_read();
+        tcompBias = *(float *) &word;
+        // load correction offset
+        word = EEPROM_read();
+        tcompOffset = *(float *) &word;
+    }
+    // reset if invalid
+    if(!isfinite(tcompCoeff) || !isfinite(tcompBias) || !isfinite(tcompOffset)) {
+        tcompCoeff = 0;
+        tcompBias = 0;
+        tcompOffset = 0;
+    }
 }
 
 void initEdgeComp() {
@@ -215,12 +240,12 @@ void GPSDO_run() {
 
     // advance PPS tracker
     ppsPresent <<= 1;
-    // verify PPS event occurred
-    if(ppsGpsEdge == ppsGpsEdgePrev) return;
-    // ignore if PPS event is stale
-    if(now - ppsGpsEdge > CLK_FREQ + PPS_GRACE_PERIOD) return;
-    // ignore if GPS has no fix
-    if(!GPS_hasFix()) return;
+    // sanity check pps output interval
+    int32_t ppsGpsDelta = ppsGpsEdge - ppsGpsEdgePrev;
+    ppsGpsEdgePrev = ppsGpsEdge;
+    // ignore if PPS event is unstable
+    if(ppsGpsDelta < CLK_FREQ - PPS_GRACE_PERIOD) return;
+    if(ppsGpsDelta > CLK_FREQ + PPS_GRACE_PERIOD) return;
     // mark PPS as present
     ppsPresent |= 1;
 
@@ -232,7 +257,7 @@ void GPSDO_run() {
             offset < -PPS_COARSE_ALIGN
     ) {
         // clamp offset to +/- 0.5 seconds
-        if(offset >  62500000) offset -= 125000000;
+        if(offset > (CLK_FREQ / 2)) offset -= CLK_FREQ;
         // record current offset
         ppsOffsetNano = offset << 3;
         // trim TAI alignment
@@ -349,6 +374,10 @@ float GPSDO_compValue() {
     return currCompensation;
 }
 
+uint32_t GPSDO_compSaved() {
+    return tcompSaved;
+}
+
 float GPSDO_pllTrim() {
     return pllBias + pllCorr;
 }
@@ -375,4 +404,14 @@ static void updateTempComp(float rate, float target) {
     error *= rate;
     error *= temp - tcompBias;
     tcompCoeff += error;
+
+    const uint32_t now = CLK_MONOTONIC_INT();
+    if(now - tcompSaved > TCOMP_SAVE_INTV) {
+        tcompSaved = now;
+        // save temperature compensation parameters
+        EEPROM_seek(TCOMP_EEPROM_BLOCK);
+        EEPROM_write(*(uint32_t *) &tcompCoeff);
+        EEPROM_write(*(uint32_t *) &tcompBias);
+        EEPROM_write(*(uint32_t *) &tcompOffset);
+    }
 }

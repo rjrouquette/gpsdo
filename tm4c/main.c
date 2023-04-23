@@ -9,25 +9,31 @@
 #include "lib/gps.h"
 #include "lib/led.h"
 #include "lib/net.h"
+#include "hw/eeprom.h"
 #include "hw/sys.h"
 
+#include "gitversion.h"
 #include "gpsdo.h"
 #include "ntp.h"
 #include "ptp.h"
 #include "snmp.h"
 #include "status.h"
 
+#define EEPROM_FORMAT (0x00000000)
+
+static void EEPROM_init();
+
 int main(void) {
     // enable FPU
     CPAC.CP10 = 3;
     CPAC.CP11 = 3;
-    // enable EEPROM
-    RCGCEEPROM.EN_EEPROM = 1;
 
     // initialize status LEDs
     LED_init();
     // initialize system clock
     CLK_init();
+    // initialize EEPROM
+    EEPROM_init();
     // initialize GPSDO
     GPSDO_init();
     // initialize networking
@@ -73,4 +79,22 @@ void Fault_Bus() {
 
 void Fault_Usage() {
     debugBlink(5);
+}
+
+static void EEPROM_init() {
+    // enable EEPROM
+    RCGCEEPROM.EN_EEPROM = 1;
+    delay_us(1);
+    EEPROM_wait();
+
+    // verify eeprom format
+    EEPROM_seek(0);
+    uint32_t format = EEPROM_read();
+    if(format != EEPROM_FORMAT) {
+        // reformat EEPROM
+        EEPROM_mass_erase();
+        EEPROM_seek(0);
+        EEPROM_write(EEPROM_FORMAT);
+        EEPROM_write(VERSION_FW);
+    }
 }
