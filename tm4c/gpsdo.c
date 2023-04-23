@@ -165,6 +165,22 @@ void initEdgeComp() {
     // lock GPIO config
     PORTM.CR = 0;
     PORTM.LOCK = 0;
+
+    // configure PPS output pin
+    RCGCGPIO.EN_PORTG = 1;
+    delay_cycles_4();
+    // unlock GPIO config
+    PORTG.LOCK = GPIO_LOCK_KEY;
+    PORTG.CR = 0x01u;
+    // configure pins
+    PORTG.DIR = 0x01u;
+    PORTG.DR8R = 0x01u;
+    PORTG.PCTL.PMC0 = 0x5;
+    PORTG.AFSEL.ALT0 = 1;
+    PORTG.DEN = 0x01u;
+    // lock GPIO config
+    PORTG.CR = 0;
+    PORTG.LOCK = 0;
 }
 
 void GPSDO_init() {

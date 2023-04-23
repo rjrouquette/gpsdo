@@ -13,11 +13,12 @@
 #define USE_XTAL 1
 #define CLK_FREQ (125000000)
 #define MAX_TRIM (500e-6f)
+#define CORR_OFFSET (0xFFB34C02)
 
 static volatile uint32_t monoInt = 0;
 static volatile uint32_t monoOff = 0;
 
-void CLK_init() {
+static void initClkSys() {
     // Enable external clock
     MOSCCTL.NOXTAL = 0;
 #ifdef USE_XTAL
@@ -49,7 +50,9 @@ void CLK_init() {
     // Switch to PLL
     RSCLKCFG.PSYSDIV = 2;
     RSCLKCFG.USEPLL = 1;
+}
 
+static void initClkMono() {
     // Enable Timer 0
     RCGCTIMER.EN_GPTM0 = 1;
     delay_cycles_4();
@@ -63,6 +66,48 @@ void CLK_init() {
     GPTM0.TAMR.MIE = 1;
     // start timer
     GPTM0.CTL.TAEN = 1;
+}
+
+static void initClkTai() {
+    // disable flash prefetch per errata
+    FLASHCONF.FPFOFF = 1;
+    // enable clock
+    RCGCEMAC.EN0 = 1;
+    delay_cycles_4();
+
+    // disable timer interrupts
+    EMAC0.IM.TS = 1;
+    // enable PTP clock
+    EMAC0.CC.PTPCEN = 1;
+    // configure PTP
+    EMAC0.TIMSTCTRL.ALLF = 1;
+    EMAC0.TIMSTCTRL.DGTLBIN = 0;
+    EMAC0.TIMSTCTRL.TSEN = 1;
+    // 2^31 / 25MHz = 85.899
+    EMAC0.SUBSECINC.SSINC = 86;
+    // init timer
+    EMAC0.TIMSECU = 0;
+    EMAC0.TIMNANOU.VALUE = 0;
+    // frequency correction
+    EMAC0.TIMADD = CORR_OFFSET;
+    EMAC0.TIMSTCTRL.ADDREGUP = 1;
+    EMAC0.TIMSTCTRL.TSFCUPDT = 1;
+    // start timer
+    EMAC0.TIMSTCTRL.TSINIT = 1;
+    // use PPS free-running mode
+    EMAC0.PPSCTRL.TRGMODS0 = 3;
+    // start 1 Hz PPS output
+    EMAC0.PPSCTRL.PPSEN0 = 0;
+    EMAC0.PPSCTRL.PPSCTRL = 0;
+
+    // re-enable flash prefetch per errata
+    FLASHCONF.FPFOFF = 0;
+}
+
+void CLK_init() {
+    initClkSys();
+    initClkMono();
+    initClkTai();
 }
 
 // second boundary comparison
@@ -170,7 +215,7 @@ float CLK_TAI_trim(float trim) {
     // convert to correction factor
     int32_t correction = lroundf(trim * 0x1p32f);
     // apply correction update
-    EMAC0.TIMADD = 0xFFB34C02 + correction;
+    EMAC0.TIMADD = CORR_OFFSET + correction;
     EMAC0.TIMSTCTRL.ADDREGUP = 1;
     // return actual value
     return 0x1p-32f * (float) correction;

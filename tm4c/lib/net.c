@@ -114,50 +114,6 @@ static void initPHY() {
     EMAC_MII_Write(&EMAC0, MII_ADDR_EPHYCFG1, temp);
 }
 
-static void initPTP() {
-    // disable timer interrupts
-    EMAC0.IM.TS = 1;
-    // enable PTP clock
-    EMAC0.CC.PTPCEN = 1;
-    // configure PTP
-    EMAC0.TIMSTCTRL.ALLF = 1;
-    EMAC0.TIMSTCTRL.DGTLBIN = 0;
-    EMAC0.TIMSTCTRL.TSEN = 1;
-    // 2^31 / 25MHz = 85.899
-    EMAC0.SUBSECINC.SSINC = 86;
-    // init timer
-    EMAC0.TIMSECU = 0;
-    EMAC0.TIMNANOU.VALUE = 0;
-    // frequency correction
-    EMAC0.TIMADD = 0xFFB34C02;
-    EMAC0.TIMSTCTRL.ADDREGUP = 1;
-    EMAC0.TIMSTCTRL.TSFCUPDT = 1;
-    // start timer
-    EMAC0.TIMSTCTRL.TSINIT = 1;
-
-    // configure PPS output pin
-    RCGCGPIO.EN_PORTG = 1;
-    delay_cycles_4();
-    // unlock GPIO config
-    PORTG.LOCK = GPIO_LOCK_KEY;
-    PORTG.CR = 0x01u;
-    // configure pins
-    PORTG.DIR = 0x01u;
-    PORTG.DR8R = 0x01u;
-    PORTG.PCTL.PMC0 = 0x5;
-    PORTG.AFSEL.ALT0 = 1;
-    PORTG.DEN = 0x01u;
-    // lock GPIO config
-    PORTG.CR = 0;
-    PORTG.LOCK = 0;
-
-    // use PPS free-running mode
-    EMAC0.PPSCTRL.TRGMODS0 = 3;
-    // start 1 Hz PPS output
-    EMAC0.PPSCTRL.PPSEN0 = 0;
-    EMAC0.PPSCTRL.PPSCTRL = 0;
-}
-
 static void initHwAddr() {
     // enable CRC module
     RCGCCCM.EN = 1;
@@ -188,7 +144,6 @@ static void initMAC() {
     while(EMAC0.DMABUSMOD.SWR);
 
     initHwAddr();
-    initPTP();
 
     // configure DMA
     EMAC0.DMABUSMOD.ATDS = 1;
@@ -197,6 +152,7 @@ static void initMAC() {
     EMAC0.DMAOPMODE.ST = 1;
     EMAC0.DMAOPMODE.SR = 1;
 
+    // set frame filter moe
     EMAC0.FRAMEFLTR.PM = 1;
     EMAC0.FRAMEFLTR.VTFE = 1;
     // verify all checksum
