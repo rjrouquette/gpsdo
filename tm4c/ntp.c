@@ -92,12 +92,12 @@ static struct Server {
 } servers[SERVER_COUNT];
 
 // hash table for interleaved timestamps
-#define XLEAVE_COUNT (1<<6)
+#define XLEAVE_COUNT (1024)
 static struct TsXleave {
     uint64_t rxTime;
     uint64_t txTime;
 } tsXleave[XLEAVE_COUNT];
-static int ptrXleave;
+static inline int hashXleave(uint32_t addr) { return (int) (((addr * 0xDE9DB139) >> 22) & (XLEAVE_COUNT - 1)); }
 
 static inline uint64_t ntpClock() { return CLK_TAI() + ntpOffset; }
 static inline uint64_t ntpModified() { return GPSDO_updated() + ntpOffset; }
@@ -687,10 +687,10 @@ static void requestTxCallback(uint8_t *frame, int flen) {
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
-    // record hardware transmit time
-    tsXleave[ptrXleave].rxTime = headerNTP->rxTime;
-    tsXleave[ptrXleave].txTime = __builtin_bswap64(ntpTimeTx(frame));
-    ptrXleave = (ptrXleave + 1) & (XLEAVE_COUNT - 1);
+    // store hardware transmit time
+    uint32_t cell = hashXleave(headerIPv4->dst);
+    tsXleave[cell].rxTime = headerNTP->rxTime;
+    tsXleave[cell].txTime = __builtin_bswap64(ntpTimeTx(frame));
 }
 
 void processRequest(uint8_t *frame, int flen) {
@@ -740,13 +740,10 @@ void processRequest(uint8_t *frame, int flen) {
             orgTime != 0 &&
             headerNTP->rxTime != headerNTP->txTime
     ) {
-        // scan table for matching timestamp
-        for(int i = 0; i < XLEAVE_COUNT; i++) {
-            if(orgTime != tsXleave[i].rxTime) continue;
-            // match found
-            xleave = i;
-            break;
-        }
+        // load TX timestamp if available
+        int cell = hashXleave(headerIPv4->dst);
+        if(orgTime == tsXleave[cell].rxTime)
+            xleave = cell;
     }
 
     // set type to server response
@@ -763,12 +760,16 @@ void processRequest(uint8_t *frame, int flen) {
     headerNTP->refID = refId;
     // set reference timestamp
     headerNTP->refTime = __builtin_bswap64(ntpModified());
-    // set origin timestamp
-    headerNTP->origTime = (xleave < 0) ? headerNTP->txTime : headerNTP->rxTime;
+    // set origin and TX timestamps
+    if(xleave < 0) {
+        headerNTP->origTime = headerNTP->txTime;
+        headerNTP->txTime = __builtin_bswap64(ntpClock());
+    } else {
+        headerNTP->origTime = headerNTP->rxTime;
+        headerNTP->txTime = tsXleave[xleave].txTime;
+    }
     // set RX timestamp
     headerNTP->rxTime = __builtin_bswap64(rxTime);
-    // set TX timestamp
-    headerNTP->txTime = (xleave < 0) ? __builtin_bswap64(ntpClock()) : tsXleave[xleave].txTime;
 
     // finalize packet
     UDP_finalize(frame, flen);
