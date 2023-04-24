@@ -5,13 +5,13 @@
 #include <math.h>
 #include "gpsdo.h"
 #include "hw/adc.h"
+#include "hw/eeprom.h"
 #include "hw/gpio.h"
 #include "hw/interrupts.h"
 #include "hw/timer.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
 #include "lib/clk.h"
-#include "hw/eeprom.h"
 
 
 #define CLK_FREQ (125000000) // 125 MHz
