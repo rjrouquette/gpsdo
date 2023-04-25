@@ -337,6 +337,7 @@ void NTP_run() {
     // fast return to stratum 1 with PPS presence
     if(clockStratum != 1 && GPSDO_ppsPresent()) {
         clockStratum = 1;
+        refId = NTP_REF_GPS;
         rootDelay = 0;
         rootDispersion = 0;
     }
@@ -1019,6 +1020,11 @@ static void resetServer(struct Server *server) {
 #define REP_LEN_SOURCESTATS (offsetof(CMD_Reply, data.sourcestats.EOR))
 #define REP_LEN_TRACKING (offsetof(CMD_Reply, data.tracking.EOR))
 
+__attribute__((always_inline))
+static inline uint16_t htons(uint16_t value) { return __builtin_bswap16(value); }
+static inline uint32_t htonl(uint32_t value) { return __builtin_bswap32(value); }
+static int32_t htonf(float value);
+
 static void candmReply(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
 static void processNSources(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
 static void processSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
@@ -1067,36 +1073,36 @@ static void processChrony(uint8_t *frame, int flen) {
 
     // nack bad protocol version
     if(cmdRequest->version != PROTO_VERSION_NUMBER) {
-        cmdReply->status = __builtin_bswap16(STT_BADPKTVERSION);
+        cmdReply->status = htons(STT_BADPKTVERSION);
     } else {
-        uint16_t cmd = __builtin_bswap16(cmdRequest->command);
+        uint16_t cmd = htons(cmdRequest->command);
         int len = flen - UDP_DATA_OFFSET;
         if (cmd == REQ_N_SOURCES) {
             if(len == REP_LEN_NSOURCES)
                 processNSources(cmdReply, cmdRequest);
             else
-                cmdReply->status = __builtin_bswap16(STT_BADPKTLENGTH);
+                cmdReply->status = htons(STT_BADPKTLENGTH);
         }
         else if (cmd == REQ_SOURCE_DATA) {
             if(len == REP_LEN_SOURCEDATA)
                 processSourceData(cmdReply, cmdRequest);
             else
-                cmdReply->status = __builtin_bswap16(STT_BADPKTLENGTH);
+                cmdReply->status = htons(STT_BADPKTLENGTH);
         }
         else if (cmd == REQ_SOURCESTATS) {
             if(len == REP_LEN_SOURCESTATS)
                 processSourceStats(cmdReply, cmdRequest);
             else
-                cmdReply->status = __builtin_bswap16(STT_BADPKTLENGTH);
+                cmdReply->status = htons(STT_BADPKTLENGTH);
         }
         else if (cmd == REQ_TRACKING) {
             if(len == REP_LEN_TRACKING)
                 processTracking(cmdReply, cmdRequest);
             else
-                cmdReply->status = __builtin_bswap16(STT_BADPKTLENGTH);
+                cmdReply->status = htons(STT_BADPKTLENGTH);
         }
         else {
-            cmdReply->status = __builtin_bswap16(STT_INVALID);
+            cmdReply->status = htons(STT_INVALID);
         }
     }
 
@@ -1111,24 +1117,104 @@ static void candmReply(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
     cmdReply->version = PROTO_VERSION_NUMBER;
     cmdReply->pkt_type = PKT_TYPE_CMD_REPLY;
     cmdReply->command = cmdRequest->command;
-    cmdReply->reply = __builtin_bswap16(RPY_NULL);
-    cmdReply->status = __builtin_bswap16(STT_SUCCESS);
+    cmdReply->reply = htons(RPY_NULL);
+    cmdReply->status = htons(STT_SUCCESS);
     cmdReply->sequence = cmdRequest->sequence;
 }
 
 static void processNSources(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
-    cmdReply->reply = RPY_N_SOURCES;
-    cmdReply->data.n_sources.n_sources = 8;
+    cmdReply->reply = htons(RPY_N_SOURCES);
+    cmdReply->data.n_sources.n_sources = htonl(SERVER_COUNT);
 }
 
 static void processSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
+    cmdReply->reply = htons(RPY_SOURCE_DATA);
 
+    uint32_t i = htonl(cmdRequest->data.source_data.index);
+    if(i >= SERVER_COUNT) return;
+
+    struct Server *server = servers + i;
+    cmdReply->data.source_data.ip_addr.family = htons(IPADDR_INET4);
+    cmdReply->data.source_data.ip_addr.addr.in4 = server->addr;
+    cmdReply->data.source_data.stratum = htons(server->stratum);
+    cmdReply->data.source_data.reachability = htons(server->reach);
+    cmdReply->data.source_data.orig_latest_meas.f = htonf(server->currentOffset);
+    cmdReply->data.source_data.latest_meas.f = htonf(server->currentOffset);
+    cmdReply->data.source_data.latest_meas_err.f = htonf(server->meanDelay + sqrtf(server->varDelay));
+    cmdReply->data.source_data.since_sample = htonl((ntpClock() - server->update) >> 32);
+    cmdReply->data.source_data.poll = (int16_t) htons(NTP_POLL_BITS);
+    if(server->weight > 0.01f) {
+        cmdReply->data.source_data.state = htons(RPY_SD_ST_SELECTED);
+    }
+    else if(server->weight != 0) {
+        cmdReply->data.source_data.state = htons(RPY_SD_ST_SELECTABLE);
+    }
+    else {
+        cmdReply->data.source_data.state = htons(RPY_SD_ST_UNSELECTED);
+    }
 }
 
 static void processSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
-
+    cmdReply->reply = htons(RPY_SOURCESTATS);
 }
 
 static void processTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
+    union fixed_32_32 scratch;
 
+    cmdReply->reply = htons(RPY_TRACKING);
+    cmdReply->data.tracking.ref_id = refId;
+    cmdReply->data.tracking.stratum = htons(clockStratum);
+    cmdReply->data.tracking.leap_status = htons(leapIndicator);
+
+    scratch.full = ntpModified();
+    cmdReply->data.tracking.ref_time.tv_sec_high = 0;
+    cmdReply->data.tracking.ref_time.tv_sec_low = htonl(scratch.ipart - NTP_UTC_OFFSET);
+    cmdReply->data.tracking.ref_time.tv_nsec = htonl(scratch.fpart);
+
+    cmdReply->data.tracking.current_correction.f = htonf(-GPSDO_offsetMean());
+    cmdReply->data.tracking.last_offset.f = htonf(-1e-9f * (float) GPSDO_offsetNano());
+    cmdReply->data.tracking.rms_offset.f = htonf(GPSDO_offsetRms());
+
+    cmdReply->data.tracking.freq_ppm.f = htonf(GPSDO_compValue() * 1e6f);
+    cmdReply->data.tracking.resid_freq_ppm.f = htonf(GPSDO_pllTrim() * 1e6f);
+    cmdReply->data.tracking.skew_ppm.f = htonf(GPSDO_skewRms() * 1e6f);
+
+    cmdReply->data.tracking.root_delay.f = htonf(0x1p-16f * (float) rootDelay);
+    cmdReply->data.tracking.root_dispersion.f = htonf(0x1p-16f * (float) rootDispersion);
+
+    cmdReply->data.tracking.last_update_interval.f = htonf((clockStratum == 1) ? 1 : 64);
+}
+
+static int32_t htonf(float value) {
+    // extract sign
+    int32_t coef, exp, neg;
+    if(value < 0) {
+        neg = 1;
+        value = -value;
+    }
+    else if(value >= 0) {
+        neg = 0;
+    }
+    else {
+        // return NaN as zero
+        return 0;
+    }
+
+    if(value < 0x1p-63f) {
+        return 0;
+    }
+    else if(value >= 0x1p63f) {
+        exp = 63;
+        coef = (1 << 24) - 1;
+    }
+    else {
+        int _exp;
+        float mantissa = frexpf(value, &_exp);
+        coef = (int32_t) roundf(mantissa * 0x1p24f);
+        exp = _exp + 1;
+    }
+
+    // final assembly
+    if(neg) coef = -coef;
+    return (int32_t) htonl((exp << 25) | (coef & 0x01FFFFFF));
 }
