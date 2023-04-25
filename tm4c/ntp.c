@@ -1006,12 +1006,129 @@ static void resetServer(struct Server *server) {
 }
 
 
+
+// -----------------------------------------------------------------------------
+// support for chronyc status queries ------------------------------------------
+// -----------------------------------------------------------------------------
+
+#define REQ_MIN_LEN (offsetof(CMD_Request, data.null.EOR))
+#define REQ_MAX_LEN (sizeof(CMD_Request))
+
+#define REP_LEN_NSOURCES (offsetof(CMD_Reply, data.n_sources.EOR))
+#define REP_LEN_SOURCEDATA (offsetof(CMD_Reply, data.source_data.EOR))
+#define REP_LEN_SOURCESTATS (offsetof(CMD_Reply, data.sourcestats.EOR))
+#define REP_LEN_TRACKING (offsetof(CMD_Reply, data.tracking.EOR))
+
+static void candmReply(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
+static void processNSources(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
+static void processSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
+static void processSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
+static void processTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
+
 static void processChrony(uint8_t *frame, int flen) {
+    // drop invalid packets
+    if(flen < (UDP_DATA_OFFSET + REQ_MIN_LEN)) return;
+    if(flen > (UDP_DATA_OFFSET + REQ_MAX_LEN)) return;
+
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+    CMD_Request *cmdRequest = (CMD_Request *) (headerUDP + 1);
 
+    // drop invalid packets
+    if(cmdRequest->pkt_type != PKT_TYPE_CMD_REQUEST) return;
+    if(cmdRequest->pad1 != 0) return;
+    if(cmdRequest->pad2 != 0) return;
+
+    // drop packet if nack is not possible
+    if(cmdRequest->version != PROTO_VERSION_NUMBER) {
+        if(cmdRequest->version < PROTO_VERSION_MISMATCH_COMPAT_SERVER)
+            return;
+    }
+
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    // allocate and clear frame buffer
+    uint8_t *resp = NET_getTxBuff(txDesc);
+    memset(resp, 0, UDP_DATA_OFFSET + sizeof(CMD_Reply));
+    // return to sender
+    memcpy(resp, frame, UDP_DATA_OFFSET);
+    UDP_returnToSender(resp, ipAddress, DEFAULT_CANDM_PORT);
+
+    // remap headers
+    headerEth = (struct FRAME_ETH *) resp;
+    headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    CMD_Reply *cmdReply = (CMD_Reply *) (headerUDP + 1);
+
+    // begin response
+    candmReply(cmdReply, cmdRequest);
+
+    // nack bad protocol version
+    if(cmdRequest->version != PROTO_VERSION_NUMBER) {
+        cmdReply->status = __builtin_bswap16(STT_BADPKTVERSION);
+    } else {
+        uint16_t cmd = __builtin_bswap16(cmdRequest->command);
+        int len = flen - UDP_DATA_OFFSET;
+        if (cmd == REQ_N_SOURCES) {
+            if(len == REP_LEN_NSOURCES)
+                processNSources(cmdReply, cmdRequest);
+            else
+                cmdReply->status = __builtin_bswap16(STT_BADPKTLENGTH);
+        }
+        else if (cmd == REQ_SOURCE_DATA) {
+            if(len == REP_LEN_SOURCEDATA)
+                processSourceData(cmdReply, cmdRequest);
+            else
+                cmdReply->status = __builtin_bswap16(STT_BADPKTLENGTH);
+        }
+        else if (cmd == REQ_SOURCESTATS) {
+            if(len == REP_LEN_SOURCESTATS)
+                processSourceStats(cmdReply, cmdRequest);
+            else
+                cmdReply->status = __builtin_bswap16(STT_BADPKTLENGTH);
+        }
+        else if (cmd == REQ_TRACKING) {
+            if(len == REP_LEN_TRACKING)
+                processTracking(cmdReply, cmdRequest);
+            else
+                cmdReply->status = __builtin_bswap16(STT_BADPKTLENGTH);
+        }
+        else {
+            cmdReply->status = __builtin_bswap16(STT_INVALID);
+        }
+    }
+
+    // finalize packet
+    UDP_finalize(resp, flen);
+    IPv4_finalize(resp, flen);
+    // transmit packet
+    NET_transmit(txDesc, flen);
+}
+
+static void candmReply(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
+    cmdReply->version = PROTO_VERSION_NUMBER;
+    cmdReply->pkt_type = PKT_TYPE_CMD_REPLY;
+    cmdReply->command = cmdRequest->command;
+    cmdReply->reply = __builtin_bswap16(RPY_NULL);
+    cmdReply->status = __builtin_bswap16(STT_SUCCESS);
+    cmdReply->sequence = cmdRequest->sequence;
+}
+
+static void processNSources(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
+    cmdReply->reply = RPY_N_SOURCES;
+    cmdReply->data.n_sources.n_sources = 8;
+}
+
+static void processSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
+
+}
+
+static void processSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
+
+}
+
+static void processTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
 
 }
