@@ -1186,13 +1186,15 @@ static void processTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) 
 }
 
 
-#define COEF_BITS (25)
-#define COEF_MASK (((1 << 25) - 1))
-
+/**
+ * convert IEEE 754 to candm float format
+ * @param value IEEE 754 single-precision float
+ * @return candm float format
+ */
 static int32_t htonf(float value) {
     // decompose IEEE 754 single-precision float
     uint32_t raw = *(uint32_t*) &value;
-    uint32_t coef = raw & ((1<<23) - 1);
+    uint32_t coef = raw & ((1 << 23) - 1);
     int32_t exp = ((int32_t) (raw >> 23 & 0xFF)) - 127;
     uint32_t sign = (raw >> 31) & 1;
 
@@ -1208,5 +1210,5 @@ static int32_t htonf(float value) {
     exp += 2;
     coef |= 1 << 23;
     if(sign) coef = -coef;
-    return (int32_t) htonl((exp << COEF_BITS) | (coef & COEF_MASK));
+    return (int32_t) htonl((exp << 25) | (coef & ((1 << 25) - 1)));
 }
