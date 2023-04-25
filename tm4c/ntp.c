@@ -6,6 +6,7 @@
 #include <math.h>
 
 #include "gpsdo.h"
+#include "lib/chrony/candm.h"
 #include "lib/clk.h"
 #include "lib/format.h"
 #include "lib/net.h"
@@ -114,6 +115,9 @@ static void processResponse(uint8_t *frame, int flen);
 static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress);
 static void callbackDNS(uint32_t addr);
 
+// process chrony status requests
+static void processChrony(uint8_t *frame, int flen);
+
 // NTP tasks
 static void runPoll();
 static void runShuffle();
@@ -146,6 +150,8 @@ void NTP_init() {
     memset(servers, 0, sizeof(servers));
     UDP_register(NTP_SRV_PORT, processRequest);
     UDP_register(NTP_CLI_PORT, processResponse);
+    // listen for crony status requests
+    UDP_register(DEFAULT_CANDM_PORT, processChrony);
 
     // configure state machine schedule
     memset(taskSlot, 0, sizeof(taskSlot));
@@ -997,4 +1003,15 @@ static void resetServer(struct Server *server) {
     server->offset = 0;
     server->update = 0;
     server->reach = 0;
+}
+
+
+static void processChrony(uint8_t *frame, int flen) {
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+
+
 }
