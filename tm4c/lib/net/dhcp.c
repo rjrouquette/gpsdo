@@ -240,9 +240,6 @@ static void processFrame(uint8_t *frame, int flen) {
                 optNtpLen = len;
             }
         }
-        // message type
-        if(key == 53)
-            optMsgType = ptr[0];
         // lease time
         if(key == 51 && len == 4) {
             uint8_t *temp = (uint8_t *) &optLease;
@@ -251,6 +248,9 @@ static void processFrame(uint8_t *frame, int flen) {
             temp[1] = ptr[2];
             temp[0] = ptr[3];
         }
+        // message type
+        if(key == 53)
+            optMsgType = ptr[0];
         // dhcp server
         if(key == 54 && len == 4)
             memcpy(&optDHCP, ptr, 4);

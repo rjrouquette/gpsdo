@@ -1137,7 +1137,7 @@ static void processSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest
     cmdReply->data.source_data.ip_addr.family = htons(IPADDR_INET4);
     cmdReply->data.source_data.ip_addr.addr.in4 = server->addr;
     cmdReply->data.source_data.stratum = htons(server->stratum);
-    cmdReply->data.source_data.reachability = htons(server->reach);
+    cmdReply->data.source_data.reachability = htons(server->reach & 0xFF);
     cmdReply->data.source_data.orig_latest_meas.f = htonf(server->currentOffset);
     cmdReply->data.source_data.latest_meas.f = htonf(server->currentOffset);
     cmdReply->data.source_data.latest_meas_err.f = htonf(server->meanDelay + sqrtf(server->varDelay));
@@ -1156,6 +1156,17 @@ static void processSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest
 
 static void processSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
     cmdReply->reply = htons(RPY_SOURCESTATS);
+
+    uint32_t i = htonl(cmdRequest->data.source_data.index);
+    if(i >= SERVER_COUNT) return;
+
+    struct Server *server = servers + i;
+    cmdReply->data.sourcestats.ip_addr.family = htons(IPADDR_INET4);
+    cmdReply->data.sourcestats.ip_addr.addr.in4 = server->addr;
+    cmdReply->data.sourcestats.est_offset.f = htonf(server->currentOffset);
+    cmdReply->data.sourcestats.est_offset_err.f = htonf(sqrtf(server->varDelay));
+    cmdReply->data.sourcestats.resid_freq_ppm.f = htonf(server->meanDrift * 1e6f);
+    cmdReply->data.sourcestats.skew_ppm.f = htonf(sqrtf(server->varDrift) * 1e6f);
 }
 
 static void processTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
@@ -1165,6 +1176,13 @@ static void processTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) 
     cmdReply->data.tracking.ref_id = refId;
     cmdReply->data.tracking.stratum = htons(clockStratum);
     cmdReply->data.tracking.leap_status = htons(leapIndicator);
+    if(refId == NTP_REF_GPS) {
+        cmdReply->data.tracking.ip_addr.family = htons(IPADDR_ID);
+        cmdReply->data.tracking.ip_addr.addr.id = refId;
+    } else {
+        cmdReply->data.tracking.ip_addr.family = htons(IPADDR_INET4);
+        cmdReply->data.tracking.ip_addr.addr.in4 = refId;
+    }
 
     scratch.full = ntpModified();
     cmdReply->data.tracking.ref_time.tv_sec_high = 0;
