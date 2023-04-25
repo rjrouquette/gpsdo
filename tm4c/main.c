@@ -4,13 +4,14 @@
  * @date 2022-04-13
  */
 
+#include "hw/eeprom.h"
+#include "hw/sys.h"
 #include "lib/clk.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
 #include "lib/led.h"
 #include "lib/net.h"
-#include "hw/eeprom.h"
-#include "hw/sys.h"
+#include "lib/rand.h"
 
 #include "gitversion.h"
 #include "gpsdo.h"
@@ -32,6 +33,8 @@ int main(void) {
     LED_init();
     // initialize system clock
     CLK_init();
+    // initialize RNG
+    RAND_init();
     // initialize EEPROM
     EEPROM_init();
     // initialize GPSDO

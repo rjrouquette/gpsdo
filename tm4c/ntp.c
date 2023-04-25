@@ -5,20 +5,20 @@
 #include <memory.h>
 #include <math.h>
 
-#include "ntp.h"
+#include "gpsdo.h"
 #include "lib/clk.h"
+#include "lib/format.h"
 #include "lib/net.h"
+#include "lib/net/arp.h"
+#include "lib/net/dns.h"
+#include "lib/net/dhcp.h"
 #include "lib/net/eth.h"
 #include "lib/net/ip.h"
 #include "lib/net/udp.h"
 #include "lib/net/util.h"
 #include "lib/led.h"
-#include "gpsdo.h"
-#include "hw/timer.h"
-#include "lib/net/arp.h"
-#include "lib/format.h"
-#include "lib/net/dns.h"
-#include "lib/net/dhcp.h"
+#include "lib/rand.h"
+#include "ntp.h"
 
 #define NTP4_SIZE (UDP_DATA_OFFSET + 48)
 #define NTP_SRV_PORT (123)
@@ -35,7 +35,7 @@
 #define NTP_POLL_INTV (64)
 #define NTP_POLL_SLOTS (8)
 #define NTP_POLL_PING (NTP_POLL_INTV - NTP_POLL_SLOTS)
-#define NTP_POLL_RAND ((GPTM0.TAV.raw >> 8) & (NTP_POLL_SLOTS - 1)) // employs scheduling uncertainty
+#define NTP_POLL_RAND (RAND_next() & (NTP_POLL_SLOTS - 1)) // employs scheduling uncertainty
 #define NTP_UTC_OFFSET (2208988800)
 #define NTP_STAT_RATE (0x1p-3f)
 #define NTP_ACTIVE_THRESH (0.0001f)
