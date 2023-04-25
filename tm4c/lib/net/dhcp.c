@@ -54,6 +54,11 @@ static int ntpLen;
 static void processFrame(uint8_t *frame, int flen);
 static void sendReply(struct HEADER_DHCP *response);
 
+__attribute__((always_inline))
+static inline void pad_opts(uint8_t *frame, int *flen) {
+    if((*flen) & 1) { frame[(*flen)++] = 0; }
+}
+
 static void initPacket(void *frame) {
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
@@ -146,10 +151,10 @@ void DHCP_renew() {
         frame[flen++] = lenHostname;
         memcpy(frame+flen, hostname, lenHostname);
         flen += lenHostname;
-        if(flen & 1) frame[flen++] = 0;
+        pad_opts(frame, &flen);
         // end mark
         frame[flen++] = 0xFF;
-        if(flen & 1) frame[flen++] = 0;
+        pad_opts(frame, &flen);
     } else {
         // renew existing lease
         headerIPv4->src = ipAddress;
@@ -162,7 +167,7 @@ void DHCP_renew() {
         flen += sizeof(DHCP_OPT_PARAM_REQ);
         // end mark
         frame[flen++] = 0xFF;
-        if(flen & 1) frame[flen++] = 0;
+        pad_opts(frame, &flen);
     }
 
     // transmit frame
@@ -208,7 +213,7 @@ static void processFrame(uint8_t *frame, int flen) {
 
     // parse options
     uint8_t *ptr = (uint8_t *) (headerDHCP + 1);
-    uint8_t *end = frame + flen - 4;
+    uint8_t *end = frame + flen;
     while((ptr + 1) < end) {
         // get field identifier
         const uint8_t key = ptr[0];
@@ -342,7 +347,7 @@ static void sendReply(struct HEADER_DHCP *response) {
     frame[flen++] = lenHostname;
     memcpy(frame+flen, hostname, lenHostname);
     flen += lenHostname;
-    if(flen & 1) frame[flen++] = 0;
+    pad_opts(frame, &flen);
     // requested IP
     frame[flen++] = 50;
     frame[flen++] = 4;
@@ -355,7 +360,7 @@ static void sendReply(struct HEADER_DHCP *response) {
     flen += 4;
     // end mark
     frame[flen++] = 0xFF;
-    if(flen & 1) frame[flen++] = 0;
+    pad_opts(frame, &flen);
     // transmit frame
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
