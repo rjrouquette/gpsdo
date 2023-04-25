@@ -1143,15 +1143,12 @@ static void processSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest
     cmdReply->data.source_data.latest_meas_err.f = htonf(server->meanDelay + sqrtf(server->varDelay));
     cmdReply->data.source_data.since_sample = htonl((ntpClock() - server->update) >> 32);
     cmdReply->data.source_data.poll = (int16_t) htons(NTP_POLL_BITS);
-    if(server->weight > 0.01f) {
+    if(server->weight > 0.01f)
         cmdReply->data.source_data.state = htons(RPY_SD_ST_SELECTED);
-    }
-    else if(server->weight != 0) {
+    else if(server->weight > 0)
         cmdReply->data.source_data.state = htons(RPY_SD_ST_SELECTABLE);
-    }
-    else {
+    else
         cmdReply->data.source_data.state = htons(RPY_SD_ST_UNSELECTED);
-    }
 }
 
 static void processSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
