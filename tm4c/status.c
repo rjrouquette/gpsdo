@@ -131,6 +131,11 @@ unsigned statusETH(char *body) {
     end = addrToStr(ipSubnet, end);
     end = append(end, "\n");
 
+    // ip subnet
+    end = append(end, "ip broadcast: ");
+    end = addrToStr(ipBroadcast, end);
+    end = append(end, "\n");
+
     // ip address
     end = append(end, "ip gateway: ");
     end = addrToStr(ipGateway, end);

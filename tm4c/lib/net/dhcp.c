@@ -44,9 +44,9 @@ static const char lut_hex[] = "0123456789abcdef";
 static char hostname[16] = { 0 };
 static int lenHostname = 0;
 
-static const uint8_t DHCP_OPT_DISCOVER[] = { 0x35, 0x01, 0x01 };
-static const uint8_t DHCP_OPT_REQUEST[] = { 0x35, 0x01, 0x03 };
-static const uint8_t DHCP_OPT_PARAM_REQ[] = { 0x37, 0x04, 0x01, 0x03, 0x06, 0x2A };
+static const uint8_t DHCP_OPT_DISCOVER[] = { 53, 1, 1 };
+static const uint8_t DHCP_OPT_REQUEST[] = { 53, 1, 3 };
+static const uint8_t DHCP_OPT_PARAM_REQ[] = { 55, 4, 1, 3, 6, 42 };
 
 static uint32_t ntpAddr[8];
 static int ntpLen;
