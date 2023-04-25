@@ -789,7 +789,7 @@ static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress) {
     // special case for external addresses
     if(remoteAddress == ipGateway) {
         for(int i = 0; i < SERVER_COUNT; i++) {
-            if((servers[i].addr ^ ipAddress) & ipSubnet) {
+            if(IPv4_testSubnet(ipSubnet, ipAddress, servers[i].addr)) {
                 copyMAC(servers[i].mac, macAddress);
             }
         }

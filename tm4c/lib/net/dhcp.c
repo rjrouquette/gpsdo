@@ -193,11 +193,13 @@ static void processFrame(uint8_t *frame, int flen) {
 
     // relevant options
     uint32_t optSubnet = ipSubnet;
-    uint32_t optRouter = ipGateway;
-    uint32_t optDNS = ipDNS;
     uint32_t optDHCP = 0;
     uint32_t optLease = 0;
     uint8_t optMsgType = 0;
+    uint8_t *optDns = NULL;
+    int optDnsLen = 0;
+    uint8_t *optRouter = NULL;
+    int optRouterLen = 0;
     uint8_t *optNtp = NULL;
     int optNtpLen = 0;
 
@@ -228,17 +230,19 @@ static void processFrame(uint8_t *frame, int flen) {
         if(key == 1 && len == 4)
             memcpy(&optSubnet, ptr, 4);
         // router address
-        if(key == 3 && len >= 4)
-            memcpy(&optRouter, ptr, 4);
+        if(key == 3 && (len & 3) == 0) {
+            optRouter = ptr;
+            optRouterLen = len;
+        }
         // DNS server address
-        if(key == 6 && len >= 4)
-            memcpy(&optDNS, ptr, 4);
+        if(key == 6 && (len & 3) == 0) {
+            optDns = ptr;
+            optDnsLen = len;
+        }
         // NTP/SNTP server address
-        if(key == 42 && len >= 4) {
-            if((len & 3) == 0) {
-                optNtp = ptr;
-                optNtpLen = len;
-            }
+        if(key == 42 && (len & 3) == 0) {
+            optNtp = ptr;
+            optNtpLen = len;
         }
         // lease time
         if(key == 51 && len == 4) {
@@ -266,11 +270,28 @@ static void processFrame(uint8_t *frame, int flen) {
     }
     // process DHCPACK
     if(optMsgType == 5) {
+        // set basic IPv4 address information
         ipAddress = headerDHCP->YIADDR;
         ipSubnet = optSubnet;
-        ipBroadcast = (ipAddress & ipSubnet) | (~ipSubnet);
-        ipGateway = optRouter;
-        ipDNS = optDNS;
+        ipBroadcast = ipAddress | (~ipSubnet);
+
+        // set default gateway if available
+        for(int i = 0; i < optRouterLen; i += 4) {
+            uint32_t addr = *(uint32_t *) (optRouter + i);
+            // the router subnet must match our own
+            if(!IPv4_testSubnet(ipSubnet, ipAddress, addr)) {
+                ipGateway = addr;
+                break;
+            }
+        }
+
+        // update DNS server
+        for(int i = 0; i < optDnsLen; i += 4) {
+            uint32_t addr = *(uint32_t *) (optDns + i);
+            // select first valid address
+            if(addr) { ipDNS = addr; break; }
+        }
+
         // update ntp server list
         if(optNtp != NULL) {
             if(optNtpLen > sizeof(ntpAddr))

@@ -43,6 +43,11 @@ extern volatile uint32_t ipSubnet;
 extern volatile uint32_t ipGateway;
 extern volatile uint32_t ipDNS;
 
+__attribute__((always_inline))
+inline uint32_t IPv4_testSubnet(uint32_t subnetMask, uint32_t addrA, uint32_t addrB) {
+    return (addrA ^ addrB) & subnetMask;
+}
+
 void IPv4_process(uint8_t *frame, int flen);
 void IPv4_init(uint8_t *frame);
 void IPv4_finalize(uint8_t *frame, int flen);
