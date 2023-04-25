@@ -44,8 +44,8 @@ static const char lut_hex[] = "0123456789abcdef";
 static char hostname[16] = { 0 };
 static int lenHostname = 0;
 
-static const uint8_t DHCP_OPT_DISCOVER[] = { 53, 1, 1 };
-static const uint8_t DHCP_OPT_REQUEST[] = { 53, 1, 3 };
+static const uint8_t DHCP_OPT_DISCOVER[] = { 53, 1, 1, 0 };
+static const uint8_t DHCP_OPT_REQUEST[] = { 53, 1, 3, 0 };
 static const uint8_t DHCP_OPT_PARAM_REQ[] = { 55, 4, 1, 3, 6, 42 };
 
 static uint32_t ntpAddr[8];
@@ -146,8 +146,10 @@ void DHCP_renew() {
         frame[flen++] = lenHostname;
         memcpy(frame+flen, hostname, lenHostname);
         flen += lenHostname;
+        if(flen & 1) frame[flen++] = 0;
         // end mark
         frame[flen++] = 0xFF;
+        if(flen & 1) frame[flen++] = 0;
     } else {
         // renew existing lease
         headerIPv4->src = ipAddress;
@@ -160,6 +162,7 @@ void DHCP_renew() {
         flen += sizeof(DHCP_OPT_PARAM_REQ);
         // end mark
         frame[flen++] = 0xFF;
+        if(flen & 1) frame[flen++] = 0;
     }
 
     // transmit frame
@@ -276,8 +279,9 @@ static void processFrame(uint8_t *frame, int flen) {
         ipBroadcast = ipAddress | (~ipSubnet);
 
         // set default gateway if available
+        uint32_t addr;
         for(int i = 0; i < optRouterLen; i += 4) {
-            uint32_t addr = *(uint32_t *) (optRouter + i);
+            memcpy(&addr, optRouter + i, sizeof(addr));
             // the router subnet must match our own
             if(!IPv4_testSubnet(ipSubnet, ipAddress, addr)) {
                 ipGateway = addr;
@@ -287,7 +291,7 @@ static void processFrame(uint8_t *frame, int flen) {
 
         // update DNS server
         for(int i = 0; i < optDnsLen; i += 4) {
-            uint32_t addr = *(uint32_t *) (optDns + i);
+            memcpy(&addr, optDns + i, sizeof(addr));
             // select first valid address
             if(addr) { ipDNS = addr; break; }
         }
@@ -333,11 +337,12 @@ static void sendReply(struct HEADER_DHCP *response) {
     // parameter request
     memcpy(frame + flen, DHCP_OPT_PARAM_REQ, sizeof(DHCP_OPT_PARAM_REQ));
     flen += sizeof(DHCP_OPT_PARAM_REQ);
-    // hostname
+    // hostname (with zero padding
     frame[flen++] = 12;
     frame[flen++] = lenHostname;
     memcpy(frame+flen, hostname, lenHostname);
     flen += lenHostname;
+    if(flen & 1) frame[flen++] = 0;
     // requested IP
     frame[flen++] = 50;
     frame[flen++] = 4;
@@ -350,6 +355,7 @@ static void sendReply(struct HEADER_DHCP *response) {
     flen += 4;
     // end mark
     frame[flen++] = 0xFF;
+    if(flen & 1) frame[flen++] = 0;
     // transmit frame
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
