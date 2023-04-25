@@ -1207,8 +1207,8 @@ static int32_t htonf(float value) {
         return (int32_t) (sign ? 0x0000007Fu : 0xFFFFFF7Eu);
 
     // normal values
-    exp += 2;
     coef |= 1 << 23;
     if(sign) coef = -coef;
-    return (int32_t) htonl((exp << 25) | (coef & ((1 << 25) - 1)));
+    coef &= (1 << 25) - 1;
+    return (int32_t) htonl(coef | ((exp + 2) << 25));
 }
