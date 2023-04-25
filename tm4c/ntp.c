@@ -1185,36 +1185,28 @@ static void processTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) 
     cmdReply->data.tracking.last_update_interval.f = htonf((clockStratum == 1) ? 1 : 64);
 }
 
+
+#define COEF_BITS (25)
+#define COEF_MASK (((1 << 25) - 1))
+
 static int32_t htonf(float value) {
-    // extract sign
-    int32_t coef, exp, neg;
-    if(value < 0) {
-        neg = 1;
-        value = -value;
-    }
-    else if(value >= 0) {
-        neg = 0;
-    }
-    else {
-        // return NaN as zero
-        return 0;
-    }
+    // decompose IEEE 754 single-precision float
+    uint32_t raw = *(uint32_t*) &value;
+    uint32_t coef = raw & ((1<<23) - 1);
+    int32_t exp = ((int32_t) (raw >> 23 & 0xFF)) - 127;
+    uint32_t sign = (raw >> 31) & 1;
 
-    if(value < 0x1p-63f) {
+    // small values and NaNs
+    if(exp < -65 || (exp == 128 && coef != 0))
         return 0;
-    }
-    else if(value >= 0x1p63f) {
-        exp = 63;
-        coef = (1 << 24) - 1;
-    }
-    else {
-        int _exp;
-        float mantissa = frexpf(value, &_exp);
-        coef = (int32_t) roundf(mantissa * 0x1p24f);
-        exp = _exp + 1;
-    }
 
-    // final assembly
-    if(neg) coef = -coef;
-    return (int32_t) htonl((exp << 25) | (coef & 0x01FFFFFF));
+    // large values
+    if(exp > 61)
+        return (int32_t) (sign ? 0x0000007Fu : 0xFFFFFF7Eu);
+
+    // normal values
+    exp += 2;
+    coef |= 1 << 23;
+    if(sign) coef = -coef;
+    return (int32_t) htonl((exp << COEF_BITS) | (coef & COEF_MASK));
 }
