@@ -1,5 +1,5 @@
 /**
- * Mersenne Twister derived from TinyMT
+ * Stripped down version of TinyMT
  * https://github.com/MersenneTwister-Lab/TinyMT
  */
 
