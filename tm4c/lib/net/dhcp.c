@@ -198,6 +198,8 @@ static void processFrame(uint8_t *frame, int flen) {
     uint32_t optDHCP = 0;
     uint32_t optLease = 0;
     uint8_t optMsgType = 0;
+    uint8_t *optNtp = NULL;
+    int optNtpLen = 0;
 
     // parse options
     uint8_t *ptr = (uint8_t *) (headerDHCP + 1);
@@ -234,11 +236,8 @@ static void processFrame(uint8_t *frame, int flen) {
         // NTP/SNTP server address
         if(key == 42 && len >= 4) {
             if((len & 3) == 0) {
-                int size = len & ~3;
-                if(size > sizeof(ntpAddr))
-                    size = sizeof(ntpAddr);
-                memcpy(&ntpAddr, ptr, size);
-                ntpLen = size >> 2;
+                optNtp = ptr;
+                optNtpLen = len;
             }
         }
         // message type
@@ -272,6 +271,13 @@ static void processFrame(uint8_t *frame, int flen) {
         ipBroadcast = (ipAddress & ipSubnet) | (~ipSubnet);
         ipGateway = optRouter;
         ipDNS = optDNS;
+        // update ntp server list
+        if(optNtp != NULL) {
+            if(optNtpLen > sizeof(ntpAddr))
+                optNtpLen = sizeof(ntpAddr);
+            memcpy(&ntpAddr, optNtp, optNtpLen);
+            ntpLen = optNtpLen >> 2;
+        }
         // set time of expiration (10% early)
         dhcpLeaseExpire = optLease;
         dhcpLeaseExpire -= optLease / 10;
