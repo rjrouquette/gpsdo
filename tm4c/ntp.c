@@ -1134,6 +1134,7 @@ static void processSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest
     if(i >= SERVER_COUNT) return;
 
     struct Server *server = servers + i;
+    cmdReply->data.source_data.mode = htons(RPY_SD_MD_CLIENT);
     cmdReply->data.source_data.ip_addr.family = htons(IPADDR_INET4);
     cmdReply->data.source_data.ip_addr.addr.in4 = server->addr;
     cmdReply->data.source_data.stratum = htons(server->stratum);
