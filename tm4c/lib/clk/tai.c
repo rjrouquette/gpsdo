@@ -27,9 +27,9 @@ uint64_t CLK_TAI_PPS() {
 
 uint64_t CLK_TAI_fromMono(uint64_t mono) {
     uint64_t trim = CLK_TRIM_fromMono(mono);
-    mono += corrValue(clkTaiRate, trim - clkTaiRef, 0);
-    mono += clkTaiOffset;
-    return mono;
+    trim += corrValue(clkTaiRate, trim - clkTaiRef, 0);
+    trim += clkTaiOffset;
+    return trim;
 }
 
 void CLK_TAI_setTrim(int32_t tai) {
