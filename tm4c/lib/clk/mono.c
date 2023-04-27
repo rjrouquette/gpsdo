@@ -24,40 +24,7 @@ extern uint64_t taiOffset;
 volatile struct ClockEvent clkMonoPps;
 
 
-static void initClkSys() {
-    // Enable external clock
-    MOSCCTL.NOXTAL = 0;
-    MOSCCTL.OSCRNG = 1;
-    MOSCCTL.PWRDN = 0;
-    while(!SYSRIS.MOSCPUPRIS);
-
-    // Configure OSC and PLL source
-    RSCLKCFG.OSCSRC = 0x3;
-    RSCLKCFG.PLLSRC = 0x3;
-
-    // Configure PLL
-    PLLFREQ1.N = 0;
-    PLLFREQ1.Q = 0;
-    PLLFREQ0.MINT = 15;
-    PLLFREQ0.MFRAC = 0;
-    PLLFREQ0.PLLPWR = 1;
-    RSCLKCFG.NEWFREQ = 1;
-    while(!PLLSTAT.LOCK);
-    // Update Memory Timing
-    MEMTIM0.EWS = 5;
-    MEMTIM0.EBCE = 0;
-    MEMTIM0.EBCHT = 6;
-    MEMTIM0.FWS = 5;
-    MEMTIM0.FBCE = 0;
-    MEMTIM0.FBCHT = 6;
-    // Apply Changes
-    RSCLKCFG.MEMTIMU = 1;
-    // Switch to PLL
-    RSCLKCFG.PSYSDIV = 2;
-    RSCLKCFG.USEPLL = 1;
-}
-
-static void initClkMono() {
+void initClkMono() {
     // Enable Timer 0
     RCGCTIMER.EN_GPTM0 = 1;
     delay_cycles_4();
@@ -73,7 +40,7 @@ static void initClkMono() {
     GPTM0.CTL.TAEN = 1;
 }
 
-static void initClkRxTx() {
+void initClkRxTx() {
     // disable flash prefetch per errata
     FLASHCONF.FPFOFF = 1;
     // enable clock
@@ -168,13 +135,6 @@ void initClkSync() {
     // lock GPIO config
     PORTG.CR = 0;
     PORTG.LOCK = 0;
-}
-
-void CLK_MONO_init() {
-    initClkSys();
-    initClkMono();
-    initClkRxTx();
-    initClkSync();
 }
 
 // second boundary comparison

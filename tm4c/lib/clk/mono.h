@@ -37,11 +37,6 @@ extern volatile int64_t clkMonoEth;
 extern volatile struct ClockEvent clkMonoPps;
 
 /**
- * Initialize monotonic system clock
- */
-void CLK_MONO_init();
-
-/**
  * Returns the current value of the system clock (1s resolution)
  * @return Raw 32-bit count of 1s ticks
  */

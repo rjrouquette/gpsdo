@@ -36,6 +36,7 @@ add_executable(
         hw/emac.c
         hw/interrupts.c
         hw/sys.c
+        lib/clk/clk.c
         lib/clk/mono.c
         lib/clk/tai.c
         lib/clk/trim.c

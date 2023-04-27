@@ -15,6 +15,13 @@ volatile uint64_t clkTaiRef = 0;
 volatile int32_t clkTaiRate = 0;
 
 
+void runClkTai() {
+    // advance reference time at roughly 16 Hz to prevent overflow
+    uint64_t now = CLK_TRIM();
+    if((now - clkTaiRef) > (1 << 28))
+        CLK_TAI_setTrim(clkTaiRate);
+}
+
 uint64_t CLK_TAI() {
     return CLK_TAI_fromMono(CLK_MONO());
 }
@@ -32,14 +39,14 @@ uint64_t CLK_TAI_fromMono(uint64_t mono) {
     return trim;
 }
 
-void CLK_TAI_setTrim(int32_t tai) {
+void CLK_TAI_setTrim(int32_t trim) {
     // prepare update values
     uint64_t now = CLK_TRIM();
     uint64_t offset = corrValue(clkTaiRate, now - clkTaiRef, &clkTaiRem);
     // apply update
     __disable_irq();
     clkTaiRef = now;
-    clkTaiRate = tai;
+    clkTaiRate = trim;
     clkTaiOffset += offset;
     __enable_irq();
 }

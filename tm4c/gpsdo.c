@@ -156,11 +156,17 @@ void GPSDO_run() {
     setFeedback(currCompensation + pllCorr + pllBias);
 
     // update PPS edge time
+    uint64_t now = CLK_MONO();
     ppsGpsEdge = CLK_MONO_PPS();
     uint64_t delta = ppsGpsEdge - ppsGpsEdgePrev;
     ppsGpsEdgePrev = ppsGpsEdge;
     // return if no update
-    if(!delta) return;
+    if(!delta) {
+        // advance PPS tracker is window has expired
+        if((now - ppsGpsEdge) > 0x110000000ul)
+            ppsPresent <<= 1;
+        return;
+    }
     // advance PPS tracker
     ppsPresent <<= 1;
     // ignore spurious events

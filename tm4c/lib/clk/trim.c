@@ -12,6 +12,14 @@ volatile uint64_t clkTrimOffset = 0;
 volatile uint64_t clkTrimRef = 0;
 volatile int32_t clkTrimRate = 0;
 
+
+void runClkTrim() {
+    // advance reference time at roughly 16 Hz to prevent overflow
+    uint64_t now = CLK_MONO();
+    if((now - clkTrimRef) > (1 << 28))
+        CLK_TRIM_setTrim(clkTrimRate);
+}
+
 uint64_t CLK_TRIM() {
     return CLK_TRIM_fromMono(CLK_MONO());
 }
