@@ -25,9 +25,10 @@ uint64_t CLK_TAI_PPS();
 
 /**
  * Translate monotonic timestamp to TAI timestamp
+ * @param ts timestamp to translate (32.32)
  * @return 64-bit fixed-point format (32.32)
  */
-uint64_t CLK_TAI_fromMono(uint64_t mono);
+uint64_t CLK_TAI_fromMono(uint64_t ts);
 
 /**
  * Adjust fractional part of TAI reference

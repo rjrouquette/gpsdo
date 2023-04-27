@@ -32,11 +32,11 @@ uint64_t CLK_TAI_PPS() {
     return ts + clkMonoPps.taiOff;
 }
 
-uint64_t CLK_TAI_fromMono(uint64_t mono) {
-    uint64_t trim = CLK_TRIM_fromMono(mono);
-    trim += corrValue(clkTaiRate, trim - clkTaiRef, 0);
-    trim += clkTaiOffset;
-    return trim;
+uint64_t CLK_TAI_fromMono(uint64_t ts) {
+    ts = CLK_TRIM_fromMono(ts);
+    ts += corrValue(clkTaiRate, ts - clkTaiRef, 0);
+    ts += clkTaiOffset;
+    return ts;
 }
 
 void CLK_TAI_setTrim(int32_t trim) {

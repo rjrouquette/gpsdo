@@ -30,10 +30,10 @@ uint64_t CLK_TRIM_PPS() {
     return ts + clkMonoPps.trimOff;
 }
 
-uint64_t CLK_TRIM_fromMono(uint64_t mono) {
-    mono += corrValue(clkTrimRate, mono - clkTrimRef, 0);
-    mono += clkTrimOffset;
-    return mono;
+uint64_t CLK_TRIM_fromMono(uint64_t ts) {
+    ts += corrValue(clkTrimRate, ts - clkTrimRef, 0);
+    ts += clkTrimOffset;
+    return ts;
 }
 
 void CLK_TRIM_setTrim(int32_t trim) {
