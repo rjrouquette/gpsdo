@@ -12,6 +12,8 @@
 #include "lib/clk.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
+#include "lib/clk/mono.h"
+#include "lib/clk/trim.h"
 
 
 #define CLK_FREQ (125000000) // 125 MHz
@@ -38,10 +40,8 @@ static float currTemp;
 static float tcompCoeff, tcompBias, tcompOffset;
 static uint32_t tcompSaved;
 
-static int32_t ppsGpsEdgePrev;
-static int32_t ppsGpsEdge;
-static int32_t ppsOutEdgePrev;
-static int32_t ppsOutEdge;
+static volatile uint64_t ppsGpsEdgePrev;
+static volatile uint64_t ppsGpsEdge;
 static int32_t ppsOffsetNano;
 
 static float pllBias;
@@ -61,7 +61,8 @@ static float currFeedback;
 static float currCompensation;
 
 static inline void setFeedback(float feedback) {
-    currFeedback = CLK_TAI_trim(feedback);
+    CLK_TRIM_set((int32_t) (0x1p32f * feedback));
+    currFeedback = 0x1p-32f * (float) CLK_TRIM_get();
 }
 
 static void updateTempComp(float rate, float target);
@@ -80,28 +81,6 @@ void ISR_ADC0Sequence3(void) {
     currTemp += _temp;
     // start next temperature measurement
     ADC0.PSSI.SS3 = 1;
-}
-
-// capture rising edge of output PPS for offset measurement
-void ISR_Timer5A() {
-    // snapshot edge time
-    uint32_t a = GPTM0.TAV.raw;
-    uint32_t b = GPTM5.TAR.raw;
-    // compute edge time
-    ppsOutEdge = (int32_t) (a - ((a - b) & 0xFFFF));
-    // clear interrupt flag
-    GPTM5.ICR.CAE = 1;
-}
-
-// capture rising edge of GPS PPS for offset measurement
-void ISR_Timer5B() {
-    // snapshot edge time
-    uint32_t a = GPTM0.TAV.raw;
-    uint32_t b = GPTM5.TBR.raw;
-    // compute edge time
-    ppsGpsEdge = (int32_t) (a - ((a - b) & 0xFFFF));
-    // clear interrupt flag
-    GPTM5.ICR.CBE = 1;
 }
 
 void initTempComp() {
@@ -145,73 +124,7 @@ void initTempComp() {
     }
 }
 
-void initEdgeComp() {
-    // Enable Timer 5
-    RCGCTIMER.EN_GPTM5 = 1;
-    delay_cycles_4();
-    // Configure Timer 5 for capture mode
-    GPTM5.CFG.GPTMCFG = 4;
-    GPTM5.TAMR.MR = 0x3;
-    GPTM5.TBMR.MR = 0x3;
-    // edge-time mode
-    GPTM5.TAMR.CMR = 1;
-    GPTM5.TBMR.CMR = 1;
-    // rising edge
-    GPTM5.CTL.TAEVENT = 0;
-    GPTM5.CTL.TBEVENT = 0;
-    // count up
-    GPTM5.TAMR.CDIR = 1;
-    GPTM5.TBMR.CDIR = 1;
-    // disable overflow interrupt
-    GPTM5.TAMR.CINTD = 0;
-    GPTM5.TBMR.CINTD = 0;
-    // full count range
-    GPTM5.TAILR = -1;
-    GPTM5.TBILR = -1;
-    // interrupts
-    GPTM5.IMR.CAE = 1;
-    GPTM5.IMR.CBE = 1;
-    // start timer
-    GPTM5.CTL.TAEN = 1;
-    GPTM5.CTL.TBEN = 1;
-    // synchronize with monotonic clock
-    GPTM0.SYNC = 0x0c03;
-
-    // configure capture pins
-    RCGCGPIO.EN_PORTM = 1;
-    delay_cycles_4();
-    // unlock GPIO config
-    PORTM.LOCK = GPIO_LOCK_KEY;
-    PORTM.CR = 0xC0u;
-    // configure pins;
-    PORTM.PCTL.PMC6 = 3;
-    PORTM.PCTL.PMC7 = 3;
-    PORTM.AFSEL.ALT6 = 1;
-    PORTM.AFSEL.ALT7 = 1;
-    PORTM.DEN = 0xC0u;
-    // lock GPIO config
-    PORTM.CR = 0;
-    PORTM.LOCK = 0;
-
-    // configure PPS output pin
-    RCGCGPIO.EN_PORTG = 1;
-    delay_cycles_4();
-    // unlock GPIO config
-    PORTG.LOCK = GPIO_LOCK_KEY;
-    PORTG.CR = 0x01u;
-    // configure pins
-    PORTG.DIR = 0x01u;
-    PORTG.DR8R = 0x01u;
-    PORTG.PCTL.PMC0 = 0x5;
-    PORTG.AFSEL.ALT0 = 1;
-    PORTG.DEN = 0x01u;
-    // lock GPIO config
-    PORTG.CR = 0;
-    PORTG.LOCK = 0;
-}
-
 void GPSDO_init() {
-    initEdgeComp();
     initTempComp();
 
     // init GPS
@@ -219,8 +132,9 @@ void GPSDO_init() {
 }
 
 void GPSDO_run() {
+
     // initialize temperature compensation
-    if(CLK_MONOTONIC_INT() < TCOMP_STARTUP) {
+    if (CLK_MONOTONIC_INT() < TCOMP_STARTUP) {
         float newComp = currTemp;
         newComp -= tcompBias;
         newComp *= tcompCoeff;
@@ -236,21 +150,32 @@ void GPSDO_run() {
     newComp *= tcompCoeff;
     newComp += tcompOffset;
     // prevent large correction impulses
-    if(fabsf(newComp - currCompensation) > 100e-9f)
+    if (fabsf(newComp - currCompensation) > 100e-9f)
         pllBias -= (newComp - currCompensation);
     currCompensation = newComp;
     setFeedback(currCompensation + pllCorr + pllBias);
 
-    // wait for window to expire
-    const int32_t now = (int32_t) GPTM0.TAV.raw;
-    if((now - ppsOutEdge) < PPS_GRACE_PERIOD)
-        return;
-    // sanity check pps output interval
-    int32_t ppsOutDelta = ppsOutEdge - ppsOutEdgePrev;
-    ppsOutEdgePrev = ppsOutEdge;
-    if(ppsOutDelta < CLK_FREQ - PPS_GRACE_PERIOD) return;
-    if(ppsOutDelta > CLK_FREQ + PPS_GRACE_PERIOD) return;
+    // update PPS edge time
+    ppsGpsEdge = CLK_MONO_PPS();
+    uint64_t delta = ppsGpsEdge - ppsGpsEdgePrev;
+    ppsGpsEdgePrev = ppsGpsEdge;
+    // return if no update
+    if (delta < 0x0FF000000ul) return;
+    if (delta > 0x101000000ul) return;
+    ppsSkewRms = 0x1p-32f * (float) (int32_t) delta;
+    pllBias += 0x1p-5f * ((-ppsSkewRms) - currFeedback);
+    // adjust TAI alignment
+    CLK_TAI_align(-(int32_t) CLK_TAI_PPS());
 
+//    uint64_t ppsGpsDelta = ppsGpsEdge - ppsGpsEdgePrev;
+//    ppsGpsEdgePrev = ppsGpsEdge;
+//    // ignore if PPS event is unstable
+//    if (ppsGpsDelta) return;
+//
+//    ppsOffsetNano = (int32_t) ppsGpsDelta;
+//    ppsSkewRms = 0x1p-32f * (float) (int32_t) ppsGpsDelta;
+}
+/*
     // advance PPS tracker
     ppsPresent <<= 1;
     // sanity check pps output interval
@@ -315,7 +240,7 @@ void GPSDO_run() {
     if(ppsSkewRms < STAT_COMP_RMS)
         updateTempComp(1.0f, currFeedback);
 }
-
+*/
 int GPSDO_ntpUpdate(float offset, float skew) {
     if(ppsPresent) return 0;
 
@@ -325,18 +250,18 @@ int GPSDO_ntpUpdate(float offset, float skew) {
     // hard adjustment
     if(fabsf(offset) > 50e-3f) {
         // trim TAI alignment
-        CLK_TAI_align((int32_t) roundf(offset * 1e9f));
+        CLK_TAI_align((int32_t) (offset * 0x1p32f));
         return 1;
     }
 
-    // soft adjustment
-    pllCorr = offset * NTP_OFFSET_CORR;
-    pllBias += offset * NTP_OFFSET_BIAS;
-    // update feedback
-    setFeedback(currCompensation + pllCorr + pllBias);
-    // update temperature compensation
-    if(skew < NTP_MAX_SKEW && skew > 0)
-        updateTempComp(NTP_RATE, currFeedback);
+//    // soft adjustment
+//    pllCorr = offset * NTP_OFFSET_CORR;
+//    pllBias += offset * NTP_OFFSET_BIAS;
+//    // update feedback
+//    setFeedback(currCompensation + pllCorr + pllBias);
+//    // update temperature compensation
+//    if(skew < NTP_MAX_SKEW && skew > 0)
+//        updateTempComp(NTP_RATE, currFeedback);
     return 0;
 }
 

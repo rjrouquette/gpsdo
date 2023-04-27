@@ -8,17 +8,6 @@
 #include <stdint.h>
 
 /**
- * fixed-point 32.32 timestamp structure
- */
-union fixed_32_32 {
-    struct {
-        uint32_t fpart;
-        uint32_t ipart;
-    };
-    uint64_t full;
-};
-
-/**
  * Initialize system clock and timers
  */
 void CLK_init();
@@ -36,16 +25,16 @@ uint32_t CLK_MONOTONIC_INT();
 uint64_t CLK_MONOTONIC();
 
 /**
- * Returns the current value of TAI clock (1s resolution)
- * @return 32-bit count of 1s ticks
- */
-uint32_t CLK_TAI_INT();
-
-/**
  * Returns the current value of TAI clock (~0.232ns resolution)
  * @return 64-bit fixed-point format (32.32)
  */
 uint64_t CLK_TAI();
+
+/**
+ * Returns the timestamp of the most recent PPS edge capture
+ * @return 64-bit fixed-point format (32.32)
+ */
+uint64_t CLK_TAI_PPS();
 
 /**
  * Trim fractional part of TAI reference
@@ -65,12 +54,5 @@ void CLK_TAI_set(uint32_t seconds);
  * @return actual rate applied
  */
 float CLK_TAI_trim(float trim);
-
-/**
- * Convert nanoseconds into fractional second
- * @param nanos nanosecond value to convert
- * @return 32-bit fixed-point format (0.32)
- */
-uint32_t nanosToFrac(uint32_t nanos);
 
 #endif //GPSDO_CLK_H

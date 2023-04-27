@@ -22,11 +22,14 @@
 #include "gpsdo.h"
 #include "ntp.h"
 #include "status.h"
+#include "lib/clk/mono.h"
+#include "lib/clk/trim.h"
 
 #define STATUS_PORT (23) // telnet port
 
 void STATUS_process(uint8_t *frame, int flen);
 
+unsigned statusClock(char *body);
 unsigned statusEEPROM(int block, char *body);
 unsigned statusETH(char *body);
 unsigned statusGPS(char *body);
@@ -73,7 +76,9 @@ void STATUS_process(uint8_t *frame, int flen) {
     char *body = (char *) (headerUDP + 1);
     // force null termination
     body[size] = 0;
-    if(strncmp(body, "eeprom", 6) == 0 && hasTerminus(body, 8)) {
+    if(strncmp(body, "clock", 6) == 0 && hasTerminus(body, 8)) {
+        size = statusClock(body);
+    } else if(strncmp(body, "eeprom", 6) == 0 && hasTerminus(body, 8)) {
         size = statusEEPROM((int) fromHex(body + 6, 2), body);
     } else if(strncmp(body, "ethernet", 8) == 0 && hasTerminus(body, 8)) {
         size = statusETH(body);
@@ -104,6 +109,108 @@ void STATUS_process(uint8_t *frame, int flen) {
     if(txDesc < 0) return;
     memcpy(NET_getTxBuff(txDesc), frame, flen);
     NET_transmit(txDesc, flen);
+}
+
+unsigned statusClock(char *body) {
+    char tmp[32];
+    char *end = body;
+
+    // current time
+    uint64_t mono = CLK_MONO();
+    strcpy(tmp, "0x");
+    toHex(mono>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(mono, 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "clk mono:   ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // current time
+    uint64_t trim = CLK_TRIM();
+    strcpy(tmp, "0x");
+    toHex(trim>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(trim, 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "clk trim:   ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // TAI time
+    uint64_t tai = CLK_TAI();
+    strcpy(tmp, "0x");
+    toHex(tai>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(tai, 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "clk tai:    ");
+    end = append(end, tmp);
+    end = append(end, "\n\n");
+
+    // current time
+    strcpy(tmp, "0x");
+    toHex(clkTrimRate, 8, '0', tmp + 2);
+    tmp[10] = 0;
+    end = append(end, "trim rate:  ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // current time
+    strcpy(tmp, "0x");
+    toHex(clkTrimRef >> 32, 8, '0', tmp + 2);
+    tmp[10] = '.';
+    toHex(clkTrimRef, 8, '0', tmp + 11);
+    tmp[19] = 0;
+    end = append(end, "trim ref:   ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // current time
+    strcpy(tmp, "0x");
+    toHex(clkTrimOffset >> 32, 8, '0', tmp + 2);
+    tmp[10] = '.';
+    toHex(clkTrimOffset, 8, '0', tmp + 11);
+    tmp[19] = 0;
+    end = append(end, "trim off:   ");
+    end = append(end, tmp);
+    end = append(end, "\n\n");
+
+    // current time
+    uint64_t pps = CLK_MONO_PPS();
+    strcpy(tmp, "0x");
+    toHex(pps>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(pps, 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "pps mono:   ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // current time
+    pps = CLK_TRIM_PPS();
+    strcpy(tmp, "0x");
+    toHex(pps>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(pps, 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "pps trim:   ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // current time
+    pps = CLK_TAI_PPS();
+    strcpy(tmp, "0x");
+    toHex(pps>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(pps, 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "pps tai:    ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // return size
+    return end - body;
 }
 
 unsigned statusETH(char *body) {

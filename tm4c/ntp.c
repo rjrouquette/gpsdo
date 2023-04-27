@@ -8,6 +8,7 @@
 #include "gpsdo.h"
 #include "lib/chrony/candm.h"
 #include "lib/clk.h"
+#include "lib/clk/util.h"
 #include "lib/format.h"
 #include "lib/net.h"
 #include "lib/net/arp.h"
@@ -20,6 +21,7 @@
 #include "lib/led.h"
 #include "lib/rand.h"
 #include "ntp.h"
+#include "lib/clk/trim.h"
 
 #define NTP4_SIZE (UDP_DATA_OFFSET + 48)
 #define NTP_SRV_PORT (123)
@@ -335,12 +337,12 @@ void NTP_run() {
     }
 
     // fast return to stratum 1 with PPS presence
-    if(clockStratum != 1 && GPSDO_ppsPresent()) {
-        clockStratum = 1;
-        refId = NTP_REF_GPS;
-        rootDelay = 0;
-        rootDispersion = 0;
-    }
+//    if(clockStratum != 1 && GPSDO_ppsPresent()) {
+//        clockStratum = 1;
+//        refId = NTP_REF_GPS;
+//        rootDelay = 0;
+//        rootDispersion = 0;
+//    }
 }
 
 static void runPoll() {
@@ -604,15 +606,15 @@ static void runAggregate() {
     }
 
     // set stratum status
-    if(_stratum == 0) {
-        clockStratum = 16;
-        rootDelay = 0;
-        rootDispersion = 0;
-    } else {
-        clockStratum = 1 + (int) roundf(_stratum);
-        rootDelay = (int32_t) roundf(0x1p16f * _delay);
-        rootDispersion = (int32_t) roundf(0x1p16f * sqrtf(_dispersion));
-    }
+//    if(_stratum == 0) {
+//        clockStratum = 16;
+//        rootDelay = 0;
+//        rootDispersion = 0;
+//    } else {
+//        clockStratum = 1 + (int) roundf(_stratum);
+//        rootDelay = (int32_t) roundf(0x1p16f * _delay);
+//        rootDispersion = (int32_t) roundf(0x1p16f * sqrtf(_dispersion));
+//    }
 }
 
 static void runPrune() {
@@ -1191,7 +1193,7 @@ static void processTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) 
     cmdReply->data.tracking.last_offset.f = htonf(-1e-9f * (float) GPSDO_offsetNano());
     cmdReply->data.tracking.rms_offset.f = htonf(GPSDO_offsetRms());
 
-    cmdReply->data.tracking.freq_ppm.f = htonf(GPSDO_compValue() * 1e6f);
+    cmdReply->data.tracking.freq_ppm.f = htonf(1e6f * (0x1p-32f * (float) CLK_TRIM_get()));
     cmdReply->data.tracking.resid_freq_ppm.f = htonf(GPSDO_pllTrim() * 1e6f);
     cmdReply->data.tracking.skew_ppm.f = htonf(GPSDO_skewRms() * 1e6f);
 

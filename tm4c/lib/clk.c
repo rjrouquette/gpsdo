@@ -2,235 +2,36 @@
 // Created by robert on 4/15/22.
 //
 
-#include <math.h>
-#include "../hw/emac.h"
-#include "../hw/interrupts.h"
-#include "../hw/sys.h"
-#include "../hw/timer.h"
 #include "clk.h"
-#include "delay.h"
+#include "clk/mono.h"
+#include "clk/trim.h"
+#include "../hw/interrupts.h"
 
-#define USE_XTAL 1
-#define CLK_FREQ (125000000)
-#define MAX_TRIM (500e-6f)
-#define CORR_OFFSET (0xFFB34C02)
-
-static volatile uint32_t monoInt = 0;
-static volatile uint32_t monoOff = 0;
-
-static void initClkSys() {
-    // Enable external clock
-    MOSCCTL.NOXTAL = 0;
-#ifdef USE_XTAL
-    MOSCCTL.OSCRNG = 1;
-    MOSCCTL.PWRDN = 0;
-    while(!SYSRIS.MOSCPUPRIS);
-#endif
-    // Configure OSC and PLL source
-    RSCLKCFG.OSCSRC = 0x3;
-    RSCLKCFG.PLLSRC = 0x3;
-
-    // Configure PLL
-    PLLFREQ1.N = 0;
-    PLLFREQ1.Q = 0;
-    PLLFREQ0.MINT = 15;
-    PLLFREQ0.MFRAC = 0;
-    PLLFREQ0.PLLPWR = 1;
-    RSCLKCFG.NEWFREQ = 1;
-    while(!PLLSTAT.LOCK);
-    // Update Memory Timing
-    MEMTIM0.EWS = 5;
-    MEMTIM0.EBCE = 0;
-    MEMTIM0.EBCHT = 6;
-    MEMTIM0.FWS = 5;
-    MEMTIM0.FBCE = 0;
-    MEMTIM0.FBCHT = 6;
-    // Apply Changes
-    RSCLKCFG.MEMTIMU = 1;
-    // Switch to PLL
-    RSCLKCFG.PSYSDIV = 2;
-    RSCLKCFG.USEPLL = 1;
-}
-
-static void initClkMono() {
-    // Enable Timer 0
-    RCGCTIMER.EN_GPTM0 = 1;
-    delay_cycles_4();
-    // Configure Timer 0
-    GPTM0.TAILR = -1;
-    GPTM0.TAMATCHR = CLK_FREQ;
-    GPTM0.TAMR.MR = 0x2;
-    GPTM0.TAMR.CDIR = 1;
-    GPTM0.TAMR.CINTD = 0;
-    GPTM0.IMR.TAM = 1;
-    GPTM0.TAMR.MIE = 1;
-    // start timer
-    GPTM0.CTL.TAEN = 1;
-}
-
-static void initClkTai() {
-    // disable flash prefetch per errata
-    FLASHCONF.FPFOFF = 1;
-    // enable clock
-    RCGCEMAC.EN0 = 1;
-    delay_cycles_4();
-
-    // disable timer interrupts
-    EMAC0.IM.TS = 1;
-    // enable PTP clock
-    EMAC0.CC.PTPCEN = 1;
-    // configure PTP
-    EMAC0.TIMSTCTRL.ALLF = 1;
-    EMAC0.TIMSTCTRL.DGTLBIN = 0;
-    EMAC0.TIMSTCTRL.TSEN = 1;
-    // 2^31 / 25MHz = 85.899
-    EMAC0.SUBSECINC.SSINC = 86;
-    // init timer
-    EMAC0.TIMSECU = 0;
-    EMAC0.TIMNANOU.VALUE = 0;
-    // frequency correction
-    EMAC0.TIMADD = CORR_OFFSET;
-    EMAC0.TIMSTCTRL.ADDREGUP = 1;
-    EMAC0.TIMSTCTRL.TSFCUPDT = 1;
-    // start timer
-    EMAC0.TIMSTCTRL.TSINIT = 1;
-    // use PPS free-running mode
-    EMAC0.PPSCTRL.TRGMODS0 = 3;
-    // start 1 Hz PPS output
-    EMAC0.PPSCTRL.PPSEN0 = 0;
-    EMAC0.PPSCTRL.PPSCTRL = 0;
-
-    // re-enable flash prefetch per errata
-    FLASHCONF.FPFOFF = 0;
-}
+uint64_t taiOffset;
 
 void CLK_init() {
-    initClkSys();
-    initClkMono();
-    initClkTai();
-}
-
-// second boundary comparison
-void ISR_Timer0A() {
-    // increment counter
-    monoOff += CLK_FREQ;
-    ++monoInt;
-    // set next second boundary
-    GPTM0.TAMATCHR = monoOff + CLK_FREQ;
-    // clear interrupt flag
-    GPTM0.ICR.TAM = 1;
-}
-
-// return integer part of current time
-uint32_t CLK_MONOTONIC_INT() {
-    return monoInt;
-}
-
-// return current time as 32.32 fixed point value
-uint64_t CLK_MONOTONIC() {
-    // capture current time
-    __disable_irq();
-    uint32_t snapF = GPTM0.TAV.raw;
-    uint32_t snapI = monoInt;
-    uint32_t snapO = monoOff;
-    __enable_irq();
-
-    // adjust for overflow
-    snapF -= snapO;
-    while(snapF >= CLK_FREQ) {
-        ++snapI;
-        snapF -= CLK_FREQ;
-    }
-
-    // assemble result
-    union fixed_32_32 result;
-    result.fpart = nanosToFrac(snapF << 3);
-    result.ipart = snapI;
-    return result.full;
-}
-
-uint32_t CLK_TAI_INT() {
-    return EMAC0.TIMSEC;
+    CLK_MONO_init();
 }
 
 uint64_t CLK_TAI() {
-    // load current TAI value
-    // read twice to correct for access skew
-    union fixed_32_32 a, b;
-    __disable_irq();
-    a.ipart = EMAC0.TIMSEC;
-    a.fpart = EMAC0.TIMNANO;
-    b.ipart = EMAC0.TIMSEC;
-    b.fpart = EMAC0.TIMNANO;
-    __enable_irq();
-    // correct for access skew at second boundary
-    if(b.fpart < a.fpart && b.ipart == a.ipart) ++b.ipart;
-    // adjust fraction point
-    b.fpart <<= 1;
-    return b.full;
+    return CLK_TRIM() + taiOffset;
 }
 
-void CLK_TAI_align(int32_t nanos) {
-    // convert nanos to fraction
-    int32_t fraction = 86 * (nanos / 40);
-    // wait for hardware ready state
-    while(EMAC0.TIMSTCTRL.TSUPDT);
-    // set fractional register (convert from two's complement form)
-    if(fraction < 0)
-        EMAC0.TIMNANOU.raw = (1 << 31) | -fraction;
-    else
-        EMAC0.TIMNANOU.raw = fraction;
-    // clear seconds register
-    EMAC0.TIMSECU = 0;
-    // start update
-    EMAC0.TIMSTCTRL.TSUPDT = 1;
-    // wait for update to complete
-    while(EMAC0.TIMSTCTRL.TSUPDT);
+uint64_t CLK_TAI_PPS() {
+    return CLK_TRIM_PPS() + clkMonoPps.taiOffset;
+}
+
+void CLK_TAI_align(int32_t fraction) {
+    __disable_irq();
+    taiOffset += fraction;
+    __enable_irq();
 }
 
 void CLK_TAI_set(uint32_t seconds) {
-    // wait for hardware ready state
-    while(EMAC0.TIMSTCTRL.TSUPDT);
-    uint32_t now = EMAC0.TIMSEC;
-    // skip if clock is already set
-    if(now == seconds) return;
-    // set update registers
-    if(seconds < now) {
-        EMAC0.TIMNANOU.raw = (1 << 31);
-        EMAC0.TIMSECU = now - seconds;
-    } else {
-        EMAC0.TIMNANOU.raw = 0;
-        EMAC0.TIMSECU = seconds - now;
-    }
-    // start update
-    EMAC0.TIMSTCTRL.TSUPDT = 1;
-    // wait for update to complete
-    while(EMAC0.TIMSTCTRL.TSUPDT);
+    uint64_t nowMono = CLK_MONO();
+    ((uint32_t *) &taiOffset)[1] = seconds - ((uint32_t *) &nowMono)[1];
 }
 
 float CLK_TAI_trim(float trim) {
-    // restrict trim rate
-    if(trim < -MAX_TRIM) trim = -MAX_TRIM;
-    if(trim >  MAX_TRIM) trim =  MAX_TRIM;
-    // convert to correction factor
-    int32_t correction = lroundf(trim * 0x1p32f);
-    // apply correction update
-    EMAC0.TIMADD = CORR_OFFSET + correction;
-    EMAC0.TIMSTCTRL.ADDREGUP = 1;
-    // return actual value
-    return 0x1p-32f * (float) correction;
-}
-
-uint32_t nanosToFrac(uint32_t nanos) {
-    // multiply by 4 (integer portion of 4.294967296)
-    nanos <<= 2;
-    // compute correction value
-    union fixed_32_32 scratch;
-    scratch.ipart = 0;
-    scratch.fpart = nanos;
-    scratch.full *= 0x12E0BE82;
-    // round up to minimize average error
-    scratch.ipart += scratch.fpart >> 31;
-    // combine correction value with base value
-    return nanos + scratch.ipart;
+    return 0;
 }

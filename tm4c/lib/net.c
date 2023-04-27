@@ -7,7 +7,7 @@
 #include "../hw/interrupts.h"
 #include "../hw/gpio.h"
 #include "../hw/sys.h"
-#include "../lib/clk.h"
+#include "../lib/clk/util.h"
 #include "../lib/delay.h"
 #include "net.h"
 #include "net/arp.h"
@@ -16,6 +16,8 @@
 #include "net/ip.h"
 #include "net/util.h"
 #include "net/dns.h"
+#include "clk/mono.h"
+#include "clk/trim.h"
 
 #define RX_RING_MASK (31)
 #define RX_RING_SIZE (32)
@@ -283,16 +285,21 @@ void NET_transmit(int desc, int len) {
     EMAC0.TXPOLLD = 1;
 }
 
+extern uint64_t taiOffset;
+
 uint64_t NET_getRxTime(const uint8_t *rxFrame) {
     // compute descriptor offset
     uint32_t rxId = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
     if(rxId >= RX_RING_SIZE) return 0;
     // retrieve timestamp
-    register union fixed_32_32 result;
-    result.ipart = rxDesc[rxId].RTSH;
-    result.fpart = rxDesc[rxId].RTSL;
-    result.fpart <<= 1;
-    return result.full;
+    uint32_t timer = clkMonoEth;
+    timer += rxDesc[rxId].RTSL >> 3;
+    timer += rxDesc[rxId].RTSH * CLK_FREQ;
+    __disable_irq();
+    uint32_t offset = clkMonoOff;
+    uint32_t integer = clkMonoInt;
+    __enable_irq();
+    return CLK_TRIM_fromMono(fromClkMono(timer, offset, integer)) + taiOffset;
 }
 
 uint64_t NET_getTxTime(const uint8_t *txFrame) {
@@ -300,9 +307,12 @@ uint64_t NET_getTxTime(const uint8_t *txFrame) {
     uint32_t txId = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
     if(txId >= TX_RING_SIZE) return 0;
     // retrieve timestamp
-    register union fixed_32_32 result;
-    result.ipart = txDesc[txId].TTSH;
-    result.fpart = txDesc[txId].TTSL;
-    result.fpart <<= 1;
-    return result.full;
+    uint32_t timer = clkMonoEth;
+    timer += txDesc[txId].TTSL >> 3;
+    timer += txDesc[txId].TTSH * CLK_FREQ;
+    __disable_irq();
+    uint32_t offset = clkMonoOff;
+    uint32_t integer = clkMonoInt;
+    __enable_irq();
+    return CLK_TRIM_fromMono(fromClkMono(timer, offset, integer)) + taiOffset;
 }
