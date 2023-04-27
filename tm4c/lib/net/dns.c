@@ -4,15 +4,15 @@
 
 #include <string.h>
 
-#include "dns.h"
-#include "util.h"
-#include "udp.h"
-#include "../clk.h"
-#include "../net.h"
-#include "ip.h"
-#include "eth.h"
-#include "arp.h"
+#include "../clk/mono.h"
 #include "../led.h"
+#include "../net.h"
+#include "arp.h"
+#include "eth.h"
+#include "dns.h"
+#include "ip.h"
+#include "udp.h"
+#include "util.h"
 
 #define DNS_HEAD_SIZE (UDP_DATA_OFFSET + 12)
 #define DNS_CLIENT_PORT (1367)
@@ -72,7 +72,7 @@ int DNS_lookup(const char *hostname, CallbackDNS callback) {
         return -2;
     }
 
-    uint32_t now = CLK_MONOTONIC_INT();
+    uint32_t now = CLK_MONO_INT();
     for(int i = 0; i < MAX_REQUESTS; i++) {
         // look for empty or expired slot
         if(requests[i].callback != 0 && ((int32_t) (now - requests[i].expire) > 0))

@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "../../hw/sys.h"
-#include "../clk.h"
+#include "../clk/mono.h"
 #include "../net.h"
 #include "eth.h"
 #include "dhcp.h"
@@ -109,7 +109,7 @@ void DHCP_init() {
 }
 
 void DHCP_run() {
-    const uint32_t now = CLK_MONOTONIC_INT();
+    const uint32_t now = CLK_MONO_INT();
     if(((int32_t)(now - dhcpLeaseExpire)) >= 0) {
         // re-attempt if renewal fails
         dhcpLeaseExpire += REATTEMPT_INTVL;
@@ -119,7 +119,7 @@ void DHCP_run() {
 
 void DHCP_renew() {
     // create request ID
-    dhcpXID = dhcpUUID + CLK_MONOTONIC_INT();
+    dhcpXID = dhcpUUID + CLK_MONO_INT();
 
     // get TX descriptor
     int txDesc = NET_getTxDesc();
@@ -312,7 +312,7 @@ static void processFrame(uint8_t *frame, int flen) {
         dhcpLeaseExpire = optLease;
         dhcpLeaseExpire -= optLease / 10;
         if(dhcpLeaseExpire > 86400) dhcpLeaseExpire = 86400;
-        dhcpLeaseExpire += CLK_MONOTONIC_INT();
+        dhcpLeaseExpire += CLK_MONO_INT();
         return;
     }
 }

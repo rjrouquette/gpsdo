@@ -34,4 +34,13 @@ uint32_t nanosToFrac(uint32_t nanos);
  */
 uint64_t fromClkMono(uint32_t timer, uint32_t offset, uint32_t integer);
 
+/**
+ * Compute offset correction for frequency trimming
+ * @param rate frequency trim rate (0.31)
+ * @param delta elapsed time since prior offset adjustment (32.32)
+ * @param rem offset remainder from prior adjustment (0.32)
+ * @return offset adjustment (32.32)
+ */
+uint64_t corrValue(uint32_t rate, uint64_t delta, uint32_t *rem);
+
 #endif //GPSDO_CLK_UTIL_H

@@ -3,15 +3,15 @@
 //
 
 #include "../delay.h"
-#include "../clk.h"
 #include "../hw/emac.h"
 #include "../hw/gpio.h"
 #include "../hw/interrupts.h"
 #include "../hw/sys.h"
 #include "../hw/timer.h"
 #include "mono.h"
-#include "util.h"
+#include "tai.h"
 #include "trim.h"
+#include "util.h"
 
 
 volatile uint32_t clkMonoInt = 0;
@@ -237,11 +237,16 @@ void ISR_Timer5B() {
     GPTM5.ICR.CBE = 1;
     // update pps edge state
     timer -= (timer - event) & 0xFFFF;
+    // monotonic clock state
     clkMonoPps.timer = timer;
     clkMonoPps.offset = clkMonoOff;
     clkMonoPps.integer = clkMonoInt;
+    // trimmed clock state
     clkMonoPps.trimRate = clkTrimRate;
     clkMonoPps.trimRef = clkTrimRef;
     clkMonoPps.trimOff = clkTrimOffset;
-    clkMonoPps.taiOffset = taiOffset;
+    // tai clock state
+    clkMonoPps.taiRate = clkTaiRate;
+    clkMonoPps.taiRef = clkTaiRef;
+    clkMonoPps.taiOff = clkTaiOffset;
 }

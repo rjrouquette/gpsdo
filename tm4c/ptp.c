@@ -6,7 +6,7 @@
 #include <math.h>
 
 #include "ptp.h"
-#include "lib/clk.h"
+#include "lib/clk/mono.h"
 #include "lib/net.h"
 #include "lib/net/eth.h"
 #include "lib/net/ip.h"
@@ -129,13 +129,13 @@ void PTP_init() {
     UDP_register(PTP2_PORT_EVENT, processMessage);
     UDP_register(PTP2_PORT_GENERAL, processMessage);
     // set next update event
-    uint64_t now = CLK_MONOTONIC();
+    uint64_t now = CLK_MONO();
     nextAnnounce = now + PTP2_ANNOUNCE_INTERVAL;
     nextSync = now + PTP2_SYNC_INTERVAL;
 }
 
 void PTP_run() {
-    const uint64_t now = CLK_MONOTONIC();
+    const uint64_t now = CLK_MONO();
 
     // check for sync event
     if(((int64_t)(now - nextSync)) >= 0) {

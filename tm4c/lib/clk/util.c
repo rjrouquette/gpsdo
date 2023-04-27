@@ -38,3 +38,22 @@ uint64_t fromClkMono(uint32_t timer, uint32_t offset, uint32_t integer) {
     result.ipart = integer;
     return result.full;
 }
+
+uint64_t corrValue(uint32_t rate, uint64_t delta, uint32_t *rem) {
+    int neg = 0;
+    if(delta >> 63) {
+        delta = -delta;
+        neg = 1;
+    }
+    if(rate >> 31 & 1) {
+        rate = -rate;
+        neg ^= 1;
+    }
+    delta *= rate;
+    if(neg) delta = -delta;
+    if(rem) {
+        delta += *rem;
+        *rem = (uint32_t) delta;
+    }
+    return ((int64_t) delta) >> 32;
+}

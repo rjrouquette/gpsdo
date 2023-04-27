@@ -4,10 +4,11 @@
 
 #include <memory.h>
 #include "../hw/uart.h"
+#include "../ntp.h"
+#include "clk/mono.h"
+#include "clk/tai.h"
 #include "delay.h"
 #include "gps.h"
-#include "clk.h"
-#include "../ntp.h"
 
 #define GPS_RING_MASK (1023)
 #define GPS_RING_SIZE (1024)
@@ -77,7 +78,7 @@ void GPS_init() {
 
 uint32_t prevSecond = 0;
 void GPS_run() {
-    uint32_t now = CLK_MONOTONIC_INT();
+    uint32_t now = CLK_MONO_INT();
     if(prevSecond != now) {
         prevSecond = now;
         if((now & 3) == 0)

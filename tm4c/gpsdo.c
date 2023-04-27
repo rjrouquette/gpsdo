@@ -9,11 +9,11 @@
 #include "hw/gpio.h"
 #include "hw/interrupts.h"
 #include "hw/timer.h"
-#include "lib/clk.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
 #include "lib/clk/mono.h"
 #include "lib/clk/trim.h"
+#include "lib/clk/tai.h"
 
 
 #define CLK_FREQ (125000000) // 125 MHz
@@ -61,8 +61,8 @@ static float currFeedback;
 static float currCompensation;
 
 static inline void setFeedback(float feedback) {
-    CLK_TRIM_set((int32_t) (0x1p32f * feedback));
-    currFeedback = 0x1p-32f * (float) CLK_TRIM_get();
+    CLK_TRIM_setTrim((int32_t) (0x1p32f * feedback));
+    currFeedback = 0x1p-32f * (float) CLK_TRIM_getTrim();
 }
 
 static void updateTempComp(float rate, float target);
@@ -134,7 +134,7 @@ void GPSDO_init() {
 void GPSDO_run() {
 
     // initialize temperature compensation
-    if (CLK_MONOTONIC_INT() < TCOMP_STARTUP) {
+    if (CLK_MONO_INT() < TCOMP_STARTUP) {
         float newComp = currTemp;
         newComp -= tcompBias;
         newComp *= tcompCoeff;
@@ -160,12 +160,29 @@ void GPSDO_run() {
     uint64_t delta = ppsGpsEdge - ppsGpsEdgePrev;
     ppsGpsEdgePrev = ppsGpsEdge;
     // return if no update
+    if(!delta) return;
+    // advance PPS tracker
+    ppsPresent <<= 1;
+    // ignore spurious events
     if (delta < 0x0FF000000ul) return;
     if (delta > 0x101000000ul) return;
-    ppsSkewRms = 0x1p-32f * (float) (int32_t) delta;
-    pllBias += 0x1p-5f * (-ppsSkewRms - currFeedback);
+    // mark PPS as present
+    ppsPresent |= 1;
+    int32_t freqError = (-(int32_t) delta) - CLK_TRIM_getTrim();
+    float fltFreqError = 0x1p-32f * (float) freqError;
+    pllBias += 0x1p-5f * fltFreqError;
+    ppsSkewVar += ((fltFreqError * fltFreqError) - ppsSkewVar) * STAT_ALPHA;
+    ppsSkewRms = sqrtf(ppsSkewVar);
     // adjust TAI alignment
-    CLK_TAI_align(-(int32_t) CLK_TAI_PPS());
+    int32_t offset = -(int32_t) CLK_TAI_PPS();
+    float fltOffset = 0x1p-32f * (float) offset;
+    CLK_TAI_align(offset);
+    if(fabsf(fltOffset) > 1e-6f) return;
+    CLK_TAI_setTrim(CLK_TAI_getTrim() + (offset >> 6));
+    // update PPS stats
+    ppsOffsetMean += (fltOffset - ppsOffsetMean) * STAT_ALPHA;
+    ppsOffsetVar += ((fltOffset * fltOffset) - ppsOffsetVar) * STAT_ALPHA;
+    ppsOffsetRms = sqrtf(ppsOffsetVar);
 
 //    uint64_t ppsGpsDelta = ppsGpsEdge - ppsGpsEdgePrev;
 //    ppsGpsEdgePrev = ppsGpsEdge;
@@ -345,7 +362,7 @@ static void updateTempComp(float rate, float target) {
     error *= temp - tcompBias;
     tcompCoeff += error;
 
-    const uint32_t now = CLK_MONOTONIC_INT();
+    const uint32_t now = CLK_MONO_INT();
     if(now - tcompSaved > TCOMP_SAVE_INTV) {
         tcompSaved = now;
         // save temperature compensation parameters

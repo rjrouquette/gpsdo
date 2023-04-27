@@ -7,7 +7,6 @@
 
 #include "gpsdo.h"
 #include "lib/chrony/candm.h"
-#include "lib/clk.h"
 #include "lib/clk/util.h"
 #include "lib/format.h"
 #include "lib/net.h"
@@ -22,6 +21,8 @@
 #include "lib/rand.h"
 #include "ntp.h"
 #include "lib/clk/trim.h"
+#include "lib/clk/mono.h"
+#include "lib/clk/tai.h"
 
 #define NTP4_SIZE (UDP_DATA_OFFSET + 48)
 #define NTP_SRV_PORT (123)
@@ -104,8 +105,8 @@ static inline int hashXleave(uint32_t addr) { return (int) (((addr * 0xDE9DB139)
 
 static inline uint64_t ntpClock() { return CLK_TAI() + ntpOffset; }
 static inline uint64_t ntpModified() { return GPSDO_updated() + ntpOffset; }
-static inline uint64_t ntpTimeRx(uint8_t *frame) { return NET_getRxTime(frame) + ntpOffset; }
-static inline uint64_t ntpTimeTx(uint8_t *frame) { return NET_getTxTime(frame) + ntpOffset; }
+static inline uint64_t ntpTimeRx(uint8_t *frame) { return CLK_TAI_fromMono(NET_getRxTime(frame)) + ntpOffset; }
+static inline uint64_t ntpTimeTx(uint8_t *frame) { return CLK_TAI_fromMono(NET_getTxTime(frame)) + ntpOffset; }
 
 static void pollServer(struct Server *server, int pingOnly);
 static void resetServer(struct Server *server);
@@ -265,7 +266,7 @@ char* NTP_servers(char *tail) {
     tail = append(tail, "weight");
     tail = append(tail, "\n");
 
-    uint32_t now = CLK_MONOTONIC_INT();
+    uint32_t now = CLK_MONO_INT();
     for(int i = 0; i < SERVER_COUNT; i++) {
         if(servers[i].addr == 0) continue;
 
@@ -321,7 +322,7 @@ char* NTP_servers(char *tail) {
 // main process entry point
 void NTP_run() {
     // set current system time
-    ntpProcess.nowMono = CLK_MONOTONIC_INT();
+    ntpProcess.nowMono = CLK_MONO_INT();
     int timeSlot = (int) ntpProcess.nowMono & NTP_POLL_MASK;
     // advance process state
     struct TaskSlot *slot = taskSlot + timeSlot;
@@ -428,7 +429,7 @@ static void runTracking() {
     if(server->addr == 0) return;
 
     // check for failure states
-    int32_t stale = (int32_t) (CLK_MONOTONIC_INT() - server->lastActive);
+    int32_t stale = (int32_t) (CLK_MONO_INT() - server->lastActive);
     if(
             server->leapIndicator == NTP_LI_ALARM ||
             server->stratum == 0 ||
@@ -529,7 +530,7 @@ static void runAggregate() {
                 ++li[servers[i].leapIndicator];
             // mark active servers
             if(weight >= NTP_ACTIVE_THRESH)
-                servers[i].lastActive = CLK_MONOTONIC_INT();
+                servers[i].lastActive = CLK_MONO_INT();
         }
     }
 
@@ -818,7 +819,7 @@ static void callbackDNS(uint32_t addr) {
     for (int i = 0; i < SERVER_COUNT; i++) {
         if (servers[i].addr == 0) {
             servers[i].addr = addr;
-            servers[i].lastActive = CLK_MONOTONIC_INT();
+            servers[i].lastActive = CLK_MONO_INT();
             break;
         }
     }
@@ -1193,8 +1194,8 @@ static void processTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) 
     cmdReply->data.tracking.last_offset.f = htonf(-1e-9f * (float) GPSDO_offsetNano());
     cmdReply->data.tracking.rms_offset.f = htonf(GPSDO_offsetRms());
 
-    cmdReply->data.tracking.freq_ppm.f = htonf(1e6f * (0x1p-32f * (float) CLK_TRIM_get()));
-    cmdReply->data.tracking.resid_freq_ppm.f = htonf(GPSDO_pllTrim() * 1e6f);
+    cmdReply->data.tracking.freq_ppm.f = htonf(1e6f * (0x1p-32f * (float) CLK_TRIM_getTrim()));
+    cmdReply->data.tracking.resid_freq_ppm.f = htonf(1e6f * (0x1p-32f * (float) CLK_TAI_getTrim()));
     cmdReply->data.tracking.skew_ppm.f = htonf(GPSDO_skewRms() * 1e6f);
 
     cmdReply->data.tracking.root_delay.f = htonf(0x1p-16f * (float) rootDelay);

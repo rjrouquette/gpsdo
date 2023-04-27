@@ -24,7 +24,7 @@ uint64_t CLK_TRIM();
 uint64_t CLK_TRIM_PPS();
 
 /**
- * Convert monotonic timestamp to trimmed timestamp
+ * Translate monotonic timestamp to trimmed timestamp
  * @return 64-bit fixed-point format (32.32)
  */
 uint64_t CLK_TRIM_fromMono(uint64_t mono);
@@ -32,15 +32,14 @@ uint64_t CLK_TRIM_fromMono(uint64_t mono);
 /**
  * Trim system clock frequency
  * @param trim new trim rate (0.31 fixed-point)
- * @return actual rate applied (0.31 fixed-point)
  */
-void CLK_TRIM_set(int32_t trim);
+void CLK_TRIM_setTrim(int32_t trim);
 
 /**
  * Get current trim rate for system clock frequency
  * @return current trim rate (0.31 fixed-point)
  */
-int32_t CLK_TRIM_get();
+int32_t CLK_TRIM_getTrim();
 
 
 #endif //GPSDO_CLK_TRIM_H

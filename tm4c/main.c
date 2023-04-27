@@ -6,7 +6,7 @@
 
 #include "hw/eeprom.h"
 #include "hw/sys.h"
-#include "lib/clk.h"
+#include "lib/clk/mono.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
 #include "lib/led.h"
@@ -32,7 +32,7 @@ int main(void) {
     // initialize status LEDs
     LED_init();
     // initialize system clock
-    CLK_init();
+    CLK_MONO_init();
     // initialize RNG
     RAND_init();
     // initialize EEPROM

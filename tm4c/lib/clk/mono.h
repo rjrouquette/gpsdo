@@ -14,13 +14,18 @@
  * Precision Clock Event Structure
  */
 struct ClockEvent {
+    // monotonic clock state
     uint32_t timer;
     uint32_t offset;
     uint32_t integer;
+    // trimmed clock state
     int32_t trimRate;
     uint64_t trimRef;
     uint64_t trimOff;
-    uint64_t taiOffset;
+    // tai clock state
+    int32_t taiRate;
+    uint64_t taiRef;
+    uint64_t taiOff;
 };
 
 // raw internal monotonic clock state

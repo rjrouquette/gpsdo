@@ -7,7 +7,9 @@
 #include "hw/eeprom.h"
 #include "hw/emac.h"
 #include "hw/sys.h"
-#include "lib/clk.h"
+#include "lib/clk/mono.h"
+#include "lib/clk/tai.h"
+#include "lib/clk/trim.h"
 #include "lib/format.h"
 #include "lib/gps.h"
 #include "lib/led.h"
@@ -22,8 +24,6 @@
 #include "gpsdo.h"
 #include "ntp.h"
 #include "status.h"
-#include "lib/clk/mono.h"
-#include "lib/clk/trim.h"
 
 #define STATUS_PORT (23) // telnet port
 
@@ -173,6 +173,34 @@ unsigned statusClock(char *body) {
     toHex(clkTrimOffset, 8, '0', tmp + 11);
     tmp[19] = 0;
     end = append(end, "trim off:   ");
+    end = append(end, tmp);
+    end = append(end, "\n\n");
+
+    // current time
+    strcpy(tmp, "0x");
+    toHex(clkTaiRate, 8, '0', tmp + 2);
+    tmp[10] = 0;
+    end = append(end, "tai rate:  ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // current time
+    strcpy(tmp, "0x");
+    toHex(clkTaiRef >> 32, 8, '0', tmp + 2);
+    tmp[10] = '.';
+    toHex(clkTaiRef, 8, '0', tmp + 11);
+    tmp[19] = 0;
+    end = append(end, "tai ref:   ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // current time
+    strcpy(tmp, "0x");
+    toHex(clkTaiOffset >> 32, 8, '0', tmp + 2);
+    tmp[10] = '.';
+    toHex(clkTaiOffset, 8, '0', tmp + 11);
+    tmp[19] = 0;
+    end = append(end, "tai off:   ");
     end = append(end, tmp);
     end = append(end, "\n\n");
 
@@ -412,7 +440,7 @@ unsigned statusGPSDO(char *body) {
     end = append(end, " ppm\n");
 
     // temperature offset
-    tmp[toBase(CLK_MONOTONIC_INT() - GPSDO_compSaved(), 10, tmp)] = 0;
+    tmp[toBase(CLK_MONO_INT() - GPSDO_compSaved(), 10, tmp)] = 0;
     end = append(end, "  - last saved: ");
     end = append(end, tmp);
     end = append(end, " s\n");
@@ -426,7 +454,7 @@ unsigned statusNTP(char *body) {
     char *end = body;
 
     // TAI time
-    uint64_t mono = CLK_MONOTONIC();
+    uint64_t mono = CLK_MONO();
     strcpy(tmp, "0x");
     toHex(mono>>32, 8, '0', tmp+2);
     tmp[10] = '.';

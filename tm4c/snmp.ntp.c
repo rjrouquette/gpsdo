@@ -2,7 +2,7 @@
 // Created by robert on 5/24/22.
 //
 
-#include "lib/clk.h"
+#include "lib/clk/mono.h"
 #include "gpsdo.h"
 #include "ntp.h"
 
@@ -115,7 +115,7 @@ int writeNtpStatus(uint8_t *buffer) {
     dlen = writeValueInt32(
             buffer, dlen,
             OID_NTP_STATUS_PREFIX, sizeof(OID_NTP_STATUS_PREFIX), NTP_STATUS_UPTIME,
-            CLK_MONOTONIC_INT()
+            CLK_MONO_INT()
     );
 
     uint32_t ntpDate[4];

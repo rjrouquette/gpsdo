@@ -3,12 +3,12 @@
 //
 
 #include <strings.h>
+#include "../clk/mono.h"
+#include "../net.h"
 #include "arp.h"
 #include "eth.h"
 #include "ip.h"
-#include "../net.h"
 #include "util.h"
-#include "../clk.h"
 
 #define ANNOUNCE_INTERVAL (60)
 #define MAX_REQUESTS (16)
@@ -49,7 +49,7 @@ void makeArpIp4(
 }
 
 void ARP_run() {
-    const uint32_t now = CLK_MONOTONIC_INT();
+    const uint32_t now = CLK_MONO_INT();
     if(((int32_t)(nextAnnounce - now)) <= 0) {
         nextAnnounce = now + ANNOUNCE_INTERVAL;
         ARP_announce();
@@ -99,7 +99,7 @@ void ARP_process(uint8_t *frame, int flen) {
 }
 
 int ARP_request(uint32_t remoteAddress, CallbackARP callback) {
-    uint32_t now = CLK_MONOTONIC_INT();
+    uint32_t now = CLK_MONO_INT();
     for(int i = 0; i < MAX_REQUESTS; i++) {
         // look for empty or expired slot
         if(requests[i].remoteAddress != 0 && ((int32_t) (now - requests[i].expire) > 0))

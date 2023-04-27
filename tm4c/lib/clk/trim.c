@@ -2,33 +2,15 @@
 // Created by robert on 4/26/23.
 //
 
-#include "trim.h"
-#include "mono.h"
 #include "../../hw/interrupts.h"
+#include "mono.h"
+#include "trim.h"
+#include "util.h"
 
 static uint32_t clkTrimRem = 0;
 volatile uint64_t clkTrimOffset = 0;
 volatile uint64_t clkTrimRef = 0;
 volatile int32_t clkTrimRate = 0;
-
-static uint64_t corrValue(uint32_t rate, uint64_t delta, uint32_t *rem) {
-    int neg = 0;
-    if(delta >> 63) {
-        delta = -delta;
-        neg = 1;
-    }
-    if(rate >> 31 & 1) {
-        rate = -rate;
-        neg ^= 1;
-    }
-    delta *= rate;
-    if(neg) delta = -delta;
-    if(rem) {
-        delta += *rem;
-        *rem = (uint32_t) delta;
-    }
-    return ((int64_t) delta) >> 32;
-}
 
 uint64_t CLK_TRIM() {
     return CLK_TRIM_fromMono(CLK_MONO());
@@ -46,7 +28,7 @@ uint64_t CLK_TRIM_fromMono(uint64_t mono) {
     return mono;
 }
 
-void CLK_TRIM_set(int32_t trim) {
+void CLK_TRIM_setTrim(int32_t trim) {
     // prepare update values
     uint64_t now = CLK_MONO();
     uint64_t offset = corrValue(clkTrimRate, now - clkTrimRef, &clkTrimRem);
@@ -58,6 +40,6 @@ void CLK_TRIM_set(int32_t trim) {
     __enable_irq();
 }
 
-int32_t CLK_TRIM_get() {
+int32_t CLK_TRIM_getTrim() {
     return clkTrimRate;
 }

@@ -299,7 +299,7 @@ uint64_t NET_getRxTime(const uint8_t *rxFrame) {
     uint32_t offset = clkMonoOff;
     uint32_t integer = clkMonoInt;
     __enable_irq();
-    return CLK_TRIM_fromMono(fromClkMono(timer, offset, integer)) + taiOffset;
+    return fromClkMono(timer, offset, integer);
 }
 
 uint64_t NET_getTxTime(const uint8_t *txFrame) {
@@ -314,5 +314,5 @@ uint64_t NET_getTxTime(const uint8_t *txFrame) {
     uint32_t offset = clkMonoOff;
     uint32_t integer = clkMonoInt;
     __enable_irq();
-    return CLK_TRIM_fromMono(fromClkMono(timer, offset, integer)) + taiOffset;
+    return fromClkMono(timer, offset, integer);
 }
