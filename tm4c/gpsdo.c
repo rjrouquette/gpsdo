@@ -163,7 +163,7 @@ void GPSDO_run() {
     if (delta < 0x0FF000000ul) return;
     if (delta > 0x101000000ul) return;
     ppsSkewRms = 0x1p-32f * (float) (int32_t) delta;
-    pllBias += 0x1p-5f * ((-ppsSkewRms) - currFeedback);
+    pllBias += 0x1p-5f * (-ppsSkewRms - currFeedback);
     // adjust TAI alignment
     CLK_TAI_align(-(int32_t) CLK_TAI_PPS());
 
