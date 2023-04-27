@@ -19,13 +19,6 @@ union fixed_32_32 {
 };
 
 /**
- * Convert nanoseconds into fractional second
- * @param nanos nanosecond value to convert
- * @return 32-bit fixed-point format (0.32)
- */
-uint32_t nanosToFrac(uint32_t nanos);
-
-/**
  * Convert monotonic clock components into timestamp
  * @param timer raw timer value (125 MHz)
  * @param offset most recent second boundary timer value
