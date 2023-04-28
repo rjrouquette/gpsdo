@@ -35,7 +35,6 @@ void NtpSource_update(struct NtpSource *this) {
 
         int64_t a = (int64_t) (future->offset.tai - present->offset.tai);
         int64_t b = (int64_t) (future->offset.mono - present->offset.mono);
-        a -= b;
         drift[k] = toFloat(a) / toFloat(b);
         mean += drift[k];
         var += drift[k] * drift[k];

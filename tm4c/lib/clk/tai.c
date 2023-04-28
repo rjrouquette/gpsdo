@@ -27,12 +27,6 @@ uint64_t CLK_TAI() {
     return CLK_TAI_fromMono(CLK_MONO());
 }
 
-uint64_t CLK_TAI_PPS() {
-    uint64_t ts = CLK_TRIM_PPS();
-    ts += corrValue(clkMonoPps.taiRate, ts - clkMonoPps.taiRef, 0);
-    return ts + clkMonoPps.taiOff;
-}
-
 uint64_t CLK_TAI_fromMono(uint64_t ts) {
     ts = CLK_TRIM_fromMono(ts);
     ts += corrValue(clkTaiRate, ts - clkTaiRef, 0);

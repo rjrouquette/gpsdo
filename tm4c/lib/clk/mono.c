@@ -21,7 +21,7 @@ volatile int64_t clkMonoEth = 0;
 extern uint64_t taiOffset;
 
 // pps edge capture state
-volatile struct ClockEvent clkMonoPps;
+volatile struct ClockEvent clkMonoPpsEvent;
 
 
 void initClkMono() {
@@ -165,11 +165,6 @@ uint64_t CLK_MONO() {
     return fromClkMono(snapF, snapO, snapI);
 }
 
-// return timestamp of PPS edge capture as 32.32 fixed point value
-uint64_t CLK_MONO_PPS() {
-    return fromClkMono(clkMonoPps.timer, clkMonoPps.offset, clkMonoPps.integer);
-}
-
 
 // capture rising edge of ethernet PPS for offset measurement
 void ISR_Timer5A() {
@@ -194,15 +189,15 @@ void ISR_Timer5B() {
     // update pps edge state
     timer -= (timer - event) & 0xFFFF;
     // monotonic clock state
-    clkMonoPps.timer = timer;
-    clkMonoPps.offset = clkMonoOff;
-    clkMonoPps.integer = clkMonoInt;
+    clkMonoPpsEvent.timer = timer;
+    clkMonoPpsEvent.offset = clkMonoOff;
+    clkMonoPpsEvent.integer = clkMonoInt;
     // trimmed clock state
-    clkMonoPps.trimRate = clkTrimRate;
-    clkMonoPps.trimRef = clkTrimRef;
-    clkMonoPps.trimOff = clkTrimOffset;
+    clkMonoPpsEvent.trimRate = clkTrimRate;
+    clkMonoPpsEvent.trimRef = clkTrimRef;
+    clkMonoPpsEvent.trimOff = clkTrimOffset;
     // tai clock state
-    clkMonoPps.taiRate = clkTaiRate;
-    clkMonoPps.taiRef = clkTaiRef;
-    clkMonoPps.taiOff = clkTaiOffset;
+    clkMonoPpsEvent.taiRate = clkTaiRate;
+    clkMonoPpsEvent.taiRef = clkTaiRef;
+    clkMonoPpsEvent.taiOff = clkTaiOffset;
 }

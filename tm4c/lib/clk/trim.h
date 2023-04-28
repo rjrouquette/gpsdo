@@ -18,12 +18,6 @@ extern volatile int32_t clkTrimRate;
 uint64_t CLK_TRIM();
 
 /**
- * Returns the timestamp of the most recent PPS edge capture
- * @return 64-bit fixed-point format (32.32)
- */
-uint64_t CLK_TRIM_PPS();
-
-/**
  * Translate monotonic timestamp to trimmed timestamp
  * @param ts timestamp to translate (32.32)
  * @return 64-bit fixed-point format (32.32)

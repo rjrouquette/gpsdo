@@ -24,12 +24,6 @@ uint64_t CLK_TRIM() {
     return CLK_TRIM_fromMono(CLK_MONO());
 }
 
-uint64_t CLK_TRIM_PPS() {
-    uint64_t ts = CLK_MONO_PPS();
-    ts += corrValue(clkMonoPps.trimRate, ts - clkMonoPps.trimRef, 0);
-    return ts + clkMonoPps.trimOff;
-}
-
 uint64_t CLK_TRIM_fromMono(uint64_t ts) {
     ts += corrValue(clkTrimRate, ts - clkTrimRef, 0);
     ts += clkTrimOffset;

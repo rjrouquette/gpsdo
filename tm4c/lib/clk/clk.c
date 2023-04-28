@@ -6,6 +6,7 @@
 #include "clk.h"
 #include "mono.h"
 #include "util.h"
+#include "../../hw/interrupts.h"
 
 static void initClkSys() {
     // Enable external clock
@@ -64,7 +65,12 @@ void CLK_run() {
 }
 
 void CLK_PPS(uint64_t *tsResult) {
-    tsResult[0] = fromClkMono(clkMonoPps.timer, clkMonoPps.offset, clkMonoPps.integer);
-    tsResult[1] = tsResult[0] + corrValue(clkMonoPps.trimRate, tsResult[0] - clkMonoPps.trimRef, 0) + clkMonoPps.trimOff;
-    tsResult[2] = tsResult[1] + corrValue(clkMonoPps.taiRate, tsResult[1] - clkMonoPps.taiRef, 0) + clkMonoPps.taiOff;
+    struct ClockEvent ppsEvent;
+    __disable_irq();
+    ppsEvent = clkMonoPpsEvent;
+    __enable_irq();
+
+    tsResult[0] = fromClkMono(ppsEvent.timer, ppsEvent.offset, ppsEvent.integer);
+    tsResult[1] = tsResult[0] + corrValue(ppsEvent.trimRate, tsResult[0] - ppsEvent.trimRef, 0) + ppsEvent.trimOff;
+    tsResult[2] = tsResult[1] + corrValue(ppsEvent.taiRate, tsResult[1] - ppsEvent.taiRef, 0) + ppsEvent.taiOff;
 }

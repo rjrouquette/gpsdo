@@ -34,7 +34,7 @@ extern volatile uint32_t clkMonoOff;
 // timer tick offset between the ethernet clock and monotonic clock
 extern volatile int64_t clkMonoEth;
 // pps edge capture state
-extern volatile struct ClockEvent clkMonoPps;
+extern volatile struct ClockEvent clkMonoPpsEvent;
 
 /**
  * Returns the current value of the system clock (1s resolution)
@@ -47,12 +47,6 @@ uint32_t CLK_MONO_INT();
  * @return 64-bit fixed-point format (32.32)
  */
 uint64_t CLK_MONO();
-
-/**
- * Returns the timestamp of the most recent PPS edge capture
- * @return 64-bit fixed-point format (32.32)
- */
-uint64_t CLK_MONO_PPS();
 
 
 #endif //GPSDO_CLK_MONO_H

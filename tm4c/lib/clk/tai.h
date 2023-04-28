@@ -20,12 +20,6 @@ extern volatile int32_t clkTaiRate;
 uint64_t CLK_TAI();
 
 /**
- * Returns the timestamp of the most recent PPS edge capture
- * @return 64-bit fixed-point format (32.32)
- */
-uint64_t CLK_TAI_PPS();
-
-/**
  * Translate monotonic timestamp to TAI timestamp
  * @param ts timestamp to translate (32.32)
  * @return 64-bit fixed-point format (32.32)

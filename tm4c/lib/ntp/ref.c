@@ -13,10 +13,14 @@
 void NtpGPS_run(void *pObj) {
     struct NtpGPS *this = (struct NtpGPS *) pObj;
 
+    // get current timestamp
     uint64_t now = CLK_MONO();
-    uint64_t pps = CLK_MONO_PPS();
+    // get pps timestamps
+    uint64_t ppsTime[3];
+    CLK_PPS(ppsTime);
+
     // is pps too old?
-    if(now - pps > 0x140000000ull) {
+    if(now - ppsTime[0] > 0x140000000ull) {
         // advance reach indicator if the pulse has been missed
         if(((int64_t)(now - this->last_update)) > 0x100000000ull) {
             this->last_update = now;
@@ -25,18 +29,20 @@ void NtpGPS_run(void *pObj) {
         return;
     }
     // wait for update
-    if(pps == this->last_pps) return;
+    if(ppsTime[0] == this->last_pps) return;
     this->last_update = now;
-    this->source.freqDrift = 0x1p-32f * (float) (int32_t) (pps - this->last_pps);
-    this->last_pps = pps;
+    this->source.freqDrift = 0x1p-32f * (float) (int32_t) (ppsTime[0] - this->last_pps);
+    this->last_pps = ppsTime[0];
     // update reach indicator
     this->source.reach = (this->source.reach << 1) | 1;
     // advance sample buffer
     NtpSource_incr(&this->source);
     // get current sample
     struct NtpPollSample *sample = this->source.pollSample + this->source.samplePtr;
-    // retrieve timestamps
-    CLK_PPS((uint64_t *) &sample->offset);
+    // store PPS timestamps
+    sample->offset.mono = (int64_t) ppsTime[0];
+    sample->offset.trim = (int64_t) ppsTime[1];
+    sample->offset.tai = (int64_t) ppsTime[2];
     // compute TAI offset
     union fixed_32_32 scratch;
     scratch.ipart = GPS_taiEpoch();
@@ -45,7 +51,7 @@ void NtpGPS_run(void *pObj) {
     sample->delay = 0;
     sample->jitter = 4e-9f;
     // update filter
-//    NtpSource_update(&this->source);
+    NtpSource_update(&this->source);
 }
 
 void NtpGPS_init(void *pObj) {
