@@ -19,6 +19,7 @@
 #define DNS_SERVER_PORT (53)
 #define MAX_REQUESTS (16)
 #define REQUEST_EXPIRE (5)
+#define ARP_MAX_AGE (64)
 
 struct PACKED HEADER_DNS {
     uint16_t id;
@@ -44,6 +45,7 @@ static volatile struct {
     void *ref;
 } requests[MAX_REQUESTS];
 
+static uint32_t lastArp;
 static uint16_t nextRequest;
 static uint8_t dnsMAC[6];
 
@@ -67,13 +69,21 @@ static void callbackARP(void *ref, uint32_t remoteAddress, uint8_t *macAddress) 
         copyMAC(dnsMAC, macAddress);
 }
 
-int DNS_lookup(const char *hostname, CallbackDNS callback, void *ref) {
+void DNS_updateMAC() {
     ARP_request(ipDNS, callbackARP, NULL);
-    if(isNullMAC(dnsMAC)) {
-        return -2;
-    }
+    lastArp = CLK_MONO_INT();
+}
 
+int DNS_lookup(const char *hostname, CallbackDNS callback, void *ref) {
+    // check MAC address age
     uint32_t now = CLK_MONO_INT();
+    if((now - lastArp) > ARP_MAX_AGE)
+        DNS_updateMAC();
+
+    // abort if MAC address is invalid
+    if(isNullMAC(dnsMAC))
+        return -2;
+
     for(int i = 0; i < MAX_REQUESTS; i++) {
         // look for empty or expired slot
         if(requests[i].callback != 0 && ((int32_t) (now - requests[i].expire) > 0))

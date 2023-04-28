@@ -25,7 +25,7 @@
 #define NTP_CLI_PORT (12345)
 #define MAX_NTP_PEERS (8)
 #define MAX_NTP_SRCS (9)
-#define MIN_DNS_INTV (64) // 64 seconds
+#define MIN_DNS_INTV (4) // 4 seconds
 
 #define NTP_POOL_FQDN ("pool.ntp.org")
 

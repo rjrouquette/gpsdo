@@ -10,6 +10,7 @@
 #include "../net.h"
 #include "eth.h"
 #include "dhcp.h"
+#include "dns.h"
 #include "ip.h"
 #include "udp.h"
 #include "util.h"
@@ -298,7 +299,11 @@ static void processFrame(uint8_t *frame, int flen) {
         for(int i = 0; i < optDnsLen; i += 4) {
             memcpy(&addr, optDns + i, sizeof(addr));
             // select first valid address
-            if(addr) { ipDNS = addr; break; }
+            if(addr) {
+                ipDNS = addr;
+                DNS_updateMAC();
+                break;
+            }
         }
 
         // update ntp server list
