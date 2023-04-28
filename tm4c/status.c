@@ -292,6 +292,12 @@ unsigned statusETH(char *body) {
     end = append(end, (phyStatus & PHY_STATUS_DUPLEX) ? "FDX" : "HDX");
     end = append(end, "\n");
 
+    // lease expiration
+    tmp[toBase(DHCP_expires(), 10, tmp)] = 0;
+    end = append(end, "lease expires: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
     // return size
     return end - body;
 }
