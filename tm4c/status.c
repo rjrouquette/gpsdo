@@ -10,7 +10,7 @@
 #include "lib/clk/clk.h"
 #include "lib/clk/mono.h"
 #include "lib/clk/tai.h"
-#include "lib/clk/trim.h"
+#include "lib/clk/comp.h"
 #include "lib/format.h"
 #include "lib/gps.h"
 #include "lib/led.h"
@@ -122,13 +122,13 @@ unsigned statusClock(char *body) {
     end = append(end, "\n");
 
     // current time
-    uint64_t trim = CLK_TRIM();
+    uint64_t comp = CLK_COMP();
     strcpy(tmp, "0x");
-    toHex(trim>>32, 8, '0', tmp+2);
+    toHex(comp>>32, 8, '0', tmp+2);
     tmp[10] = '.';
-    toHex(trim, 8, '0', tmp+11);
+    toHex(comp, 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "clk trim:  ");
+    end = append(end, "clk comp:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
@@ -145,29 +145,29 @@ unsigned statusClock(char *body) {
 
     // current time
     strcpy(tmp, "0x");
-    toHex(clkTrimRate, 8, '0', tmp + 2);
+    toHex(clkCompRate, 8, '0', tmp + 2);
     tmp[10] = 0;
-    end = append(end, "trim rate: ");
+    end = append(end, "comp rate: ");
     end = append(end, tmp);
     end = append(end, "\n");
 
     // current time
     strcpy(tmp, "0x");
-    toHex(clkTrimRef >> 32, 8, '0', tmp + 2);
+    toHex(clkCompRef >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
-    toHex(clkTrimRef, 8, '0', tmp + 11);
+    toHex(clkCompRef, 8, '0', tmp + 11);
     tmp[19] = 0;
-    end = append(end, "trim ref:  ");
+    end = append(end, "comp ref:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
     // current time
     strcpy(tmp, "0x");
-    toHex(clkTrimOffset >> 32, 8, '0', tmp + 2);
+    toHex(clkCompOffset >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
-    toHex(clkTrimOffset, 8, '0', tmp + 11);
+    toHex(clkCompOffset, 8, '0', tmp + 11);
     tmp[19] = 0;
-    end = append(end, "trim off:  ");
+    end = append(end, "comp off:  ");
     end = append(end, tmp);
     end = append(end, "\n\n");
 

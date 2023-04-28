@@ -20,7 +20,7 @@
 #include "lib/led.h"
 #include "lib/rand.h"
 #include "ntp.h"
-#include "lib/clk/trim.h"
+#include "lib/clk/comp.h"
 #include "lib/clk/mono.h"
 #include "lib/clk/tai.h"
 

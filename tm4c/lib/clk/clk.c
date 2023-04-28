@@ -54,13 +54,13 @@ void CLK_init() {
 }
 
 
-// trim.c
-void runClkTrim();
+// comp.c
+void runClkComp();
 // tai.c
 void runClkTai();
 
 void CLK_run() {
-    runClkTrim();
+    runClkComp();
     runClkTai();
 }
 
@@ -71,6 +71,6 @@ void CLK_PPS(uint64_t *tsResult) {
     __enable_irq();
 
     tsResult[0] = fromClkMono(ppsEvent.timer, ppsEvent.offset, ppsEvent.integer);
-    tsResult[1] = tsResult[0] + corrValue(ppsEvent.trimRate, tsResult[0] - ppsEvent.trimRef, 0) + ppsEvent.trimOff;
+    tsResult[1] = tsResult[0] + corrValue(ppsEvent.compRate, tsResult[0] - ppsEvent.compRef, 0) + ppsEvent.compOff;
     tsResult[2] = tsResult[1] + corrValue(ppsEvent.taiRate, tsResult[1] - ppsEvent.taiRef, 0) + ppsEvent.taiOff;
 }

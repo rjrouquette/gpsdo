@@ -17,7 +17,7 @@
 #include "net/util.h"
 #include "net/dns.h"
 #include "clk/mono.h"
-#include "clk/trim.h"
+#include "clk/comp.h"
 
 #define RX_RING_MASK (31)
 #define RX_RING_SIZE (32)

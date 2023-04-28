@@ -12,7 +12,7 @@
 #include "lib/delay.h"
 #include "lib/gps.h"
 #include "lib/clk/mono.h"
-#include "lib/clk/trim.h"
+#include "lib/clk/comp.h"
 #include "lib/clk/tai.h"
 
 

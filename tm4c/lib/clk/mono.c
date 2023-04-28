@@ -10,7 +10,7 @@
 #include "../hw/timer.h"
 #include "mono.h"
 #include "tai.h"
-#include "trim.h"
+#include "comp.h"
 #include "util.h"
 
 
@@ -192,10 +192,10 @@ void ISR_Timer5B() {
     clkMonoPpsEvent.timer = timer;
     clkMonoPpsEvent.offset = clkMonoOff;
     clkMonoPpsEvent.integer = clkMonoInt;
-    // trimmed clock state
-    clkMonoPpsEvent.trimRate = clkTrimRate;
-    clkMonoPpsEvent.trimRef = clkTrimRef;
-    clkMonoPpsEvent.trimOff = clkTrimOffset;
+    // compmed clock state
+    clkMonoPpsEvent.compRate = clkCompRate;
+    clkMonoPpsEvent.compRef = clkCompRef;
+    clkMonoPpsEvent.compOff = clkCompOffset;
     // tai clock state
     clkMonoPpsEvent.taiRate = clkTaiRate;
     clkMonoPpsEvent.taiRef = clkTaiRef;

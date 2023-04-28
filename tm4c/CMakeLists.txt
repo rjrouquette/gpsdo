@@ -37,7 +37,7 @@ add_executable(
         lib/clk/clk.c
         lib/clk/mono.c
         lib/clk/tai.c
-        lib/clk/trim.c
+        lib/clk/comp.c
         lib/clk/util.c
         lib/delay.c
         lib/format.c

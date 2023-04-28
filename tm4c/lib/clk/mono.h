@@ -18,10 +18,10 @@ struct ClockEvent {
     uint32_t timer;
     uint32_t offset;
     uint32_t integer;
-    // trimmed clock state
-    int32_t trimRate;
-    uint64_t trimRef;
-    uint64_t trimOff;
+    // compensated clock state
+    int32_t compRate;
+    uint64_t compRef;
+    uint64_t compOff;
     // tai clock state
     int32_t taiRate;
     uint64_t taiRef;

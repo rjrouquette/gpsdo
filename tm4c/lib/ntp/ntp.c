@@ -6,7 +6,7 @@
 
 #include "../chrony/candm.h"
 #include "../clk/tai.h"
-#include "../clk/trim.h"
+#include "../clk/comp.h"
 #include "../clk/util.h"
 #include "../net.h"
 #include "../net/eth.h"
@@ -270,7 +270,7 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
 //    cmdReply->data.tracking.last_offset.f = htonf(-1e-9f * (float) GPSDO_offsetNano());
 //    cmdReply->data.tracking.rms_offset.f = htonf(GPSDO_offsetRms());
 
-    cmdReply->data.tracking.freq_ppm.f = htonf(1e6f * (0x1p-32f * (float) CLK_TRIM_getTrim()));
+    cmdReply->data.tracking.freq_ppm.f = htonf(1e6f * (0x1p-32f * (float) CLK_COMP_getComp()));
     cmdReply->data.tracking.resid_freq_ppm.f = htonf(1e6f * (0x1p-32f * (float) CLK_TAI_getTrim()));
 //    cmdReply->data.tracking.skew_ppm.f = htonf(GPSDO_skewRms() * 1e6f);
 
