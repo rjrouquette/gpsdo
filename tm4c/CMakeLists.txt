@@ -35,9 +35,9 @@ add_executable(
         hw/interrupts.c
         hw/sys.c
         lib/clk/clk.c
+        lib/clk/comp.c
         lib/clk/mono.c
         lib/clk/tai.c
-        lib/clk/comp.c
         lib/clk/util.c
         lib/delay.c
         lib/format.c

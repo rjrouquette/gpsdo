@@ -35,7 +35,7 @@ static int phyStatus = 0;
 static struct EMAC_RX_DESC rxDesc[RX_RING_SIZE];
 static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 
-static CallbackNetTX txCallback[TX_RING_SIZE];
+static struct { CallbackNetTX call; void *ref; } txCallback[TX_RING_SIZE];
 static struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
 static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
@@ -69,7 +69,7 @@ static void initDescriptors() {
         // capture timestamp
         txDesc[i].TDES0.TTSE = 1;
         // clear callback
-        txCallback[i] = 0;
+        txCallback[i].call = 0;
     }
     txDesc[TX_RING_SIZE-1].TDES0.TER = 1;
 }
@@ -221,10 +221,10 @@ void NET_run() {
     // check for completed transmissions
     while ((endTX != ptrTX) && !txDesc[endTX].TDES0.OWN) {
         // invoke callback
-        CallbackNetTX pCall = txCallback[endTX];
-        if(pCall) { (*pCall) (txBuffer[endTX], txDesc[endTX].TDES1.TBS1); }
+        CallbackNetTX pCall = txCallback[endTX].call;
+        if(pCall) { (*pCall) (txCallback[endTX].ref, txBuffer[endTX], txDesc[endTX].TDES1.TBS1); }
         // clear callback
-        txCallback[endTX] = 0;
+        txCallback[endTX].call = 0;
         // advance pointer
         endTX = (endTX + 1) & TX_RING_MASK;
     }
@@ -269,8 +269,9 @@ uint8_t * NET_getTxBuff(int desc) {
     return (uint8_t *) txDesc[desc & TX_RING_MASK].BUFF1;
 }
 
-void NET_setTxCallback(int desc, CallbackNetTX callback) {
-    txCallback[desc & TX_RING_MASK] = callback;
+void NET_setTxCallback(int desc, CallbackNetTX callback, void *ref) {
+    txCallback[desc & TX_RING_MASK].call = callback;
+    txCallback[desc & TX_RING_MASK].ref = ref;
 }
 
 void NET_transmit(int desc, int len) {

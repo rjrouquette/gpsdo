@@ -41,6 +41,7 @@ static volatile struct {
     uint32_t expire;
     uint32_t requestId;
     CallbackDNS callback;
+    void *ref;
 } requests[MAX_REQUESTS];
 
 static uint16_t nextRequest;
@@ -61,13 +62,13 @@ void DNS_init() {
     UDP_register(DNS_CLIENT_PORT, processFrame);
 }
 
-static void callbackARP(uint32_t remoteAddress, uint8_t *macAddress) {
+static void callbackARP(void *ref, uint32_t remoteAddress, uint8_t *macAddress) {
     if(remoteAddress == ipDNS)
         copyMAC(dnsMAC, macAddress);
 }
 
-int DNS_lookup(const char *hostname, CallbackDNS callback) {
-    ARP_request(ipDNS, callbackARP);
+int DNS_lookup(const char *hostname, CallbackDNS callback, void *ref) {
+    ARP_request(ipDNS, callbackARP, NULL);
     if(isNullMAC(dnsMAC)) {
         return -2;
     }
@@ -80,6 +81,7 @@ int DNS_lookup(const char *hostname, CallbackDNS callback) {
 
         // register callback
         requests[i].callback = callback;
+        requests[i].ref = ref;
         requests[i].requestId = nextRequest++;
         requests[i].expire = now + REQUEST_EXPIRE;
 
@@ -170,7 +172,7 @@ static void processFrame(uint8_t *frame, int flen) {
         // read address
         uint32_t addr = *(uint32_t *) next; next += 4;
         // report address via callback
-        (*requests[match].callback)(addr);
+        (*requests[match].callback)(requests[match].ref, addr);
     }
     // clear request slot
     requests[match].callback = 0;

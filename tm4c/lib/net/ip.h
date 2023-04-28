@@ -35,11 +35,7 @@ struct PACKED HEADER_IPv4 {
     uint32_t src;
     uint32_t dst;
 };
-#ifdef __cplusplus
-static_assert(sizeof(struct HEADER_IPv4) == 20, "HEADER_IPv4 must be 20 bytes");
-#else
 _Static_assert(sizeof(struct HEADER_IPv4) == 20, "HEADER_IPv4 must be 20 bytes");
-#endif
 
 extern volatile uint32_t ipBroadcast;
 extern volatile uint32_t ipAddress;

@@ -7,9 +7,9 @@
 
 #include <stdint.h>
 
-typedef void (*CallbackDNS)(uint32_t remoteAddress);
+typedef void (*CallbackDNS)(void *ref, uint32_t remoteAddress);
 
 void DNS_init();
-int DNS_lookup(const char *hostname, CallbackDNS callback);
+int DNS_lookup(const char *hostname, CallbackDNS callback, void *ref);
 
 #endif //GPSDO_DNS_H

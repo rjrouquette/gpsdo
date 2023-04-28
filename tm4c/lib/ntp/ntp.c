@@ -7,8 +7,12 @@
 #include "../chrony/candm.h"
 #include "../clk/tai.h"
 #include "../clk/comp.h"
+#include "../clk/mono.h"
 #include "../clk/util.h"
+#include "../led.h"
 #include "../net.h"
+#include "../net/dhcp.h"
+#include "../net/dns.h"
 #include "../net/eth.h"
 #include "../net/ip.h"
 #include "../net/udp.h"
@@ -21,19 +25,26 @@
 #define NTP_CLI_PORT (12345)
 #define MAX_NTP_PEERS (8)
 #define MAX_NTP_SRCS (9)
+#define MIN_DNS_INTV (64) // 64 seconds
+
+#define NTP_POOL_FQDN ("pool.ntp.org")
 
 static struct NtpGPS srcGps;
 static struct NtpPeer peerSlots[MAX_NTP_PEERS];
 
 static struct NtpSource *sources[MAX_NTP_SRCS];
-static int cntSources = 0;
-static int runNext = 0;
+static volatile int cntSources = 0;
+static volatile int runNext = 0;
+
+static uint32_t lastDnsRequest = 0;
 
 static void ntpRequest(uint8_t *frame, int flen);
 static void ntpResponse(uint8_t *frame, int flen);
 static void chronycRequest(uint8_t *frame, int flen);
 
 static void ntpRun();
+static struct NtpSource* ntpAllocPeer();
+static void ntpDnsCallback(void *ref, uint32_t addr);
 
 void NTP_init() {
     UDP_register(NTP_SRV_PORT, ntpRequest);
@@ -41,7 +52,11 @@ void NTP_init() {
     // listen for crony status requests
     UDP_register(DEFAULT_CANDM_PORT, chronycRequest);
 
-    // add GPS reference as source
+    // initialize empty peer records
+    for(int i = 0; i < MAX_NTP_PEERS; i++)
+        NtpPeer_init(peerSlots + i);
+
+    // initialize GPS reference and register it as a source
     NtpGPS_init(&srcGps);
     sources[cntSources++] = (void *) &srcGps;
 }
@@ -65,8 +80,57 @@ static void ntpResponse(uint8_t *frame, int flen) {
 }
 
 static void ntpRun() {
-
+    // fill empty source slots with DHCP provided addresses
+    if(cntSources < MAX_NTP_SRCS) {
+        uint32_t *addr;
+        int cnt;
+        // get dhcp ntp list
+        DHCP_ntpAddr(&addr, &cnt);
+        for(int i = 0; i < cnt; i++) {
+            ntpDnsCallback(NULL, addr[i]);
+        }
+    }
+    // fill empty source slots with server from public ntp pool
+    uint32_t now = CLK_MONO_INT();
+    if(cntSources < MAX_NTP_SRCS) {
+        if ((now - lastDnsRequest) > MIN_DNS_INTV) {
+            lastDnsRequest = now;
+            DNS_lookup(NTP_POOL_FQDN, ntpDnsCallback, NULL);
+        }
+    }
 }
+
+static struct NtpSource* ntpAllocPeer() {
+    for(int i = 0; i < MAX_NTP_PEERS; i++) {
+        struct NtpPeer *slot = peerSlots + i;
+        if(slot->source.id == 0) {
+            (*(slot->source.init))(slot);
+            return (struct NtpSource *) slot;
+        }
+    }
+    return NULL;
+}
+
+static void ntpDnsCallback(void *ref, uint32_t addr) {
+    // ignore if slots are full
+    if(cntSources >= MAX_NTP_SRCS) return;
+    // ignore own address
+    if(addr == ipAddress) return;
+    // verify address is not currently in use
+    for(int i = 0; i < cntSources; i++) {
+        if(sources[i]->mode != RPY_SD_MD_CLIENT)
+            continue;
+        if(sources[i]->id == addr)
+            return;
+    }
+    // attempt to add as new source
+    struct NtpSource *newSource = ntpAllocPeer();
+    if(newSource != NULL) {
+        newSource->id = addr;
+        sources[cntSources++] = newSource;
+    }
+}
+
 
 // -----------------------------------------------------------------------------
 // support for chronyc status queries ------------------------------------------

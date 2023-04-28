@@ -18,6 +18,7 @@ volatile struct {
     uint32_t expire;
     uint32_t remoteAddress;
     CallbackARP callback;
+    void *ref;
 } requests[MAX_REQUESTS];
 
 static uint32_t nextAnnounce = 0;
@@ -90,7 +91,7 @@ void ARP_process(uint8_t *frame, int flen) {
         if(payload->SPA != 0) {
             for(int i = 0; i < MAX_REQUESTS; i++) {
                 if(requests[i].remoteAddress == payload->SPA) {
-                    (*requests[i].callback)(payload->SPA, payload->SHA);
+                    (*requests[i].callback)(requests[i].ref, payload->SPA, payload->SHA);
                     requests[i].remoteAddress = 0;
                 }
             }
@@ -98,7 +99,7 @@ void ARP_process(uint8_t *frame, int flen) {
     }
 }
 
-int ARP_request(uint32_t remoteAddress, CallbackARP callback) {
+int ARP_request(uint32_t remoteAddress, CallbackARP callback, void *ref) {
     uint32_t now = CLK_MONO_INT();
     for(int i = 0; i < MAX_REQUESTS; i++) {
         // look for empty or expired slot
@@ -117,6 +118,7 @@ int ARP_request(uint32_t remoteAddress, CallbackARP callback) {
         broadcastMAC(((struct FRAME_ETH *)packetTX)->macDst);
         // register callback
         requests[i].callback = callback;
+        requests[i].ref = ref;
         requests[i].remoteAddress = remoteAddress;
         requests[i].expire = now + REQUEST_EXPIRE;
         // transmit frame

@@ -28,6 +28,10 @@ struct NtpPeer {
     // state machine
     uint64_t lastPoll;
     int burstCounter;
+    uint32_t lastArp;
+
+    // remote mac address
+    uint8_t macAddr[6];
 };
 
 void NtpPeer_init(void *pObj);
