@@ -25,12 +25,13 @@
 #define NTP_CLI_PORT (12345)
 #define MAX_NTP_PEERS (8)
 #define MAX_NTP_SRCS (9)
-#define MIN_DNS_INTV (4) // 4 seconds
+#define MIN_DNS_INTV (16) // 16 seconds
 
 #define NTP_POOL_FQDN ("pool.ntp.org")
 
 static struct NtpGPS srcGps;
 static struct NtpPeer peerSlots[MAX_NTP_PEERS];
+static struct NtpSource* ntpAllocPeer();
 
 static struct NtpSource *sources[MAX_NTP_SRCS];
 static volatile int cntSources = 0;
@@ -42,8 +43,7 @@ static void ntpRequest(uint8_t *frame, int flen);
 static void ntpResponse(uint8_t *frame, int flen);
 static void chronycRequest(uint8_t *frame, int flen);
 
-static void ntpRun();
-static struct NtpSource* ntpAllocPeer();
+static void ntpMain();
 static void ntpDnsCallback(void *ref, uint32_t addr);
 
 void NTP_init() {
@@ -66,7 +66,7 @@ void NTP_run() {
         struct NtpSource *source = sources[runNext++];
         (*(source->run))(source);
     } else {
-        ntpRun();
+        ntpMain();
         runNext = 0;
     }
 }
@@ -79,22 +79,21 @@ static void ntpResponse(uint8_t *frame, int flen) {
 
 }
 
-static void ntpRun() {
-    // fill empty source slots with DHCP provided addresses
-    if(cntSources < MAX_NTP_SRCS) {
-        uint32_t *addr;
-        int cnt;
-        // get dhcp ntp list
-        DHCP_ntpAddr(&addr, &cnt);
-        for(int i = 0; i < cnt; i++) {
-            ntpDnsCallback(NULL, addr[i]);
-        }
-    }
-    // fill empty source slots with server from public ntp pool
+static void ntpMain() {
+    // periodically attempt to fill empty source slots
     uint32_t now = CLK_MONO_INT();
-    if(cntSources < MAX_NTP_SRCS) {
-        if ((now - lastDnsRequest) > MIN_DNS_INTV) {
-            lastDnsRequest = now;
+    if ((now - lastDnsRequest) > MIN_DNS_INTV) {
+        lastDnsRequest = now;
+
+        if(cntSources < MAX_NTP_SRCS) {
+            // fill with DHCP provided addresses
+            uint32_t *addr;
+            int cnt;
+            DHCP_ntpAddr(&addr, &cnt);
+            for (int i = 0; i < cnt; i++)
+                ntpDnsCallback(NULL, addr[i]);
+
+            // fill with servers from public ntp pool
             DNS_lookup(NTP_POOL_FQDN, ntpDnsCallback, NULL);
         }
     }
