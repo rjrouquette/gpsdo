@@ -121,6 +121,7 @@ static void startPoll(NtpPeer *this) {
 static void runPoll(NtpPeer *this) {
     this->source.reach <<= 1;
     if(!this->pktSent) {
+        this->pktSent = true;
         sendPoll(this);
         return;
     }
