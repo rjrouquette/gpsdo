@@ -14,15 +14,13 @@
 #include "../net/dhcp.h"
 #include "../net/dns.h"
 #include "../net/eth.h"
-#include "../net/ip.h"
-#include "../net/udp.h"
 
+#include "common.h"
 #include "ntp.h"
 #include "peer.h"
 #include "ref.h"
 
-#define NTP_SRV_PORT (123)
-#define NTP_CLI_PORT (12345)
+#define NTP_TS_PREC (-24)
 #define MAX_NTP_PEERS (8)
 #define MAX_NTP_SRCS (9)
 #define MIN_DNS_INTV (16) // 16 seconds
@@ -31,7 +29,10 @@
 
 static struct NtpGPS srcGps;
 static struct NtpPeer peerSlots[MAX_NTP_PEERS];
+// allocate new peer
 static struct NtpSource* ntpAllocPeer();
+// deallocate peer
+static void ntpDeallocatePeer(struct NtpSource *peer);
 
 static struct NtpSource *sources[MAX_NTP_SRCS];
 static volatile int cntSources = 0;
@@ -39,16 +40,43 @@ static volatile int runNext = 0;
 
 static uint32_t lastDnsRequest = 0;
 
+// aggregate NTP state
+static int leapIndicator;
+static int clockStratum = 16;
+static uint32_t refId;
+static uint32_t rootDelay;
+static uint32_t rootDispersion;
+
+
+// hash table for interleaved timestamps
+#define XLEAVE_COUNT (1024)
+static struct TsXleave {
+    uint64_t rxTime;
+    uint64_t txTime;
+} tsXleave[XLEAVE_COUNT];
+static inline int hashXleave(uint32_t addr) {
+    return (int) (((addr * 0xDE9DB139) >> 22) & (XLEAVE_COUNT - 1));
+}
+
+// request handlers
 static void ntpRequest(uint8_t *frame, int flen);
 static void ntpResponse(uint8_t *frame, int flen);
 static void chronycRequest(uint8_t *frame, int flen);
 
+// internal operations
 static void ntpMain();
 static void ntpDnsCallback(void *ref, uint32_t addr);
 
+// timestamp convenience functions
+static inline uint64_t ntpClock() { return NTP_UTC_OFFSET + CLK_TAI() - clkTaiUtcOffset; }
+static inline uint64_t ntpModified() { return 0; }
+static inline uint64_t ntpTimeRx(uint8_t *frame) { return NTP_UTC_OFFSET + CLK_TAI_fromMono(NET_getRxTime(frame)) - clkTaiUtcOffset; }
+static inline uint64_t ntpTimeTx(uint8_t *frame) { return NTP_UTC_OFFSET + CLK_TAI_fromMono(NET_getTxTime(frame)) - clkTaiUtcOffset; }
+
+
 void NTP_init() {
-    UDP_register(NTP_SRV_PORT, ntpRequest);
-    UDP_register(NTP_CLI_PORT, ntpResponse);
+    UDP_register(NTP_PORT_SRV, ntpRequest);
+    UDP_register(NTP_PORT_CLI, ntpResponse);
     // listen for crony status requests
     UDP_register(DEFAULT_CANDM_PORT, chronycRequest);
 
@@ -71,8 +99,102 @@ void NTP_run() {
     }
 }
 
-static void ntpRequest(uint8_t *frame, int flen) {
+static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
+    // store hardware transmit time
+    uint32_t cell = hashXleave(headerIPv4->dst);
+    tsXleave[cell].rxTime = headerNTP->rxTime;
+    tsXleave[cell].txTime = __builtin_bswap64(ntpTimeTx(frame));
+}
+
+static void ntpRequest(uint8_t *frame, int flen) {
+    // discard malformed packets
+    if(flen < NTP4_SIZE) return;
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+
+    // verify destination
+    if(headerIPv4->dst != ipAddress) return;
+    // prevent loopback
+    if(headerIPv4->src == ipAddress) return;
+    // filter non-client frames
+    if(headerNTP->mode != NTP_MODE_CLI) return;
+    // indicate time-server activity
+    LED_act0();
+
+    // retrieve rx time
+    const uint64_t rxTime = ntpTimeRx(frame);
+
+    // get TX descriptor
+    const int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    // set callback for precise TX timestamp
+    NET_setTxCallback(txDesc, ntpTxCallback, NULL);
+    // duplicate packet for sending
+    uint8_t *temp = NET_getTxBuff(txDesc);
+    memcpy(temp, frame, flen);
+    frame = temp;
+
+    // return the response directly to the sender
+    UDP_returnToSender(frame, ipAddress, NTP_PORT_SRV);
+
+    // remap headers
+    headerEth = (struct FRAME_ETH *) frame;
+    headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+
+    // check for interleaved request
+    int xleave = -1;
+    const uint64_t orgTime = headerNTP->origTime;
+    if(
+            orgTime != 0 &&
+            headerNTP->rxTime != headerNTP->txTime
+            ) {
+        // load TX timestamp if available
+        int cell = hashXleave(headerIPv4->dst);
+        if(orgTime == tsXleave[cell].rxTime)
+            xleave = cell;
+    }
+
+    // set type to server response
+    headerNTP->mode = NTP_MODE_SRV;
+    headerNTP->status = leapIndicator;
+    // set stratum and precision
+    headerNTP->stratum = clockStratum;
+    headerNTP->precision = NTP_TS_PREC;
+    // set root delay
+    headerNTP->rootDelay = __builtin_bswap32(rootDelay);
+    // set root dispersion
+    headerNTP->rootDispersion = __builtin_bswap32(rootDispersion);
+    // set reference ID
+    headerNTP->refID = refId;
+    // set reference timestamp
+    headerNTP->refTime = __builtin_bswap64(ntpModified());
+    // set origin and TX timestamps
+    if(xleave < 0) {
+        headerNTP->origTime = headerNTP->txTime;
+        headerNTP->txTime = __builtin_bswap64(ntpClock());
+    } else {
+        headerNTP->origTime = headerNTP->rxTime;
+        headerNTP->txTime = tsXleave[xleave].txTime;
+    }
+    // set RX timestamp
+    headerNTP->rxTime = __builtin_bswap64(rxTime);
+
+    // finalize packet
+    UDP_finalize(frame, flen);
+    IPv4_finalize(frame, flen);
+    // transmit packet
+    NET_transmit(txDesc, flen);
 }
 
 static void ntpResponse(uint8_t *frame, int flen) {
@@ -103,11 +225,31 @@ static struct NtpSource* ntpAllocPeer() {
     for(int i = 0; i < MAX_NTP_PEERS; i++) {
         struct NtpPeer *slot = peerSlots + i;
         if(slot->source.id == 0) {
+            // initialize peer record
             (*(slot->source.init))(slot);
+            // append to source list
+            sources[cntSources++] = (struct NtpSource *) slot;
+            // return instance
             return (struct NtpSource *) slot;
         }
     }
     return NULL;
+}
+
+static void ntpDeallocatePeer(struct NtpSource *peer) {
+    peer->id = 0;
+    int slot = -1;
+    for(int i = 0; i < cntSources; i++) {
+        if(sources[i] == peer) slot = i;
+    }
+    if(slot < 0) return;
+    // remove source from source list
+    --cntSources;
+    for(int i = slot; i < cntSources; i++)
+        sources[i] = sources[i+1];
+    // clear empty slots
+    for(int i = cntSources; i < MAX_NTP_SRCS; i++)
+        sources[i] = NULL;
 }
 
 static void ntpDnsCallback(void *ref, uint32_t addr) {
@@ -124,10 +266,8 @@ static void ntpDnsCallback(void *ref, uint32_t addr) {
     }
     // attempt to add as new source
     struct NtpSource *newSource = ntpAllocPeer();
-    if(newSource != NULL) {
+    if(newSource != NULL)
         newSource->id = addr;
-        sources[cntSources++] = newSource;
-    }
 }
 
 

@@ -677,16 +677,6 @@ static void runPing() {
 }
 
 static void requestTxCallback(uint8_t *frame, int flen) {
-    // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
-
-    // store hardware transmit time
-    uint32_t cell = hashXleave(headerIPv4->dst);
-    tsXleave[cell].rxTime = headerNTP->rxTime;
-    tsXleave[cell].txTime = __builtin_bswap64(ntpTimeTx(frame));
 }
 
 void processRequest(uint8_t *frame, int flen) {
