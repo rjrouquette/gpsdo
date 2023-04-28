@@ -127,7 +127,10 @@ static void runPoll(NtpPeer *this) {
     if(this->pktRecv) {
         this->pollActive = false;
     } else {
-
+        uint64_t now = CLK_MONO();
+        if((now - this->pollStart) > PEER_RESPONSE_TIMEOUT) {
+            this->pollActive = false;
+        }
     }
 }
 
