@@ -28,7 +28,7 @@ void NtpSource_update(NtpSource *this) {
     float drift[NTP_MAX_HISTORY - 1];
     float mean = 0, var = 0;
     NtpPollSample *future = this->pollSample + i;
-    const int len = this->sampleCount + 1;
+    const int len = this->sampleCount - 1;
     for (int k = 0; k < len; k++) {
         i = (i - 1) & (NTP_MAX_HISTORY - 1);
         NtpPollSample *present = this->pollSample + i;

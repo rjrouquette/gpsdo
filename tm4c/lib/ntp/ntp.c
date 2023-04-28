@@ -490,8 +490,8 @@ static uint16_t chronycSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRe
     cmdReply->data.sourcestats.span_seconds = htonl(source->span);
 //    cmdReply->data.sourcestats.est_offset.f = htonf(server->currentOffset);
 //    cmdReply->data.sourcestats.est_offset_err.f = htonf(sqrtf(server->varDelay));
-    cmdReply->data.sourcestats.resid_freq_ppm.f = htonf(source->freqDrift);
-    cmdReply->data.sourcestats.skew_ppm.f = htonf(source->freqSkew);
+    cmdReply->data.sourcestats.resid_freq_ppm.f = htonf(source->freqDrift * 1e6f);
+    cmdReply->data.sourcestats.skew_ppm.f = htonf(source->freqSkew * 1e6f);
     return htons(STT_SUCCESS);
 }
 
