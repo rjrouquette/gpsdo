@@ -36,4 +36,18 @@ uint64_t fromClkMono(uint32_t timer, uint32_t offset, uint32_t integer);
  */
 uint64_t corrValue(uint32_t rate, uint64_t delta, uint32_t *rem);
 
+/**
+ * Convert 64-bit fixed-point timestamp (32.32) to float
+ * @param value to convert
+ * @return single-precision floating point value
+ */
+float toFloatU(uint64_t value);
+
+/**
+ * Convert signed 64-bit fixed-point timestamp (32.32) to float
+ * @param value to convert
+ * @return single-precision floating point value
+ */
+float toFloat(int64_t value);
+
 #endif //GPSDO_CLK_UTIL_H

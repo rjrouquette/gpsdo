@@ -7,6 +7,7 @@
 #include "hw/eeprom.h"
 #include "hw/emac.h"
 #include "hw/sys.h"
+#include "lib/clk/clk.h"
 #include "lib/clk/mono.h"
 #include "lib/clk/tai.h"
 #include "lib/clk/trim.h"
@@ -21,8 +22,6 @@
 #include "lib/net/dhcp.h"
 
 #include "gitversion.h"
-#include "gpsdo.h"
-#include "ntp.h"
 #include "status.h"
 
 #define STATUS_PORT (23) // telnet port
@@ -84,10 +83,6 @@ void STATUS_process(uint8_t *frame, int flen) {
         size = statusETH(body);
     } else if(strncmp(body, "gps", 3) == 0 && hasTerminus(body, 3)) {
         size = statusGPS(body);
-    } else if(strncmp(body, "gpsdo", 5) == 0 && hasTerminus(body, 5)) {
-        size = statusGPSDO(body);
-    } else if(strncmp(body, "ntp", 3) == 0 && hasTerminus(body, 3)) {
-        size = statusNTP(body);
     } else if(strncmp(body, "system", 6) == 0 && hasTerminus(body, 6)) {
         size = statusSystem(body);
     } else {
@@ -122,7 +117,7 @@ unsigned statusClock(char *body) {
     tmp[10] = '.';
     toHex(mono, 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "clk mono:   ");
+    end = append(end, "clk mono:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
@@ -133,7 +128,7 @@ unsigned statusClock(char *body) {
     tmp[10] = '.';
     toHex(trim, 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "clk trim:   ");
+    end = append(end, "clk trim:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
@@ -144,7 +139,7 @@ unsigned statusClock(char *body) {
     tmp[10] = '.';
     toHex(tai, 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "clk tai:    ");
+    end = append(end, "clk tai:   ");
     end = append(end, tmp);
     end = append(end, "\n\n");
 
@@ -152,7 +147,7 @@ unsigned statusClock(char *body) {
     strcpy(tmp, "0x");
     toHex(clkTrimRate, 8, '0', tmp + 2);
     tmp[10] = 0;
-    end = append(end, "trim rate:  ");
+    end = append(end, "trim rate: ");
     end = append(end, tmp);
     end = append(end, "\n");
 
@@ -162,7 +157,7 @@ unsigned statusClock(char *body) {
     tmp[10] = '.';
     toHex(clkTrimRef, 8, '0', tmp + 11);
     tmp[19] = 0;
-    end = append(end, "trim ref:   ");
+    end = append(end, "trim ref:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
@@ -172,7 +167,7 @@ unsigned statusClock(char *body) {
     tmp[10] = '.';
     toHex(clkTrimOffset, 8, '0', tmp + 11);
     tmp[19] = 0;
-    end = append(end, "trim off:   ");
+    end = append(end, "trim off:  ");
     end = append(end, tmp);
     end = append(end, "\n\n");
 
@@ -204,36 +199,33 @@ unsigned statusClock(char *body) {
     end = append(end, tmp);
     end = append(end, "\n\n");
 
-    // current time
-    uint64_t pps = CLK_MONO_PPS();
+    // PPS status
+    uint64_t pps[3];
+    CLK_PPS(pps);
     strcpy(tmp, "0x");
-    toHex(pps>>32, 8, '0', tmp+2);
+    toHex(pps[0]>>32, 8, '0', tmp+2);
     tmp[10] = '.';
-    toHex(pps, 8, '0', tmp+11);
+    toHex(pps[0], 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "pps mono:   ");
+    end = append(end, "pps mono:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
-    // current time
-    pps = CLK_TRIM_PPS();
     strcpy(tmp, "0x");
-    toHex(pps>>32, 8, '0', tmp+2);
+    toHex(pps[1]>>32, 8, '0', tmp+2);
     tmp[10] = '.';
-    toHex(pps, 8, '0', tmp+11);
+    toHex(pps[1], 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "pps trim:   ");
+    end = append(end, "pps trim:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
-    // current time
-    pps = CLK_TAI_PPS();
     strcpy(tmp, "0x");
-    toHex(pps>>32, 8, '0', tmp+2);
+    toHex(pps[2]>>32, 8, '0', tmp+2);
     tmp[10] = '.';
-    toHex(pps, 8, '0', tmp+11);
+    toHex(pps[2], 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "pps tai:    ");
+    end = append(end, "pps tai:   ");
     end = append(end, tmp);
     end = append(end, "\n");
 
@@ -355,175 +347,6 @@ unsigned statusGPS(char *body) {
     end = append(end, tmp);
     end = append(end, " ps/s\n");
 
-    return end - body;
-}
-
-unsigned statusGPSDO(char *body) {
-    char tmp[32];
-    char *end = body;
-
-    // current offset
-    tmp[toOct(GPSDO_ppsPresent(), 11, '0', tmp)] = 0;
-    end = append(end, "pps present: ");
-    end = append(end, tmp);
-    end = append(end, "\n");
-
-    // pll lock
-    end = append(end, "pps locked: ");
-    end = append(end, GPSDO_isLocked() ? "yes" : "no");
-    end = append(end, "\n");
-
-    // current offset
-    tmp[fmtFloat((float) GPSDO_offsetNano(), 0, 0, tmp)] = 0;
-    end = append(end, "current offset: ");
-    end = append(end, tmp);
-    end = append(end, " ns\n");
-
-    // mean offset
-    tmp[fmtFloat(GPSDO_offsetMean() * 1e9f, 0, 1, tmp)] = 0;
-    end = append(end, "mean offset: ");
-    end = append(end, tmp);
-    end = append(end, " ns\n");
-
-    // rms offset
-    tmp[fmtFloat(GPSDO_offsetRms() * 1e9f, 0, 1, tmp)] = 0;
-    end = append(end, "rms offset: ");
-    end = append(end, tmp);
-    end = append(end, " ns\n");
-
-    // frequency skew
-    tmp[fmtFloat(GPSDO_skewRms() * 1e6f, 0, 4, tmp)] = 0;
-    end = append(end, "frequency skew: ");
-    end = append(end, tmp);
-    end = append(end, " ppm\n");
-
-    // frequency correction
-    tmp[fmtFloat(GPSDO_freqCorr() * 1e6f, 0, 4, tmp)] = 0;
-    end = append(end, "frequency correction: ");
-    end = append(end, tmp);
-    end = append(end, " ppm\n");
-
-    // PLL trimming
-    tmp[fmtFloat(GPSDO_pllTrim() * 1e6f, 0, 4, tmp)] = 0;
-    end = append(end, "  - pll trimming: ");
-    end = append(end, tmp);
-    end = append(end, " ppm\n");
-
-    // temperature compensation
-    tmp[fmtFloat(GPSDO_compValue() * 1e6f, 0, 4, tmp)] = 0;
-    end = append(end, "compensation: ");
-    end = append(end, tmp);
-    end = append(end, " ppm\n");
-
-    // temperature
-    tmp[fmtFloat(GPSDO_temperature(), 0, 3, tmp)] = 0;
-    end = append(end, "  - temperature: ");
-    end = append(end, tmp);
-    end = append(end, " C\n");
-
-    // temperature offset
-    tmp[fmtFloat(GPSDO_compBias(), 0, 3, tmp)] = 0;
-    end = append(end, "  - bias: ");
-    end = append(end, tmp);
-    end = append(end, " C\n");
-
-    // temperature coefficient
-    tmp[fmtFloat(GPSDO_compCoeff() * 1e6f, 0, 4, tmp)] = 0;
-    end = append(end, "  - coefficient: ");
-    end = append(end, tmp);
-    end = append(end, " ppm/C\n");
-
-    // temperature offset
-    tmp[fmtFloat(GPSDO_compOffset() * 1e6f, 0, 4, tmp)] = 0;
-    end = append(end, "  - offset: ");
-    end = append(end, tmp);
-    end = append(end, " ppm\n");
-
-    // temperature offset
-    tmp[toBase(CLK_MONO_INT() - GPSDO_compSaved(), 10, tmp)] = 0;
-    end = append(end, "  - last saved: ");
-    end = append(end, tmp);
-    end = append(end, " s\n");
-
-    // return size
-    return end - body;
-}
-
-unsigned statusNTP(char *body) {
-    char tmp[32];
-    char *end = body;
-
-    // TAI time
-    uint64_t mono = CLK_MONO();
-    strcpy(tmp, "0x");
-    toHex(mono>>32, 8, '0', tmp+2);
-    tmp[10] = '.';
-    toHex(mono, 8, '0', tmp+11);
-    tmp[19] = 0;
-    end = append(end, "clk mono.:   ");
-    end = append(end, tmp);
-    end = append(end, "\n");
-
-    // TAI time
-    uint64_t tai = CLK_TAI();
-    strcpy(tmp, "0x");
-    toHex(tai>>32, 8, '0', tmp+2);
-    tmp[10] = '.';
-    toHex(tai, 8, '0', tmp+11);
-    tmp[19] = 0;
-    end = append(end, "tai epoch:   ");
-    end = append(end, tmp);
-    end = append(end, "\n");
-
-    // NTP offset
-    uint64_t offset = NTP_offset();
-    strcpy(tmp, "0x");
-    toHex(offset>>32, 8, '0', tmp+2);
-    tmp[10] = '.';
-    toHex(offset, 8, '0', tmp+11);
-    tmp[19] = 0;
-    end = append(end, "ntp offset:  ");
-    end = append(end, tmp);
-    end = append(end, "\n");
-
-    end = NTP_servers(end);
-
-    end = append(end, "clock stratum: ");
-    tmp[toBase(NTP_clockStratum(), 10, tmp)] = 0;
-    end = append(end, tmp);
-    end = append(end, "\n");
-
-    end = append(end, "clock offset: ");
-    tmp[fmtFloat(NTP_clockOffset() * 1e3f, 0, 3, tmp)] = 0;
-    end = append(end, tmp);
-    end = append(end, " ms\n");
-
-    end = append(end, "clock drift: ");
-    tmp[fmtFloat(NTP_clockDrift() * 1e6f, 0, 3, tmp)] = 0;
-    end = append(end, tmp);
-    end = append(end, " ppm\n");
-
-    end = append(end, "clock skew: ");
-    tmp[fmtFloat(NTP_clockSkew() * 1e6f, 0, 3, tmp)] = 0;
-    end = append(end, tmp);
-    end = append(end, " ppm\n");
-
-    end = append(end, "leap indicator: ");
-    tmp[toBase(NTP_leapIndicator(), 10, tmp)] = 0;
-    end = append(end, tmp);
-    end = append(end, "\n");
-
-    end = append(end, "root delay: ");
-    tmp[fmtFloat(NTP_rootDelay() * 1e3f, 0, 3, tmp)] = 0;
-    end = append(end, tmp);
-    end = append(end, " ms\n");
-
-    end = append(end, "root dispersion: ");
-    tmp[fmtFloat(NTP_rootDispersion() * 1e3f, 0, 3, tmp)] = 0;
-    end = append(end, tmp);
-    end = append(end, " ms\n");
-
-    // return size
     return end - body;
 }
 

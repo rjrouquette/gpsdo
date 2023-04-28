@@ -20,4 +20,7 @@ int GPS_accFreq();
 
 int GPS_hasFix();
 
+uint32_t GPS_taiEpoch();
+int GPS_taiOffset();
+
 #endif //GPSDO_GPS_H

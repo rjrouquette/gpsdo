@@ -52,3 +52,18 @@ uint64_t corrValue(uint32_t rate, uint64_t delta, uint32_t *rem) {
     }
     return ((int64_t) delta) >> 32;
 }
+
+float toFloatU(uint64_t value) {
+    union fixed_32_32 scratch;
+    scratch.full = value;
+    float temp = 0x1p-32f * (float) scratch.fpart;
+    temp += (float) scratch.ipart;
+    return temp;
+}
+
+float toFloat(int64_t value) {
+    if(value < 0)
+        return -toFloatU((uint64_t) -value);
+    else
+        return toFloatU((uint64_t) value);
+}

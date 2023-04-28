@@ -8,6 +8,7 @@
 #include "trim.h"
 #include "util.h"
 
+volatile uint64_t clkTaiUtcOffset = 0;
 
 static uint32_t clkTaiRem = 0;
 volatile uint64_t clkTaiOffset = 0;

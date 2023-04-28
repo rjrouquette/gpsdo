@@ -17,7 +17,11 @@ struct PACKED HEADER_UDP {
     uint16_t length;
     uint16_t chksum;
 };
+#ifdef __cplusplus
+static_assert(sizeof(struct HEADER_UDP) == 8, "HEADER_UDP must be 8 bytes");
+#else
 _Static_assert(sizeof(struct HEADER_UDP) == 8, "HEADER_UDP must be 8 bytes");
+#endif
 
 #define UDP_DATA_OFFSET (14+20+8)
 

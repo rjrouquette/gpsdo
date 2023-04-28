@@ -152,8 +152,6 @@ void ISR_Timer0A() {
 uint32_t CLK_MONO_INT() {
     return clkMonoInt;
 }
-// public alias
-uint32_t CLK_MONOTONIC_INT() __attribute__((alias("CLK_MONO_INT")));
 
 // return current time as 32.32 fixed point value
 uint64_t CLK_MONO() {
@@ -166,8 +164,6 @@ uint64_t CLK_MONO() {
     // convert to timestamp
     return fromClkMono(snapF, snapO, snapI);
 }
-// public alias
-uint64_t CLK_MONOTONIC() __attribute__((alias("CLK_MONO")));
 
 // return timestamp of PPS edge capture as 32.32 fixed point value
 uint64_t CLK_MONO_PPS() {

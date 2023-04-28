@@ -4,7 +4,6 @@
 
 #include <memory.h>
 #include "../hw/uart.h"
-#include "../ntp.h"
 #include "clk/mono.h"
 #include "clk/tai.h"
 #include "delay.h"
@@ -24,6 +23,7 @@ static int endUBX;
 static int fixGood;
 static float locLat, locLon, locAlt;
 static int clkBias, clkDrift, accTime, accFreq;
+static uint32_t taiEpoch;
 static int taiOffset;
 
 static int hasNema, hasPvt, hasGpsTime, hasClock;
@@ -446,9 +446,14 @@ static void processUbxPVT(const uint8_t *payload) {
     // realign as TAI (PTP 1970 epoch)
     offset -= 2208988800;
     offset += taiOffset;
+    // set TAI epoch
+    taiEpoch = offset;
+}
 
-    // set TAI clock
-    CLK_TAI_set(offset);
-    // set NTP offset
-    NTP_setOffsetTai(-taiOffset);
+uint32_t GPS_taiEpoch() {
+    return taiEpoch;
+}
+
+int GPS_taiOffset() {
+    return taiOffset;
 }

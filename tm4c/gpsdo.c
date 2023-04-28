@@ -126,9 +126,6 @@ void initTempComp() {
 
 void GPSDO_init() {
     initTempComp();
-
-    // init GPS
-    GPS_init();
 }
 
 void GPSDO_run() {

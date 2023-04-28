@@ -7,6 +7,8 @@
 
 #include <stdint.h>
 
+extern volatile uint64_t clkTaiUtcOffset;
+
 extern volatile uint64_t clkTaiOffset;
 extern volatile uint64_t clkTaiRef;
 extern volatile int32_t clkTaiRate;

@@ -5,8 +5,7 @@
 #include "../hw/sys.h"
 #include "clk.h"
 #include "mono.h"
-#include "tai.h"
-#include "trim.h"
+#include "util.h"
 
 static void initClkSys() {
     // Enable external clock
@@ -62,4 +61,10 @@ void runClkTai();
 void CLK_run() {
     runClkTrim();
     runClkTai();
+}
+
+void CLK_PPS(uint64_t *tsResult) {
+    tsResult[0] = fromClkMono(clkMonoPps.timer, clkMonoPps.offset, clkMonoPps.integer);
+    tsResult[1] = tsResult[0] + corrValue(clkMonoPps.trimRate, tsResult[0] - clkMonoPps.trimRef, 0) + clkMonoPps.trimOff;
+    tsResult[2] = tsResult[1] + corrValue(clkMonoPps.taiRate, tsResult[1] - clkMonoPps.taiRef, 0) + clkMonoPps.taiOff;
 }
