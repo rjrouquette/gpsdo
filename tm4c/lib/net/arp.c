@@ -99,7 +99,7 @@ void ARP_process(uint8_t *frame, int flen) {
     }
 }
 
-int ARP_request(uint32_t remoteAddress, CallbackARP callback, void *ref) {
+int ARP_request(uint32_t remoteAddress, CallbackARP callback, volatile void *ref) {
     uint32_t now = CLK_MONO_INT();
     for(int i = 0; i < MAX_REQUESTS; i++) {
         // look for empty or expired slot
@@ -118,7 +118,7 @@ int ARP_request(uint32_t remoteAddress, CallbackARP callback, void *ref) {
         broadcastMAC(((struct FRAME_ETH *)packetTX)->macDst);
         // register callback
         requests[i].callback = callback;
-        requests[i].ref = ref;
+        requests[i].ref = (void *) ref;
         requests[i].remoteAddress = remoteAddress;
         requests[i].expire = now + REQUEST_EXPIRE;
         // transmit frame

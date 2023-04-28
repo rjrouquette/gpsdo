@@ -7,8 +7,11 @@
 #include "../hw/interrupts.h"
 #include "../hw/gpio.h"
 #include "../hw/sys.h"
-#include "../lib/clk/util.h"
-#include "../lib/delay.h"
+#include "clk/comp.h"
+#include "clk/mono.h"
+#include "clk/tai.h"
+#include "clk/util.h"
+#include "delay.h"
 #include "net.h"
 #include "net/arp.h"
 #include "net/dhcp.h"
@@ -16,8 +19,6 @@
 #include "net/ip.h"
 #include "net/util.h"
 #include "net/dns.h"
-#include "clk/mono.h"
-#include "clk/comp.h"
 
 #define RX_RING_MASK (31)
 #define RX_RING_SIZE (32)
@@ -269,9 +270,9 @@ uint8_t * NET_getTxBuff(int desc) {
     return (uint8_t *) txDesc[desc & TX_RING_MASK].BUFF1;
 }
 
-void NET_setTxCallback(int desc, CallbackNetTX callback, void *ref) {
+void NET_setTxCallback(int desc, CallbackNetTX callback, volatile void *ref) {
     txCallback[desc & TX_RING_MASK].call = callback;
-    txCallback[desc & TX_RING_MASK].ref = ref;
+    txCallback[desc & TX_RING_MASK].ref = (void *) ref;
 }
 
 void NET_transmit(int desc, int len) {
@@ -288,10 +289,10 @@ void NET_transmit(int desc, int len) {
 
 extern uint64_t taiOffset;
 
-uint64_t NET_getRxTime(const uint8_t *rxFrame) {
+void NET_getRxTime(const uint8_t *rxFrame, volatile uint64_t *stamps) {
     // compute descriptor offset
     uint32_t rxId = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
-    if(rxId >= RX_RING_SIZE) return 0;
+    if(rxId >= RX_RING_SIZE) return;
     // retrieve timestamp
     uint32_t timer = clkMonoEth;
     timer += rxDesc[rxId].RTSL >> 3;
@@ -300,13 +301,15 @@ uint64_t NET_getRxTime(const uint8_t *rxFrame) {
     uint32_t offset = clkMonoOff;
     uint32_t integer = clkMonoInt;
     __enable_irq();
-    return fromClkMono(timer, offset, integer);
+    stamps[0] = fromClkMono(timer, offset, integer);
+    stamps[1] = stamps[0] + corrValue(clkCompRate, stamps[0] - clkCompRef, 0) + clkCompOffset;
+    stamps[2] = stamps[1] + corrValue(clkTaiRate, stamps[1] - clkTaiRef, 0) + clkTaiOffset;
 }
 
-uint64_t NET_getTxTime(const uint8_t *txFrame) {
+void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps) {
     // compute descriptor offset
     uint32_t txId = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
-    if(txId >= TX_RING_SIZE) return 0;
+    if(txId >= TX_RING_SIZE) return;
     // retrieve timestamp
     uint32_t timer = clkMonoEth;
     timer += txDesc[txId].TTSL >> 3;
@@ -315,5 +318,7 @@ uint64_t NET_getTxTime(const uint8_t *txFrame) {
     uint32_t offset = clkMonoOff;
     uint32_t integer = clkMonoInt;
     __enable_irq();
-    return fromClkMono(timer, offset, integer);
+    stamps[0] = fromClkMono(timer, offset, integer);
+    stamps[1] = stamps[0] + corrValue(clkCompRate, stamps[0] - clkCompRef, 0) + clkCompOffset;
+    stamps[2] = stamps[1] + corrValue(clkTaiRate, stamps[1] - clkTaiRef, 0) + clkTaiOffset;
 }

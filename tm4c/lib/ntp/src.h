@@ -18,13 +18,15 @@ struct NtpPollSample {
     float delay;
     float jitter;
 };
+typedef volatile struct NtpPollSample NtpPollSample;
 
 struct NtpSource {
-    void (*init)(void *);
-    void (*run)(void *);
+    void (*init)(volatile void *);
+    void (*run)(volatile void *);
 
     uint32_t id;
     uint32_t ref_id;
+    uint32_t lastResponse;
     uint16_t mode;
     uint16_t state;
     uint16_t reach;
@@ -45,9 +47,10 @@ struct NtpSource {
     float freqDrift;
     float freqSkew;
 };
+typedef volatile struct NtpSource NtpSource;
 
-void NtpSource_incr(struct NtpSource *this);
+void NtpSource_incr(NtpSource *this);
 
-void NtpSource_update(struct NtpSource *this);
+void NtpSource_update(NtpSource *this);
 
 #endif //GPSDO_SRC_H

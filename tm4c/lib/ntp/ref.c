@@ -10,11 +10,11 @@
 #include "../gps.h"
 #include "ref.h"
 
-void NtpGPS_run(void *pObj) {
-    struct NtpGPS *this = (struct NtpGPS *) pObj;
+static void NtpGPS_run(volatile void *pObj) {
+    NtpGPS *this = (struct NtpGPS *) pObj;
 
     // get current timestamp
-    uint64_t now = CLK_MONO();
+    const uint64_t now = CLK_MONO();
     // get pps timestamps
     uint64_t ppsTime[3];
     CLK_PPS(ppsTime);
@@ -38,7 +38,7 @@ void NtpGPS_run(void *pObj) {
     // advance sample buffer
     NtpSource_incr(&this->source);
     // get current sample
-    struct NtpPollSample *sample = this->source.pollSample + this->source.samplePtr;
+    NtpPollSample *sample = this->source.pollSample + this->source.samplePtr;
     // store PPS timestamps
     sample->offset.mono = (int64_t) ppsTime[0];
     sample->offset.trim = (int64_t) ppsTime[1];
@@ -52,13 +52,15 @@ void NtpGPS_run(void *pObj) {
     sample->jitter = 4e-9f;
     // update filter
     NtpSource_update(&this->source);
+    // update last response time
+    this->source.lastResponse = now >> 32;
 }
 
-void NtpGPS_init(void *pObj) {
+void NtpGPS_init(volatile void *pObj) {
     // clear structure contents
-    memset(pObj, 0, sizeof(struct NtpGPS));
+    memset((void *) pObj, 0, sizeof(struct NtpGPS));
 
-    struct NtpGPS *this = (struct NtpGPS *) pObj;
+    NtpGPS *this = (NtpGPS *) pObj;
     // set virtual functions
     this->source.init = NtpGPS_init;
     this->source.run = NtpGPS_run;
@@ -66,6 +68,7 @@ void NtpGPS_init(void *pObj) {
     this->source.mode = RPY_SD_MD_REF;
     // set id to "GPS"
     this->source.id = 0x00535047;
+    this->source.state = RPY_SD_ST_UNSELECTED;
     // one second poll interval
     this->source.poll = 0;
 }

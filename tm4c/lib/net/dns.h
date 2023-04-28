@@ -11,6 +11,6 @@ typedef void (*CallbackDNS)(void *ref, uint32_t remoteAddress);
 
 void DNS_init();
 void DNS_updateMAC();
-int DNS_lookup(const char *hostname, CallbackDNS callback, void *ref);
+int DNS_lookup(const char *hostname, CallbackDNS callback, volatile void *ref);
 
 #endif //GPSDO_DNS_H

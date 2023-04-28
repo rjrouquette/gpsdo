@@ -13,7 +13,8 @@ struct NtpGPS {
     uint64_t last_update;
     uint64_t last_pps;
 };
+typedef volatile struct NtpGPS NtpGPS;
 
-void NtpGPS_init(void *pObj);
+void NtpGPS_init(volatile void *pObj);
 
 #endif //GPSDO_REF_H

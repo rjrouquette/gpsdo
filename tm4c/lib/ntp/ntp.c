@@ -27,41 +27,43 @@
 
 #define NTP_POOL_FQDN ("pool.ntp.org")
 
-static struct NtpGPS srcGps;
-static struct NtpPeer peerSlots[MAX_NTP_PEERS];
+static NtpGPS srcGps;
+static NtpPeer peerSlots[MAX_NTP_PEERS];
 // allocate new peer
-static struct NtpSource* ntpAllocPeer();
+static NtpSource* ntpAllocPeer();
 // deallocate peer
-static void ntpDeallocatePeer(struct NtpSource *peer);
+static void ntpDeallocatePeer(NtpSource *peer);
 
-static struct NtpSource *sources[MAX_NTP_SRCS];
-static volatile int cntSources = 0;
-static volatile int runNext = 0;
+static NtpSource * volatile sources[MAX_NTP_SRCS];
+static volatile uint32_t cntSources = 0;
+static volatile uint32_t runNext = 0;
 
-static uint32_t lastDnsRequest = 0;
+static volatile uint32_t lastDnsRequest = 0;
 
 // aggregate NTP state
-static int leapIndicator;
-static int clockStratum = 16;
-static uint32_t refId;
-static uint32_t rootDelay;
-static uint32_t rootDispersion;
+static volatile int leapIndicator;
+static volatile int clockStratum = 16;
+static volatile uint32_t refId;
+static volatile uint32_t rootDelay;
+static volatile uint32_t rootDispersion;
 
 
 // hash table for interleaved timestamps
 #define XLEAVE_COUNT (1024)
-static struct TsXleave {
+static volatile struct TsXleave {
     uint64_t rxTime;
     uint64_t txTime;
 } tsXleave[XLEAVE_COUNT];
+// hash function for interleaved timestamp table
 static inline int hashXleave(uint32_t addr) {
     return (int) (((addr * 0xDE9DB139) >> 22) & (XLEAVE_COUNT - 1));
 }
 
 // request handlers
 static void ntpRequest(uint8_t *frame, int flen);
-static void ntpResponse(uint8_t *frame, int flen);
 static void chronycRequest(uint8_t *frame, int flen);
+// response handlers
+static void ntpResponse(uint8_t *frame, int flen);
 
 // internal operations
 static void ntpMain();
@@ -70,8 +72,6 @@ static void ntpDnsCallback(void *ref, uint32_t addr);
 // timestamp convenience functions
 static inline uint64_t ntpClock() { return NTP_UTC_OFFSET + CLK_TAI() - clkTaiUtcOffset; }
 static inline uint64_t ntpModified() { return 0; }
-static inline uint64_t ntpTimeRx(uint8_t *frame) { return NTP_UTC_OFFSET + CLK_TAI_fromMono(NET_getRxTime(frame)) - clkTaiUtcOffset; }
-static inline uint64_t ntpTimeTx(uint8_t *frame) { return NTP_UTC_OFFSET + CLK_TAI_fromMono(NET_getTxTime(frame)) - clkTaiUtcOffset; }
 
 
 void NTP_init() {
@@ -91,7 +91,7 @@ void NTP_init() {
 
 void NTP_run() {
     if(runNext < cntSources) {
-        struct NtpSource *source = sources[runNext++];
+        NtpSource *source = sources[runNext++];
         (*(source->run))(source);
     } else {
         ntpMain();
@@ -106,12 +106,18 @@ static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
-    // store hardware transmit time
+    // retrieve hardware transmit time
+    uint64_t stamps[3];
+    NET_getTxTime(frame, stamps);
+    const uint64_t txTime = (stamps[2] - clkTaiUtcOffset) + NTP_UTC_OFFSET;
+
+    // record hardware transmit time
     uint32_t cell = hashXleave(headerIPv4->dst);
     tsXleave[cell].rxTime = headerNTP->rxTime;
-    tsXleave[cell].txTime = __builtin_bswap64(ntpTimeTx(frame));
+    tsXleave[cell].txTime = __builtin_bswap64(txTime);
 }
 
+// process client request
 static void ntpRequest(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < NTP4_SIZE) return;
@@ -131,7 +137,10 @@ static void ntpRequest(uint8_t *frame, int flen) {
     LED_act0();
 
     // retrieve rx time
-    const uint64_t rxTime = ntpTimeRx(frame);
+    uint64_t stamps[3];
+    NET_getRxTime(frame, stamps);
+    // translate TAI timestamp into NTP domain
+    const uint64_t rxTime = (stamps[2] - clkTaiUtcOffset) + NTP_UTC_OFFSET;
 
     // get TX descriptor
     const int txDesc = NET_getTxDesc();
@@ -197,8 +206,37 @@ static void ntpRequest(uint8_t *frame, int flen) {
     NET_transmit(txDesc, flen);
 }
 
+// process peer response
 static void ntpResponse(uint8_t *frame, int flen) {
+    // discard malformed packets
+    if(flen < NTP4_SIZE) return;
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
+    // verify destination
+    if(headerIPv4->dst != ipAddress) return;
+    // prevent loopback
+    if(headerIPv4->src == ipAddress) return;
+    // filter non-server frames
+    if(headerNTP->mode != NTP_MODE_SRV) return;
+
+    // locate recipient
+    uint32_t srcAddr = headerIPv4->src;
+    for(uint32_t i = 0; i < cntSources; i++) {
+        volatile struct NtpSource *source = sources[i];
+
+        // check for matching peer
+        if(source == NULL) return;
+        if(source->mode != RPY_SD_MD_CLIENT) continue;
+        if(source->id != srcAddr) continue;
+
+        // handoff frame to peer
+        NtpPeer_recv(source, frame, flen);
+        return;
+    }
 }
 
 static void ntpMain() {
@@ -221,9 +259,9 @@ static void ntpMain() {
     }
 }
 
-static struct NtpSource* ntpAllocPeer() {
+volatile static struct NtpSource* ntpAllocPeer() {
     for(int i = 0; i < MAX_NTP_PEERS; i++) {
-        struct NtpPeer *slot = peerSlots + i;
+        NtpPeer *slot = peerSlots + i;
         if(slot->source.id == 0) {
             // initialize peer record
             (*(slot->source.init))(slot);
@@ -236,19 +274,19 @@ static struct NtpSource* ntpAllocPeer() {
     return NULL;
 }
 
-static void ntpDeallocatePeer(struct NtpSource *peer) {
+static void ntpDeallocatePeer(NtpSource *peer) {
     peer->id = 0;
-    int slot = -1;
-    for(int i = 0; i < cntSources; i++) {
+    uint32_t slot = -1u;
+    for(uint32_t i = 0; i < cntSources; i++) {
         if(sources[i] == peer) slot = i;
     }
-    if(slot < 0) return;
+    if(slot > cntSources) return;
     // remove source from source list
     --cntSources;
-    for(int i = slot; i < cntSources; i++)
+    for(uint32_t i = slot; i < cntSources; i++)
         sources[i] = sources[i+1];
     // clear empty slots
-    for(int i = cntSources; i < MAX_NTP_SRCS; i++)
+    for(uint32_t i = cntSources; i < MAX_NTP_SRCS; i++)
         sources[i] = NULL;
 }
 
@@ -258,14 +296,14 @@ static void ntpDnsCallback(void *ref, uint32_t addr) {
     // ignore own address
     if(addr == ipAddress) return;
     // verify address is not currently in use
-    for(int i = 0; i < cntSources; i++) {
+    for(uint32_t i = 0; i < cntSources; i++) {
         if(sources[i]->mode != RPY_SD_MD_CLIENT)
             continue;
         if(sources[i]->id == addr)
             return;
     }
     // attempt to add as new source
-    struct NtpSource *newSource = ntpAllocPeer();
+    NtpSource *newSource = ntpAllocPeer();
     if(newSource != NULL)
         newSource->id = addr;
 }
@@ -283,13 +321,21 @@ static void ntpDnsCallback(void *ref, uint32_t addr) {
 #define REP_LEN_SOURCESTATS (offsetof(CMD_Reply, data.sourcestats.EOR))
 #define REP_LEN_TRACKING (offsetof(CMD_Reply, data.tracking.EOR))
 
+// replicate htons() function
 __attribute__((always_inline))
 static inline uint16_t htons(uint16_t value) { return __builtin_bswap16(value); }
+
+// replicate htonl() function
+__attribute__((always_inline))
 static inline uint32_t htonl(uint32_t value) { return __builtin_bswap32(value); }
+
+// replicate chronyc float format
 static int32_t htonf(float value);
 
+// begin chronyc reply
 static void chronycReply(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
 
+// chronyc command handlers
 static uint16_t chronycNSources(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
 static uint16_t chronycSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
 static uint16_t chronycSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
@@ -304,7 +350,7 @@ static const struct {
         { chronycNSources, REP_LEN_NSOURCES, REQ_N_SOURCES },
         { chronycSourceData, REP_LEN_SOURCEDATA, REQ_SOURCE_DATA },
         { chronycSourceStats, REP_LEN_SOURCESTATS, REQ_SOURCESTATS },
-        { chronycTracking, REP_LEN_TRACKING, REQ_TRACKING },
+        { chronycTracking, REP_LEN_TRACKING, REQ_TRACKING }
 };
 
 static void chronycRequest(uint8_t *frame, int flen) {
@@ -390,10 +436,10 @@ static uint16_t chronycNSources(CMD_Reply *cmdReply, const CMD_Request *cmdReque
 static uint16_t chronycSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
     cmdReply->reply = htons(RPY_SOURCE_DATA);
     // locate source
-    uint32_t i = htonl(cmdRequest->data.source_data.index);
+    const uint32_t i = htonl(cmdRequest->data.source_data.index);
     if(i >= cntSources) return htons(STT_NOSUCHSOURCE);
     // sanity check
-    struct NtpSource *source = sources[i];
+    NtpSource *source = sources[i];
     if(source == NULL) return htons(STT_NOSUCHSOURCE);
 
     // set source id
@@ -406,7 +452,7 @@ static uint16_t chronycSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdReq
     cmdReply->data.source_data.orig_latest_meas.f = htonf(source->lastOffsetOrig);
     cmdReply->data.source_data.latest_meas.f = htonf(source->lastOffset);
 //    cmdReply->data.source_data.latest_meas_err.f = htonf(server->meanDelay + sqrtf(server->varDelay));
-//    cmdReply->data.source_data.since_sample = htonl((ntpClock() - source->update) >> 32);
+    cmdReply->data.source_data.since_sample = htonl(CLK_MONO_INT() - source->lastResponse);
     cmdReply->data.source_data.poll = (int16_t) htons(source->poll);
     cmdReply->data.source_data.state = htons(source->mode);
 //    if(server->weight > 0.01f)
@@ -421,10 +467,10 @@ static uint16_t chronycSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdReq
 static uint16_t chronycSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
     cmdReply->reply = htons(RPY_SOURCESTATS);
 
-    uint32_t i = htonl(cmdRequest->data.sourcestats.index);
+    const uint32_t i = htonl(cmdRequest->data.sourcestats.index);
     if(i >= cntSources) return htons(STT_NOSUCHSOURCE);
     // sanity check
-    struct NtpSource *source = sources[i];
+    NtpSource *source = sources[i];
     if(source == NULL) return htons(STT_NOSUCHSOURCE);
 
     // set source id
@@ -450,19 +496,19 @@ static uint16_t chronycSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRe
 }
 
 static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
-//    union fixed_32_32 scratch;
+    union fixed_32_32 scratch;
 
     cmdReply->reply = htons(RPY_TRACKING);
-//    cmdReply->data.tracking.ref_id = refId;
-//    cmdReply->data.tracking.stratum = htons(clockStratum);
-//    cmdReply->data.tracking.leap_status = htons(leapIndicator);
-//    if(refId == NTP_REF_GPS) {
-//        cmdReply->data.tracking.ip_addr.family = htons(IPADDR_ID);
-//        cmdReply->data.tracking.ip_addr.addr.id = refId;
-//    } else {
-//        cmdReply->data.tracking.ip_addr.family = htons(IPADDR_INET4);
-//        cmdReply->data.tracking.ip_addr.addr.in4 = refId;
-//    }
+    cmdReply->data.tracking.ref_id = refId;
+    cmdReply->data.tracking.stratum = htons(clockStratum);
+    cmdReply->data.tracking.leap_status = htons(leapIndicator);
+    if(refId == srcGps.source.id) {
+        cmdReply->data.tracking.ip_addr.family = htons(IPADDR_UNSPEC);
+        cmdReply->data.tracking.ip_addr.addr.in4 = refId;
+    } else {
+        cmdReply->data.tracking.ip_addr.family = htons(IPADDR_INET4);
+        cmdReply->data.tracking.ip_addr.addr.in4 = refId;
+    }
 
 //    scratch.full = ntpModified();
 //    cmdReply->data.tracking.ref_time.tv_sec_high = 0;
@@ -477,8 +523,8 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
     cmdReply->data.tracking.resid_freq_ppm.f = htonf(1e6f * (0x1p-32f * (float) CLK_TAI_getTrim()));
 //    cmdReply->data.tracking.skew_ppm.f = htonf(GPSDO_skewRms() * 1e6f);
 
-//    cmdReply->data.tracking.root_delay.f = htonf(0x1p-16f * (float) rootDelay);
-//    cmdReply->data.tracking.root_dispersion.f = htonf(0x1p-16f * (float) rootDispersion);
+    cmdReply->data.tracking.root_delay.f = htonf(0x1p-16f * (float) rootDelay);
+    cmdReply->data.tracking.root_dispersion.f = htonf(0x1p-16f * (float) rootDispersion);
 
 //    cmdReply->data.tracking.last_update_interval.f = htonf((clockStratum == 1) ? 1 : 64);
     return htons(STT_SUCCESS);

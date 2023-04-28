@@ -11,6 +11,7 @@
 void DHCP_init();
 void DHCP_run();
 void DHCP_renew();
+uint32_t DHCP_expires();
 
 const char * DHCP_hostname();
 

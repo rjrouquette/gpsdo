@@ -18,11 +18,11 @@ void NET_run();
 
 int NET_getTxDesc();
 uint8_t * NET_getTxBuff(int desc);
-void NET_setTxCallback(int desc, CallbackNetTX callback, void *ref);
+void NET_setTxCallback(int desc, CallbackNetTX callback, volatile void *ref);
 void NET_transmit(int desc, int len);
 
-uint64_t NET_getRxTime(const uint8_t *rxFrame);
+void NET_getRxTime(const uint8_t *rxFrame, volatile uint64_t *stamps);
 
-uint64_t NET_getTxTime(const uint8_t *txFrame);
+void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps);
 
 #endif //GPSDO_NET_H

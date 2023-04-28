@@ -74,7 +74,7 @@ void DNS_updateMAC() {
     lastArp = CLK_MONO_INT();
 }
 
-int DNS_lookup(const char *hostname, CallbackDNS callback, void *ref) {
+int DNS_lookup(const char *hostname, CallbackDNS callback, volatile void *ref) {
     // check MAC address age
     uint32_t now = CLK_MONO_INT();
     if((now - lastArp) > ARP_MAX_AGE)
@@ -91,7 +91,7 @@ int DNS_lookup(const char *hostname, CallbackDNS callback, void *ref) {
 
         // register callback
         requests[i].callback = callback;
-        requests[i].ref = ref;
+        requests[i].ref = (void *) ref;
         requests[i].requestId = nextRequest++;
         requests[i].expire = now + REQUEST_EXPIRE;
 

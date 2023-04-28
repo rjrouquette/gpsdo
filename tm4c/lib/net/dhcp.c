@@ -177,6 +177,10 @@ void DHCP_renew() {
     NET_transmit(txDesc, flen);
 }
 
+uint32_t DHCP_expires() {
+    return dhcpLeaseExpire - CLK_MONO_INT();
+}
+
 static void processFrame(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < 282) return;

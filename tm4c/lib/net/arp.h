@@ -34,6 +34,6 @@ typedef void (*CallbackARP)(void *ref, uint32_t remoteAddress, uint8_t *macAddre
 void ARP_announce();
 void ARP_run();
 void ARP_process(uint8_t *frame, int flen);
-int ARP_request(uint32_t remoteAddress, CallbackARP callback, void *ref);
+int ARP_request(uint32_t remoteAddress, CallbackARP callback, volatile void *ref);
 
 #endif //GPSDO_ARP_H

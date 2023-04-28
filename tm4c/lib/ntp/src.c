@@ -6,15 +6,15 @@
 #include "../clk/util.h"
 #include "src.h"
 
-void NtpSource_incr(struct NtpSource *this) {
+void NtpSource_incr(NtpSource *this) {
     this->samplePtr = (this->samplePtr + 1) & (NTP_MAX_HISTORY - 1);
     if(++this->sampleCount > NTP_MAX_HISTORY)
         this->sampleCount = NTP_MAX_HISTORY;
 }
 
-void NtpSource_update(struct NtpSource *this) {
+void NtpSource_update(NtpSource *this) {
     int i = this->samplePtr;
-    struct NtpPollSample *sample = this->pollSample + i;
+    NtpPollSample *sample = this->pollSample + i;
     this->lastOffsetOrig = toFloat(sample->offset.tai);
     this->lastOffset = this->lastOffsetOrig;
 
@@ -27,11 +27,11 @@ void NtpSource_update(struct NtpSource *this) {
     // analyse clock drift
     float drift[NTP_MAX_HISTORY - 1];
     float mean = 0, var = 0;
-    struct NtpPollSample *future = this->pollSample + i;
+    NtpPollSample *future = this->pollSample + i;
     const int len = this->sampleCount + 1;
     for (int k = 0; k < len; k++) {
         i = (i - 1) & (NTP_MAX_HISTORY - 1);
-        struct NtpPollSample *present = this->pollSample + i;
+        NtpPollSample *present = this->pollSample + i;
 
         int64_t a = (int64_t) (future->offset.tai - present->offset.tai);
         int64_t b = (int64_t) (future->offset.mono - present->offset.mono);
