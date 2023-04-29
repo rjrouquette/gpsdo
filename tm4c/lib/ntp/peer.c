@@ -3,6 +3,7 @@
 //
 
 #include <memory.h>
+#include <math.h>
 #include "../chrony/candm.h"
 #include "../clk/mono.h"
 #include "../led.h"
@@ -14,6 +15,7 @@
 #include "common.h"
 #include "peer.h"
 #include "../clk/tai.h"
+#include "../clk/util.h"
 
 
 #define ARP_MIN_AGE (4) // maximum polling rate
@@ -161,16 +163,16 @@ static void runPoll(NtpPeer *this) {
 
         // get pointer to current burst sample
         NtpPollSample *burstSample = this->burstSamples + this->pollBurst;
-        // set monotonic reference time
-        burstSample->offset.mono = (int64_t) avg64(this->local_tx_hw[0], this->local_rx_hw[0]);
         // set compensated reference time
-        burstSample->offset.comp = (int64_t) avg64(this->local_tx_hw[1], this->local_rx_hw[1]);
+        burstSample->comp = avg64(this->local_tx_hw[1], this->local_rx_hw[1]);
+        // set TAI reference time
+        burstSample->tai = avg64(this->local_tx_hw[2], this->local_rx_hw[2]);
+        // compute TAI offset
+        uint64_t offset = avg64(remote_rx, remote_tx) - burstSample->tai;
+        burstSample->offset = (int64_t) offset;
         // compute delay (use compensated clock for best accuracy)
         int64_t delay = (int64_t) ((this->local_tx_hw[1] - this->local_rx_hw[1]) - (remote_rx - remote_tx));
         burstSample->delay = 0x1p-31f * (float) (int32_t) (delay >> 2);
-        // compute TAI offset
-        uint64_t offset = avg64(remote_rx - this->local_tx_hw[2], remote_tx - this->local_rx_hw[2]);
-        burstSample->offset.tai = (int64_t) offset;
 
         if(++this->pollBurst >= PEER_BURST_SIZE) {
             // burst complete
@@ -195,17 +197,43 @@ static void runPoll(NtpPeer *this) {
 
     // end of burst
     if(!this->pollActive) {
+        const int count = this->pollBurst;
         // no burst samples completed
-        if(this->pollBurst < 1) return;
+        if(count < 1) return;
         // promote a burst sample as the final sample
+        int selected = 0;
+        // special case for exactly two samples
+        if(count == 2) {
+            if(this->burstSamples[1].delay < this->burstSamples[0].delay)
+                selected = 1;
+        }
+        // select sample closest to the mean
+        else if(count > 2) {
+            float offset[count];
+            float mean = 0;
+            for(int i = 0; i < count; i++) {
+                offset[i] = toFloat(this->burstSamples[i].offset);
+                mean += offset[i];
+            }
+            float best = fabsf(offset[0] - mean);
+            for(int i = 0; i < count; i++) {
+                float dist = fabsf(offset[0] - mean);
+                if(dist < best) {
+                    best = dist;
+                    selected = i;
+                }
+            }
+        }
 
         // advance sample buffer
         NtpSource_incr(&this->source);
         // set current sample
         NtpPollSample *sample = this->source.pollSample + this->source.samplePtr;
-        *sample = this->burstSamples[0];
+        *sample = this->burstSamples[selected];
         // update filter
         NtpSource_update(&this->source);
+        // set update time
+        this->source.lastUpdate = CLK_MONO();
     }
 }
 
@@ -270,6 +298,7 @@ void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     // set remote timestamps
     this->remote_rx = headerNTP->rxTime;
     this->remote_tx = headerNTP->txTime;
-    // set response time
-    this->source.lastResponse = CLK_MONO_INT();
+    // set root metrics
+    this->source.rootDelay = __builtin_bswap32(headerNTP->rootDelay);
+    this->source.rootDispersion = __builtin_bswap32(headerNTP->rootDispersion);
 }

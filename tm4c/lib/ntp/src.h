@@ -10,11 +10,9 @@
 #define NTP_MAX_HISTORY (16)
 
 struct NtpPollSample {
-    struct {
-        int64_t mono;
-        int64_t comp;
-        int64_t tai;
-    } offset;
+    uint64_t comp;
+    uint64_t tai;
+    int64_t offset;
     float delay;
 };
 typedef volatile struct NtpPollSample NtpPollSample;
@@ -23,9 +21,11 @@ struct NtpSource {
     void (*init)(volatile void *);
     void (*run)(volatile void *);
 
+    uint64_t lastUpdate;
     uint32_t id;
     uint32_t ref_id;
-    uint32_t lastResponse;
+    uint32_t rootDelay;
+    uint32_t rootDispersion;
     uint16_t mode;
     uint16_t state;
     uint16_t reach;
@@ -46,9 +46,14 @@ struct NtpSource {
     // offset stats
     float offsetMean;
     float offsetStdDev;
+    // delay stats
+    float delayMean;
+    float delayStdDev;
     // frequency stats
     float freqDrift;
     float freqSkew;
+    // overall score
+    float score;
 };
 typedef volatile struct NtpSource NtpSource;
 

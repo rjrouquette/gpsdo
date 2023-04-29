@@ -10,8 +10,8 @@
 struct NtpGPS {
     struct NtpSource source;
 
-    uint64_t last_update;
-    uint64_t last_pps;
+    uint64_t lastPoll;
+    uint64_t lastPps;
 };
 typedef volatile struct NtpGPS NtpGPS;
 

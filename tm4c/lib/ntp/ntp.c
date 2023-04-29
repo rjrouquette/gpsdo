@@ -3,6 +3,7 @@
 //
 
 #include <memory.h>
+#include <math.h>
 
 #include "../chrony/candm.h"
 #include "../clk/tai.h"
@@ -37,6 +38,8 @@ static void ntpDeallocatePeer(NtpSource *peer);
 static NtpSource * volatile sources[MAX_NTP_SRCS];
 static volatile uint32_t cntSources = 0;
 static volatile uint32_t runNext = 0;
+static volatile uint32_t activeSource = 0;
+static volatile uint64_t lastUpdate = 0;
 
 static volatile uint32_t lastDnsRequest = 0;
 
@@ -257,6 +260,35 @@ static void ntpMain() {
             DNS_lookup(NTP_POOL_FQDN, ntpDnsCallback, NULL);
         }
     }
+
+    // select best clock
+    activeSource = 0;
+    float score = sources[0]->score;
+
+    NtpSource *source = sources[activeSource];
+    if(source == NULL) return;
+    if(source->lastUpdate == lastUpdate) return;
+    lastUpdate = source->lastUpdate;
+    if(source->used < 8) return;
+
+    // adjust frequency compensation
+    if(source->freqSkew < 5e-6f) {
+        int32_t comp = CLK_COMP_getComp();
+        comp += (int32_t) (0x1p32f * 0x1p-6f * source->freqDrift);
+        CLK_COMP_setComp(comp);
+    }
+
+    // adjust TAI alignment
+    if(source->offsetMean > 0.25f) {
+        CLK_TAI_adjust(source->pollSample[source->samplePtr].offset);
+    }
+    else {
+//        CLK_TAI_setTrim(-(int32_t) (0x1p32f * 0x1p-8f * source->offsetMean));
+        if(fabsf(source->offsetMean) > 100e-6f)
+            CLK_TAI_align((int32_t) (0x1p32f * source->offsetMean));
+        else
+            CLK_TAI_align((int32_t) (0x1p32f * 0x1p-6f * source->offsetMean));
+    }
 }
 
 volatile static struct NtpSource* ntpAllocPeer() {
@@ -452,7 +484,7 @@ static uint16_t chronycSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdReq
     cmdReply->data.source_data.orig_latest_meas.f = htonf(source->lastOffsetOrig);
     cmdReply->data.source_data.latest_meas.f = htonf(source->lastOffset);
     cmdReply->data.source_data.latest_meas_err.f = htonf(source->lastDelay);
-    cmdReply->data.source_data.since_sample = htonl(CLK_MONO_INT() - source->lastResponse);
+    cmdReply->data.source_data.since_sample = htonl((CLK_MONO() - source->lastUpdate) >> 32);
     cmdReply->data.source_data.poll = (int16_t) htons(source->poll);
     cmdReply->data.source_data.state = htons(source->mode);
 //    if(server->weight > 0.01f)
