@@ -19,6 +19,11 @@
 #define ARP_MIN_AGE (4) // maximum polling rate
 #define ARP_MAX_AGE (64) // refresh old MAC addresses
 
+static uint64_t avg64(uint64_t a, uint64_t b) {
+    int64_t diff = (int64_t) (b - a);
+    return a + (diff >> 1);
+}
+
 // ARP response callback
 static void arpCallback(void *ref, uint32_t remoteAddr, uint8_t *macAddr) {
     // typecast "this" pointer
@@ -34,6 +39,7 @@ static int checkMac(NtpPeer *this) {
     const int invalid = isNullMAC(this->macAddr) ? 1 : 0;
     if(invalid || (age > ARP_MAX_AGE)) {
         if (age > ARP_MIN_AGE) {
+            this->lastArp = now;
             if(IPv4_testSubnet(ipSubnet, ipAddress, this->source.id))
                 ARP_request(ipGateway, arpCallback, this);
             else
@@ -116,22 +122,77 @@ static void startPoll(NtpPeer *this) {
     // start poll
     this->pollStart = now;
     this->pollActive = true;
+    this->pollBurst = 0xFF;
+    this->pollRetry = 0;
 }
 
 static void runPoll(NtpPeer *this) {
-    this->source.reach <<= 1;
+    // start of poll
+    if(this->pollBurst == 0xFF) {
+        this->source.reach <<= 1;
+        this->pollBurst = 0;
+        this->pktSent = false;
+    }
+
+    // send packet
     if(!this->pktSent) {
         this->pktSent = true;
         sendPoll(this);
         return;
     }
+
+    // receive packet
     if(this->pktRecv) {
-        this->pollActive = false;
+        // get pointer to current burst sample
+        NtpPollSample *burstSample = this->burstSamples + this->pollBurst;
+        // set monotonic reference time
+//        burstSample->offset.mono = (int64_t) avg64(this->local_tx_hw[0], this->local_rx_hw[0]);
+        burstSample->offset.mono = (int64_t) this->local_tx_hw[0];
+        // set compensated reference time
+//        burstSample->offset.comp = (int64_t) avg64(this->local_tx_hw[1], this->local_rx_hw[1]);
+        burstSample->offset.comp = (int64_t) this->local_tx_hw[1];
+        // compute delay (use compensated clock for best accuracy)
+        int64_t delay = (int64_t) avg64(this->remote_rx - this->local_tx_hw[1], this->local_rx_hw[1] - this->remote_tx);
+        burstSample->delay = 0x1p-32f * (float) (int32_t) delay;
+        // compute TAI offset
+//        uint64_t offset = avg64(this->remote_rx - this->local_tx_hw[2], this->remote_tx - this->local_rx_hw[2]);
+        uint64_t offset = this->remote_rx - this->local_tx_hw[2];
+        burstSample->offset.tai = (int64_t) ((offset - NTP_UTC_OFFSET) + clkTaiUtcOffset);
+
+        if(++this->pollBurst >= PEER_BURST_SIZE) {
+            // burst complete
+            this->pollActive = false;
+        } else {
+            // perform next poll in burst
+            this->pktSent = false;
+        }
     } else {
         uint64_t now = CLK_MONO();
         if((now - this->pollStart) > PEER_RESPONSE_TIMEOUT) {
-            this->pollActive = false;
+            // check if reattempt is allowed
+            if(++this->pollRetry > PEER_BURST_RETRIES) {
+                // retry count exceeded
+                this->pollActive = false;
+            } else {
+                // retry poll
+                this->pktSent = false;
+            }
         }
+    }
+
+    // end of burst
+    if(!this->pollActive) {
+        // no burst samples completed
+        if(this->pollBurst < 1) return;
+        // promote a burst sample as the final sample
+
+        // advance sample buffer
+        NtpSource_incr(&this->source);
+        // set current sample
+        NtpPollSample *sample = this->source.pollSample + this->source.samplePtr;
+        *sample = this->burstSamples[0];
+        // update filter
+        NtpSource_update(&this->source);
     }
 }
 
@@ -179,14 +240,23 @@ void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
+    // drop unsolicited packets
+    if(headerNTP->origTime != __builtin_bswap64(this->local_tx))
+        return;
+    // prevent reception of duplicate packets
+    this->local_tx = 0;
+
     // set reach bit
     this->source.reach |= 1;
-    // set response time
-    this->source.lastResponse = CLK_MONO_INT();
     // set stratum
     this->source.stratum = headerNTP->stratum;
+    // set remote timestamps
+    this->remote_rx = __builtin_bswap64(headerNTP->rxTime);
+    this->remote_tx = __builtin_bswap64(headerNTP->txTime);
     // set hardware timestamp
     NET_getRxTime(frame, this->local_rx_hw);
+    // set response time
+    this->source.lastResponse = CLK_MONO_INT();
     // signal packet received
     this->pktRecv = true;
 }

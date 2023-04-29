@@ -62,3 +62,9 @@ void CLK_TAI_set(uint32_t seconds) {
     ((uint32_t *) &clkTaiOffset)[1] = seconds - ((uint32_t *) &now)[1];
     __enable_irq();
 }
+
+void CLK_TAI_adjust(int64_t delta) {
+    __disable_irq();
+    clkTaiOffset += delta;
+    __enable_irq();
+}

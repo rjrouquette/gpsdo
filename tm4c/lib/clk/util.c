@@ -40,7 +40,7 @@ uint64_t corrValue(uint32_t rate, uint64_t delta, uint32_t *rem) {
         delta = -delta;
         neg = 1;
     }
-    if(rate >> 31 & 1) {
+    if(rate >> 31) {
         rate = -rate;
         neg ^= 1;
     }

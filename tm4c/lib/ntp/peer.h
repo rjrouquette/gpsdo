@@ -31,7 +31,8 @@ struct NtpPeer {
     uint64_t pollStart;
     uint32_t lastArp;
 
-    uint8_t burstCounter;
+    uint8_t pollBurst;
+    uint8_t pollRetry;
     bool pollActive;
     bool pktSent;
     bool pktRecv;

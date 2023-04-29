@@ -2,6 +2,7 @@
 // Created by robert on 4/26/22.
 //
 
+#include <stddef.h>
 #include "../hw/crc.h"
 #include "../hw/emac.h"
 #include "../hw/interrupts.h"
@@ -287,23 +288,22 @@ void NET_transmit(int desc, int len) {
     EMAC0.TXPOLLD = 1;
 }
 
-extern uint64_t taiOffset;
-
 void NET_getRxTime(const uint8_t *rxFrame, volatile uint64_t *stamps) {
     // compute descriptor offset
     uint32_t rxId = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
     if(rxId >= RX_RING_SIZE) return;
     // retrieve timestamp
-    uint32_t timer = clkMonoEth;
+    uint32_t timer;
+    timer  = rxDesc[rxId].RTSH * CLK_FREQ;
     timer += rxDesc[rxId].RTSL >> 3;
-    timer += rxDesc[rxId].RTSH * CLK_FREQ;
+    timer += clkMonoEth;
     __disable_irq();
     uint32_t offset = clkMonoOff;
     uint32_t integer = clkMonoInt;
     __enable_irq();
     stamps[0] = fromClkMono(timer, offset, integer);
-    stamps[1] = stamps[0] + corrValue(clkCompRate, stamps[0] - clkCompRef, 0) + clkCompOffset;
-    stamps[2] = stamps[1] + corrValue(clkTaiRate, stamps[1] - clkTaiRef, 0) + clkTaiOffset;
+    stamps[1] = stamps[0] + corrValue(clkCompRate, stamps[0] - clkCompRef, NULL) + clkCompOffset;
+    stamps[2] = stamps[1] + corrValue(clkTaiRate, stamps[1] - clkTaiRef, NULL) + clkTaiOffset;
 }
 
 void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps) {
@@ -311,14 +311,15 @@ void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps) {
     uint32_t txId = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
     if(txId >= TX_RING_SIZE) return;
     // retrieve timestamp
-    uint32_t timer = clkMonoEth;
+    uint32_t timer;
+    timer  = txDesc[txId].TTSH * CLK_FREQ;
     timer += txDesc[txId].TTSL >> 3;
-    timer += txDesc[txId].TTSH * CLK_FREQ;
+    timer += clkMonoEth;
     __disable_irq();
     uint32_t offset = clkMonoOff;
     uint32_t integer = clkMonoInt;
     __enable_irq();
     stamps[0] = fromClkMono(timer, offset, integer);
-    stamps[1] = stamps[0] + corrValue(clkCompRate, stamps[0] - clkCompRef, 0) + clkCompOffset;
-    stamps[2] = stamps[1] + corrValue(clkTaiRate, stamps[1] - clkTaiRef, 0) + clkTaiOffset;
+    stamps[1] = stamps[0] + corrValue(clkCompRate, stamps[0] - clkCompRef, NULL) + clkCompOffset;
+    stamps[2] = stamps[1] + corrValue(clkTaiRate, stamps[1] - clkTaiRef, NULL) + clkTaiOffset;
 }

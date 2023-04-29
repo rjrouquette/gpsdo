@@ -18,8 +18,6 @@ volatile uint32_t clkMonoInt = 0;
 volatile uint32_t clkMonoOff = 0;
 volatile int64_t clkMonoEth = 0;
 
-extern uint64_t taiOffset;
-
 // pps edge capture state
 volatile struct ClockEvent clkMonoPpsEvent;
 

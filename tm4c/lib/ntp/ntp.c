@@ -254,7 +254,7 @@ static void ntpMain() {
                 ntpDnsCallback(NULL, addr[i]);
 
             // fill with servers from public ntp pool
-            DNS_lookup(NTP_POOL_FQDN, ntpDnsCallback, NULL);
+//            DNS_lookup(NTP_POOL_FQDN, ntpDnsCallback, NULL);
         }
     }
 }
@@ -451,7 +451,7 @@ static uint16_t chronycSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdReq
     cmdReply->data.source_data.reachability = htons(source->reach & 0xFF);
     cmdReply->data.source_data.orig_latest_meas.f = htonf(source->lastOffsetOrig);
     cmdReply->data.source_data.latest_meas.f = htonf(source->lastOffset);
-//    cmdReply->data.source_data.latest_meas_err.f = htonf(server->meanDelay + sqrtf(server->varDelay));
+    cmdReply->data.source_data.latest_meas_err.f = htonf(source->lastDelay);
     cmdReply->data.source_data.since_sample = htonl(CLK_MONO_INT() - source->lastResponse);
     cmdReply->data.source_data.poll = (int16_t) htons(source->poll);
     cmdReply->data.source_data.state = htons(source->mode);
@@ -488,8 +488,8 @@ static uint16_t chronycSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRe
     cmdReply->data.sourcestats.n_samples = htonl(source->sampleCount);
     cmdReply->data.sourcestats.n_runs = htonl(source->used);
     cmdReply->data.sourcestats.span_seconds = htonl(source->span);
-//    cmdReply->data.sourcestats.est_offset.f = htonf(server->currentOffset);
-//    cmdReply->data.sourcestats.est_offset_err.f = htonf(sqrtf(server->varDelay));
+    cmdReply->data.sourcestats.est_offset.f = htonf(source->offsetMean);
+    cmdReply->data.sourcestats.est_offset_err.f = htonf(source->offsetStdDev);
     cmdReply->data.sourcestats.resid_freq_ppm.f = htonf(source->freqDrift * 1e6f);
     cmdReply->data.sourcestats.skew_ppm.f = htonf(source->freqSkew * 1e6f);
     return htons(STT_SUCCESS);
@@ -519,8 +519,8 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
 //    cmdReply->data.tracking.last_offset.f = htonf(-1e-9f * (float) GPSDO_offsetNano());
 //    cmdReply->data.tracking.rms_offset.f = htonf(GPSDO_offsetRms());
 
-    cmdReply->data.tracking.freq_ppm.f = htonf(1e6f * (0x1p-32f * (float) CLK_COMP_getComp()));
-    cmdReply->data.tracking.resid_freq_ppm.f = htonf(1e6f * (0x1p-32f * (float) CLK_TAI_getTrim()));
+    cmdReply->data.tracking.freq_ppm.f = htonf(-1e6f * (0x1p-32f * (float) CLK_COMP_getComp()));
+    cmdReply->data.tracking.resid_freq_ppm.f = htonf(-1e6f * (0x1p-32f * (float) CLK_TAI_getTrim()));
 //    cmdReply->data.tracking.skew_ppm.f = htonf(GPSDO_skewRms() * 1e6f);
 
     cmdReply->data.tracking.root_delay.f = htonf(0x1p-16f * (float) rootDelay);

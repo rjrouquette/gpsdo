@@ -227,6 +227,16 @@ unsigned statusClock(char *body) {
     tmp[19] = 0;
     end = append(end, "pps tai:   ");
     end = append(end, tmp);
+    end = append(end, "\n\n");
+
+    // current time
+    strcpy(tmp, "0x");
+    toHex(clkTaiUtcOffset >> 32, 8, '0', tmp + 2);
+    tmp[10] = '.';
+    toHex(clkTaiUtcOffset, 8, '0', tmp + 11);
+    tmp[19] = 0;
+    end = append(end, "tai - utc: ");
+    end = append(end, tmp);
     end = append(end, "\n");
 
     // return size

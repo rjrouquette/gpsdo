@@ -39,6 +39,12 @@ void CLK_TAI_align(int32_t fraction);
 void CLK_TAI_set(uint32_t seconds);
 
 /**
+ * Set integer part of TAI reference
+ * @param seconds  64-bit fixed-point format (31.32)
+ */
+void CLK_TAI_adjust(int64_t seconds);
+
+/**
  * Trim TAI clock frequency
  * @param trim new trim rate (0.31 fixed-point)
  */

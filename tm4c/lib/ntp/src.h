@@ -12,11 +12,10 @@
 struct NtpPollSample {
     struct {
         int64_t mono;
-        int64_t trim;
+        int64_t comp;
         int64_t tai;
     } offset;
     float delay;
-    float jitter;
 };
 typedef volatile struct NtpPollSample NtpPollSample;
 
@@ -40,9 +39,13 @@ struct NtpSource {
     // last sample offset
     float lastOffset;
     float lastOffsetOrig;
+    float lastDelay;
     // time span
     int span;
     int used;
+    // offset stats
+    float offsetMean;
+    float offsetStdDev;
     // frequency stats
     float freqDrift;
     float freqSkew;
