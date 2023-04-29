@@ -279,15 +279,17 @@ static void ntpMain() {
     }
 
     // adjust TAI alignment
+    int64_t lastOffset = source->pollSample[source->samplePtr].offset;
     if(source->offsetMean > 0.25f) {
-        CLK_TAI_adjust(source->pollSample[source->samplePtr].offset);
+        CLK_TAI_adjust(lastOffset);
     }
     else {
-//        CLK_TAI_setTrim(-(int32_t) (0x1p32f * 0x1p-8f * source->offsetMean));
         if(fabsf(source->offsetMean) > 100e-6f)
-            CLK_TAI_align((int32_t) (0x1p32f * source->offsetMean));
-        else
+            CLK_TAI_align((int32_t) lastOffset);
+        else {
             CLK_TAI_align((int32_t) (0x1p32f * 0x1p-6f * source->offsetMean));
+            CLK_TAI_setTrim((int32_t) (0x1p32f * 0x1p-4f * source->offsetMean));
+        }
     }
 }
 
@@ -521,7 +523,7 @@ static uint16_t chronycSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRe
     cmdReply->data.sourcestats.n_runs = htonl(source->used);
     cmdReply->data.sourcestats.span_seconds = htonl(source->span);
     cmdReply->data.sourcestats.est_offset.f = htonf(source->offsetMean);
-    cmdReply->data.sourcestats.est_offset_err.f = htonf(source->offsetStdDev);
+    cmdReply->data.sourcestats.sd.f = htonf(source->offsetStdDev);
     cmdReply->data.sourcestats.resid_freq_ppm.f = htonf(source->freqDrift * 1e6f);
     cmdReply->data.sourcestats.skew_ppm.f = htonf(source->freqSkew * 1e6f);
     return htons(STT_SUCCESS);

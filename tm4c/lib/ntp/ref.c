@@ -45,7 +45,7 @@ static void NtpGPS_run(volatile void *pObj) {
     sample->tai = ppsTime[2];
     // compute TAI offset
     union fixed_32_32 scratch;
-    scratch.ipart = GPS_taiEpoch();
+    scratch.ipart = GPS_taiEpoch() + 1;
     scratch.fpart = 0;
     sample->offset = (int64_t) (scratch.full - ppsTime[2]);
     sample->delay = 0;
