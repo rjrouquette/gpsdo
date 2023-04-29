@@ -5,7 +5,6 @@
 #include <string.h>
 
 #include "../clk/mono.h"
-#include "../led.h"
 #include "../net.h"
 #include "arp.h"
 #include "eth.h"
@@ -19,7 +18,7 @@
 #define DNS_SERVER_PORT (53)
 #define MAX_REQUESTS (16)
 #define REQUEST_EXPIRE (5)
-#define ARP_MAX_AGE (64)
+#define ARP_MAX_AGE (300)
 
 struct PACKED HEADER_DNS {
     uint16_t id;
@@ -65,7 +64,11 @@ void DNS_init() {
 }
 
 static void callbackARP(void *ref, uint32_t remoteAddress, uint8_t *macAddress) {
-    if(remoteAddress == ipDNS)
+    if(isNullMAC(macAddress)) {
+        // retry if request timed-out
+        DNS_updateMAC();
+    }
+    else if(remoteAddress == ipDNS)
         copyMAC(dnsMAC, macAddress);
 }
 

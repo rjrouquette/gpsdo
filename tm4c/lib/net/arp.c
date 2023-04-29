@@ -10,9 +10,9 @@
 #include "ip.h"
 #include "util.h"
 
-#define ANNOUNCE_INTERVAL (60)
+#define ANNOUNCE_INTERVAL (60) // 60 seconds
 #define MAX_REQUESTS (16)
-#define REQUEST_EXPIRE (5)
+#define REQUEST_EXPIRE (5) //  5 seconds
 
 volatile struct {
     uint32_t expire;
@@ -54,6 +54,17 @@ void ARP_run() {
     if(((int32_t)(nextAnnounce - now)) <= 0) {
         nextAnnounce = now + ANNOUNCE_INTERVAL;
         ARP_announce();
+    }
+    // expire requests
+    for(int i = 0; i < MAX_REQUESTS; i++) {
+        // skip empty slots
+        if(requests[i].remoteAddress == 0) continue;
+        // skip fresh requests
+        if(((int32_t) (now - requests[i].expire) <= 0)) continue;
+        // cancel request
+        uint8_t nullMac[6] = {0,0,0,0,0,0};
+        (*requests[i].callback)(requests[i].ref, requests[i].remoteAddress, nullMac);
+        requests[i].remoteAddress = 0;
     }
 }
 

@@ -290,8 +290,8 @@ static void ntpMain() {
         if(fabsf(source->offsetMean) > 100e-6f)
             CLK_TAI_align((int32_t) lastOffset);
         else {
-            CLK_TAI_align((int32_t) (0x1p32f * 0x1p-6f * source->offsetMean));
-            CLK_TAI_setTrim((int32_t) (0x1p32f * 0x1p-4f * source->offsetMean));
+            CLK_TAI_align(((int32_t) lastOffset) >> 4);
+            CLK_TAI_setTrim(((int32_t) lastOffset) >> 5);
         }
     }
 }

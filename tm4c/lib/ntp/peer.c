@@ -6,7 +6,8 @@
 #include <math.h>
 #include "../chrony/candm.h"
 #include "../clk/mono.h"
-#include "../led.h"
+#include "../clk/tai.h"
+#include "../clk/util.h"
 #include "../rand.h"
 #include "../net.h"
 #include "../net/arp.h"
@@ -14,15 +15,23 @@
 #include "../net/util.h"
 #include "common.h"
 #include "peer.h"
-#include "../clk/tai.h"
-#include "../clk/util.h"
 
 
-#define ARP_MIN_AGE (4) // maximum polling rate
-#define ARP_MAX_AGE (64) // refresh old MAC addresses
+#define ARP_MAX_AGE (300) // refresh old MAC addresses
 
+// average two 64-bit numbers
+static uint64_t avg64(uint64_t a, uint64_t b);
 
-extern uint64_t tsDebug[3];
+// API callbacks
+static void arpCallback(void *ref, uint32_t remoteAddr, uint8_t *macAddr);
+static void txCallback(void *ref, uint8_t *frame, int flen);
+
+// private member functions
+static void updateMac(NtpPeer *this);
+static int checkMac(NtpPeer *this);
+static void sendPoll(NtpPeer *this);
+static void startPoll(NtpPeer *this);
+static void runPoll(NtpPeer *this);
 
 
 static uint64_t avg64(uint64_t a, uint64_t b) {
@@ -34,25 +43,30 @@ static uint64_t avg64(uint64_t a, uint64_t b) {
 static void arpCallback(void *ref, uint32_t remoteAddr, uint8_t *macAddr) {
     // typecast "this" pointer
     NtpPeer *this = (struct NtpPeer *) ref;
-    // update MAC address
-    copyMAC((uint8_t *) this->macAddr, macAddr);
+    if(isNullMAC(macAddr)) {
+        // retry if request timed-out
+        updateMac(this);
+    } else {
+        // update MAC address
+        copyMAC((uint8_t *) this->macAddr, macAddr);
+    }
+}
+
+static void updateMac(NtpPeer *this) {
+    this->lastArp = CLK_MONO_INT();
+    if(IPv4_testSubnet(ipSubnet, ipAddress, this->source.id))
+        ARP_request(ipGateway, arpCallback, this);
+    else
+        ARP_request(this->source.id, arpCallback, this);
 }
 
 // Checks MAC address of peer and performs ARP request to retrieve it
 static int checkMac(NtpPeer *this) {
-    const uint32_t now = CLK_MONO_INT();
-    const uint32_t age = now - this->lastArp;
-    const int invalid = isNullMAC(this->macAddr) ? 1 : 0;
-    if(invalid || (age > ARP_MAX_AGE)) {
-        if (age > ARP_MIN_AGE) {
-            this->lastArp = now;
-            if(IPv4_testSubnet(ipSubnet, ipAddress, this->source.id))
-                ARP_request(ipGateway, arpCallback, this);
-            else
-                ARP_request(this->source.id, arpCallback, this);
-        }
-    }
-    return invalid;
+    // refresh stale MAC addresses
+    if((CLK_MONO_INT() - this->lastArp) > ARP_MAX_AGE)
+        updateMac(this);
+    // report if MAC address is invalid
+    return isNullMAC(this->macAddr) ? 1 : 0;
 }
 
 static void txCallback(void *ref, uint8_t *frame, int flen) {
