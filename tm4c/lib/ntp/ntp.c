@@ -277,7 +277,7 @@ static void ntpMain() {
     // adjust frequency compensation
     if(source->freqSkew < 25e-6f) {
         int32_t comp = CLK_COMP_getComp();
-        comp += (int32_t) (0x1p32f * 0x1p-6f * source->freqDrift);
+        comp += (int32_t) (0x1p24f * source->freqDrift);
         CLK_COMP_setComp(comp);
     }
 
