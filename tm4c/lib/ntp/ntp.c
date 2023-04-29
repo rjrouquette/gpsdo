@@ -72,10 +72,6 @@ static void ntpResponse(uint8_t *frame, int flen);
 static void ntpMain();
 static void ntpDnsCallback(void *ref, uint32_t addr);
 
-// timestamp convenience functions
-static inline uint64_t ntpClock() { return NTP_UTC_OFFSET + CLK_TAI() - clkTaiUtcOffset; }
-static inline uint64_t ntpModified() { return 0; }
-
 
 void NTP_init() {
     UDP_register(NTP_PORT_SRV, ntpRequest);
@@ -190,11 +186,11 @@ static void ntpRequest(uint8_t *frame, int flen) {
     // set reference ID
     headerNTP->refID = refId;
     // set reference timestamp
-    headerNTP->refTime = __builtin_bswap64(ntpModified());
+    headerNTP->refTime = __builtin_bswap64(CLK_TAI_fromMono(lastUpdate) + NTP_UTC_OFFSET - clkTaiUtcOffset);
     // set origin and TX timestamps
     if(xleave < 0) {
         headerNTP->origTime = headerNTP->txTime;
-        headerNTP->txTime = __builtin_bswap64(ntpClock());
+        headerNTP->txTime = __builtin_bswap64(CLK_TAI() + NTP_UTC_OFFSET - clkTaiUtcOffset);
     } else {
         headerNTP->origTime = headerNTP->rxTime;
         headerNTP->txTime = tsXleave[xleave].txTime;
@@ -271,8 +267,15 @@ static void ntpMain() {
     lastUpdate = source->lastUpdate;
     if(source->used < 8) return;
 
+    // set status
+    refId = source->id;
+    clockStratum = source->stratum + 1;
+    leapIndicator = 0;
+    rootDelay = source->rootDelay + (uint16_t) (0x1p16f * source->delayMean);
+    rootDispersion = source->rootDispersion + (uint16_t) (0x1p16f * source->delayStdDev);
+
     // adjust frequency compensation
-    if(source->freqSkew < 5e-6f) {
+    if(source->freqSkew < 25e-6f) {
         int32_t comp = CLK_COMP_getComp();
         comp += (int32_t) (0x1p32f * 0x1p-6f * source->freqDrift);
         CLK_COMP_setComp(comp);
@@ -544,23 +547,25 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
         cmdReply->data.tracking.ip_addr.addr.in4 = refId;
     }
 
-//    scratch.full = ntpModified();
-//    cmdReply->data.tracking.ref_time.tv_sec_high = 0;
-//    cmdReply->data.tracking.ref_time.tv_sec_low = htonl(scratch.ipart - NTP_UTC_OFFSET);
-//    cmdReply->data.tracking.ref_time.tv_nsec = htonl(scratch.fpart);
+    NtpSource *source = sources[activeSource];
 
-//    cmdReply->data.tracking.current_correction.f = htonf(-GPSDO_offsetMean());
-//    cmdReply->data.tracking.last_offset.f = htonf(-1e-9f * (float) GPSDO_offsetNano());
-//    cmdReply->data.tracking.rms_offset.f = htonf(GPSDO_offsetRms());
+    scratch.full = CLK_TAI_fromMono(lastUpdate) - clkTaiUtcOffset;
+    cmdReply->data.tracking.ref_time.tv_sec_high = 0;
+    cmdReply->data.tracking.ref_time.tv_sec_low = htonl(scratch.ipart);
+    cmdReply->data.tracking.ref_time.tv_nsec = htonl(scratch.fpart);
+
+    cmdReply->data.tracking.current_correction.f = htonf(source ? source->offsetMean : 0);
+    cmdReply->data.tracking.last_offset.f = htonf(source ? source->lastOffset : 0);
+    cmdReply->data.tracking.rms_offset.f = htonf(source ? source->offsetStdDev : 0);
 
     cmdReply->data.tracking.freq_ppm.f = htonf(-1e6f * (0x1p-32f * (float) CLK_COMP_getComp()));
     cmdReply->data.tracking.resid_freq_ppm.f = htonf(-1e6f * (0x1p-32f * (float) CLK_TAI_getTrim()));
-//    cmdReply->data.tracking.skew_ppm.f = htonf(GPSDO_skewRms() * 1e6f);
+    cmdReply->data.tracking.skew_ppm.f = htonf(source ? (1e6f * source->freqSkew) : 0);
 
     cmdReply->data.tracking.root_delay.f = htonf(0x1p-16f * (float) rootDelay);
     cmdReply->data.tracking.root_dispersion.f = htonf(0x1p-16f * (float) rootDispersion);
 
-//    cmdReply->data.tracking.last_update_interval.f = htonf((clockStratum == 1) ? 1 : 64);
+    cmdReply->data.tracking.last_update_interval.f = htonf(source ? (0x1p-16f * (float) (1u << (16 + source->poll))) : 0);
     return htons(STT_SUCCESS);
 }
 

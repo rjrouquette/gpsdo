@@ -22,7 +22,7 @@
 #define NTP_MODE_CLI (3)
 #define NTP_MODE_SRV (4)
 
-#define NTP_UTC_OFFSET (2208988800)
+#define NTP_UTC_OFFSET (0x83AA7E8000000000ull)
 
 struct PACKED HEADER_NTPv4 {
         uint16_t mode: 3;

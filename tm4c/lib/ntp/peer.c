@@ -152,14 +152,8 @@ static void runPoll(NtpPeer *this) {
     if(this->pktRecv) {
         this->pktRecv = false;
         // translate remote timestamps
-        uint64_t remote_rx = __builtin_bswap64(this->remote_rx);
-        uint64_t remote_tx = __builtin_bswap64(this->remote_tx);
-        // remove NTP offset
-        ((uint32_t *) &remote_rx)[1] -= NTP_UTC_OFFSET;
-        ((uint32_t *) &remote_tx)[1] -= NTP_UTC_OFFSET;
-        // add TAI offset
-        remote_rx += clkTaiUtcOffset;
-        remote_tx += clkTaiUtcOffset;
+        uint64_t remote_rx = __builtin_bswap64(this->remote_rx) + clkTaiUtcOffset - NTP_UTC_OFFSET;
+        uint64_t remote_tx = __builtin_bswap64(this->remote_tx) + clkTaiUtcOffset - NTP_UTC_OFFSET;
 
         // get pointer to current burst sample
         NtpPollSample *burstSample = this->burstSamples + this->pollBurst;
