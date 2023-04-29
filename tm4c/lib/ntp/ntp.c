@@ -254,7 +254,7 @@ static void ntpMain() {
                 ntpDnsCallback(NULL, addr[i]);
 
             // fill with servers from public ntp pool
-//            DNS_lookup(NTP_POOL_FQDN, ntpDnsCallback, NULL);
+            DNS_lookup(NTP_POOL_FQDN, ntpDnsCallback, NULL);
         }
     }
 }

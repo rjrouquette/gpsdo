@@ -32,7 +32,7 @@ struct ClockEvent {
 extern volatile uint32_t clkMonoInt;
 extern volatile uint32_t clkMonoOff;
 // timer tick offset between the ethernet clock and monotonic clock
-extern volatile int64_t clkMonoEth;
+extern volatile uint32_t clkMonoEth;
 // pps edge capture state
 extern volatile struct ClockEvent clkMonoPpsEvent;
 

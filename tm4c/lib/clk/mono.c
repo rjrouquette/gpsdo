@@ -16,7 +16,7 @@
 
 volatile uint32_t clkMonoInt = 0;
 volatile uint32_t clkMonoOff = 0;
-volatile int64_t clkMonoEth = 0;
+volatile uint32_t clkMonoEth = 0;
 
 // pps edge capture state
 volatile struct ClockEvent clkMonoPpsEvent;
@@ -173,7 +173,7 @@ void ISR_Timer5A() {
     GPTM5.ICR.CAE = 1;
     // compute ethernet clock offset
     timer -= (timer - event) & 0xFFFF;
-    timer -= (uint32_t) (EMAC0.TIMSEC * CLK_FREQ);
+    timer -= EMAC0.TIMSEC * CLK_FREQ;
     clkMonoEth = timer;
 }
 

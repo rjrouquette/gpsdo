@@ -106,6 +106,8 @@ void STATUS_process(uint8_t *frame, int flen) {
     NET_transmit(txDesc, flen);
 }
 
+uint64_t tsDebug[3];
+
 unsigned statusClock(char *body) {
     char tmp[32];
     char *end = body;
@@ -229,13 +231,49 @@ unsigned statusClock(char *body) {
     end = append(end, tmp);
     end = append(end, "\n\n");
 
-    // current time
+    // debug status
+    strcpy(tmp, "0x");
+    toHex(tsDebug[0]>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(tsDebug[0], 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "dbg mono:  ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    strcpy(tmp, "0x");
+    toHex(tsDebug[1]>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(tsDebug[1], 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "dbg trim:  ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    strcpy(tmp, "0x");
+    toHex(tsDebug[2]>>32, 8, '0', tmp+2);
+    tmp[10] = '.';
+    toHex(tsDebug[2], 8, '0', tmp+11);
+    tmp[19] = 0;
+    end = append(end, "dbg tai:   ");
+    end = append(end, tmp);
+    end = append(end, "\n\n");
+
+    // tai - utc
     strcpy(tmp, "0x");
     toHex(clkTaiUtcOffset >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
     toHex(clkTaiUtcOffset, 8, '0', tmp + 11);
     tmp[19] = 0;
     end = append(end, "tai - utc: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // mono - eth
+    strcpy(tmp, "0x");
+    toHex(clkMonoEth, 8, '0', tmp + 2);
+    tmp[10] = 0;
+    end = append(end, "mon - eth: ");
     end = append(end, tmp);
     end = append(end, "\n");
 

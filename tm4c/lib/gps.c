@@ -23,8 +23,8 @@ static int endUBX;
 static int fixGood;
 static float locLat, locLon, locAlt;
 static int clkBias, clkDrift, accTime, accFreq;
-static uint32_t taiEpoch;
-static int taiOffset;
+static volatile uint32_t taiEpoch;
+static volatile int taiOffset;
 
 static int hasNema, hasPvt, hasGpsTime, hasClock;
 

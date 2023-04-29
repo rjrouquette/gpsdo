@@ -44,12 +44,12 @@ static void NtpGPS_run(volatile void *pObj) {
     // store PPS timestamps
     sample->offset.mono = (int64_t) ppsTime[0];
     sample->offset.comp = (int64_t) ppsTime[1];
-    sample->offset.tai = (int64_t) ppsTime[2];
+    sample->offset.tai = -(int64_t) ppsTime[2];
     // compute TAI offset
     union fixed_32_32 scratch;
     scratch.ipart = GPS_taiEpoch();
     scratch.fpart = 0;
-    sample->offset.tai -= (int64_t) scratch.full;
+    sample->offset.tai += (int64_t) scratch.full;
     sample->delay = 0;
     // update filter
     NtpSource_update(&this->source);

@@ -296,11 +296,14 @@ void NET_getRxTime(const uint8_t *rxFrame, volatile uint64_t *stamps) {
     uint32_t timer;
     timer  = rxDesc[rxId].RTSH * CLK_FREQ;
     timer += rxDesc[rxId].RTSL >> 3;
-    timer += clkMonoEth;
+    // snapshot clock state
     __disable_irq();
+    uint32_t monoEth = clkMonoEth;
     uint32_t offset = clkMonoOff;
     uint32_t integer = clkMonoInt;
     __enable_irq();
+    // assemble timestamps
+    timer += monoEth;
     stamps[0] = fromClkMono(timer, offset, integer);
     stamps[1] = stamps[0] + corrValue(clkCompRate, stamps[0] - clkCompRef, NULL) + clkCompOffset;
     stamps[2] = stamps[1] + corrValue(clkTaiRate, stamps[1] - clkTaiRef, NULL) + clkTaiOffset;
@@ -314,11 +317,14 @@ void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps) {
     uint32_t timer;
     timer  = txDesc[txId].TTSH * CLK_FREQ;
     timer += txDesc[txId].TTSL >> 3;
-    timer += clkMonoEth;
+    // snapshot clock state
     __disable_irq();
+    uint32_t monoEth = clkMonoEth;
     uint32_t offset = clkMonoOff;
     uint32_t integer = clkMonoInt;
     __enable_irq();
+    // assemble timestamps
+    timer += monoEth;
     stamps[0] = fromClkMono(timer, offset, integer);
     stamps[1] = stamps[0] + corrValue(clkCompRate, stamps[0] - clkCompRef, NULL) + clkCompOffset;
     stamps[2] = stamps[1] + corrValue(clkTaiRate, stamps[1] - clkTaiRef, NULL) + clkTaiOffset;
