@@ -257,9 +257,27 @@ static void ntpMain() {
         }
     }
 
+    // prune defunct sources
+    for(int i = 0; i < cntSources; i++) {
+        // reference sources are excluded
+        if(sources[i]->mode == RPY_SD_MD_REF)
+            continue;
+        if(sources[i]->prune) {
+            ntpDeallocatePeer(sources[i]);
+            break;
+        }
+    }
+
     // select best clock
     activeSource = 0;
-    float score = sources[0]->score;
+//    float score = sources[0]->score;
+//    for(int i = 1; i < cntSources; i++) {
+//        if(sources[i]->score  0)
+//        if(sources[i]->score < score) {
+//            score = sources[i]->score;
+//            activeSource = i;
+//        }
+//    }
 
     NtpSource *source = sources[activeSource];
     if(source == NULL) return;

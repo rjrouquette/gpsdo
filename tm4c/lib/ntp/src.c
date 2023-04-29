@@ -5,6 +5,7 @@
 #include <math.h>
 #include "../clk/util.h"
 #include "src.h"
+#include "../clk/mono.h"
 
 static void getMeanVar(int cnt, const float *v, float *mean, float *var);
 
@@ -67,13 +68,6 @@ void NtpSource_update(NtpSource *this) {
     this->offsetMean = mean;
     this->offsetStdDev = sqrtf(var);
 
-    // skip drift calculation if only one sample
-    if(cnt < 2) {
-        this->freqDrift = 0;
-        this->freqSkew = 0;
-        return;
-    }
-
     // analyse clock drift
     float drift[cnt - 1];
     for (int i = 0; i < cnt - 1; i++) {
@@ -96,6 +90,9 @@ void NtpSource_update(NtpSource *this) {
     score += this->delayMean;
     score += this->delayStdDev;
     this->score = score;
+
+    // set update time
+    this->lastUpdate = CLK_MONO();
 }
 
 static void getMeanVar(int cnt, const float *v, float *mean, float *var) {
@@ -111,4 +108,41 @@ static void getMeanVar(int cnt, const float *v, float *mean, float *var) {
     // return result
     *mean = _mean;
     *var = _var;
+}
+
+
+void NtpSource_updateStatus(NtpSource *this) {
+    // clear lost flag if peer was reached
+    if(this->reach & 1)
+        this->lost = false;
+
+    // increment poll counter
+    if(++this->pollCounter == 0)
+        this->pollCounter = -1;
+
+    // adjust poll interval
+    if(
+            this->sampleCount == NTP_MAX_HISTORY &&
+            (this->reach & 0xFF) == 0xFF &&
+            this->pollCounter >= 8 &&
+            this->poll < this->maxPoll
+            ) {
+        // increase poll interval (increase update rate)
+        ++this->poll;
+        this->pollCounter = 0;
+    }
+    else if(
+            (this->reach & 0xF) == 0 &&
+            this->pollCounter >= 4 &&
+            this->poll > this->minPoll
+            ) {
+        // decrease poll interval (increase update rate)
+        --this->poll;
+        this->pollCounter = 0;
+        // mark connection as lost
+        this->lost = true;
+    }
+
+    // mark source for pruning if it is unreachable
+    this->prune = (this->reach == 0 && this->pollCounter >= 16);
 }

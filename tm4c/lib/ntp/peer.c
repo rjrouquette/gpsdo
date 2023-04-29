@@ -32,6 +32,7 @@ static int checkMac(NtpPeer *this);
 static void sendPoll(NtpPeer *this);
 static void startPoll(NtpPeer *this);
 static void runPoll(NtpPeer *this);
+static void promoteSample(NtpPeer *this);
 
 
 static uint64_t avg64(uint64_t a, uint64_t b) {
@@ -63,7 +64,7 @@ static void updateMac(NtpPeer *this) {
 // Checks MAC address of peer and performs ARP request to retrieve it
 static int checkMac(NtpPeer *this) {
     // refresh stale MAC addresses
-    if((CLK_MONO_INT() - this->lastArp) > ARP_MAX_AGE)
+    if(!this->lastArp || (CLK_MONO_INT() - this->lastArp) > ARP_MAX_AGE)
         updateMac(this);
     // report if MAC address is invalid
     return isNullMAC(this->macAddr) ? 1 : 0;
@@ -205,45 +206,50 @@ static void runPoll(NtpPeer *this) {
 
     // end of burst
     if(!this->pollActive) {
-        const int count = this->pollBurst;
-        // no burst samples completed
-        if(count < 1) return;
-        // promote a burst sample as the final sample
-        int selected = 0;
-        // special case for exactly two samples
-        if(count == 2) {
-            if(this->burstSamples[1].delay < this->burstSamples[0].delay)
-                selected = 1;
-        }
-        // select sample closest to the mean
-        else if(count > 2) {
-            float offset[count];
-            float mean = 0;
-            for(int i = 0; i < count; i++) {
-                offset[i] = toFloat(this->burstSamples[i].offset);
-                mean += offset[i];
-            }
-            float best = fabsf(offset[0] - mean);
-            for(int i = 0; i < count; i++) {
-                float dist = fabsf(offset[0] - mean);
-                if(dist < best) {
-                    best = dist;
-                    selected = i;
-                }
-            }
-        }
-
-        // advance sample buffer
-        NtpSource_incr(&this->source);
-        // set current sample
-        NtpPollSample *sample = this->source.pollSample + this->source.samplePtr;
-        *sample = this->burstSamples[selected];
-        // update filter
-        NtpSource_update(&this->source);
-        // set update time
-        this->source.lastUpdate = CLK_MONO();
+        promoteSample(this);
+        // update status
+        NtpSource_updateStatus(&(this->source));
     }
 }
+
+static void promoteSample(NtpPeer *this) {
+    const int count = this->pollBurst;
+    // no burst samples completed
+    if(count < 1) return;
+    // promote a burst sample as the final sample
+    int selected = 0;
+    // special case for exactly two samples
+    if(count == 2) {
+        if(this->burstSamples[1].delay < this->burstSamples[0].delay)
+            selected = 1;
+    }
+        // select sample closest to the mean
+    else if(count > 2) {
+        float offset[count];
+        float mean = 0;
+        for(int i = 0; i < count; i++) {
+            offset[i] = toFloat(this->burstSamples[i].offset);
+            mean += offset[i];
+        }
+        float best = fabsf(offset[0] - mean);
+        for(int i = 0; i < count; i++) {
+            float dist = fabsf(offset[0] - mean);
+            if(dist < best) {
+                best = dist;
+                selected = i;
+            }
+        }
+    }
+
+    // advance sample buffer
+    NtpSource_incr(&this->source);
+    // set current sample
+    NtpPollSample *sample = this->source.pollSample + this->source.samplePtr;
+    *sample = this->burstSamples[selected];
+    // update filter
+    NtpSource_update(&this->source);
+}
+
 
 static void run(volatile void *pObj) {
     // typecast "this" pointer
@@ -275,6 +281,8 @@ void NtpPeer_init(volatile void *pObj) {
     this->source.mode = RPY_SD_MD_CLIENT;
     this->source.state = RPY_SD_ST_UNSELECTED;
     // initialize polling
+    this->source.maxPoll = PEER_MAX_POLL;
+    this->source.minPoll = PEER_MIN_POLL;
     this->source.poll = PEER_MIN_POLL;
     this->nextPoll = CLK_MONO();
 }

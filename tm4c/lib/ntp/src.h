@@ -6,6 +6,7 @@
 #define GPSDO_SRC_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define NTP_MAX_HISTORY (16)
 
@@ -31,6 +32,9 @@ struct NtpSource {
     uint16_t reach;
     uint16_t stratum;
     int16_t poll;
+    uint16_t pollCounter;
+    int16_t minPoll;
+    int16_t maxPoll;
 
     // filter state
     struct NtpPollSample pollSample[NTP_MAX_HISTORY];
@@ -54,11 +58,18 @@ struct NtpSource {
     float freqSkew;
     // overall score
     float score;
+
+    // status flags
+    bool prune;
+    bool lost;
+    bool unstable;
 };
 typedef volatile struct NtpSource NtpSource;
 
 void NtpSource_incr(NtpSource *this);
 
 void NtpSource_update(NtpSource *this);
+
+void NtpSource_updateStatus(NtpSource *this);
 
 #endif //GPSDO_SRC_H

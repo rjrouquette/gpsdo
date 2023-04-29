@@ -34,8 +34,16 @@ static void NtpGPS_run(volatile void *pObj) {
     if(ppsTime[0] == this->lastPps) return;
     this->lastPoll = now;
     this->lastPps = ppsTime[0];
+
     // update reach indicator
     this->source.reach = (this->source.reach << 1) | 1;
+
+    // update TAI/UTC offset
+    union fixed_32_32 scratch;
+    scratch.ipart = GPS_taiOffset();
+    scratch.fpart = 0;
+    clkTaiUtcOffset = scratch.full;
+
     // advance sample buffer
     NtpSource_incr(&this->source);
     // get current sample
@@ -44,19 +52,15 @@ static void NtpGPS_run(volatile void *pObj) {
     sample->comp = ppsTime[1];
     sample->tai = ppsTime[2];
     // compute TAI offset
-    union fixed_32_32 scratch;
     scratch.ipart = GPS_taiEpoch() + 1;
     scratch.fpart = 0;
     sample->offset = (int64_t) (scratch.full - ppsTime[2]);
     sample->delay = 0;
+
     // update filter
     NtpSource_update(&this->source);
-    // update TAI/UTC offset
-    scratch.ipart = GPS_taiOffset();
-    scratch.fpart = 0;
-    clkTaiUtcOffset = scratch.full;
-    // set update time
-    this->source.lastUpdate = CLK_MONO();
+    // update status
+    NtpSource_updateStatus(&(this->source));
 }
 
 void NtpGPS_init(volatile void *pObj) {

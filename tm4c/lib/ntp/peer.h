@@ -10,7 +10,7 @@
 
 #define PEER_BURST_SIZE (4)
 #define PEER_BURST_RETRIES (2)
-#define PEER_RESPONSE_TIMEOUT (0x40000000) // 256 ms
+#define PEER_RESPONSE_TIMEOUT (0x80000000ull) // 500 ms
 #define PEER_MIN_POLL (4)
 #define PEER_MAX_POLL (6)
 
