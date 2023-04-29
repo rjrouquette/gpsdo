@@ -14,15 +14,31 @@
 #define MAX_REQUESTS (16)
 #define REQUEST_EXPIRE (5) //  5 seconds
 
-volatile struct {
+volatile struct ArpRequest {
     uint32_t expire;
     uint32_t remoteAddress;
     CallbackARP callback;
     void *ref;
 } requests[MAX_REQUESTS];
 
-static uint32_t nextAnnounce = 0;
+volatile uint8_t macRouter[6];
 
+static volatile uint32_t nextAnnounce = 0;
+static volatile uint32_t lastRouterPoll = 0;
+
+
+static void arpRouter(void *ref, uint32_t remoteAddress, uint8_t *macAddress) {
+    // retry if request timed-out
+    if(isNullMAC(macAddress))
+        ARP_refreshRouter();
+    else
+        copyMAC(macRouter, macAddress);
+}
+
+void ARP_refreshRouter() {
+    lastRouterPoll = CLK_MONO_INT();
+    ARP_request(ipRouter, arpRouter, NULL);
+}
 
 void makeArpIp4(
         void *packet,
@@ -50,22 +66,29 @@ void makeArpIp4(
 }
 
 void ARP_run() {
+    // announce presence
     const uint32_t now = CLK_MONO_INT();
     if(((int32_t)(nextAnnounce - now)) <= 0) {
         nextAnnounce = now + ANNOUNCE_INTERVAL;
         ARP_announce();
     }
-    // expire requests
+
+    // process request expiration
     for(int i = 0; i < MAX_REQUESTS; i++) {
+        volatile struct ArpRequest *request = requests + i;
         // skip empty slots
-        if(requests[i].remoteAddress == 0) continue;
+        if(request->remoteAddress == 0) continue;
         // skip fresh requests
-        if(((int32_t) (now - requests[i].expire) <= 0)) continue;
-        // cancel request
+        if(((int32_t) (now - request->expire)) <= 0) continue;
+        // report expiration
         uint8_t nullMac[6] = {0,0,0,0,0,0};
-        (*requests[i].callback)(requests[i].ref, requests[i].remoteAddress, nullMac);
-        requests[i].remoteAddress = 0;
+        (*(request->callback))(request->ref, request->remoteAddress, nullMac);
+        bzero((void *) request, sizeof(struct ArpRequest));
     }
+
+    // refresh router MAC address
+    if((now - lastRouterPoll) > ARP_MAX_AGE)
+        ARP_refreshRouter();
 }
 
 void ARP_process(uint8_t *frame, int flen) {
@@ -102,8 +125,8 @@ void ARP_process(uint8_t *frame, int flen) {
         if(payload->SPA != 0) {
             for(int i = 0; i < MAX_REQUESTS; i++) {
                 if(requests[i].remoteAddress == payload->SPA) {
-                    (*requests[i].callback)(requests[i].ref, payload->SPA, payload->SHA);
-                    requests[i].remoteAddress = 0;
+                    (*requests[i].callback)(requests[i].ref, requests[i].remoteAddress, payload->SHA);
+                    bzero((void *) (requests + i), sizeof(struct ArpRequest));
                 }
             }
         }
@@ -113,8 +136,8 @@ void ARP_process(uint8_t *frame, int flen) {
 int ARP_request(uint32_t remoteAddress, CallbackARP callback, volatile void *ref) {
     uint32_t now = CLK_MONO_INT();
     for(int i = 0; i < MAX_REQUESTS; i++) {
-        // look for empty or expired slot
-        if(requests[i].remoteAddress != 0 && ((int32_t) (now - requests[i].expire) > 0))
+        // look for empty slot
+        if(requests[i].remoteAddress != 0)
             continue;
         // get TX descriptor
         int txDesc = NET_getTxDesc();

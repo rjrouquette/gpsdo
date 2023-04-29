@@ -8,16 +8,12 @@
 #include <stdbool.h>
 #include "src.h"
 
-#define PEER_BURST_SIZE (4)
-#define PEER_BURST_RETRIES (2)
 #define PEER_RESPONSE_TIMEOUT (0x80000000ull) // 500 ms
-#define PEER_MIN_POLL (4)
+#define PEER_MIN_POLL (2)
 #define PEER_MAX_POLL (6)
 
 struct NtpPeer {
     struct NtpSource source;
-
-    struct NtpPollSample burstSamples[PEER_BURST_SIZE];
 
     // packet timestamps
     uint64_t local_tx_hw[3];

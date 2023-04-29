@@ -54,6 +54,7 @@ struct NtpSource {
     float delayMean;
     float delayStdDev;
     // frequency stats
+    int freqUsed;
     float freqDrift;
     float freqSkew;
     // overall score
@@ -71,5 +72,7 @@ void NtpSource_incr(NtpSource *this);
 void NtpSource_update(NtpSource *this);
 
 void NtpSource_updateStatus(NtpSource *this);
+
+void NtpSource_applyOffset(NtpSource *this, int64_t offset);
 
 #endif //GPSDO_SRC_H

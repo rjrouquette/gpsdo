@@ -33,7 +33,7 @@ static NtpPeer peerSlots[MAX_NTP_PEERS];
 // allocate new peer
 static NtpSource* ntpAllocPeer();
 // deallocate peer
-static void ntpDeallocatePeer(NtpSource *peer);
+static void ntpRemovePeer(NtpSource *peer);
 
 static NtpSource * volatile sources[MAX_NTP_SRCS];
 static volatile uint32_t cntSources = 0;
@@ -238,6 +238,15 @@ static void ntpResponse(uint8_t *frame, int flen) {
     }
 }
 
+static void ntpSetTaiClock(int64_t offset) {
+    CLK_TAI_adjust(offset);
+    for(int i = 0; i < cntSources; i++) {
+        NtpSource *source = sources[i];
+        if(source == NULL) continue;
+        NtpSource_applyOffset(source, offset);
+    }
+}
+
 static void ntpMain() {
     // periodically attempt to fill empty source slots
     uint32_t now = CLK_MONO_INT();
@@ -263,7 +272,7 @@ static void ntpMain() {
         if(sources[i]->mode == RPY_SD_MD_REF)
             continue;
         if(sources[i]->prune) {
-            ntpDeallocatePeer(sources[i]);
+            ntpRemovePeer(sources[i]);
             break;
         }
     }
@@ -293,7 +302,7 @@ static void ntpMain() {
     rootDispersion = source->rootDispersion + (uint16_t) (0x1p16f * source->delayStdDev);
 
     // adjust frequency compensation
-    if(source->freqSkew < 25e-6f) {
+    if(source->freqUsed > 4 && source->freqSkew < 25e-6f) {
         int32_t comp = CLK_COMP_getComp();
         comp += (int32_t) (0x1p24f * source->freqDrift);
         CLK_COMP_setComp(comp);
@@ -302,7 +311,7 @@ static void ntpMain() {
     // adjust TAI alignment
     int64_t lastOffset = source->pollSample[source->samplePtr].offset;
     if(source->offsetMean > 0.25f) {
-        CLK_TAI_adjust(lastOffset);
+        ntpSetTaiClock(lastOffset);
     }
     else {
         if(fabsf(source->offsetMean) > 100e-6f)
@@ -329,20 +338,21 @@ volatile static struct NtpSource* ntpAllocPeer() {
     return NULL;
 }
 
-static void ntpDeallocatePeer(NtpSource *peer) {
+static void ntpRemovePeer(NtpSource *peer) {
     peer->id = 0;
     uint32_t slot = -1u;
     for(uint32_t i = 0; i < cntSources; i++) {
         if(sources[i] == peer) slot = i;
     }
     if(slot > cntSources) return;
-    // remove source from source list
+    // compact source list
+    while(++slot < cntSources)
+        sources[slot-1] = sources[slot];
+    // clear unused slots
+    while(slot < MAX_NTP_SRCS)
+        sources[slot++] = NULL;
+    // reduce source count
     --cntSources;
-    for(uint32_t i = slot; i < cntSources; i++)
-        sources[i] = sources[i+1];
-    // clear empty slots
-    for(uint32_t i = cntSources; i < MAX_NTP_SRCS; i++)
-        sources[i] = NULL;
 }
 
 static void ntpDnsCallback(void *ref, uint32_t addr) {

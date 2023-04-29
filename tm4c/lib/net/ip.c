@@ -10,7 +10,7 @@
 volatile uint32_t ipBroadcast = 0;
 volatile uint32_t ipAddress = 0;
 volatile uint32_t ipSubnet = -1;
-volatile uint32_t ipGateway = 0;
+volatile uint32_t ipRouter = 0;
 volatile uint32_t ipDNS = 0;
 
 void IPv4_process(uint8_t *frame, int flen) {

@@ -18,7 +18,6 @@
 #define DNS_SERVER_PORT (53)
 #define MAX_REQUESTS (16)
 #define REQUEST_EXPIRE (5)
-#define ARP_MAX_AGE (300)
 
 struct PACKED HEADER_DNS {
     uint16_t id;
@@ -64,17 +63,21 @@ void DNS_init() {
 }
 
 static void callbackARP(void *ref, uint32_t remoteAddress, uint8_t *macAddress) {
-    if(isNullMAC(macAddress)) {
+    if(remoteAddress == ipDNS) {
         // retry if request timed-out
-        DNS_updateMAC();
+        if (isNullMAC(macAddress))
+            DNS_updateMAC();
+        else
+            copyMAC(dnsMAC, macAddress);
     }
-    else if(remoteAddress == ipDNS)
-        copyMAC(dnsMAC, macAddress);
 }
 
 void DNS_updateMAC() {
-    ARP_request(ipDNS, callbackARP, NULL);
     lastArp = CLK_MONO_INT();
+    if(IPv4_testSubnet(ipSubnet, ipAddress, ipDNS))
+        copyMAC(dnsMAC, macRouter);
+    else
+        ARP_request(ipDNS, callbackARP, NULL);
 }
 
 int DNS_lookup(const char *hostname, CallbackDNS callback, volatile void *ref) {

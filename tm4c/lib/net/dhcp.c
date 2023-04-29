@@ -8,9 +8,10 @@
 #include "../../hw/sys.h"
 #include "../clk/mono.h"
 #include "../net.h"
-#include "eth.h"
+#include "arp.h"
 #include "dhcp.h"
 #include "dns.h"
+#include "eth.h"
 #include "ip.h"
 #include "udp.h"
 #include "util.h"
@@ -294,7 +295,8 @@ static void processFrame(uint8_t *frame, int flen) {
             memcpy(&addr, optRouter + i, sizeof(addr));
             // the router subnet must match our own
             if(!IPv4_testSubnet(ipSubnet, ipAddress, addr)) {
-                ipGateway = addr;
+                ipRouter = addr;
+                ARP_refreshRouter();
                 break;
             }
         }

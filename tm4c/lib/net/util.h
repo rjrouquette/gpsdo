@@ -14,6 +14,6 @@ int isNullMAC(const volatile void *mac);
 void copyMAC(volatile void *dst, volatile const void *src);
 
 char* addrToStr(uint32_t addr, char *str);
-char* macToStr(uint8_t *mac, char *str);
+char* macToStr(const volatile uint8_t *mac, volatile char *str);
 
 #endif //GPSDO_UTIL_H

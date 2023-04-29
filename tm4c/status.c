@@ -15,6 +15,7 @@
 #include "lib/gps.h"
 #include "lib/led.h"
 #include "lib/net.h"
+#include "lib/net/arp.h"
 #include "lib/net/eth.h"
 #include "lib/net/ip.h"
 #include "lib/net/udp.h"
@@ -296,6 +297,12 @@ unsigned statusETH(char *body) {
     end = append(end, tmp);
     end = append(end, "\n");
 
+    // mac router
+    macToStr(macRouter, tmp);
+    end = append(end, "mac router: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
     // ip address
     end = append(end, "ip address: ");
     end = addrToStr(ipAddress, end);
@@ -312,8 +319,8 @@ unsigned statusETH(char *body) {
     end = append(end, "\n");
 
     // ip address
-    end = append(end, "ip gateway: ");
-    end = addrToStr(ipGateway, end);
+    end = append(end, "ip router: ");
+    end = addrToStr(ipRouter, end);
     end = append(end, "\n");
 
     // ip address

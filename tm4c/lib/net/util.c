@@ -27,7 +27,7 @@ void broadcastMAC(volatile void *_mac) {
 }
 
 int isNullMAC(const volatile void *_mac) {
-    uint8_t *mac = (uint8_t *)_mac;
+    const uint8_t *mac = (uint8_t *)_mac;
     if(mac[0] != 0) return 0;
     if(mac[1] != 0) return 0;
     if(mac[2] != 0) return 0;
@@ -39,7 +39,7 @@ int isNullMAC(const volatile void *_mac) {
 
 void copyMAC(volatile void *_dst, volatile const void *_src) {
     uint8_t *dst = (uint8_t *)_dst;
-    uint8_t *src = (uint8_t *)_src;
+    const uint8_t *src = (uint8_t *)_src;
     dst[0] = src[0];
     dst[1] = src[1];
     dst[2] = src[2];
@@ -60,11 +60,11 @@ char* addrToStr(uint32_t addr, char *str) {
     return str;
 }
 
-char* macToStr(uint8_t *mac, char *str) {
+char* macToStr(const volatile uint8_t *mac, volatile char *str) {
     for(int i = 0; i < 6; i++) {
-        str += toHex(mac[i], 2, '0', str);
+        str += toHex(mac[i], 2, '0', (char *) str);
         *(str++) = ':';
     }
     str[-1] = 0;
-    return str - 1;
+    return (char *) (str - 1);
 }

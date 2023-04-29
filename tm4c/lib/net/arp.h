@@ -11,6 +11,8 @@
 #define PACKED __attribute__((packed))
 #endif
 
+#define ARP_MAX_AGE (64) // refresh old MAC addresses
+
 #define ARP_OP_REQUEST (0x0100)
 #define ARP_OP_REPLY (0x0200)
 
@@ -31,9 +33,12 @@ _Static_assert(sizeof(struct PAYLOAD_ARP_IP4) == 28, "PAYLOAD_ARP_IP4 must be 28
 
 typedef void (*CallbackARP)(void *ref, uint32_t remoteAddress, uint8_t *macAddress);
 
+extern volatile uint8_t macRouter[6];
+
 void ARP_announce();
 void ARP_run();
 void ARP_process(uint8_t *frame, int flen);
 int ARP_request(uint32_t remoteAddress, CallbackARP callback, volatile void *ref);
+void ARP_refreshRouter();
 
 #endif //GPSDO_ARP_H

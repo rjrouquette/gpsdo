@@ -22,11 +22,9 @@ void NtpSource_update(NtpSource *this) {
     this->lastOffset = this->lastOffsetOrig;
     this->lastDelay = sample->delay;
 
-    int j = head - this->sampleCount + 1;
-    if (j < 0) j += NTP_MAX_HISTORY;
-    uint32_t span = sample->comp >> 32;
-    span -= this->pollSample[j].comp >> 32;
-    this->span = (int) span;
+    // compute time spanned by samples
+    int j = (head - (this->sampleCount - 1)) & (NTP_MAX_HISTORY - 1);
+    this->span = (int) ((sample->comp - this->pollSample[j].comp) >> 32);
 
     // convert offsets to floats
     int index[NTP_MAX_HISTORY];
@@ -69,19 +67,36 @@ void NtpSource_update(NtpSource *this) {
     this->offsetStdDev = sqrtf(var);
 
     // analyse clock drift
-    float drift[cnt - 1];
-    for (int i = 0; i < cnt - 1; i++) {
+    --cnt;
+    float drift[cnt];
+    for (int i = 0; i < cnt; i++) {
         NtpPollSample *current = this->pollSample + index[i];
         NtpPollSample *previous = this->pollSample + index[i+1];
 
+        // all three deltas are required to isolate drift from offset adjustments
         int64_t a = (int64_t) (current->tai - previous->tai);
         int64_t b = (int64_t) (current->comp - previous->comp);
         int64_t c = (int64_t) (current->offset - previous->offset);
         drift[i] = toFloat(c + a - b) / toFloat(b);
     }
     // compute mean and variance
-    getMeanVar(cnt - 1, drift, &mean, &var);
+    getMeanVar(cnt, drift, &mean, &var);
+    // exclude outliers
+    limit = var * 4;
+    j = 0;
+    for (int i = 0; i < cnt; i++) {
+        float diff = drift[i] - mean;
+        if((diff * diff) < limit) {
+            drift[j] = drift[i];
+            ++j;
+        }
+    }
+    cnt = j;
+    // recompute mean and variance
+    if(cnt > 0)
+        getMeanVar(cnt, drift, &mean, &var);
     // set frequency status
+    this->freqUsed = cnt;
     this->freqDrift = mean;
     this->freqSkew = sqrtf(var);
     // set overall score
@@ -95,16 +110,28 @@ void NtpSource_update(NtpSource *this) {
     this->lastUpdate = CLK_MONO();
 }
 
-static void getMeanVar(int cnt, const float *v, float *mean, float *var) {
-    float _mean = 0, _var = 0;
+static void getMeanVar(const int cnt, const float *v, float *mean, float *var) {
+    // return zeros if count is less than one
+    if(cnt < 1) {
+        *mean = 0;
+        *var = 0;
+        return;
+    }
+
+    // compute the mean
+    float _mean = 0;
     for(int k = 0; k < cnt; k++)
         _mean += v[k];
     _mean /= (float) cnt;
+
+    // compute the variance
+    float _var = 0;
     for(int k = 0; k < cnt; k++) {
         float diff = v[k] - _mean;
         _var += diff * diff;
     }
-    _var /= (float) cnt;
+    _var /= (float) (cnt - 1);
+
     // return result
     *mean = _mean;
     *var = _var;
@@ -126,7 +153,7 @@ void NtpSource_updateStatus(NtpSource *this) {
             (this->reach & 0xFF) == 0xFF &&
             this->pollCounter >= 8 &&
             this->poll < this->maxPoll
-            ) {
+    ) {
         // increase poll interval (increase update rate)
         ++this->poll;
         this->pollCounter = 0;
@@ -135,7 +162,7 @@ void NtpSource_updateStatus(NtpSource *this) {
             (this->reach & 0xF) == 0 &&
             this->pollCounter >= 4 &&
             this->poll > this->minPoll
-            ) {
+    ) {
         // decrease poll interval (increase update rate)
         --this->poll;
         this->pollCounter = 0;
@@ -145,4 +172,11 @@ void NtpSource_updateStatus(NtpSource *this) {
 
     // mark source for pruning if it is unreachable
     this->prune = (this->reach == 0 && this->pollCounter >= 16);
+}
+
+void NtpSource_applyOffset(NtpSource *this, int64_t offset) {
+    for (int i = 0; i < NTP_MAX_HISTORY; i++) {
+        this->pollSample[i].tai += offset;
+        this->pollSample[i].offset -= offset;
+    }
 }
