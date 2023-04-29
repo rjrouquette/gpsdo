@@ -76,7 +76,7 @@ void STATUS_process(uint8_t *frame, int flen) {
     char *body = (char *) (headerUDP + 1);
     // force null termination
     body[size] = 0;
-    if(strncmp(body, "clock", 6) == 0 && hasTerminus(body, 8)) {
+    if(strncmp(body, "clock", 5) == 0 && hasTerminus(body, 8)) {
         size = statusClock(body);
     } else if(strncmp(body, "eeprom", 6) == 0 && hasTerminus(body, 8)) {
         size = statusEEPROM((int) fromHex(body + 6, 2), body);

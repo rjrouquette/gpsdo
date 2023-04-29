@@ -53,6 +53,7 @@ add_executable(
         lib/net/util.c
         lib/ntp/ntp.c
         lib/ntp/peer.c
+        lib/ntp/pll.c
         lib/ntp/ref.c
         lib/ntp/src.c
         lib/rand.c

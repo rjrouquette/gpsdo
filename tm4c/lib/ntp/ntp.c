@@ -20,6 +20,7 @@
 #include "ntp.h"
 #include "peer.h"
 #include "ref.h"
+#include "pll.h"
 
 #define NTP_TS_PREC (-24)
 #define MAX_NTP_PEERS (8)
@@ -72,6 +73,14 @@ static void ntpResponse(uint8_t *frame, int flen);
 static void ntpMain();
 static void ntpDnsCallback(void *ref, uint32_t addr);
 
+// called by PLL for hard TAI adjustments
+void ntpApplyOffset(int64_t offset) {
+    for(int i = 0; i < cntSources; i++) {
+        NtpSource *source = sources[i];
+        if(source == NULL) continue;
+        NtpSource_applyOffset(source, offset);
+    }
+}
 
 void NTP_init() {
     UDP_register(NTP_PORT_SRV, ntpRequest);
@@ -238,15 +247,6 @@ static void ntpResponse(uint8_t *frame, int flen) {
     }
 }
 
-static void ntpSetTaiClock(int64_t offset) {
-    CLK_TAI_adjust(offset);
-    for(int i = 0; i < cntSources; i++) {
-        NtpSource *source = sources[i];
-        if(source == NULL) continue;
-        NtpSource_applyOffset(source, offset);
-    }
-}
-
 static void ntpMain() {
     // periodically attempt to fill empty source slots
     uint32_t now = CLK_MONO_INT();
@@ -301,25 +301,12 @@ static void ntpMain() {
     rootDelay = source->rootDelay + (uint16_t) (0x1p16f * source->delayMean);
     rootDispersion = source->rootDispersion + (uint16_t) (0x1p16f * source->delayStdDev);
 
+    // adjust offset compensation
+    float rmsOffset = sqrtf((source->offsetMean * source->offsetMean) + (source->offsetStdDev * source->offsetStdDev));
+    PLL_updateOffset(source->poll, source->pollSample[source->samplePtr].offset, rmsOffset);
     // adjust frequency compensation
     if(source->freqUsed > 4 && source->freqSkew < 25e-6f) {
-        int32_t comp = CLK_COMP_getComp();
-        comp += (int32_t) (0x1p24f * source->freqDrift);
-        CLK_COMP_setComp(comp);
-    }
-
-    // adjust TAI alignment
-    int64_t lastOffset = source->pollSample[source->samplePtr].offset;
-    if(source->offsetMean > 0.25f) {
-        ntpSetTaiClock(lastOffset);
-    }
-    else {
-        if(fabsf(source->offsetMean) > 100e-6f)
-            CLK_TAI_align((int32_t) lastOffset);
-        else {
-            CLK_TAI_align(((int32_t) lastOffset) >> 4);
-            CLK_TAI_setTrim(((int32_t) lastOffset) >> 5);
-        }
+        PLL_updateDrift(source->poll, source->freqDrift);
     }
 }
 
