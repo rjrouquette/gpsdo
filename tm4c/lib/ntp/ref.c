@@ -27,6 +27,7 @@ static void NtpGPS_run(volatile void *pObj) {
         if(((int64_t)(now - this->lastPoll)) > 0x100000000ull) {
             this->lastPoll = now;
             this->source.reach <<= 1;
+            ++this->source.txCount;
         }
         return;
     }
@@ -37,6 +38,9 @@ static void NtpGPS_run(volatile void *pObj) {
 
     // update reach indicator
     this->source.reach = (this->source.reach << 1) | 1;
+    ++this->source.rxCount;
+    ++this->source.rxValid;
+    ++this->source.txCount;
 
     // update TAI/UTC offset
     union fixed_32_32 scratch;
@@ -76,6 +80,7 @@ void NtpGPS_init(volatile void *pObj) {
     // set id to "GPS"
     this->source.id = 0x00535047;
     this->source.state = RPY_SD_ST_UNSELECTED;
+    this->source.precision = -28;
     // one second poll interval
     this->source.poll = 0;
 }

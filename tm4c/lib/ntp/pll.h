@@ -7,10 +7,13 @@
 
 #include <stdint.h>
 
+#define PLL_MAX_FREQ_TRIM (0x00200000)
+#define PLL_MIN_FREQ_TRIM (-0x00200000)
+
 #define PLL_OFFSET_HARD_ALIGN (0x00400000) //  0.976 ms
 #define PLL_OFFSET_CORR_BASIS (256e-9f) // unity rate threshold
 #define PLL_OFFSET_CORR_MAX (0xfp-4f) // 0.9375
-#define PLL_OFFSET_INT_RATE (0x1p-6f) // relative integration rate
+#define PLL_OFFSET_INT_RATE (6) // relative integration rate (log2 of divisor)
 
 #define PLL_DRIFT_INT_RATE (0x1p-8f)
 

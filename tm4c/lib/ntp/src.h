@@ -27,6 +27,9 @@ struct NtpSource {
     uint32_t ref_id;
     uint32_t rootDelay;
     uint32_t rootDispersion;
+    uint32_t rxCount;
+    uint32_t rxValid;
+    uint32_t txCount;
     uint16_t mode;
     uint16_t state;
     uint16_t reach;
@@ -35,6 +38,9 @@ struct NtpSource {
     uint16_t pollCounter;
     int16_t minPoll;
     int16_t maxPoll;
+    int8_t precision;
+    uint8_t leap;
+    uint8_t version;
 
     // filter state
     struct NtpPollSample pollSample[NTP_MAX_HISTORY];

@@ -22,7 +22,7 @@
 #include "ref.h"
 #include "pll.h"
 
-#define NTP_TS_PREC (-24)
+#define NTP_TS_PREC (-25)
 #define MAX_NTP_PEERS (8)
 #define MAX_NTP_SRCS (9)
 #define MIN_DNS_INTV (16) // 16 seconds
@@ -98,6 +98,10 @@ void NTP_init() {
 }
 
 void NTP_run() {
+    // wait for hardware time synchronization
+    if(clkMonoEth == 0)
+        return;
+
     if(runNext < cntSources) {
         NtpSource *source = sources[runNext++];
         (*(source->run))(source);
@@ -372,6 +376,7 @@ static void ntpDnsCallback(void *ref, uint32_t addr) {
 #define REP_LEN_SOURCEDATA (offsetof(CMD_Reply, data.source_data.EOR))
 #define REP_LEN_SOURCESTATS (offsetof(CMD_Reply, data.sourcestats.EOR))
 #define REP_LEN_TRACKING (offsetof(CMD_Reply, data.tracking.EOR))
+#define REP_LEN_NTP_DATA (offsetof(CMD_Reply, data.ntp_data.EOR))
 
 // replicate htons() function
 __attribute__((always_inline))
@@ -392,8 +397,9 @@ static uint16_t chronycNSources(CMD_Reply *cmdReply, const CMD_Request *cmdReque
 static uint16_t chronycSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
 static uint16_t chronycSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
 static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
+static uint16_t chronycNtpData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
 
-#define CHRONYC_HANDLER_CNT (4)
+#define CHRONYC_HANDLER_CNT (5)
 static const struct {
     uint16_t (*call) (CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
     int len;
@@ -402,7 +408,8 @@ static const struct {
         { chronycNSources, REP_LEN_NSOURCES, REQ_N_SOURCES },
         { chronycSourceData, REP_LEN_SOURCEDATA, REQ_SOURCE_DATA },
         { chronycSourceStats, REP_LEN_SOURCESTATS, REQ_SOURCESTATS },
-        { chronycTracking, REP_LEN_TRACKING, REQ_TRACKING }
+        { chronycTracking, REP_LEN_TRACKING, REQ_TRACKING },
+        { chronycNtpData, REP_LEN_NTP_DATA, REQ_NTP_DATA }
 };
 
 static void chronycRequest(uint8_t *frame, int flen) {
@@ -581,6 +588,55 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
     cmdReply->data.tracking.root_dispersion.f = htonf(0x1p-16f * (float) rootDispersion);
 
     cmdReply->data.tracking.last_update_interval.f = htonf(source ? (0x1p-16f * (float) (1u << (16 + source->poll))) : 0);
+    return htons(STT_SUCCESS);
+}
+
+static uint16_t chronycNtpData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
+    cmdReply->reply = htons(RPY_NTP_DATA);
+
+    // must be an IPv4 address
+    if(cmdRequest->data.ntp_data.ip_addr.family != htons(IPADDR_INET4))
+        return htons(STT_NOSUCHSOURCE);
+
+    // locate server
+    uint32_t addr = cmdRequest->data.ntp_data.ip_addr.addr.in4;
+    NtpSource *source = NULL;
+    for(int i = 0; i < cntSources; i++) {
+        if(sources[i]->mode != RPY_SD_MD_CLIENT)
+            continue;
+        if(sources[i]->id == addr) {
+            source = sources[i];
+            break;
+        }
+    }
+    if(source == NULL)
+        return htons(STT_NOSUCHSOURCE);
+
+    cmdReply->data.ntp_data.local_addr.family = htons(IPADDR_INET4);
+    cmdReply->data.ntp_data.local_addr.addr.in4 = ipAddress;
+    cmdReply->data.ntp_data.remote_addr.family = htons(IPADDR_INET4);
+    cmdReply->data.ntp_data.remote_addr.addr.in4 = source->id;
+    cmdReply->data.ntp_data.remote_port = htons(NTP_PORT_SRV);
+    cmdReply->data.ntp_data.mode = source->mode;
+    cmdReply->data.ntp_data.version = source->version;
+    cmdReply->data.ntp_data.stratum = source->stratum;
+    cmdReply->data.ntp_data.leap = source->leap;
+    cmdReply->data.ntp_data.precision = source->precision;
+    cmdReply->data.ntp_data.poll = (int8_t) source->poll;
+    cmdReply->data.ntp_data.ref_id = source->ref_id;
+    cmdReply->data.ntp_data.offset.f = htonf(source->lastOffset);
+    cmdReply->data.ntp_data.root_delay.f = htonf(0x1p-16f * (float) source->rootDelay);
+    cmdReply->data.ntp_data.root_dispersion.f = htonf(0x1p-16f * (float) source->rootDispersion);
+    cmdReply->data.ntp_data.peer_delay.f = htonf(source->delayMean);
+    cmdReply->data.ntp_data.peer_dispersion.f = htonf(source->offsetStdDev);
+    cmdReply->data.ntp_data.jitter_asymmetry.f = 0;
+    cmdReply->data.ntp_data.response_time.f = htonf(source->delayMean + source->delayStdDev);
+    cmdReply->data.ntp_data.rx_tss_char = 'H';
+    cmdReply->data.ntp_data.tx_tss_char = 'H';
+    cmdReply->data.ntp_data.total_rx_count = htonl(source->rxCount);
+    cmdReply->data.ntp_data.total_tx_count = htonl(source->txCount);
+    cmdReply->data.ntp_data.total_valid_count = htonl(source->rxValid);
+
     return htons(STT_SUCCESS);
 }
 

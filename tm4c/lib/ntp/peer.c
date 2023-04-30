@@ -126,6 +126,7 @@ static void sendPoll(NtpPeer *this) {
     NET_setTxCallback(txDesc, txCallback, this);
 
     // transmit request
+    ++this->source.txCount;
     UDP_finalize(frame, NTP4_SIZE);
     IPv4_finalize(frame, NTP4_SIZE);
     NET_transmit(txDesc, NTP4_SIZE);
@@ -249,6 +250,7 @@ void NtpPeer_init(volatile void *pObj) {
 void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     // typecast "this" pointer
     NtpPeer *this = (NtpPeer *) pObj;
+    ++this->source.rxCount;
 
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
@@ -270,10 +272,15 @@ void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     this->source.reach |= 1;
     // set stratum
     this->source.stratum = headerNTP->stratum;
+    this->source.leap = headerNTP->status;
+    this->source.precision = headerNTP->precision;
+    this->source.version = headerNTP->version;
     // set remote timestamps
     this->remote_rx = headerNTP->rxTime;
     this->remote_tx = headerNTP->txTime;
     // set root metrics
     this->source.rootDelay = __builtin_bswap32(headerNTP->rootDelay);
     this->source.rootDispersion = __builtin_bswap32(headerNTP->rootDispersion);
+    // increment count of valid packets
+    ++this->source.rxValid;
 }
