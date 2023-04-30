@@ -56,6 +56,7 @@ add_executable(
         lib/ntp/pll.c
         lib/ntp/ref.c
         lib/ntp/src.c
+        lib/ntp/tcmp.c
         lib/rand.c
 )
 

@@ -9,8 +9,8 @@
 
 #define UPDATE_INTERVAL (7812500) // 16 Hz
 
-static uint32_t nextUpdate = 0;
-static uint8_t status = 0;
+static volatile uint32_t nextUpdate = 0;
+static volatile uint8_t status = 0;
 
 void LED_init() {
     // enable port

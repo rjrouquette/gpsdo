@@ -2,9 +2,11 @@
 // Created by robert on 4/29/23.
 //
 
+#include <math.h>
 #include "../clk/comp.h"
-#include "pll.h"
 #include "../clk/tai.h"
+#include "pll.h"
+#include "tcmp.h"
 
 // PLL proportional terms
 volatile int32_t offsetProportion;
@@ -12,6 +14,42 @@ volatile int32_t offsetProportion;
 // PLL integral terms
 volatile int32_t offsetIntegral;
 volatile int32_t driftIntegral;
+
+// Temperature Compensation State
+volatile float tcompCurrent;
+volatile float tcompPrior;
+volatile int32_t driftComp;
+
+void PLL_init() {
+    TCMP_init();
+
+    tcompCurrent = TCMP_get();
+    tcompPrior = tcompCurrent;
+    driftComp = (int32_t) (0x1p32f * tcompCurrent);
+    CLK_COMP_setComp(driftComp + driftIntegral);
+}
+
+void PLL_run() {
+    TCMP_run();
+
+    // get current tcomp value and compute delta
+    tcompCurrent = TCMP_get();
+    float tcompDelta = tcompCurrent - tcompPrior;
+    tcompPrior = tcompCurrent;
+
+    // apply tcomp update
+    if (tcompDelta != 0) {
+        if (fabsf(tcompDelta) > 100e-9f) {
+            int32_t driftNew = (int32_t) (0x1p32f * tcompCurrent);
+            driftIntegral -= driftNew - driftComp;
+            driftComp = driftNew;
+        } else {
+            driftComp = (int32_t) (0x1p32f * tcompCurrent);
+        }
+        CLK_COMP_setComp(driftComp + driftIntegral);
+    }
+}
+
 
 // from ntp.c
 void ntpApplyOffset(int64_t offset);
@@ -59,5 +97,5 @@ void PLL_updateDrift(int interval, float drift) {
     // limit integration range
     if(driftIntegral > PLL_MAX_FREQ_TRIM) driftIntegral = PLL_MAX_FREQ_TRIM;
     if(driftIntegral < PLL_MIN_FREQ_TRIM) driftIntegral = PLL_MIN_FREQ_TRIM;
-    CLK_COMP_setComp(driftIntegral);
+    CLK_COMP_setComp(driftComp + driftIntegral);
 }

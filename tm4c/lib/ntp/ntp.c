@@ -83,6 +83,8 @@ void ntpApplyOffset(int64_t offset) {
 }
 
 void NTP_init() {
+    PLL_init();
+
     UDP_register(NTP_PORT_SRV, ntpRequest);
     UDP_register(NTP_PORT_CLI, ntpResponse);
     // listen for crony status requests
@@ -98,6 +100,8 @@ void NTP_init() {
 }
 
 void NTP_run() {
+    PLL_run();
+
     // wait for hardware time synchronization
     if(clkMonoEth == 0)
         return;
