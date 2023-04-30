@@ -90,6 +90,9 @@ void PLL_updateOffset(int interval, int64_t offset, float rmsOffset) {
 }
 
 void PLL_updateDrift(int interval, float drift) {
+    // update temperature compensation
+    TCMP_update(drift + (0x1p-32f * (float) CLK_COMP_getComp()));
+
 //    if(interval < 0) interval = 0;
 //    float rate = 0x1p-16f * (float) (1 << (16 - interval));
 //    driftIntegral += (int32_t) (0x1p32f * PLL_DRIFT_INT_RATE * rate * drift);
