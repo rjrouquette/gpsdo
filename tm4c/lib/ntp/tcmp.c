@@ -154,7 +154,7 @@ unsigned TCMP_status(char *buffer) {
     end = append(end, "tcomp status:\n");
 
     tmp[fmtFloat(tempValue, 12, 4, tmp)] = 0;
-    end = append(end, "  - temp: " );
+    end = append(end, "  - temp:  " );
     end = append(end, tmp);
     end = append(end, " C\n");
 
