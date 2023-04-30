@@ -30,7 +30,7 @@ static int checkMac(NtpPeer *this);
 static void sendPoll(NtpPeer *this);
 static void startPoll(NtpPeer *this);
 static void runPoll(NtpPeer *this);
-static void promoteSample(NtpPeer *this);
+static void finishPoll(NtpPeer *this);
 
 
 static uint64_t avg64(uint64_t a, uint64_t b) {
@@ -108,22 +108,28 @@ static void sendPoll(NtpPeer *this) {
     headerNTP->mode = 3;
     headerNTP->poll = this->source.poll;
     // set stratum and precision
-    headerNTP->stratum = 0;//clockStratum;
-    headerNTP->precision = -32;//NTP_;
+    headerNTP->stratum = 16;
+    headerNTP->precision = -25;
     // set reference ID
-    headerNTP->refID = 0;//refId;
+    headerNTP->refID = 0;
     // set reference timestamp
-    headerNTP->refTime = 0;//__builtin_bswap64(ntpModified());
-    // set origin timestamp
-    headerNTP->origTime = this->remote_tx;
-    // set rx time timestamp
-    headerNTP->rxTime = __builtin_bswap64((this->local_rx_hw[2] - clkTaiUtcOffset) + NTP_UTC_OFFSET);
-    // set TX time
-    uint64_t txTime = __builtin_bswap64((CLK_TAI() - clkTaiUtcOffset) + NTP_UTC_OFFSET);
-    headerNTP->txTime = txTime;
-    this->local_tx = txTime;
-
-    NET_setTxCallback(txDesc, txCallback, this);
+    headerNTP->refTime = 0;
+    if(this->pollXleave) {
+        // interleaved timestamp chaining
+        headerNTP->origTime = this->remote_rx;
+        headerNTP->rxTime = this->local_rx_hw[0];
+        headerNTP->txTime = this->local_tx_hw[0];
+    } else {
+        // standard timestamp chaining
+        headerNTP->origTime = this->remote_tx;
+        headerNTP->rxTime = __builtin_bswap64((this->local_rx_hw[2] - clkTaiUtcOffset) + NTP_UTC_OFFSET);
+        // set provisional TX time (actual value in unimportant, only need to be unique)
+        uint64_t txTime = CLK_MONO();
+        headerNTP->txTime = txTime;
+        this->local_tx = txTime;
+        // set callback for tx timestamp
+        NET_setTxCallback(txDesc, txCallback, this);
+    }
 
     // transmit request
     ++this->source.txCount;
@@ -149,6 +155,7 @@ static void startPoll(NtpPeer *this) {
     this->pollActive = true;
     this->pollBurst = 0xFF;
     this->pollRetry = 0;
+    this->pollXleave = false;
     this->local_tx = 0;
 }
 
@@ -171,33 +178,23 @@ static void runPoll(NtpPeer *this) {
     // receive packet
     if(this->pktRecv) {
         this->pktRecv = false;
-        // translate remote timestamps
-        uint64_t remote_rx = __builtin_bswap64(this->remote_rx) + clkTaiUtcOffset - NTP_UTC_OFFSET;
-        uint64_t remote_tx = __builtin_bswap64(this->remote_tx) + clkTaiUtcOffset - NTP_UTC_OFFSET;
-
-
-        // advance sample buffer
-        NtpSource_incr(&this->source);
-        // set current sample
-        NtpPollSample *sample = this->source.pollSample + this->source.samplePtr;
-        // set compensated reference time
-        sample->comp = avg64(this->local_tx_hw[1], this->local_rx_hw[1]);
-        // set TAI reference time
-        sample->tai = avg64(this->local_tx_hw[2], this->local_rx_hw[2]);
-        // compute TAI offset
-        uint64_t offset = avg64(remote_rx, remote_tx) - sample->tai;
-        sample->offset = (int64_t) offset;
-        // compute delay (use compensated clock for best accuracy)
-        int64_t delay = (int64_t) ((this->local_tx_hw[1] - this->local_rx_hw[1]) - (remote_rx - remote_tx));
-        sample->delay = 0x1p-31f * (float) (int32_t) (delay >> 2);
-
-        // update filter
-        NtpSource_update(&this->source);
-        // burst complete
-        this->pollActive = false;
+        // send followup interleaved request for local timeservers
+        if(!this->pollXleave && !IPv4_testSubnet(ipSubnet, ipAddress, this->source.id)) {
+            this->pollXleave = true;
+            sendPoll(this);
+            return;
+        }
+        // complete poll
+        finishPoll(this);
     } else {
         uint64_t now = CLK_MONO();
         if((now - this->pollStart) > PEER_RESPONSE_TIMEOUT) {
+            // fallback to original response if we were waiting for an interleaved followup
+            if(this->pollXleave) {
+                this->source.xleave = false;
+                // complete poll
+                finishPoll(this);
+            }
             // response timeout
             this->pollActive = false;
         }
@@ -208,6 +205,35 @@ static void runPoll(NtpPeer *this) {
         // update status
         NtpSource_updateStatus(&(this->source));
     }
+}
+
+static void finishPoll(NtpPeer *this) {
+    // translate remote timestamps
+    uint64_t remote_rx = __builtin_bswap64(this->remote_rx) + clkTaiUtcOffset - NTP_UTC_OFFSET;
+    uint64_t remote_tx = __builtin_bswap64(this->remote_tx) + clkTaiUtcOffset - NTP_UTC_OFFSET;
+
+    // advance sample buffer
+    NtpSource_incr(&this->source);
+    // set current sample
+    NtpPollSample *sample = this->source.pollSample + this->source.samplePtr;
+    // set compensated reference time
+    sample->comp = avg64(this->local_tx_hw[1], this->local_rx_hw[1]);
+    // set TAI reference time
+    sample->tai = avg64(this->local_tx_hw[2], this->local_rx_hw[2]);
+    // compute TAI offset
+    uint64_t offset = avg64(remote_rx, remote_tx) - sample->tai;
+    sample->offset = (int64_t) offset;
+    // compute delay (use compensated clock for best accuracy)
+    uint64_t responseTime = remote_tx - remote_rx;
+    int64_t delay = (int64_t) ((this->local_rx_hw[1] - this->local_tx_hw[1]) - responseTime);
+    sample->delay = 0x1p-31f * (float) (int32_t) (delay >> 2);
+    // set response time
+    this->source.responseTime = toFloat((int64_t) responseTime);
+
+    // update filter
+    NtpSource_update(&this->source);
+    // poll complete
+    this->pollActive = false;
 }
 
 
@@ -259,12 +285,38 @@ void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
     // drop unsolicited packets
+    if(headerNTP->origTime == 0)
+        return;
+
+    // check for interleaved response
+    if(this->pollXleave) {
+        // discard non-interleaved packets
+        if(headerNTP->origTime == this->local_tx_hw[0]) {
+            // packet received, but it was not interleaved
+            this->pktRecv = true;
+            this->source.xleave = false;
+            return;
+        }
+        // discard unsolicited packets
+        if(headerNTP->origTime != this->local_rx_hw[0])
+            return;
+        // replace remote TX timestamp with updated value
+        this->local_tx = headerNTP->txTime;
+        // packet received, and it was interleaved
+        this->pktRecv = true;
+        this->source.xleave = true;
+        // increment count of valid packets
+        ++this->source.rxValid;
+        return;
+    }
+
+    // drop unsolicited packets
     if(headerNTP->origTime != this->local_tx)
         return;
-    // indicate packet received
-    this->pktRecv = true;
     // prevent reception of duplicate packets
     this->local_tx = 0;
+    // packet received
+    this->pktRecv = true;
     // set hardware timestamp
     NET_getRxTime(frame, this->local_rx_hw);
 
@@ -275,6 +327,8 @@ void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     this->source.leap = headerNTP->status;
     this->source.precision = headerNTP->precision;
     this->source.version = headerNTP->version;
+    this->source.refID = headerNTP->refID;
+    this->source.refTime = headerNTP->refTime;
     // set remote timestamps
     this->remote_rx = headerNTP->rxTime;
     this->remote_tx = headerNTP->txTime;

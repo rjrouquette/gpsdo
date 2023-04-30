@@ -23,13 +23,15 @@ struct NtpSource {
     void (*run)(volatile void *);
 
     uint64_t lastUpdate;
+    uint64_t refTime;
     uint32_t id;
-    uint32_t ref_id;
+    uint32_t refID;
     uint32_t rootDelay;
     uint32_t rootDispersion;
     uint32_t rxCount;
     uint32_t rxValid;
     uint32_t txCount;
+    float responseTime;
     uint16_t mode;
     uint16_t state;
     uint16_t reach;
@@ -67,6 +69,7 @@ struct NtpSource {
     float score;
 
     // status flags
+    bool xleave;
     bool prune;
     bool lost;
     bool unstable;

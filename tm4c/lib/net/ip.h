@@ -43,6 +43,13 @@ extern volatile uint32_t ipSubnet;
 extern volatile uint32_t ipRouter;
 extern volatile uint32_t ipDNS;
 
+/**
+ * Check IPv4 subnet co-membership
+ * @param subnetMask IPv4 subnet mask
+ * @param addrA IPv4 address
+ * @param addrB IPv4 address
+ * @return non-zero if addresses fall in different subnets
+ */
 __attribute__((always_inline))
 inline uint32_t IPv4_testSubnet(uint32_t subnetMask, uint32_t addrA, uint32_t addrB) {
     return (addrA ^ addrB) & subnetMask;

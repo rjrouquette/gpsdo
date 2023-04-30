@@ -20,6 +20,7 @@ struct NtpPeer {
     uint64_t local_tx;
     uint64_t remote_rx;
     uint64_t remote_tx;
+    uint64_t local_rx;
     uint64_t local_rx_hw[3];
 
     // state machine
@@ -30,6 +31,7 @@ struct NtpPeer {
     uint8_t pollBurst;
     uint8_t pollRetry;
     bool pollActive;
+    bool pollXleave;
     bool pktSent;
     bool pktRecv;
 
