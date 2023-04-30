@@ -185,17 +185,17 @@ unsigned PLL_status(char *buffer) {
 
     end = append(end, "drift status:\n");
 
-    tmp[fmtFloat(offsetMean * 1e6f, 12, 4, tmp)] = 0;
+    tmp[fmtFloat(driftMean * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - mean:  ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
-    tmp[fmtFloat(offsetStdDev * 1e6f, 12, 4, tmp)] = 0;
+    tmp[fmtFloat(driftStdDev * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - dev:   ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
-    tmp[fmtFloat(offsetRms * 1e6f, 12, 4, tmp)] = 0;
+    tmp[fmtFloat(driftRms * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - rms:   ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
