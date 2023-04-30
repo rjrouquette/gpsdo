@@ -300,14 +300,16 @@ static void ntpMain() {
     if(source == NULL) return;
     if(source->lastUpdate == lastUpdate) return;
     lastUpdate = source->lastUpdate;
-    if(source->used < 8) return;
 
     // set status
     refId = source->id;
     clockStratum = source->stratum + 1;
-    leapIndicator = 0;
-    rootDelay = source->rootDelay + (uint16_t) (0x1p16f * source->delayMean);
-    rootDispersion = source->rootDispersion + (uint16_t) (0x1p16f * source->delayStdDev);
+    leapIndicator = source->leap;
+    rootDelay = source->rootDelay + (uint32_t) (0x1p16f * source->delayMean);
+    rootDispersion = source->rootDispersion + (uint32_t) (0x1p16f * source->delayStdDev);
+
+    // guard against spurious sources
+    if(source->used < 8) return;
 
     // update offset compensation
     PLL_updateOffset(source->poll, source->pollSample[source->samplePtr].offset);
@@ -531,12 +533,6 @@ static uint16_t chronycSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdReq
     cmdReply->data.source_data.since_sample = htonl((CLK_MONO() - source->lastUpdate) >> 32);
     cmdReply->data.source_data.poll = (int16_t) htons(source->poll);
     cmdReply->data.source_data.state = htons(source->mode);
-//    if(server->weight > 0.01f)
-//        cmdReply->data.source_data.state = htons(RPY_SD_ST_SELECTED);
-//    else if(server->weight > 0)
-//        cmdReply->data.source_data.state = htons(RPY_SD_ST_SELECTABLE);
-//    else
-//        cmdReply->data.source_data.state = htons(RPY_SD_ST_UNSELECTED);
     return htons(STT_SUCCESS);
 }
 
