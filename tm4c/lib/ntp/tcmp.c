@@ -169,7 +169,7 @@ unsigned TCMP_status(char *buffer) {
     end = append(end, " ppm/C\n");
 
     tmp[fmtFloat(tcmpOff * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - off.: ");
+    end = append(end, "  - offs: ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
