@@ -154,27 +154,27 @@ unsigned TCMP_status(char *buffer) {
     end = append(end, "tcomp status:\n");
 
     tmp[fmtFloat(tempValue, 12, 4, tmp)] = 0;
-    end = append(end, "  - temp: ");
+    end = append(end, "  - temp: " );
     end = append(end, tmp);
     end = append(end, " C\n");
 
     tmp[fmtFloat(tcmpBias, 12, 4, tmp)] = 0;
-    end = append(end, "  - bias: ");
+    end = append(end, "  - bias:  ");
     end = append(end, tmp);
     end = append(end, " C\n");
 
     tmp[fmtFloat(tcmpCoef * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - coef: ");
+    end = append(end, "  - coef:  ");
     end = append(end, tmp);
     end = append(end, " ppm/C\n");
 
     tmp[fmtFloat(tcmpOff * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - offs: ");
+    end = append(end, "  - offs:  ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
     tmp[fmtFloat(tcmpValue * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - curr: ");
+    end = append(end, "  - curr:  ");
     end = append(end, tmp);
     end = append(end, " ppm\n\n");
 
