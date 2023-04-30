@@ -309,10 +309,9 @@ static void ntpMain() {
     rootDelay = source->rootDelay + (uint16_t) (0x1p16f * source->delayMean);
     rootDispersion = source->rootDispersion + (uint16_t) (0x1p16f * source->delayStdDev);
 
-    // adjust offset compensation
-    float rmsOffset = sqrtf((source->offsetMean * source->offsetMean) + (source->offsetStdDev * source->offsetStdDev));
-    PLL_updateOffset(source->poll, source->pollSample[source->samplePtr].offset, rmsOffset);
-    // adjust frequency compensation
+    // update offset compensation
+    PLL_updateOffset(source->poll, source->pollSample[source->samplePtr].offset);
+    // update frequency compensation
     if(source->freqUsed > 4 && source->freqSkew < 25e-6f) {
         PLL_updateDrift(source->poll, source->freqDrift);
     }
@@ -591,13 +590,13 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
 
     toTimespec(CLK_TAI_fromMono(lastUpdate) - clkTaiUtcOffset, &(cmdReply->data.tracking.ref_time));
 
-    cmdReply->data.tracking.current_correction.f = htonf(source ? source->offsetMean : 0);
-    cmdReply->data.tracking.last_offset.f = htonf(source ? source->lastOffset : 0);
-    cmdReply->data.tracking.rms_offset.f = htonf(source ? source->offsetStdDev : 0);
+    cmdReply->data.tracking.current_correction.f = htonf(PLL_offsetMean());
+    cmdReply->data.tracking.last_offset.f = htonf(PLL_offsetLast());
+    cmdReply->data.tracking.rms_offset.f = htonf(PLL_offsetRms());
 
     cmdReply->data.tracking.freq_ppm.f = htonf(-1e6f * (0x1p-32f * (float) CLK_COMP_getComp()));
     cmdReply->data.tracking.resid_freq_ppm.f = htonf(-1e6f * (0x1p-32f * (float) CLK_TAI_getTrim()));
-    cmdReply->data.tracking.skew_ppm.f = htonf(source ? (1e6f * source->freqSkew) : 0);
+    cmdReply->data.tracking.skew_ppm.f = htonf(1e6f * PLL_driftStdDev());
 
     cmdReply->data.tracking.root_delay.f = htonf(0x1p-16f * (float) rootDelay);
     cmdReply->data.tracking.root_dispersion.f = htonf(0x1p-16f * (float) rootDispersion);

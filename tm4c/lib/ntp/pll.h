@@ -25,7 +25,7 @@ void PLL_run();
  * @param interval the current update interval in log2 seconds
  * @param offset the most recent offset sample
  */
-void PLL_updateOffset(int interval, int64_t offset, float rmsOffset);
+void PLL_updateOffset(int interval, int64_t offset);
 
 /**
  * Update the frequency drift correction PLL.
@@ -33,5 +33,24 @@ void PLL_updateOffset(int interval, int64_t offset, float rmsOffset);
  * @param drift the most recent drift rate
  */
 void PLL_updateDrift(int interval, float drift);
+
+/**
+ * Write human readable status to buffer
+ * @param buffer destination
+ * @return number of bytes written
+ */
+unsigned PLL_status(char *buffer);
+
+// offset stats
+float PLL_offsetLast();
+float PLL_offsetMean();
+float PLL_offsetRms();
+float PLL_offsetStdDev();
+
+// drift stats
+float PLL_driftLast();
+float PLL_driftMean();
+float PLL_driftRms();
+float PLL_driftStdDev();
 
 #endif //GPSDO_PLL_H

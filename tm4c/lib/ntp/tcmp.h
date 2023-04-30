@@ -21,4 +21,6 @@ float TCMP_get();
 
 void TCMP_update(float target);
 
+unsigned TCMP_status(char *buffer);
+
 #endif //GPSDO_TCMP_H

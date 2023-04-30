@@ -16,11 +16,12 @@
 #include "lib/led.h"
 #include "lib/net.h"
 #include "lib/net/arp.h"
+#include "lib/net/dhcp.h"
 #include "lib/net/eth.h"
 #include "lib/net/ip.h"
 #include "lib/net/udp.h"
 #include "lib/net/util.h"
-#include "lib/net/dhcp.h"
+#include "lib/ntp/pll.h"
 
 #include "gitversion.h"
 #include "status.h"
@@ -84,6 +85,8 @@ void STATUS_process(uint8_t *frame, int flen) {
         size = statusETH(body);
     } else if(strncmp(body, "gps", 3) == 0 && hasTerminus(body, 3)) {
         size = statusGPS(body);
+    } else if(strncmp(body, "pll", 3) == 0 && hasTerminus(body, 3)) {
+        size = PLL_status(body);
     } else if(strncmp(body, "system", 6) == 0 && hasTerminus(body, 6)) {
         size = statusSystem(body);
     } else {
