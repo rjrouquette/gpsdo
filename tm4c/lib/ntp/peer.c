@@ -144,14 +144,17 @@ static void startPoll(NtpPeer *this) {
         NtpSource_updateStatus(&(this->source));
     }
 
-    const uint64_t now = CLK_MONO();
-    // schedule next poll
-    uint64_t nextOffset = RAND_next();
-    nextOffset >>= this->source.poll - 4;
-    nextOffset += 1ull << (this->source.poll + 32);
-    this->nextPoll += nextOffset;
+    // add random jitter to polling interval
+    union fixed_32_32 scratch;
+    scratch.fpart = 0;
+    scratch.ipart = RAND_next();
+    scratch.full >>= 35 - this->source.poll;
+    scratch.full |= (1ull << (32 + this->source.poll));
+    // set next poll
+    this->nextPoll += scratch.full;
+
     // start poll
-    this->pollStart = now;
+    this->pollStart = CLK_MONO();
     this->pollActive = true;
     this->pollBurst = 0xFF;
     this->pollRetry = 0;

@@ -365,8 +365,13 @@ static void ntpDnsCallback(void *ref, uint32_t addr) {
     }
     // attempt to add as new source
     NtpSource *newSource = ntpAllocPeer();
-    if(newSource != NULL)
+    if(newSource != NULL) {
         newSource->id = addr;
+        if(!IPv4_testSubnet(ipSubnet, ipAddress, addr)) {
+            // faster initial burst for local timeservers
+            newSource->poll = 1;
+        }
+    }
 }
 
 

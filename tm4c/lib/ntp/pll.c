@@ -104,19 +104,14 @@ void PLL_updateOffset(int interval, int64_t offset) {
         offsetRms = sqrtf(offsetMS);
     }
 
-    // restrict interval sign
-    if(interval < 0) interval = 0;
     // compute proportional rate
     float rate = offsetRms / PLL_OFFSET_CORR_BASIS;
     // limit proportional rate
     if(rate > PLL_OFFSET_CORR_MAX) rate = PLL_OFFSET_CORR_MAX;
-    // compensate rate for polling interval
-    rate *= 0x1p-31f * (float) (1 << (31 - interval));
+    // adjust rate to match polling interval
+    rate *= 0x1p-16f * (float) (1u << (16 - interval));
     // update offset compensation
-    float pllCorr = rate * -fltOffset;
-    // limit correction step size
-    if(pllCorr >  PLL_OFFSET_CORR_CAP) pllCorr =  PLL_OFFSET_CORR_CAP;
-    if(pllCorr < -PLL_OFFSET_CORR_CAP) pllCorr = -PLL_OFFSET_CORR_CAP;
+    float pllCorr = rate * fltOffset;
     // convert back to fixed-point correction factor
     offsetProportion = (int32_t) (0x1p32f * pllCorr);
     offsetIntegral += offsetProportion >> PLL_OFFSET_INT_RATE;
