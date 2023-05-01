@@ -38,13 +38,30 @@ void initClkMono() {
     GPTM0.CTL.TAEN = 1;
 }
 
-void initClkRxTx() {
+void initClkEth() {
+    // configure PPS output pin
+    RCGCGPIO.EN_PORTG = 1;
+    delay_cycles_4();
+    // unlock GPIO config
+    PORTG.LOCK = GPIO_LOCK_KEY;
+    PORTG.CR = 0x01u;
+    // configure pins
+    PORTG.DIR = 0x01u;
+    PORTG.DR8R = 0x01u;
+    PORTG.PCTL.PMC0 = 0x5;
+    PORTG.AFSEL.ALT0 = 1;
+    PORTG.DEN = 0x01u;
+    // lock GPIO config
+    PORTG.CR = 0;
+    PORTG.LOCK = 0;
+
     // disable flash prefetch per errata
     FLASHCONF.FPFOFF = 1;
-    // enable clock
+    // enable MAC and PHY clocks
     RCGCEMAC.EN0 = 1;
-    delay_cycles_4();
+    RCGCEPHY.EN0 = 1;
     while(!PREMAC.RDY0);
+    while(!PREPHY.RDY0);
 
     // disable timer interrupts
     EMAC0.IM.TS = 1;
@@ -118,22 +135,6 @@ void initClkSync() {
     // lock GPIO config
     PORTM.CR = 0;
     PORTM.LOCK = 0;
-
-    // configure PPS output pin
-    RCGCGPIO.EN_PORTG = 1;
-    delay_cycles_4();
-    // unlock GPIO config
-    PORTG.LOCK = GPIO_LOCK_KEY;
-    PORTG.CR = 0x01u;
-    // configure pins
-    PORTG.DIR = 0x01u;
-    PORTG.DR8R = 0x01u;
-    PORTG.PCTL.PMC0 = 0x5;
-    PORTG.AFSEL.ALT0 = 1;
-    PORTG.DEN = 0x01u;
-    // lock GPIO config
-    PORTG.CR = 0;
-    PORTG.LOCK = 0;
 }
 
 // second boundary comparison

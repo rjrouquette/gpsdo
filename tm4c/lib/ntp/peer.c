@@ -109,7 +109,7 @@ static void sendPoll(NtpPeer *this) {
     headerNTP->poll = this->source.poll;
     // set stratum and precision
     headerNTP->stratum = 16;
-    headerNTP->precision = -25;
+    headerNTP->precision = -32;
     // set reference ID
     headerNTP->refID = 0;
     // set reference timestamp
@@ -208,6 +208,12 @@ static void runPoll(NtpPeer *this) {
 }
 
 static void finishPoll(NtpPeer *this) {
+    // drop sample if source is not synchronized
+    if(this->source.stratum > 15)
+        return;
+    // set reach bit
+    this->source.reach |= 1;
+
     // translate remote timestamps
     uint64_t remote_rx = __builtin_bswap64(this->remote_rx) + clkTaiUtcOffset - NTP_UTC_OFFSET;
     uint64_t remote_tx = __builtin_bswap64(this->remote_tx) + clkTaiUtcOffset - NTP_UTC_OFFSET;
@@ -320,8 +326,6 @@ void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     // set hardware timestamp
     NET_getRxTime(frame, this->local_rx_hw);
 
-    // set reach bit
-    this->source.reach |= 1;
     // set stratum
     this->source.stratum = headerNTP->stratum;
     this->source.leap = headerNTP->status;

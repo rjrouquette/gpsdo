@@ -43,14 +43,14 @@ static void initClkSys() {
 
 // mono.c
 void initClkMono();
-void initClkRxTx();
+void initClkEth();
 void initClkSync();
 
 void CLK_init() {
     initClkSys();
     initClkMono();
-    initClkRxTx();
     initClkSync();
+    initClkEth();
 }
 
 
