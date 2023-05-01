@@ -22,7 +22,6 @@
 #include "ref.h"
 #include "pll.h"
 
-#define NTP_TS_PREC (-25)
 #define MAX_NTP_PEERS (8)
 #define MAX_NTP_SRCS (9)
 #define MIN_DNS_INTV (16) // 16 seconds
@@ -195,7 +194,7 @@ static void ntpRequest(uint8_t *frame, int flen) {
     headerNTP->status = leapIndicator;
     // set stratum and precision
     headerNTP->stratum = clockStratum;
-    headerNTP->precision = NTP_TS_PREC;
+    headerNTP->precision = NTP_CLK_PREC;
     // set root delay
     headerNTP->rootDelay = __builtin_bswap32(rootDelay);
     // set root dispersion

@@ -109,7 +109,7 @@ static void sendPoll(NtpPeer *this) {
     headerNTP->poll = this->source.poll;
     // set stratum and precision
     headerNTP->stratum = 16;
-    headerNTP->precision = -32;
+    headerNTP->precision = NTP_CLK_PREC;
     // set reference ID
     headerNTP->refID = 0;
     // set reference timestamp

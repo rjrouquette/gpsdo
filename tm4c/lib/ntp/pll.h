@@ -15,7 +15,7 @@
 #define PLL_OFFSET_HARD_ALIGN (0x01000000ll) //  39.06 ms
 #define PLL_OFFSET_CORR_BASIS (256e-9f) // unity rate threshold
 #define PLL_OFFSET_CORR_MAX (0.5f) // 0.5 to dampen oscillation
-#define PLL_OFFSET_INT_RATE (32) // relative integration rate (log2 of divisor)
+#define PLL_OFFSET_INT_RATE (5) // relative integration rate (log2 of divisor)
 
 #define PLL_DRIFT_INT_RATE (0x1p-8f)
 
