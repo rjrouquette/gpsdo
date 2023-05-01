@@ -5,12 +5,20 @@
 #include <memory.h>
 #include "../hw/uart.h"
 #include "clk/mono.h"
-#include "clk/tai.h"
 #include "delay.h"
 #include "gps.h"
+#include "clk/clk.h"
+#include "clk/util.h"
 
 #define GPS_RING_MASK (1023)
 #define GPS_RING_SIZE (1024)
+
+#define GPS_RST_PORT (PORTP)
+#define GPS_RST_PIN (1<<5)
+#define GPS_RST_INTV (300)
+#define GPS_RST_THR (60)
+
+uint32_t gpsLastReset;
 
 static uint8_t rxBuff[GPS_RING_SIZE];
 static uint8_t txBuff[GPS_RING_SIZE];
@@ -23,6 +31,7 @@ static int endUBX;
 static int fixGood;
 static float locLat, locLon, locAlt;
 static int clkBias, clkDrift, accTime, accFreq;
+static volatile uint64_t taiEpochUpdate;
 static volatile uint32_t taiEpoch;
 static volatile int taiOffset;
 
@@ -40,8 +49,10 @@ static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload
 static void configureGPS();
 
 void GPS_init() {
-    // enable GPIO A
+    // enable GPIO J
     RCGCGPIO.EN_PORTJ = 1;
+    // enable GPIO P
+    RCGCGPIO.EN_PORTP = 1;
     // enable UART 3
     RCGCUART.EN_UART3 = 1;
     delay_cycles_4();
@@ -61,6 +72,16 @@ void GPS_init() {
     PORTJ.CR = 0;
     PORTJ.LOCK = 0;
 
+    // configure reset pins
+    GPS_RST_PORT.LOCK = GPIO_LOCK_KEY;
+    GPS_RST_PORT.CR = GPS_RST_PIN;
+    GPS_RST_PORT.DIR = GPS_RST_PIN;
+    GPS_RST_PORT.DR8R = GPS_RST_PIN;
+    GPS_RST_PORT.DEN = GPS_RST_PIN;
+    // lock GPIO config
+    GPS_RST_PORT.CR = 0;
+    GPS_RST_PORT.LOCK = 0;
+
     // configure UART 3
     UART3.CTL.UARTEN = 0;
     // baud divisor = 813.80208 = (125 MHz / (16 * 9600 baud))
@@ -74,6 +95,11 @@ void GPS_init() {
     UART3.CTL.RXE = 1;
     UART3.CTL.TXE = 1;
     UART3.CTL.UARTEN = 1;
+
+    // reset GPS
+    GPS_RST_PORT.DATA[GPS_RST_PIN] = 0;
+    delay_ms(125);
+    GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
 }
 
 uint32_t prevSecond = 0;
@@ -81,8 +107,27 @@ void GPS_run() {
     uint32_t now = CLK_MONO_INT();
     if(prevSecond != now) {
         prevSecond = now;
+        // check GPS message configuration
         if((now & 3) == 0)
             configureGPS();
+
+        // release reset pin if it held down
+        if(!GPS_RST_PORT.DATA[GPS_RST_PIN])
+            GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
+
+        // reset GPS if PPS has stopped
+        if((now - gpsLastReset) > GPS_RST_INTV) {
+            union fixed_32_32 age;
+            age.full = CLK_MONO();
+            uint64_t pps[3];
+            CLK_PPS(pps);
+            age.full -= pps[0];
+            if (age.ipart > GPS_RST_THR) {
+                // reset GPS
+                GPS_RST_PORT.DATA[GPS_RST_PIN] = 0;
+                gpsLastReset = now;
+            }
+        }
     }
 
     // read GPS serial data
@@ -448,6 +493,13 @@ static void processUbxPVT(const uint8_t *payload) {
     offset += taiOffset;
     // set TAI epoch
     taiEpoch = offset;
+    // mark as updated
+    if(taiOffset != 0)
+        taiEpochUpdate = CLK_MONO();
+}
+
+uint64_t GPS_taiEpochUpdate() {
+    return taiEpochUpdate;
 }
 
 uint32_t GPS_taiEpoch() {

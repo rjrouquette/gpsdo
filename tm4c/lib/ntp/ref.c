@@ -31,6 +31,14 @@ static void NtpGPS_run(volatile void *pObj) {
         }
         return;
     }
+    // GPS must have time set
+    if(GPS_taiEpoch() == 0) return;
+    // GPS TAI epoch must not be stale
+    union fixed_32_32 age;
+    age.full = now;
+    age.full -= GPS_taiEpochUpdate();
+    if(age.ipart > 0) return;
+
     // wait for update
     if(ppsTime[0] == this->lastPps) return;
     this->lastPoll = now;
