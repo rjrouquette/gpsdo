@@ -286,7 +286,7 @@ static void ntpMain() {
     }
 
     // select best clock
-    activeSource = 0;
+    activeSource = 1;
 //    float score = sources[0]->score;
 //    for(int i = 1; i < cntSources; i++) {
 //        if(sources[i]->score  0)

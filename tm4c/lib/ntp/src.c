@@ -48,19 +48,21 @@ void NtpSource_update(NtpSource *this) {
     getMeanVar(this->sampleCount, offset, &mean, &var);
     // remove extrema
     float limit = var * 4;
-    j = 0;
-    for (int i = 0; i < cnt; i++) {
-        float diff = offset[i] - mean;
-        if((diff * diff) < limit) {
-            index[j] = index[i];
-            offset[j] = offset[i];
-            ++j;
+    if(limit > 0) {
+        j = 0;
+        for (int i = 0; i < cnt; i++) {
+            float diff = offset[i] - mean;
+            if ((diff * diff) < limit) {
+                index[j] = index[i];
+                offset[j] = offset[i];
+                ++j;
+            }
         }
+        cnt = j;
+        // recompute mean and variance
+        if (cnt > 0)
+            getMeanVar(cnt, offset, &mean, &var);
     }
-    cnt = j;
-    // recompute mean and variance
-    if(cnt > 0)
-        getMeanVar(cnt, offset, &mean, &var);
     // update offset stats
     this->used = cnt;
     this->offsetMean = mean;
@@ -83,18 +85,20 @@ void NtpSource_update(NtpSource *this) {
     getMeanVar(cnt, drift, &mean, &var);
     // exclude outliers
     limit = var * 4;
-    j = 0;
-    for (int i = 0; i < cnt; i++) {
-        float diff = drift[i] - mean;
-        if((diff * diff) < limit) {
-            drift[j] = drift[i];
-            ++j;
+    if(limit > 0) {
+        j = 0;
+        for (int i = 0; i < cnt; i++) {
+            float diff = drift[i] - mean;
+            if ((diff * diff) < limit) {
+                drift[j] = drift[i];
+                ++j;
+            }
         }
+        cnt = j;
+        // recompute mean and variance
+        if (cnt > 0)
+            getMeanVar(cnt, drift, &mean, &var);
     }
-    cnt = j;
-    // recompute mean and variance
-    if(cnt > 0)
-        getMeanVar(cnt, drift, &mean, &var);
     // set frequency status
     this->freqUsed = cnt;
     this->freqDrift = mean;
