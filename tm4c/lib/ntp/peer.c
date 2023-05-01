@@ -144,14 +144,15 @@ static void startPoll(NtpPeer *this) {
         NtpSource_updateStatus(&(this->source));
     }
 
-    // add random jitter to polling interval
+    // add random fuzz to polling interval to temporally disperse poll requests
+    // (maximum of 1/16 of polling interval)
     union fixed_32_32 scratch;
     scratch.fpart = 0;
     scratch.ipart = RAND_next();
-    scratch.full >>= 35 - this->source.poll;
-    scratch.full |= (1ull << (32 + this->source.poll));
+    scratch.full >>= 36 - this->source.poll;
+    scratch.full |= 1ull << (32 + this->source.poll);
     // set next poll
-    this->nextPoll += scratch.full;
+    this->pollNext += scratch.full;
 
     // start poll
     this->pollStart = CLK_MONO();
@@ -255,7 +256,7 @@ static void run(volatile void *pObj) {
 
     // check for start of poll
     const uint64_t now = CLK_MONO();
-    if(((int64_t)(now - this->nextPoll)) > 0)
+    if(((int64_t)(now - this->pollNext)) > 0)
         startPoll(this);
 
     // run current poll
@@ -279,7 +280,7 @@ void NtpPeer_init(volatile void *pObj) {
     this->source.maxPoll = PEER_MAX_POLL;
     this->source.minPoll = PEER_MIN_POLL;
     this->source.poll = PEER_MIN_POLL;
-    this->nextPoll = CLK_MONO();
+    this->pollNext = CLK_MONO();
 }
 
 void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {

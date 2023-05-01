@@ -24,7 +24,7 @@ struct NtpPeer {
     uint64_t local_rx_hw[3];
 
     // state machine
-    uint64_t nextPoll;
+    uint64_t pollNext;
     uint64_t pollStart;
     uint32_t lastArp;
 
