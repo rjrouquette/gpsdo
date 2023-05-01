@@ -44,6 +44,7 @@ void initClkRxTx() {
     // enable clock
     RCGCEMAC.EN0 = 1;
     delay_cycles_4();
+    while(!PREMAC.RDY0);
 
     // disable timer interrupts
     EMAC0.IM.TS = 1;
