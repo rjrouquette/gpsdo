@@ -9,7 +9,6 @@
 #include "pll.h"
 #include "tcmp.h"
 
-#define STATS_ALPHA (0x1p-3f)
 
 // offset statistics
 static volatile float offsetLast;
@@ -98,9 +97,9 @@ void PLL_updateOffset(int interval, int64_t offset) {
     } else {
         // update stats
         float diff = fltOffset - offsetMean;
-        offsetVar += ((diff * diff) - offsetVar) * STATS_ALPHA;
-        offsetMS += ((fltOffset * fltOffset) - offsetMS) * STATS_ALPHA;
-        offsetMean += diff * STATS_ALPHA;
+        offsetVar += ((diff * diff) - offsetVar) * PLL_STATS_ALPHA;
+        offsetMS += ((fltOffset * fltOffset) - offsetMS) * PLL_STATS_ALPHA;
+        offsetMean += diff * PLL_STATS_ALPHA;
         offsetStdDev = sqrtf(offsetVar);
         offsetRms = sqrtf(offsetMS);
     }
@@ -115,9 +114,12 @@ void PLL_updateOffset(int interval, int64_t offset) {
     rate *= 0x1p-31f * (float) (1 << (31 - interval));
     // update offset compensation
     float pllCorr = rate * -fltOffset;
+    // limit correction step size
+    if(pllCorr >  PLL_OFFSET_CORR_CAP) pllCorr =  PLL_OFFSET_CORR_CAP;
+    if(pllCorr < -PLL_OFFSET_CORR_CAP) pllCorr = -PLL_OFFSET_CORR_CAP;
+    // convert back to fixed-point correction factor
     offsetProportion = (int32_t) (0x1p32f * pllCorr);
-    if(offsetRms < PLL_OFFSET_CORR_BASIS)
-        offsetIntegral += offsetProportion >> PLL_OFFSET_INT_RATE;
+    offsetIntegral += offsetProportion >> PLL_OFFSET_INT_RATE;
     // limit integration range
     if(offsetIntegral > PLL_MAX_FREQ_TRIM) driftIntegral = PLL_MAX_FREQ_TRIM;
     if(offsetIntegral < PLL_MIN_FREQ_TRIM) driftIntegral = PLL_MIN_FREQ_TRIM;
@@ -135,9 +137,9 @@ void PLL_updateDrift(int interval, float drift) {
     // update stats
     driftLast = drift;
     float diff = drift - driftMean;
-    driftVar += ((diff * diff) - driftVar) * STATS_ALPHA;
-    driftMS += ((drift * drift) - driftMS) * STATS_ALPHA;
-    driftMean += diff * STATS_ALPHA;
+    driftVar += ((diff * diff) - driftVar) * PLL_STATS_ALPHA;
+    driftMS += ((drift * drift) - driftMS) * PLL_STATS_ALPHA;
+    driftMean += diff * PLL_STATS_ALPHA;
     driftStdDev = sqrtf(driftVar);
     driftRms = sqrtf(driftMS);
 
