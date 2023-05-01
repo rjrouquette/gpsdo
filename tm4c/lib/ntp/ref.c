@@ -3,15 +3,13 @@
 //
 
 #include <memory.h>
-#include <math.h>
 #include "../chrony/candm.h"
 #include "../clk/clk.h"
 #include "../clk/mono.h"
+#include "../clk/tai.h"
 #include "../clk/util.h"
 #include "../gps.h"
 #include "ref.h"
-#include "../clk/comp.h"
-#include "../clk/tai.h"
 
 static void NtpGPS_run(volatile void *pObj) {
     NtpGPS *this = (struct NtpGPS *) pObj;
@@ -33,16 +31,16 @@ static void NtpGPS_run(volatile void *pObj) {
     }
     // GPS must have time set
     if(GPS_taiEpoch() == 0) return;
-    // GPS TAI epoch must not be stale
-    union fixed_32_32 age;
-    age.full = now;
-    age.full -= GPS_taiEpochUpdate();
-    if(age.ipart > 0) return;
-
     // wait for update
     if(ppsTime[0] == this->lastPps) return;
     this->lastPoll = now;
     this->lastPps = ppsTime[0];
+
+    // align GPS TAI epoch
+    union fixed_32_32 scratch;
+    scratch.full = ppsTime[0];
+    scratch.full -= GPS_taiEpochUpdate();
+    uint32_t taiEpoch = GPS_taiEpoch() + scratch.ipart + 1;
 
     // update reach indicator
     this->source.reach = (this->source.reach << 1) | 1;
@@ -51,7 +49,6 @@ static void NtpGPS_run(volatile void *pObj) {
     ++this->source.txCount;
 
     // update TAI/UTC offset
-    union fixed_32_32 scratch;
     scratch.ipart = GPS_taiOffset();
     scratch.fpart = 0;
     clkTaiUtcOffset = scratch.full;
@@ -64,7 +61,7 @@ static void NtpGPS_run(volatile void *pObj) {
     sample->comp = ppsTime[1];
     sample->tai = ppsTime[2];
     // compute TAI offset
-    scratch.ipart = GPS_taiEpoch() + 1;
+    scratch.ipart = taiEpoch;
     scratch.fpart = 0;
     sample->offset = (int64_t) (scratch.full - ppsTime[2]);
     sample->delay = 0;
