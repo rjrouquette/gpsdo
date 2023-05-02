@@ -7,6 +7,7 @@
 #include "tai.h"
 #include "comp.h"
 #include "util.h"
+#include "../gps.h"
 
 volatile uint64_t clkTaiUtcOffset = 0;
 
@@ -15,6 +16,10 @@ volatile uint64_t clkTaiOffset = 0;
 volatile uint64_t clkTaiRef = 0;
 volatile int32_t clkTaiRate = 0;
 
+
+void initClkTai() {
+    clkTaiOffset = ((uint64_t) GPS_taiOffset()) << 32;
+}
 
 void runClkTai() {
     // advance reference time at roughly 16 Hz to prevent overflow

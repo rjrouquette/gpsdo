@@ -45,12 +45,15 @@ static void initClkSys() {
 void initClkMono();
 void initClkEth();
 void initClkSync();
+// tai.c
+void initClkTai();
 
 void CLK_init() {
     initClkSys();
     initClkMono();
     initClkSync();
     initClkEth();
+    initClkTai();
 }
 
 
