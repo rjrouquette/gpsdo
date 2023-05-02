@@ -406,7 +406,7 @@ unsigned statusGPS(char *body) {
     end = append(end, " ns\n");
 
     // frequency accuracy
-    tmp[toBase(GPS_accTime(), 10, tmp)] = 0;
+    tmp[toBase(GPS_accFreq(), 10, tmp)] = 0;
     end = append(end, "frequency accuracy: ");
     end = append(end, tmp);
     end = append(end, " ps/s\n");
