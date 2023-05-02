@@ -9,6 +9,7 @@
 #include "../clk/tai.h"
 #include "../clk/util.h"
 #include "../gps.h"
+#include "common.h"
 #include "ref.h"
 
 static void NtpGPS_run(volatile void *pObj) {
@@ -81,11 +82,12 @@ void NtpGPS_init(volatile void *pObj) {
     this->source.init = NtpGPS_init;
     this->source.run = NtpGPS_run;
     // set mode
+    this->source.lost = true;
     this->source.mode = RPY_SD_MD_REF;
+    this->source.state = RPY_SD_ST_UNSELECTED;
     // set id to "GPS"
     this->source.id = 0x00535047;
-    this->source.state = RPY_SD_ST_UNSELECTED;
-    this->source.precision = -28;
+    this->source.precision = NTP_CLK_PREC;
     // one second poll interval
     this->source.poll = 0;
 }

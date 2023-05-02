@@ -36,9 +36,9 @@ static NtpSource* ntpAllocPeer();
 static void ntpRemovePeer(NtpSource *peer);
 
 static NtpSource * volatile sources[MAX_NTP_SRCS];
+static NtpSource * volatile selectedSource = NULL;
 static volatile uint32_t cntSources = 0;
 static volatile uint32_t runNext = 0;
-static volatile uint32_t activeSource = 0;
 static volatile uint64_t lastUpdate = 0;
 
 static volatile uint32_t lastDnsRequest = 0;
@@ -285,18 +285,26 @@ static void ntpMain() {
     }
 
     // select best clock
-    activeSource = 1;
-//    float score = sources[0]->score;
-//    for(int i = 1; i < cntSources; i++) {
-//        if(sources[i]->score  0)
-//        if(sources[i]->score < score) {
-//            score = sources[i]->score;
-//            activeSource = i;
-//        }
-//    }
+    selectedSource = NULL;
+    for(int i = 0; i < cntSources; i++) {
+        if(sources[i]->lost || sources[i]->score == 0) {
+            sources[i]->state = RPY_SD_ST_UNSELECTED;
+            continue;
+        }
+        sources[i]->state = RPY_SD_ST_SELECTABLE;
+        if(selectedSource == NULL) {
+            selectedSource = sources[i];
+            continue;
+        }
+        if(sources[i]->score < selectedSource->score) {
+            selectedSource = sources[i];
+        }
+    }
 
-    NtpSource *source = sources[activeSource];
+    // sanity check source and check for update
+    NtpSource *source = selectedSource;
     if(source == NULL) return;
+    source->state = RPY_SD_ST_SELECTED;
     if(source->lastUpdate == lastUpdate) return;
     lastUpdate = source->lastUpdate;
 
@@ -334,6 +342,10 @@ volatile static struct NtpSource* ntpAllocPeer() {
 }
 
 static void ntpRemovePeer(NtpSource *peer) {
+    // deselect source if selected
+    if(peer == selectedSource)
+        selectedSource = NULL;
+
     peer->id = 0;
     uint32_t slot = -1u;
     for(uint32_t i = 0; i < cntSources; i++) {
@@ -536,7 +548,7 @@ static uint16_t chronycSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdReq
     cmdReply->data.source_data.latest_meas_err.f = htonf(source->lastDelay);
     cmdReply->data.source_data.since_sample = htonl((CLK_MONO() - source->lastUpdate) >> 32);
     cmdReply->data.source_data.poll = (int16_t) htons(source->poll);
-    cmdReply->data.source_data.state = htons(source->mode);
+    cmdReply->data.source_data.state = htons(source->state);
     return htons(STT_SUCCESS);
 }
 
@@ -586,7 +598,7 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
         cmdReply->data.tracking.ip_addr.addr.in4 = refId;
     }
 
-    NtpSource *source = sources[activeSource];
+    NtpSource *source = selectedSource;
 
     toTimespec(CLK_TAI_fromMono(lastUpdate) - clkTaiUtcOffset, &(cmdReply->data.tracking.ref_time));
 

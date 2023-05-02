@@ -108,6 +108,7 @@ void NtpSource_update(NtpSource *this) {
     score += 0x1p-16f * (float) this->rootDispersion;
     score += this->delayMean;
     score += this->delayStdDev;
+    score += this->offsetStdDev;
     this->score = score;
 
     // set update time
@@ -144,7 +145,7 @@ static void getMeanVar(const int cnt, const float *v, float *mean, float *var) {
 
 void NtpSource_updateStatus(NtpSource *this) {
     // clear lost flag if peer was reached
-    if(this->reach & 1)
+    if(this->reach & 0xF)
         this->lost = false;
 
     // increment poll counter

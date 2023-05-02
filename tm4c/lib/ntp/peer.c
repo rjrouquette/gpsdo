@@ -274,6 +274,7 @@ void NtpPeer_init(volatile void *pObj) {
     this->source.init = NtpPeer_init;
     this->source.run = run;
     // set mode and state
+    this->source.lost = true;
     this->source.mode = RPY_SD_MD_CLIENT;
     this->source.state = RPY_SD_ST_UNSELECTED;
     // initialize polling
