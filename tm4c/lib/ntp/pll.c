@@ -108,7 +108,7 @@ void PLL_updateOffset(int interval, int64_t offset) {
     // adjust rate to match polling interval
     rate *= 0x1p-16f * (float) (1u << (16 - interval));
     // update offset compensation
-    offsetProportion = rate * fltOffset;
+    offsetProportion = fltOffset * rate;
     offsetIntegral += offsetProportion * PLL_OFFSET_INT_RATE;
     // limit integration range
     if(offsetIntegral >  PLL_MAX_FREQ_TRIM) offsetIntegral =  PLL_MAX_FREQ_TRIM;
@@ -166,12 +166,12 @@ unsigned PLL_status(char *buffer) {
     end = append(end, tmp);
     end = append(end, " us\n");
 
-    tmp[fmtFloat(1e6f * 0x1p-32f * (float) offsetProportion, 12, 4, tmp)] = 0;
+    tmp[fmtFloat(offsetProportion * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - pll p: ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
-    tmp[fmtFloat(1e6f * 0x1p-32f * (float) offsetIntegral, 12, 4, tmp)] = 0;
+    tmp[fmtFloat(offsetIntegral * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - pll i: ");
     end = append(end, tmp);
     end = append(end, " ppm\n\n");
