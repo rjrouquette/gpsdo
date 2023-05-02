@@ -33,7 +33,7 @@ static float locLat, locLon, locAlt;
 static int clkBias, clkDrift, accTime, accFreq;
 static volatile uint64_t taiEpochUpdate;
 static volatile uint32_t taiEpoch;
-static volatile int taiOffset;
+static volatile int taiOffset = 37; // as of 2016-12-31
 
 static int hasNema, hasPvt, hasGpsTime, hasClock;
 
