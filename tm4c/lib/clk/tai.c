@@ -18,7 +18,7 @@ volatile int32_t clkTaiRate = 0;
 
 
 void initClkTai() {
-    clkTaiOffset = ((uint64_t) GPS_taiOffset()) << 32;
+    clkTaiUtcOffset = ((uint64_t) GPS_taiOffset()) << 32;
 }
 
 void runClkTai() {
