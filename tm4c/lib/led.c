@@ -4,10 +4,11 @@
 
 #include "../hw/gpio.h"
 #include "../hw/timer.h"
+#include "clk/mono.h"
 #include "delay.h"
 #include "led.h"
 
-#define UPDATE_INTERVAL (7812500) // 16 Hz
+#define UPDATE_INTERVAL (CLK_FREQ / 16) // 16 Hz
 
 static volatile uint32_t nextUpdate = 0;
 static volatile uint8_t status = 0;

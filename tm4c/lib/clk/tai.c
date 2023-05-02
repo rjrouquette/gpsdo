@@ -3,15 +3,19 @@
 //
 
 #include "../../hw/interrupts.h"
+#include "../../hw/timer.h"
 #include "mono.h"
 #include "tai.h"
 #include "comp.h"
 #include "util.h"
 #include "../gps.h"
 
+#define MIN_UPDT_INTV (CLK_FREQ / 4) // 4 Hz
+
 volatile uint64_t clkTaiUtcOffset = 0;
 
-static uint32_t clkTaiRem = 0;
+static volatile uint32_t clkTaiUpdate = 0;
+static volatile uint32_t clkTaiRem = 0;
 volatile uint64_t clkTaiOffset = 0;
 volatile uint64_t clkTaiRef = 0;
 volatile int32_t clkTaiRate = 0;
@@ -22,10 +26,11 @@ void initClkTai() {
 }
 
 void runClkTai() {
-    // advance reference time at roughly 16 Hz to prevent overflow
-    uint64_t now = CLK_COMP();
-    if((now - clkTaiRef) > (1 << 28))
+    // periodically update alignment to prevent numerical overflow
+    if((GPTM0.TAV.raw - clkTaiUpdate) > 0) {
+        clkTaiUpdate += MIN_UPDT_INTV;
         CLK_TAI_setTrim(clkTaiRate);
+    }
 }
 
 uint64_t CLK_TAI() {
@@ -34,7 +39,7 @@ uint64_t CLK_TAI() {
 
 uint64_t CLK_TAI_fromMono(uint64_t ts) {
     ts = CLK_COMP_fromMono(ts);
-    ts += corrValue(clkTaiRate, ts - clkTaiRef, 0);
+    ts += corrValue(clkTaiRate, (int64_t) (ts - clkTaiRef));
     ts += clkTaiOffset;
     return ts;
 }
@@ -42,7 +47,8 @@ uint64_t CLK_TAI_fromMono(uint64_t ts) {
 void CLK_TAI_setTrim(int32_t comp) {
     // prepare update values
     uint64_t now = CLK_COMP();
-    uint64_t offset = corrValue(clkTaiRate, now - clkTaiRef, &clkTaiRem);
+    uint64_t offset = corrFrac(clkTaiRate, (uint32_t) (now - clkTaiRef), &clkTaiRem);
+
     // apply update
     __disable_irq();
     clkTaiRef = now;

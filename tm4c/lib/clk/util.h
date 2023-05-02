@@ -29,12 +29,20 @@ uint64_t fromClkMono(uint32_t timer, uint32_t offset, uint32_t integer);
 
 /**
  * Compute offset correction for frequency trimming
- * @param rate frequency trim rate (0.31)
- * @param delta elapsed time since prior offset adjustment (32.32)
- * @param rem offset remainder from prior adjustment (0.32)
- * @return offset adjustment (32.32)
+ * @param rate frequency trim rate (signed 0.31)
+ * @param delta elapsed time since prior offset adjustment (signed 31.32)
+ * @return offset adjustment (signed 31.32)
  */
-uint64_t corrValue(uint32_t rate, uint64_t delta, uint32_t *rem);
+int64_t corrValue(int32_t rate, int64_t delta);
+
+/**
+ * Compute offset correction for frequency trimming
+ * @param rate frequency trim rate (signed 0.31)
+ * @param delta elapsed time since prior offset adjustment (unsigned 0.32)
+ * @param rem offset remainder from prior adjustment (unsigned 0.32)
+ * @return offset adjustment (signed 0.31)
+ */
+int32_t corrFrac(int32_t rate, uint32_t delta, volatile uint32_t *rem);
 
 /**
  * Convert 64-bit fixed-point timestamp (32.32) to float

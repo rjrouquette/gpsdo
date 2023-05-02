@@ -34,23 +34,38 @@ uint64_t fromClkMono(uint32_t timer, uint32_t offset, uint32_t integer) {
     return scratch.full;
 }
 
-uint64_t corrValue(uint32_t rate, uint64_t delta, uint32_t *rem) {
-    int neg = 0;
-    if(delta >> 63) {
-        delta = -delta;
-        neg = 1;
-    }
-    if(rate >> 31) {
-        rate = -rate;
-        neg ^= 1;
-    }
-    delta *= rate;
-    if(neg) delta = -delta;
-    if(rem) {
-        delta += *rem;
-        *rem = (uint32_t) delta;
-    }
-    return ((int64_t) delta) >> 32;
+int64_t corrValue(int32_t rate, int64_t delta) {
+    union fixed_32_32 scratch;
+    int neg = delta < 0;
+    scratch.full = neg ? -delta : delta;
+
+    // compute fractional correction
+    uint32_t rem = 0;
+    int32_t frac = corrFrac(rate, scratch.fpart, &rem);
+
+    // compute integral correction
+    scratch.fpart = 0;
+    scratch.ipart = corrFrac(rate, scratch.ipart, &scratch.fpart);
+    scratch.full += frac;
+
+    if(neg) scratch.full = -scratch.full;
+    return (int64_t) scratch.full;
+}
+
+int32_t corrFrac(int32_t rate, uint32_t delta, volatile uint32_t *rem) {
+    union fixed_32_32 scratch;
+    int neg = rate < 0;
+
+    scratch.ipart = 0;
+    scratch.fpart = neg ? -rate: rate;
+    scratch.full *= delta;
+    // reapply sign
+    if(neg) scratch.full = -scratch.full;
+    // apply prior remainder
+    scratch.full += *rem;
+    // update remainder
+    *rem = scratch.fpart;
+    return (int32_t) scratch.ipart;
 }
 
 float toFloatU(uint64_t value) {

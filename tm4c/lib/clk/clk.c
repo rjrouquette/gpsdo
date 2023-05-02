@@ -74,6 +74,6 @@ void CLK_PPS(uint64_t *tsResult) {
     __enable_irq();
 
     tsResult[0] = fromClkMono(ppsEvent.timer, ppsEvent.offset, ppsEvent.integer);
-    tsResult[1] = tsResult[0] + corrValue(ppsEvent.compRate, tsResult[0] - ppsEvent.compRef, 0) + ppsEvent.compOff;
-    tsResult[2] = tsResult[1] + corrValue(ppsEvent.taiRate, tsResult[1] - ppsEvent.taiRef, 0) + ppsEvent.taiOff;
+    tsResult[1] = tsResult[0] + corrValue(ppsEvent.compRate, (int64_t) (tsResult[0] - ppsEvent.compRef)) + ppsEvent.compOff;
+    tsResult[2] = tsResult[1] + corrValue(ppsEvent.taiRate, (int64_t) (tsResult[1] - ppsEvent.taiRef)) + ppsEvent.taiOff;
 }

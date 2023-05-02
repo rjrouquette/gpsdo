@@ -17,7 +17,7 @@
 #define TCMP_ALPHA (0x1p-14f)
 #define TCMP_EEPROM_BLOCK (0x0010)
 #define TCMP_SAVE_INTV (3600) // save state every hour
-#define TCMP_UPDT_INTV (3906250)  // 32 Hz
+#define TCMP_UPDT_INTV (CLK_FREQ / 16)  // 16 Hz
 
 static volatile uint32_t tempNext = 0;
 static volatile float tempValue;
@@ -89,7 +89,7 @@ void TCMP_init() {
 
 void TCMP_run() {
     // poll for next temperature update trigger
-    if(((int32_t) (tempNext - GPTM0.TAV.raw)) <= 0) {
+    if((GPTM0.TAV.raw - tempNext) > 0) {
         // start next temperature measurement
         ADC0.PSSI.SS3 = 1;
         // set next update time
