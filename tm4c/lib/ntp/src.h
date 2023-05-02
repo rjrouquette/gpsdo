@@ -43,6 +43,7 @@ struct NtpSource {
     int8_t precision;
     uint8_t leap;
     uint8_t version;
+    uint8_t ntpMode;
 
     // filter state
     struct NtpPollSample pollSample[NTP_MAX_HISTORY];

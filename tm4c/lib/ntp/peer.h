@@ -15,12 +15,13 @@
 struct NtpPeer {
     struct NtpSource source;
 
+    // packet timestamp filters
+    uint64_t filterTx;
+    uint64_t filterRx;
     // packet timestamps
     uint64_t local_tx_hw[3];
-    uint64_t local_tx;
     uint64_t remote_rx;
     uint64_t remote_tx;
-    uint64_t local_rx;
     uint64_t local_rx_hw[3];
 
     // state machine

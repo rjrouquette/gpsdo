@@ -27,6 +27,8 @@ static void NtpGPS_run(volatile void *pObj) {
             this->lastPoll = now;
             this->source.reach <<= 1;
             ++this->source.txCount;
+            // update status
+            NtpSource_updateStatus(&(this->source));
         }
         return;
     }
@@ -85,6 +87,8 @@ void NtpGPS_init(volatile void *pObj) {
     this->source.lost = true;
     this->source.mode = RPY_SD_MD_REF;
     this->source.state = RPY_SD_ST_UNSELECTED;
+    this->source.version = 4;
+    this->source.ntpMode = 4;
     // set id to "GPS"
     this->source.id = 0x00535047;
     this->source.precision = NTP_CLK_PREC;

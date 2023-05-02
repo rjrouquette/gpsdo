@@ -115,18 +115,21 @@ static void sendPoll(NtpPeer *this) {
     // set reference timestamp
     headerNTP->refTime = 0;
     if(this->pollXleave) {
-        // interleaved timestamp chaining
+        // set filter timestamps
+        this->filterRx = __builtin_bswap64(this->local_rx_hw[0]);
+        this->filterTx = __builtin_bswap64(this->local_tx_hw[0]);
+        // interleaved query
         headerNTP->origTime = this->remote_rx;
-        headerNTP->rxTime = this->local_rx_hw[0];
-        headerNTP->txTime = this->local_tx_hw[0];
+        headerNTP->rxTime = this->filterRx;
+        headerNTP->txTime = this->filterTx;
     } else {
-        // standard timestamp chaining
-        headerNTP->origTime = this->remote_tx;
-        headerNTP->rxTime = __builtin_bswap64((this->local_rx_hw[2] - clkTaiUtcOffset) + NTP_UTC_OFFSET);
-        // set provisional TX time (actual value in unimportant, only need to be unique)
-        uint64_t txTime = CLK_MONO();
-        headerNTP->txTime = txTime;
-        this->local_tx = txTime;
+        // set filter timestamps
+        this->filterRx = 0;
+        this->filterTx = __builtin_bswap64(CLK_MONO());
+        // standard query
+        headerNTP->origTime = 0;
+        headerNTP->rxTime = this->filterRx;
+        headerNTP->txTime = this->filterTx;
         // set callback for tx timestamp
         NET_setTxCallback(txDesc, txCallback, this);
     }
@@ -160,7 +163,8 @@ static void startPoll(NtpPeer *this) {
     this->pollBurst = 0xFF;
     this->pollRetry = 0;
     this->pollXleave = false;
-    this->local_tx = 0;
+    this->filterTx = 0;
+    this->filterRx = 0;
 }
 
 static void runPoll(NtpPeer *this) {
@@ -284,6 +288,8 @@ void NtpPeer_init(volatile void *pObj) {
     this->pollNext = CLK_MONO();
 }
 
+extern uint64_t tsDebug[3];
+
 void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     // typecast "this" pointer
     NtpPeer *this = (NtpPeer *) pObj;
@@ -295,24 +301,24 @@ void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
 
-    // drop unsolicited packets
-    if(headerNTP->origTime == 0)
-        return;
-
     // check for interleaved response
     if(this->pollXleave) {
+        tsDebug[0] = __builtin_bswap64(headerNTP->origTime);
+        tsDebug[1] = __builtin_bswap64(headerNTP->rxTime);
+        tsDebug[2] = __builtin_bswap64(headerNTP->txTime);
+
         // discard non-interleaved packets
-        if(headerNTP->origTime == this->local_tx_hw[0]) {
+        if(headerNTP->origTime == this->filterTx) {
             // packet received, but it was not interleaved
             this->pktRecv = true;
             this->source.xleave = false;
             return;
         }
         // discard unsolicited packets
-        if(headerNTP->origTime != this->local_rx_hw[0])
+        if(headerNTP->origTime != this->filterRx)
             return;
         // replace remote TX timestamp with updated value
-        this->local_tx = headerNTP->txTime;
+        this->remote_tx = headerNTP->txTime;
         // packet received, and it was interleaved
         this->pktRecv = true;
         this->source.xleave = true;
@@ -322,10 +328,10 @@ void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     }
 
     // drop unsolicited packets
-    if(headerNTP->origTime != this->local_tx)
+    if(headerNTP->origTime != this->filterTx)
         return;
     // prevent reception of duplicate packets
-    this->local_tx = 0;
+    this->filterTx = 0;
     // packet received
     this->pktRecv = true;
     // set hardware timestamp
@@ -336,6 +342,7 @@ void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     this->source.leap = headerNTP->status;
     this->source.precision = headerNTP->precision;
     this->source.version = headerNTP->version;
+    this->source.ntpMode = headerNTP->mode;
     this->source.refID = headerNTP->refID;
     this->source.refTime = headerNTP->refTime;
     // set remote timestamps

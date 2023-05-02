@@ -237,6 +237,8 @@ static void ntpResponse(uint8_t *frame, int flen) {
     if(headerIPv4->src == ipAddress) return;
     // filter non-server frames
     if(headerNTP->mode != NTP_MODE_SRV) return;
+    // filter invalid frames
+    if(headerNTP->origTime == 0) return;
 
     // locate recipient
     uint32_t srcAddr = headerIPv4->src;
@@ -643,7 +645,7 @@ static uint16_t chronycNtpData(CMD_Reply *cmdReply, const CMD_Request *cmdReques
     cmdReply->data.ntp_data.remote_addr.family = htons(IPADDR_INET4);
     cmdReply->data.ntp_data.remote_addr.addr.in4 = source->id;
     cmdReply->data.ntp_data.remote_port = htons(NTP_PORT_SRV);
-    cmdReply->data.ntp_data.mode = source->mode;
+    cmdReply->data.ntp_data.mode = source->ntpMode;
     cmdReply->data.ntp_data.version = source->version;
     cmdReply->data.ntp_data.stratum = source->stratum;
     cmdReply->data.ntp_data.leap = source->leap;

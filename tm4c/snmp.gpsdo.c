@@ -3,7 +3,9 @@
 //
 
 #include <math.h>
-#include "gpsdo.h"
+#include "lib/clk/comp.h"
+#include "lib/ntp/pll.h"
+#include "lib/ntp/tcmp.h"
 
 const uint8_t OID_SENSOR_PREFIX[] = { 0x06, 0x0A, 0x2B, 6, 1, 2, 1, 99, 1, 1, 1 };
 
@@ -300,63 +302,63 @@ int writeGpsdoValue(uint8_t *buffer) {
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(GPSDO_temperature() * 1e3f)
+            lroundf(TCMP_temp() * 1e3f)
     );
 
     // DCXO temp
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(GPSDO_temperature() * 1e3f)
+            lroundf(TCMP_temp() * 1e3f)
     );
 
     // GPSDO mean offset
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(GPSDO_offsetMean() * 1e10f)
+            lroundf(PLL_offsetMean() * 1e10f)
     );
 
     // GPSDO RMS offset
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(GPSDO_offsetRms() * 1e10f)
+            lroundf(PLL_offsetRms() * 1e10f)
     );
 
     // GPSDO RMS skew
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(GPSDO_skewRms() * 1e10f)
+            lroundf(PLL_driftStdDev() * 1e10f)
     );
 
     // GPSDO correction
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(GPSDO_freqCorr() * 1e10f)
+            lroundf(1e10f * 0x1p-32f * (float) CLK_COMP_getComp())
     );
 
     // GPSDO temperature compensation offset
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(GPSDO_compOffset() * 1e10f)
+            lroundf(0 * 1e10f)
     );
 
     // GPSDO temperature compensation coefficient
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(GPSDO_compCoeff() * 1e10f)
+            lroundf(0 * 1e10f)
     );
 
     // GPSDO temperature compensation value
     dlen = writeValueInt32(
             buffer, dlen,
             OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE,
-            lroundf(GPSDO_compValue() * 1e10f)
+            lroundf(TCMP_get() * 1e10f)
     );
 
     return dlen;
