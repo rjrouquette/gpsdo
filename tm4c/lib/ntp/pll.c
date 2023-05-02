@@ -27,24 +27,23 @@ static volatile float driftStdDev;
 static volatile float driftRms;
 
 // PLL proportional terms
-static volatile int32_t offsetProportion;
+static volatile float offsetProportion;
 
 // PLL integral terms
-static volatile int32_t offsetIntegral;
-static volatile int32_t driftIntegral;
+static volatile float offsetIntegral;
+static volatile float driftIntegral;
 
 // Temperature Compensation State
 static volatile float tcompCurrent;
 static volatile float tcompPrior;
-static volatile int32_t driftComp;
 
 void PLL_init() {
     TCMP_init();
 
     tcompCurrent = TCMP_get();
     tcompPrior = tcompCurrent;
-    driftComp = (int32_t) (0x1p32f * tcompCurrent);
-    CLK_COMP_setComp(driftComp + driftIntegral);
+    float comp = tcompCurrent + driftIntegral;
+    CLK_COMP_setComp((int32_t) (0x1p32f * comp));
 }
 
 void PLL_run() {
@@ -57,14 +56,12 @@ void PLL_run() {
 
     // apply tcomp update
     if (tcompDelta != 0) {
-        if (fabsf(tcompDelta) > 100e-9f) {
-            int32_t driftNew = (int32_t) (0x1p32f * tcompCurrent);
-            driftIntegral -= driftNew - driftComp;
-            driftComp = driftNew;
-        } else {
-            driftComp = (int32_t) (0x1p32f * tcompCurrent);
-        }
-        CLK_COMP_setComp(driftComp + driftIntegral);
+        // prevent spurious frequency corrections
+        if (fabsf(tcompDelta) > 100e-9f)
+            driftIntegral -= tcompDelta;
+        // update compensation
+        float comp = tcompCurrent + driftIntegral;
+        CLK_COMP_setComp((int32_t) (0x1p32f * comp));
     }
 }
 
@@ -111,18 +108,16 @@ void PLL_updateOffset(int interval, int64_t offset) {
     // adjust rate to match polling interval
     rate *= 0x1p-16f * (float) (1u << (16 - interval));
     // update offset compensation
-    float pllCorr = rate * fltOffset;
-    // convert back to fixed-point correction factor
-    offsetProportion = (int32_t) (0x1p32f * pllCorr);
-    offsetIntegral += offsetProportion >> PLL_OFFSET_INT_RATE;
+    offsetProportion = rate * fltOffset;
+    offsetIntegral += offsetProportion * PLL_OFFSET_INT_RATE;
     // limit integration range
-    if(offsetIntegral > PLL_MAX_FREQ_TRIM) driftIntegral = PLL_MAX_FREQ_TRIM;
-    if(offsetIntegral < PLL_MIN_FREQ_TRIM) driftIntegral = PLL_MIN_FREQ_TRIM;
+    if(offsetIntegral >  PLL_MAX_FREQ_TRIM) offsetIntegral =  PLL_MAX_FREQ_TRIM;
+    if(offsetIntegral < -PLL_MAX_FREQ_TRIM) offsetIntegral = -PLL_MAX_FREQ_TRIM;
     // limit correction range
-    int32_t trim = offsetProportion + offsetIntegral;
-    if(trim > PLL_MAX_FREQ_TRIM) trim = PLL_MAX_FREQ_TRIM;
-    if(trim < PLL_MIN_FREQ_TRIM) trim = PLL_MIN_FREQ_TRIM;
-    CLK_TAI_setTrim(trim);
+    float trim = offsetProportion + offsetIntegral;
+    if(trim >  PLL_MAX_FREQ_TRIM) trim =  PLL_MAX_FREQ_TRIM;
+    if(trim < -PLL_MAX_FREQ_TRIM) trim = -PLL_MAX_FREQ_TRIM;
+    CLK_TAI_setTrim((int32_t) (0x1p32f * trim));
 }
 
 void PLL_updateDrift(int interval, float drift) {
@@ -138,14 +133,16 @@ void PLL_updateDrift(int interval, float drift) {
     driftStdDev = sqrtf(driftVar);
     driftRms = sqrtf(driftMS);
 
-//    if(interval < 0) interval = 0;
-//    float rate = 0x1p-16f * (float) (1 << (16 - interval));
-//    driftIntegral += (int32_t) (0x1p32f * PLL_DRIFT_INT_RATE * rate * drift);
-    driftIntegral += (int32_t) (0x1p32f * PLL_DRIFT_INT_RATE * drift);
+    // update integral term
+    driftIntegral += drift * PLL_DRIFT_INT_RATE;
     // limit integration range
-    if(driftIntegral > PLL_MAX_FREQ_TRIM) driftIntegral = PLL_MAX_FREQ_TRIM;
-    if(driftIntegral < PLL_MIN_FREQ_TRIM) driftIntegral = PLL_MIN_FREQ_TRIM;
-    CLK_COMP_setComp(driftComp + driftIntegral);
+    if(driftIntegral >  PLL_MAX_FREQ_TRIM) driftIntegral =  PLL_MAX_FREQ_TRIM;
+    if(driftIntegral < -PLL_MAX_FREQ_TRIM) driftIntegral = -PLL_MAX_FREQ_TRIM;
+    // limit compensation range
+    float comp = tcompCurrent + driftIntegral;
+    if(comp >  PLL_MAX_FREQ_TRIM) comp =  PLL_MAX_FREQ_TRIM;
+    if(comp < -PLL_MAX_FREQ_TRIM) comp = -PLL_MAX_FREQ_TRIM;
+    CLK_COMP_setComp((int32_t) (0x1p32f * comp));
 }
 
 unsigned PLL_status(char *buffer) {
@@ -197,12 +194,12 @@ unsigned PLL_status(char *buffer) {
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
-    tmp[fmtFloat(1e6f * 0x1p-32f * (float) driftIntegral, 12, 4, tmp)] = 0;
+    tmp[fmtFloat(driftIntegral * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - pll i: ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
-    tmp[fmtFloat(1e6f * 0x1p-32f * (float) driftComp, 12, 4, tmp)] = 0;
+    tmp[fmtFloat(tcompCurrent * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - tcomp: ");
     end = append(end, tmp);
     end = append(end, " ppm\n\n");
