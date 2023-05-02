@@ -288,8 +288,6 @@ void NtpPeer_init(volatile void *pObj) {
     this->pollNext = CLK_MONO();
 }
 
-extern uint64_t tsDebug[3];
-
 void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
     // typecast "this" pointer
     NtpPeer *this = (NtpPeer *) pObj;
@@ -303,10 +301,6 @@ void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
 
     // check for interleaved response
     if(this->pollXleave) {
-        tsDebug[0] = __builtin_bswap64(headerNTP->origTime);
-        tsDebug[1] = __builtin_bswap64(headerNTP->rxTime);
-        tsDebug[2] = __builtin_bswap64(headerNTP->txTime);
-
         // discard non-interleaved packets
         if(headerNTP->origTime == this->filterTx) {
             // packet received, but it was not interleaved
