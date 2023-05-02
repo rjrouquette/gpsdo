@@ -108,8 +108,7 @@ void GPS_run() {
     if(prevSecond != now) {
         prevSecond = now;
         // check GPS message configuration
-        if((now & 3) == 0)
-            configureGPS();
+        configureGPS();
 
         // release reset pin if it held down
         if(!GPS_RST_PORT.DATA[GPS_RST_PIN])
