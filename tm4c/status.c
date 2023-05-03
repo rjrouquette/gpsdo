@@ -38,6 +38,8 @@ unsigned statusGPSDO(char *body);
 unsigned statusNTP(char *body);
 unsigned statusSystem(char *body);
 
+unsigned statusSom(char *buffer);
+
 int hasTerminus(const char *str, int offset) {
     if(str[offset] == 0) return 1;
     if(str[offset] == '\n') return 1;
@@ -89,6 +91,8 @@ void STATUS_process(uint8_t *frame, int flen) {
         size = PLL_status(body);
     } else if(strncmp(body, "system", 6) == 0 && hasTerminus(body, 6)) {
         size = statusSystem(body);
+    } else if(strncmp(body, "som", 3) == 0 && hasTerminus(body, 3)) {
+        size = statusSom(body);
     } else {
         char tmp[32];
         strncpy(tmp, body, size);
