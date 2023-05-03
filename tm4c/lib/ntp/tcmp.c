@@ -50,19 +50,6 @@ void TCMP_init() {
     ADC0.SS3.TSH.TSH0 = ADC_TSH_256;
     ADC0.ACTSS.ASEN3 = 1;
 
-    // take and discard some initial measurements to allow for settling
-    for(int i = 0; i < 16; i++) {
-        // trigger temperature measurement
-        ADC0.PSSI.SS3 = 1;
-        // wait for data
-        while(!ADC0.RIS.INR3);
-        // clear flag
-        ADC0.ISC.IN3 = 1;
-        // read data
-        while(!ADC0.SS3.FSTAT.EMPTY)
-            tempValue = toCelsius(ADC0.SS3.FIFO.DATA);
-    }
-
     // load temperature compensation parameters
     uint32_t word;
     EEPROM_seek(TCMP_EEPROM_BLOCK);
@@ -83,7 +70,17 @@ void TCMP_init() {
         tcmpBias = 0;
         tcmpOff = 0;
     }
-    // update compensation value
+
+    // take and discard some initial measurements
+    for(int i = 0; i < 16; i++) {
+        ADC0.PSSI.SS3 = 1;      // trigger temperature measurement
+        while(!ADC0.RIS.INR3);  // wait for data
+        ADC0.ISC.IN3 = 1;       // clear flag
+        // drain FIFO
+        while(!ADC0.SS3.FSTAT.EMPTY)
+            tempValue = toCelsius(ADC0.SS3.FIFO.DATA);
+    }
+    // set compensation value
     tcmpValue = tcmpOff + (tcmpCoef * (tempValue - tcmpBias));
 }
 
@@ -102,7 +99,7 @@ void TCMP_run() {
     }
 
     // poll for next compensation update trigger
-    if(((int32_t) (tcmpNext - GPTM0.TAV.raw)) <= 0) {
+    if((GPTM0.TAV.raw - tcmpNext) > 0) {
         // set next update time
         tcmpNext += TCMP_UPDT_INTV;
         // update compensation value
