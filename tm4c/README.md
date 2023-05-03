@@ -21,26 +21,6 @@
 
 
 ## Supported SNMP MIBs:
-- 1.3.6.1.2.1.197.1.1 = NTP Info (Get)
-  - 1.3.6.1.2.1.197.1.1.1 = NTP Software Name
-  - 1.3.6.1.2.1.197.1.1.2 = NTP Software Version
-  - 1.3.6.1.2.1.197.1.1.3 = NTP Software Vendor
-  - 1.3.6.1.2.1.197.1.1.4 = NTP System Type
-  - 1.3.6.1.2.1.197.1.1.5 = NTP Time Resolution
-  - 1.3.6.1.2.1.197.1.1.6 = NTP Time Precision
-  - 1.3.6.1.2.1.197.1.1.7 = NTP Time Distance
-- 1.3.6.1.2.1.197.1.2 NTP Status (Get)
-  - 1.3.6.1.2.1.197.1.2.1 NTP Current Mode
-    - 2 = Not Synchronized
-    - 5 = GPS Synchronized
-  - 1.3.6.1.2.1.197.1.2.2 NTP Stratum
-  - 1.3.6.1.2.1.197.1.2.3 NTP Active Reference ID
-  - 1.3.6.1.2.1.197.1.2.4 NTP Active Reference Name
-  - 1.3.6.1.2.1.197.1.2.5 NTP Active Reference Offset
-  - 1.3.6.1.2.1.197.1.2.6 NTP Number of References
-  - 1.3.6.1.2.1.197.1.2.7 NTP Root Dispersion
-  - 1.3.6.1.2.1.197.1.2.8 NTP Uptime (in seconds)
-  - 1.3.6.1.2.1.197.1.2.9 NTP Date (128-bit format)
 
 
 ## Hardware References:

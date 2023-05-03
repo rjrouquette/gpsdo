@@ -17,6 +17,7 @@
 #include "../net/eth.h"
 
 #include "common.h"
+#include "gitversion.h"
 #include "ntp.h"
 #include "peer.h"
 #include "ref.h"

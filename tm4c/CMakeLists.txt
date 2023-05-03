@@ -58,6 +58,8 @@ add_executable(
         lib/ntp/src.c
         lib/ntp/tcmp.c
         lib/rand.c
+        lib/snmp/sensors.c
+        lib/snmp/util.c
 )
 
 target_link_libraries(

@@ -5,6 +5,8 @@
 #ifndef GPSDO_NET_H
 #define GPSDO_NET_H
 
+#include <stdint.h>
+
 #define PHY_STATUS_DUPLEX (4)
 #define PHY_STATUS_100M (2)
 #define PHY_STATUS_LINK (1)

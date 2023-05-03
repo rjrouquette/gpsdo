@@ -4,13 +4,14 @@
 
 #include <memory.h>
 
-#include "lib/format.h"
+#include "lib/led.h"
 #include "lib/net.h"
 #include "lib/net/eth.h"
 #include "lib/net/ip.h"
 #include "lib/net/udp.h"
 #include "lib/net/util.h"
-#include "lib/led.h"
+#include "lib/snmp/sensors.h"
+#include "lib/snmp/util.h"
 #include "snmp.h"
 
 #include "gitversion.h"
@@ -18,9 +19,6 @@
 #define SNMP_PORT (161)
 
 const uint8_t OID_PREFIX_MGMT[] = {0x2B, 6, 1, 2, 1 };
-
-const uint8_t RESP_HEAD[] = { 0x02, 0x01, 0x00, 0x04, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0xA2 };
-const uint8_t RESP_ERR[] = { 0x02, 0x01, 0x00, 0x02, 0x01, 0x00, 0x30 };
 
 static uint8_t buffOID[16];
 static int lenOID;
@@ -31,29 +29,14 @@ int readBytes(const uint8_t *data, int offset, int dlen, void *result, int *rlen
 int readInt32(const uint8_t *data, int offset, int dlen, uint32_t *result);
 int readOID(const uint8_t *data, int offset, int dlen, void *result, int *rlen);
 
-int writeLength(uint8_t *data, int offset, int len);
-int writeBytes(uint8_t *data, int offset, const void *value, int len);
-int writeInt(uint8_t *data, int offset, void *value, int size);
-
-int writeValueBytes(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, const void *value, int len);
-int writeValueInt8(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint8_t value);
-int writeValueInt16(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint16_t value);
-int writeValueInt32(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint32_t value);
-int writeValueInt64(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint64_t value);
-
-int wrapVars(uint8_t *data, int offset, uint8_t *vars, int len);
-
 void sendBatt(uint8_t *frame);
-void sendGPSDO(uint8_t *frame);
-//void sendNTP(uint8_t *frame);
+void sendSensors(uint8_t *frame);
 
 void SNMP_process(uint8_t *frame, int flen);
 
 void SNMP_init() {
     UDP_register(SNMP_PORT, SNMP_process);
 }
-
-extern volatile uint8_t debugHex[32];
 
 void SNMP_process(uint8_t *frame, int flen) {
     // map headers
@@ -128,12 +111,8 @@ void SNMP_process(uint8_t *frame, int flen) {
             switch (section) {
                 // GPSDO (Physical Sensors)
                 case 99:
-                    sendGPSDO(frame);
+                    sendSensors(frame);
                     break;
-//                // NTP
-//                case 197:
-//                    sendNTP(frame);
-//                    break;
                 // battery
                 case 233:
                     sendBatt(frame);
@@ -237,164 +216,6 @@ int readOID(const uint8_t *data, int offset, int dlen, void *result, int *rlen) 
     return offset + blen;
 }
 
-int writeLength(uint8_t *data, int offset, int len) {
-    if(len < 128) {
-        data[offset++] = len;
-        return offset;
-    }
-    if(len < (1<<8)) {
-        data[offset++] = 0x81;
-        data[offset++] = len;
-        return offset;
-    }
-    if(len < (1<<16)) {
-        data[offset++] = 0x82;
-        data[offset++] = len >> 8;
-        data[offset++] = len;
-        return offset;
-    }
-    if(len < (1<<24)) {
-        data[offset++] = 0x83;
-        data[offset++] = len >> 16;
-        data[offset++] = len >> 8;
-        data[offset++] = len;
-        return offset;
-    }
-    data[offset++] = 0x84;
-    data[offset++] = len >> 24;
-    data[offset++] = len >> 16;
-    data[offset++] = len >> 8;
-    data[offset++] = len;
-    return offset;
-}
-
-int writeBytes(uint8_t *data, int offset, const void *value, int len) {
-    data[offset++] = 0x04;
-    data[offset++] = len;
-    for(int i = 0; i < len; i++)
-        data[offset++] = ((uint8_t *)value)[i];
-    return offset;
-}
-
-int writeInt(uint8_t *data, int offset, void *value, int size) {
-    data[offset++] = 0x02;
-    data[offset++] = size--;
-    while(size >= 0) {
-        // append byte
-        data[offset++] = ((uint8_t *) value)[size--];
-    }
-    return offset;
-}
-
-int writeValueBytes(
-        uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, const void *value, int len
-) {
-    uint8_t *buff = data + offset;
-    len &= 0x7F;
-    int vlen = 2;
-    memcpy(buff + vlen, prefOID, prefLen);
-    vlen += prefLen;
-    buff[vlen++] = oid;
-    vlen = writeBytes(buff, vlen, value, len);
-    buff[0] = 0x30;
-    buff[1] = vlen - 2;
-    return offset + vlen;
-}
-
-int writeValueInt8(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint8_t value) {
-    uint8_t *buff = data + offset;
-    int vlen = 2;
-    memcpy(buff + vlen, prefOID, prefLen);
-    vlen += prefLen;
-    buff[vlen++] = oid;
-    vlen = writeInt(buff, vlen, &value, sizeof(value));
-    buff[0] = 0x30;
-    buff[1] = vlen - 2;
-    return offset + vlen;
-}
-
-int writeValueInt16(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint16_t value) {
-    uint8_t *buff = data + offset;
-    int vlen = 2;
-    memcpy(buff + vlen, prefOID, prefLen);
-    vlen += prefLen;
-    buff[vlen++] = oid;
-    vlen = writeInt(buff, vlen, &value, sizeof(value));
-    buff[0] = 0x30;
-    buff[1] = vlen - 2;
-    return offset + vlen;
-}
-
-int writeValueInt32(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint32_t value) {
-    uint8_t *buff = data + offset;
-    int vlen = 2;
-    memcpy(buff + vlen, prefOID, prefLen);
-    vlen += prefLen;
-    buff[vlen++] = oid;
-    vlen = writeInt(buff, vlen, &value, sizeof(value));
-    buff[0] = 0x30;
-    buff[1] = vlen - 2;
-    return offset + vlen;
-}
-
-int writeValueInt64(uint8_t *data, int offset, const uint8_t *prefOID, int prefLen, uint8_t oid, uint64_t value) {
-    uint8_t *buff = data + offset;
-    int vlen = 2;
-    memcpy(buff + vlen, prefOID, prefLen);
-    vlen += prefLen;
-    buff[vlen++] = oid;
-    vlen = writeInt(buff, vlen, &value, sizeof(value));
-    buff[0] = 0x30;
-    buff[1] = vlen - 2;
-    return offset + vlen;
-}
-
-int lengthSize(int len) {
-    if(len < 128)
-        return 1;
-    if(len < (1<<8))
-        return 2;
-    if(len < (1<<16))
-        return 3;
-    if(len < (1<<24))
-        return 4;
-    return 5;
-}
-
-int wrapVars(uint8_t *data, int offset, uint8_t *vars, int len) {
-    // request id
-    uint8_t rid[8];
-    int lenRID = writeInt(rid, 0, &reqId, sizeof(reqId));
-
-    int tlen = len;
-    tlen += lengthSize(len);
-    tlen += sizeof(RESP_ERR);
-    tlen += lenRID;
-    int rlen = tlen;
-    tlen += lengthSize(tlen);
-    tlen += sizeof(RESP_HEAD);
-
-    data[offset++] = 0x30;
-    offset = writeLength(data, offset, tlen);
-
-    memcpy(data + offset, RESP_HEAD, sizeof(RESP_HEAD));
-    offset += sizeof(RESP_HEAD);
-
-    offset = writeLength(data, offset, rlen);
-
-    memcpy(data + offset, rid, lenRID);
-    offset += lenRID;
-
-    memcpy(data + offset, RESP_ERR, sizeof(RESP_ERR));
-    offset += sizeof(RESP_ERR);
-
-    offset = writeLength(data, offset, len);
-
-    memcpy(data + offset, vars, len);
-    offset += len;
-    return offset;
-}
-
 void sendResults(uint8_t *frame, uint8_t *data, int dlen) {
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
@@ -415,7 +236,8 @@ void sendResults(uint8_t *frame, uint8_t *data, int dlen) {
     uint8_t *txFrame = NET_getTxBuff(txDesc);
     memcpy(txFrame, frame, UDP_DATA_OFFSET);
 
-    dlen = wrapVars(txFrame, UDP_DATA_OFFSET, data, dlen);
+    dlen  = UDP_DATA_OFFSET;
+    dlen += SNMP_wrapVars(reqId, txFrame + dlen, data, dlen);
 
     // transmit response
     UDP_finalize(txFrame, dlen);
@@ -425,5 +247,38 @@ void sendResults(uint8_t *frame, uint8_t *data, int dlen) {
 
 // sub units
 #include "snmp.batt.c"
-#include "snmp.gpsdo.c"
-//#include "snmp.ntp.c"
+
+void sendSensors(uint8_t *frame) {
+    // variable bindings
+    uint8_t buffer[512];
+    int dlen;
+
+    // filter MIB
+    if(buffOID[sizeof(OID_PREFIX_MGMT)+1] != 1) return;
+    if(buffOID[sizeof(OID_PREFIX_MGMT)+2] != 1) return;
+    if(buffOID[sizeof(OID_PREFIX_MGMT)+3] != 1) return;
+
+    // select output data
+    switch (buffOID[sizeof(OID_PREFIX_MGMT)+4]) {
+        case OID_SENSOR_TYPE:
+            dlen = SNMP_writeSensorTypes(buffer);
+            sendResults(frame, buffer, dlen);
+            break;
+        case OID_SENSOR_SCALE:
+            dlen = SNMP_writeSensorScales(buffer);
+            sendResults(frame, buffer, dlen);
+            break;
+        case OID_SENSOR_PREC:
+            dlen = SNMP_writeSensorPrecs(buffer);
+            sendResults(frame, buffer, dlen);
+            break;
+        case OID_SENSOR_VALUE:
+            dlen = SNMP_writeSensorValues(buffer);
+            sendResults(frame, buffer, dlen);
+            break;
+        case OID_SENSOR_UNITS:
+            dlen = SNMP_writeSensorUnits(buffer);
+            sendResults(frame, buffer, dlen);
+            break;
+    }
+}
