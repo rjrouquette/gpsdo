@@ -9,6 +9,8 @@
 #include <stdbool.h>
 
 #define NTP_MAX_HISTORY (16)
+#define NTP_MAX_STRAT (3)
+#define NTP_MAX_DELAY (50e-3f)
 
 struct NtpPollSample {
     uint64_t comp;

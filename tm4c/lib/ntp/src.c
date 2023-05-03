@@ -3,9 +3,9 @@
 //
 
 #include <math.h>
+#include "../clk/mono.h"
 #include "../clk/util.h"
 #include "src.h"
-#include "../clk/mono.h"
 
 static void getMeanVar(int cnt, const float *v, float *mean, float *var);
 
@@ -181,7 +181,11 @@ void NtpSource_updateStatus(NtpSource *this) {
     }
 
     // mark source for pruning if it is unreachable
-    this->prune = (this->reach == 0 && this->pollCounter >= 16);
+    this->prune = (this->reach == 0) && (this->pollCounter >= 16);
+    // mark source for pruning if its stratum is too high
+    this->prune |= this->stratum > NTP_MAX_STRAT;
+    // mark source for pruning if its delay is too high
+    this->prune |= (this->used > 7) && (this->delayMean > NTP_MAX_DELAY);
 }
 
 void NtpSource_applyOffset(NtpSource *this, int64_t offset) {
