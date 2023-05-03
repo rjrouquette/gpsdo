@@ -20,7 +20,7 @@
 #define TCMP_UPDT_INTV (CLK_FREQ / 16)  // 16 Hz
 
 #define SOM_EEPROM_BASE (0x0020)
-#define SOM_NODE_CNT (64)
+#define SOM_NODE_CNT (32)
 #define SOM_ALPHA (0x1p-10f)
 
 static volatile uint32_t tempNext = 0;
@@ -34,7 +34,7 @@ static volatile uint32_t tcmpSaved;
 static volatile float tcmpValue;
 
 // SOM for filtering compensation samples
-static volatile float somComp[SOM_NODE_CNT][2];
+static volatile float somComp[SOM_NODE_CNT][3];
 
 // neighbor weight = exp(-2.0f * dist)
 static const float somNW[SOM_NODE_CNT] = {
@@ -69,39 +69,7 @@ static const float somNW[SOM_NODE_CNT] = {
         4.78089288e-25f,
         6.47023493e-26f,
         8.75651076e-27f,
-        1.18506486e-27f,
-        1.60381089e-28f,
-        2.17052201e-29f,
-        2.93748211e-30f,
-        3.97544974e-31f,
-        5.38018616e-32f,
-        7.28129018e-33f,
-        9.85415469e-34f,
-        1.33361482e-34f,
-        1.80485139e-35f,
-        2.44260074e-36f,
-        3.30570063e-37f,
-        4.47377931e-38f,
-        6.05460190e-39f,
-        8.19401262e-40f,
-        1.10893902e-40f,
-        1.50078576e-41f,
-        2.03109266e-42f,
-        2.74878501e-43f,
-        3.72007598e-44f,
-        5.03457536e-45f,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        1.18506486e-27f
 };
 
 __attribute__((always_inline))
@@ -286,11 +254,12 @@ static void saveSom() {
 }
 
 static void seedSom(float temp, float comp) {
-    float norm = 1.0f / (float) SOM_NODE_CNT;
+    float norm = 0.01f / (float) SOM_NODE_CNT;
     int mid = SOM_NODE_CNT / 2;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         somComp[i][0] = temp + (norm * (float)(i - mid));
         somComp[i][1] = comp;
+        somComp[i][2] = 0;
     }
 }
 
@@ -321,6 +290,7 @@ static void updateSom(float temp, float comp) {
         // update node weights
         somComp[i][0] += (temp - somComp[i][0]) * alpha;
         somComp[i][1] += (comp - somComp[i][1]) * alpha;
+        somComp[i][2] += (1.0f - somComp[i][2]) * alpha;
     }
 }
 
@@ -329,7 +299,8 @@ unsigned statusSom(char *buffer) {
 
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         end += fmtFloat(somComp[i][0], 9, 4, end);
-        end += fmtFloat(somComp[i][1] * 1e6f, 12, 4, end);
+        end += fmtFloat(somComp[i][1] * 1e6f, 10, 4, end);
+        end += fmtFloat(somComp[i][2], 8, 5, end);
         *(end++) = '\n';
     }
 
