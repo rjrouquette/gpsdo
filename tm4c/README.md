@@ -25,6 +25,8 @@ Supported SNMP MIB Requests:
 
 
 Hardware References:
+- [MSP432E401Y Datasheet](../docs/msp432e401y.pdf)
+- [MSP432E401Y Manual](../docs/slau723a.pdf)
 - [TM4C1249NCPDT Datasheet](../docs/tm4c1294ncpdt.pdf)
 - [EK-TM4C1249XL Manual](../docs/EK-TM4C1249XL.pdf)
 - [TM4C Template for Linux](https://github.com/shawn-dsilva/tm4c-linux-template)
