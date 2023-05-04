@@ -250,7 +250,7 @@ void sendResults(uint8_t *frame, uint8_t *data, int dlen) {
 
 void sendSensors(uint8_t *frame) {
     // variable bindings
-    uint8_t buffer[512];
+    uint8_t buffer[1024];
     int dlen;
 
     // filter MIB
@@ -290,6 +290,10 @@ void sendSensors(uint8_t *frame) {
             break;
         case OID_SENSOR_UPDATE_RATE:
             dlen = SNMP_writeSensorUpdateRates(buffer);
+            sendResults(frame, buffer, dlen);
+            break;
+        case OID_SENSOR_NAME:
+            dlen = SNMP_writeSensorNames(buffer);
             sendResults(frame, buffer, dlen);
             break;
     }

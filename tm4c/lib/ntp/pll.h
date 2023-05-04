@@ -47,11 +47,17 @@ float PLL_offsetLast();
 float PLL_offsetMean();
 float PLL_offsetRms();
 float PLL_offsetStdDev();
+float PLL_offsetProp();
+float PLL_offsetInt();
+float PLL_offsetCorr();
 
 // drift stats
 float PLL_driftLast();
 float PLL_driftMean();
 float PLL_driftRms();
 float PLL_driftStdDev();
+float PLL_driftInt();
+float PLL_driftTcmp();
+float PLL_driftCorr();
 
 #endif //GPSDO_PLL_H

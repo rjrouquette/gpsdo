@@ -214,9 +214,15 @@ float PLL_offsetLast() { return offsetLast; }
 float PLL_offsetMean() { return offsetMean; }
 float PLL_offsetRms() { return offsetRms; }
 float PLL_offsetStdDev() { return offsetStdDev; }
+float PLL_offsetProp() { return offsetProportion; }
+float PLL_offsetInt() { return offsetIntegral; }
+float PLL_offsetCorr() { return 0x1p-32f * (float) CLK_TAI_getTrim(); }
 
 // drift stats
 float PLL_driftLast() { return driftLast; }
 float PLL_driftMean() { return driftMean; }
 float PLL_driftRms() { return driftRms; }
 float PLL_driftStdDev() { return driftStdDev; }
+float PLL_driftInt() { return driftIntegral; }
+float PLL_driftTcmp() { return tcompCurrent; }
+float PLL_driftCorr() { return 0x1p-32f * (float) CLK_COMP_getComp(); }

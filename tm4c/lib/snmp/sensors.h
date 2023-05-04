@@ -15,6 +15,7 @@
 #define OID_SENSOR_UNITS (6)
 #define OID_SENSOR_UPDATE_TIME (7)
 #define OID_SENSOR_UPDATE_RATE (8)
+#define OID_SENSOR_NAME (9) // not part of the RFC
 
 #define OID_SENSOR_TYPE_OTHER (1)
 #define OID_SENSOR_TYPE_UNKNOWN (2)
@@ -107,6 +108,13 @@ int SNMP_writeSensorUpdateTimes(uint8_t *dst);
  */
 int SNMP_writeSensorUpdateRates(uint8_t *dst);
 
+/**
+ * Write SNMP response for Sensor Name OID
+ * @param dst address of output buffer
+ * @return number of bytes written to buffer
+ */
+int SNMP_writeSensorNames(uint8_t *dst);
+
 
 
 /**
@@ -171,6 +179,14 @@ int SNMP_writeSensorUpdateTime(uint8_t *dst, uint32_t timeTicks);
  * @param millis update rate in milliseconds
  * @return number of bytes written to destination
  */
-int SNMP_writeSensorUpdateRate(uint8_t *dst, int millis);
+int SNMP_writeSensorUpdateRate(uint8_t *dst, uint32_t millis);
+
+/**
+ * Write SNMP MIB for sensor names
+ * @param dst address at which to encode sensor name
+ * @param unit name of senor
+ * @return number of bytes written to destination
+ */
+int SNMP_writeSensorName(uint8_t *dst, const char *name);
 
 #endif //GPSDO_LIB_SNMP_SENSORS_H

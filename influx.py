@@ -1,46 +1,51 @@
 #!/usr/bin/python3
 
-from numpy import var
+import math
 from pysnmp.hlapi import *
 import requests
 import sys
 import time
+
+
+def getSnmpData(address: str, mib: str):
+    # issue request
+    iterator = getCmd(
+        SnmpEngine(),
+        CommunityData('status', mpModel=0),
+        UdpTransportTarget((address, 161)),
+        ContextData(),
+        ObjectType(ObjectIdentity(mib))
+    )
+    # get response
+    errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
+    if errorIndication or errorStatus:
+        return None
+    # return data
+    return [var[1] for var in varBinds]
+
+
+def assembleSnmpData(address: str):
+    scale = getSnmpData(address, '1.3.6.1.2.1.99.1.1.1.2')
+    prec = getSnmpData(address, '1.3.6.1.2.1.99.1.1.1.3')
+    value = getSnmpData(address, '1.3.6.1.2.1.99.1.1.1.4')
+    names = getSnmpData(address, '1.3.6.1.2.1.99.1.1.1.9')
+
+    result = {}
+    for i in range(len(names)):
+        result[str(names[i])] = int(value[i]) * math.pow(10, ((int(scale[i]) - 9) * 3) - int(prec[i]))
+    return result
+
 
 gpsdoHost = sys.argv[1]
 influxUrl = 'http://192.168.3.200:8086/write?db=radio_astronomy'
 
 while True:
     try:
-        iterator = getCmd(
-            SnmpEngine(),
-            CommunityData('status', mpModel=0),
-            UdpTransportTarget((gpsdoHost, 161)),
-            ContextData(),
-            ObjectType(ObjectIdentity('1.3.6.1.2.1.99.1.1.1.4'))
-        )
-
-        errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
-
-        if errorIndication:
-            print(errorIndication)
-
-        elif errorStatus:
-            print('%s at %s' % (errorStatus.prettyPrint(),
-                                errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
-
-        proc_temp = int(varBinds[0][1]) / 1000
-        err_mean = int(varBinds[1][1]) / 10
-        err_rms = int(varBinds[2][1]) / 10
-        pll_skew = int(varBinds[3][1]) / 10000
-        pll_ppm = int(varBinds[4][1]) / 10000
-        comp_bias = int(varBinds[5][1]) / 10
-        comp_coef = int(varBinds[6][1]) / 10
-        comp_val = int(varBinds[7][1]) / 10
-
-        body = 'gpsdo,host=%s proc_temp=%.3f,pll_error=%.1f,pll_rmse=%.1f,freq_skew=%.4f,pll_ppm=%.4f,comp_m=%.1f,comp_b=%.1f,comp_v=%.1f' % (
-            gpsdoHost, proc_temp, err_mean, err_rms, pll_skew, pll_ppm, comp_coef, comp_bias, comp_val
-        )
-        requests.post(influxUrl, data=body, timeout=1)
+        data = assembleSnmpData(gpsdoHost)
+        fields = ','.join([
+            f'{key.replace(".", "_")}={value}' for key, value in data.items()
+        ])
+        requests.post(influxUrl, data=f'gpsdo,host={gpsdoHost} {fields}', timeout=1)
     except:
         print('failed to poll or record stats')
 
