@@ -297,12 +297,20 @@ static void updateSom(float temp, float comp) {
 unsigned statusSom(char *buffer) {
     char *end = buffer;
 
+    // export in C-style array syntax
+    end = append(end, "float som[32][3] = {\n");
     for(int i = 0; i < SOM_NODE_CNT; i++) {
-        end += fmtFloat(somComp[i][0], 9, 4, end);
-        end += fmtFloat(somComp[i][1] * 1e6f, 10, 4, end);
-        end += fmtFloat(somComp[i][2], 8, 5, end);
+        end += fmtFloat(somComp[i][0], 0, 4, end);
+        end = append(end, "f, ");
+        end += fmtFloat(somComp[i][1] * 1e6f, 0, 4, end);
+        end = append(end, "f, ");
+        end += fmtFloat(somComp[i][2], 0, 6, end);
+        end = append(end, "f");
+        if(i < SOM_NODE_CNT - 1)
+            *(end++) = ',';
         *(end++) = '\n';
     }
+    end = append(end, "};\n");
 
     return end - buffer;
 }
