@@ -21,7 +21,6 @@
 
 #define SOM_EEPROM_BASE (0x0020)
 #define SOM_NODE_CNT (32)
-#define SOM_ALPHA (0x1p-10f)
 
 static volatile uint32_t tempNext = 0;
 static volatile float tempValue;
@@ -264,15 +263,18 @@ static void seedSom(float temp, float comp) {
 }
 
 static void updateSom(float temp, float comp) {
+    // initialize som nodes if necessary
     if(!isfinite(somComp[0][0])) {
         seedSom(temp, comp);
         return;
     }
 
-    // locate closest node
+    // locate nearest node and measure learning progress
+    float alpha = 0;
     int best = 0;
     float dist = fabsf(temp - somComp[0][0]);
     for(int i = 1; i < SOM_NODE_CNT; i++) {
+        alpha += somComp[i][2];
         float diff = fabsf(temp - somComp[i][0]);
         if(diff < dist) {
             dist = diff;
@@ -280,17 +282,18 @@ static void updateSom(float temp, float comp) {
         }
     }
 
-    // update nodes
+    // update nodes using dynamic learning rate
+    alpha = 0x1p-31f * (float) (1u << (31 - lroundf(alpha)));
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         // compute neighbor distance
         int ndist = i - best;
         if(ndist < 0) ndist = -ndist;
         // compute node alpha
-        const float alpha = SOM_ALPHA * somNW[ndist];
+        const float w = alpha * somNW[ndist];
         // update node weights
-        somComp[i][0] += (temp - somComp[i][0]) * alpha;
-        somComp[i][1] += (comp - somComp[i][1]) * alpha;
-        somComp[i][2] += (1.0f - somComp[i][2]) * alpha;
+        somComp[i][0] += (temp - somComp[i][0]) * w;
+        somComp[i][1] += (comp - somComp[i][1]) * w;
+        somComp[i][2] += (1.0f - somComp[i][2]) * w;
     }
 }
 
