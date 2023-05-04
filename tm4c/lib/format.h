@@ -24,7 +24,7 @@ int toTemp(int16_t value, char *origin);
 
 int toHMS(uint32_t value, char *origin);
 
-int fmtFloat(float value, int width, int digits, char *origin);
+int fmtFloat(float value, int width, int places, char *origin);
 
 uint32_t fromHex(const char *str, int len);
 
