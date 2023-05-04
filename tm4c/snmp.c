@@ -236,13 +236,13 @@ void sendResults(uint8_t *frame, uint8_t *data, int dlen) {
     uint8_t *txFrame = NET_getTxBuff(txDesc);
     memcpy(txFrame, frame, UDP_DATA_OFFSET);
 
-    dlen  = UDP_DATA_OFFSET;
-    dlen += SNMP_wrapVars(reqId, txFrame + dlen, data, dlen);
+    int flen = UDP_DATA_OFFSET;
+    flen += SNMP_wrapVars(reqId, txFrame + flen, data, dlen);
 
     // transmit response
-    UDP_finalize(txFrame, dlen);
-    IPv4_finalize(txFrame, dlen);
-    NET_transmit(txDesc, dlen);
+    UDP_finalize(txFrame, flen);
+    IPv4_finalize(txFrame, flen);
+    NET_transmit(txDesc, flen);
 }
 
 // sub units

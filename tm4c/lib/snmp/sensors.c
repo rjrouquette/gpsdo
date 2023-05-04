@@ -13,7 +13,7 @@
 static const uint8_t OID_SENSOR_PREFIX[] = { 0x06, 0x0A, 0x2B, 6, 1, 2, 1, 99, 1, 1, 1 };
 
 
-int SNMP_writeSensorTypes(uint8_t *const dst) {
+int SNMP_writeSensorTypes(uint8_t * const dst) {
     uint8_t *ptr = dst;
 
     // processor temperature
@@ -38,7 +38,7 @@ int SNMP_writeSensorTypes(uint8_t *const dst) {
     return ptr - dst;
 }
 
-int SNMP_writeSensorScales(uint8_t *dst) {
+int SNMP_writeSensorScales(uint8_t * const dst) {
     uint8_t *ptr = dst;
 
     // processor temperature
@@ -63,7 +63,7 @@ int SNMP_writeSensorScales(uint8_t *dst) {
     return ptr - dst;
 }
 
-int SNMP_writeSensorPrecs(uint8_t *dst) {
+int SNMP_writeSensorPrecs(uint8_t * const dst) {
     uint8_t *ptr = dst;
 
     // processor temperature
@@ -88,7 +88,7 @@ int SNMP_writeSensorPrecs(uint8_t *dst) {
     return ptr - dst;
 }
 
-int SNMP_writeSensorValues(uint8_t *dst) {
+int SNMP_writeSensorValues(uint8_t * const dst) {
     uint8_t *ptr = dst;
 
     // processor temperature
@@ -113,7 +113,7 @@ int SNMP_writeSensorValues(uint8_t *dst) {
     return ptr - dst;
 }
 
-int SNMP_writeSensorUnits(uint8_t *dst) {
+int SNMP_writeSensorUnits(uint8_t * const dst) {
     uint8_t *ptr = dst;
 
     // processor temperature
@@ -139,23 +139,24 @@ int SNMP_writeSensorUnits(uint8_t *dst) {
 }
 
 
-int SNMP_writeSensorType(uint8_t *dst, int typeId) {
+int SNMP_writeSensorType(uint8_t * const dst, int typeId) {
     return SNMP_writeValueInt8(dst, OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_TYPE, typeId);
 }
 
-int SNMP_writeSensorScale(uint8_t *dst, int scaleId) {
+int SNMP_writeSensorScale(uint8_t * const dst, int scaleId) {
     return SNMP_writeValueInt8(dst, OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_SCALE, scaleId);
 }
 
-int SNMP_writeSensorPrec(uint8_t *dst, int precision) {
+int SNMP_writeSensorPrec(uint8_t * const dst, int precision) {
     return SNMP_writeValueInt8(dst, OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_PREC, precision);
 }
 
-int SNMP_writeSensorValue(uint8_t *dst, int value) {
+int SNMP_writeSensorValue(uint8_t * const dst, int value) {
     return SNMP_writeValueInt32(dst, OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_VALUE, value);
 }
 
-int SNMP_writeSensorUnit(uint8_t *dst, const char *unit) {
+int SNMP_writeSensorUnit(uint8_t * const dst, const char *unit) {
     return SNMP_writeValueBytes(
-            dst, OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS, unit, (int) strlen(unit));
+            dst, OID_SENSOR_PREFIX, sizeof(OID_SENSOR_PREFIX), OID_SENSOR_UNITS, unit, (int) strlen(unit)
+    );
 }

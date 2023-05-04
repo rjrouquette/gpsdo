@@ -15,6 +15,20 @@
 int SNMP_lengthSize(int len);
 
 /**
+ * Determine expected size of encoded byte data based of length
+ * @param len the number of bytes to be encoded
+ * @return number of bytes required to encode the byte data
+ */
+int SNMP_lengthBytes(int len);
+
+/**
+ * Determine expected size of encoded integer
+ * @param size the size of the integer in bytes
+ * @return number of bytes required to encode the integer
+ */
+int SNMP_lengthInteger(int size);
+
+/**
  * Write SMNP encoded length value to byte stream
  * @param dst address at which to encode data
  * @param len length value to encode
@@ -53,12 +67,12 @@ int SNMP_writeValueInt64(uint8_t *dst, const uint8_t *prefOID, int prefLen, uint
 /**
  * Wrap SNMP request variable data to from a complete response
  * @param reqId request id
- * @param dest address at which to encode data
+ * @param dst address at which to encode data
  * @param vars variable data to wrap as a response
  * @param len length of variable data in bytes
  * @return number of bytes written to dest
  */
-int SNMP_wrapVars(uint32_t reqId, uint8_t *dest, const uint8_t *vars, int len);
+int SNMP_wrapVars(uint32_t reqId, uint8_t *dst, const uint8_t *vars, int len);
 
 
 #endif //GPSDO_LIB_SNMP_UTIL_H

@@ -9,7 +9,7 @@
 // success response header
 static const uint8_t RESP_HEAD[] = { 0x02, 0x01, 0x00, 0x04, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0xA2 };
 // error response header
-static const uint8_t RESP_ERR[] = { 0x02, 0x01, 0x00, 0x02, 0x01, 0x00, 0x30 };
+static const uint8_t RESP_ERR[] = { 0x02, 0x01, 0x00, 0x02, 0x01, 0x00 };
 
 
 
@@ -23,6 +23,14 @@ int SNMP_lengthSize(int len) {
     if(len < (1<<24))
         return 4;
     return 5;
+}
+
+int SNMP_lengthBytes(int len) {
+    return 1 + SNMP_lengthSize(len) + len;
+}
+
+int SNMP_lengthInteger(int size) {
+    return 2 + size;
 }
 
 int SNMP_writeLength(uint8_t * const dst, int len) {
@@ -63,7 +71,7 @@ int SNMP_writeBytes(uint8_t * const dst, const void *value, int len) {
 
     *(ptr++) = 0x04;
     ptr += SNMP_writeLength(ptr, len);
-    for(unsigned i = 0; i < len; i++)
+    for(int i = 0; i < len; i++)
         ptr[i] = ((uint8_t *) value)[i];
     return len + (ptr - dst);
 }
@@ -80,94 +88,91 @@ int SNMP_writeInteger(uint8_t * const dst, const void *value, int size) {
 }
 
 int SNMP_writeValueBytes(
-        uint8_t *dst, const uint8_t *prefOID, int prefLen, uint8_t oid, const void *value, int len
+        uint8_t * const dst, const uint8_t *prefOID, int prefLen, uint8_t oid, const void *value, int len
 ) {
-    len &= 0x7F;
-    uint8_t *ptr = dst + 2;
+    uint8_t *base = dst + 1 + SNMP_lengthSize(SNMP_lengthBytes(len));
+    uint8_t *ptr = base;
     memcpy(ptr, prefOID, prefLen);
     ptr += prefLen;
     *(ptr++) = oid;
     ptr += SNMP_writeBytes(ptr, value, len);
     dst[0] = 0x30;
-    dst[1] = (ptr - dst) - 2;
+    SNMP_writeLength(dst + 1, ptr - base);
     return ptr - dst;
 }
 
-int SNMP_writeValueInt8(uint8_t *dst, const uint8_t *prefOID, int prefLen, uint8_t oid, uint8_t value) {
+int SNMP_writeValueInt8(uint8_t * const dst, const uint8_t *prefOID, int prefLen, uint8_t oid, uint8_t value) {
     uint8_t *ptr = dst + 2;
     memcpy(ptr, prefOID, prefLen);
     ptr += prefLen;
     *(ptr++) = oid;
-    ptr += SNMP_writeBytes(ptr, &value, sizeof(value));
+    ptr += SNMP_writeInteger(ptr, &value, sizeof(value));
     dst[0] = 0x30;
     dst[1] = (ptr - dst) - 2;
     return ptr - dst;
 }
 
-int SNMP_writeValueInt16(uint8_t *dst, const uint8_t *prefOID, int prefLen, uint8_t oid, uint16_t value) {
+int SNMP_writeValueInt16(uint8_t * const dst, const uint8_t *prefOID, int prefLen, uint8_t oid, uint16_t value) {
     uint8_t *ptr = dst + 2;
     memcpy(ptr, prefOID, prefLen);
     ptr += prefLen;
     *(ptr++) = oid;
-    ptr += SNMP_writeBytes(ptr, &value, sizeof(value));
+    ptr += SNMP_writeInteger(ptr, &value, sizeof(value));
     dst[0] = 0x30;
     dst[1] = (ptr - dst) - 2;
     return ptr - dst;
 }
 
-int SNMP_writeValueInt32(uint8_t *dst, const uint8_t *prefOID, int prefLen, uint8_t oid, uint32_t value) {
+int SNMP_writeValueInt32(uint8_t * const dst, const uint8_t *prefOID, int prefLen, uint8_t oid, uint32_t value) {
     uint8_t *ptr = dst + 2;
     memcpy(ptr, prefOID, prefLen);
     ptr += prefLen;
     *(ptr++) = oid;
-    ptr += SNMP_writeBytes(ptr, &value, sizeof(value));
+    ptr += SNMP_writeInteger(ptr, &value, sizeof(value));
     dst[0] = 0x30;
     dst[1] = (ptr - dst) - 2;
     return ptr - dst;
 }
 
-int SNMP_writeValueInt64(uint8_t *dst, const uint8_t *prefOID, int prefLen, uint8_t oid, uint64_t value) {
+int SNMP_writeValueInt64(uint8_t * const dst, const uint8_t *prefOID, int prefLen, uint8_t oid, uint64_t value) {
     uint8_t *ptr = dst + 2;
     memcpy(ptr, prefOID, prefLen);
     ptr += prefLen;
     *(ptr++) = oid;
-    ptr += SNMP_writeBytes(ptr, &value, sizeof(value));
+    ptr += SNMP_writeInteger(ptr, &value, sizeof(value));
     dst[0] = 0x30;
     dst[1] = (ptr - dst) - 2;
     return ptr - dst;
 }
 
-int SNMP_wrapVars(const uint32_t reqId, uint8_t *data, const uint8_t *vars, int len) {
-    // request id
-    uint8_t rid[8];
-    int lenRID = SNMP_writeInteger(rid, &reqId, sizeof(reqId));
-
+int SNMP_wrapVars(const uint32_t reqId, uint8_t * const dst, const uint8_t *vars, int len) {
     int tlen = len;
-    tlen += SNMP_lengthSize(len);
+    tlen += 1 + SNMP_lengthSize(len);
     tlen += sizeof(RESP_ERR);
-    tlen += lenRID;
+    tlen += SNMP_lengthInteger(sizeof(reqId));
     int rlen = tlen;
     tlen += SNMP_lengthSize(tlen);
     tlen += sizeof(RESP_HEAD);
 
-    int offset = 0;
-    data[offset++] = 0x30;
-    offset += SNMP_writeLength(data + offset, tlen);
+    uint8_t *ptr = dst;
+    *(ptr++) = 0x30;
+    ptr += SNMP_writeLength(ptr, tlen);
 
-    memcpy(data + offset, RESP_HEAD, sizeof(RESP_HEAD));
-    offset += sizeof(RESP_HEAD);
+    memcpy(ptr, RESP_HEAD, sizeof(RESP_HEAD));
+    ptr += sizeof(RESP_HEAD);
 
-    offset = SNMP_writeLength(data + offset, rlen);
+    ptr += SNMP_writeLength(ptr, rlen);
+    ptr += SNMP_writeInteger(ptr, &reqId, sizeof(reqId));
 
-    memcpy(data + offset, rid, lenRID);
-    offset += lenRID;
+    memcpy(ptr, RESP_ERR, sizeof(RESP_ERR));
+    ptr += sizeof(RESP_ERR);
 
-    memcpy(data + offset, RESP_ERR, sizeof(RESP_ERR));
-    offset += sizeof(RESP_ERR);
+    // append variable data
+    *(ptr++) = 0x30;
+    ptr += SNMP_writeLength(dst, len);
+    memcpy(ptr, vars, len);
+    ptr += len;
 
-    offset += SNMP_writeLength(data, len);
-
-    memcpy(data + offset, vars, len);
-    offset += len;
-    return offset;
+    // return final length
+    return ptr - dst;
 }
