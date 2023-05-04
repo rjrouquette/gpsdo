@@ -4,12 +4,11 @@
 
 #include <math.h>
 #include <string.h>
-#include "../clk/comp.h"
+#include "../clk/mono.h"
 #include "../ntp/pll.h"
 #include "../ntp/tcmp.h"
 #include "sensors.h"
 #include "util.h"
-#include "../clk/mono.h"
 
 static const uint8_t OID_SENSOR_PREFIX[] = { 0x06, 0x0A, 0x2B, 6, 1, 2, 1, 99, 1, 1, 1 };
 
