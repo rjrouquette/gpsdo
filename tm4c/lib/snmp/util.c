@@ -169,7 +169,7 @@ int SNMP_wrapVars(const uint32_t reqId, uint8_t * const dst, const uint8_t *vars
 
     // append variable data
     *(ptr++) = 0x30;
-    ptr += SNMP_writeLength(dst, len);
+    ptr += SNMP_writeLength(ptr, len);
     memcpy(ptr, vars, len);
     ptr += len;
 
