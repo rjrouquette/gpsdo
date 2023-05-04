@@ -21,6 +21,15 @@
 
 
 ## Supported SNMP MIBs:
+- 1.3.6.1.2.1.99.1.1.1 (Entity Sensor MIB)
+  - 1.3.6.1.2.1.99.1.1.1.1 (Sensor Type)
+  - 1.3.6.1.2.1.99.1.1.1.2 (Sensor Scale)
+  - 1.3.6.1.2.1.99.1.1.1.3 (Sensor Precision)
+  - 1.3.6.1.2.1.99.1.1.1.4 (Sensor Value)
+  - 1.3.6.1.2.1.99.1.1.1.5 (Sensor Status)
+  - 1.3.6.1.2.1.99.1.1.1.6 (Sensor Units)
+  - 1.3.6.1.2.1.99.1.1.1.7 (Sensor Update Time)
+  - 1.3.6.1.2.1.99.1.1.1.8 (Sensor Update Rate)
 
 
 ## Hardware References:
