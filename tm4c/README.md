@@ -30,6 +30,7 @@
   - 1.3.6.1.2.1.99.1.1.1.6 (Sensor Units)
   - 1.3.6.1.2.1.99.1.1.1.7 (Sensor Update Time)
   - 1.3.6.1.2.1.99.1.1.1.8 (Sensor Update Rate)
+  - 1.3.6.1.2.1.99.1.1.1.9 (Sensor Name) (not-standard)
 
 
 ## Hardware References:
