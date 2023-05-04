@@ -33,13 +33,13 @@ float som[32][3] = {
         34.2525, -174.8284, 0.01154,
         34.2528, -174.8287, 0.00721,
         34.2531, -174.8288, 0.00742,
-        34.2534, -174.8286, 0.00625,
-        34.2538, -174.8287, 0.01131,
-        34.2553, -174.8269, 0.05642,
-        34.3199, -174.8143, 0.24187,
-        34.6966, -174.5978, 0.64422,
-        35.9427, -173.9895, 0.98818,
-        36.8111, -173.6115, 0.99997,
+        34.2534, -174.8286, 0.00627,
+        34.2538, -174.8287, 0.01144,
+        34.2553, -174.8269, 0.05736,
+        34.3410, -174.8143, 0.24743,
+        34.8179, -174.5534, 0.66303,
+        36.2942, -173.8364, 0.99209,
+        37.1034, -173.4903, 0.99997,
 };
 
 
@@ -63,8 +63,8 @@ int main(int argc, char **argv) {
     for(auto &row : som) {
         float x = row[0] - mean[0];
         float y = row[1] - mean[1];
-        xx += (x * x) * mean[2];
-        xy += (x * y) * mean[2];
+        xx += (x * x) * row[2];
+        xy += (x * y) * row[2];
     }
     float beta = xy / xx;
     float rmse = 0;
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
         float x = row[0] - mean[0];
         float y = row[1] - mean[1];
         y -= (x * beta);
-        rmse += (y * y) * mean[2];
+        rmse += (y * y) * row[2];
     }
     rmse = sqrtf(rmse / mean[2]);
     // display means
@@ -87,8 +87,8 @@ int main(int argc, char **argv) {
         float y = row[1] - mean[1];
         y -= x * beta;
         x = x * x;
-        xx += (x * x) * mean[2];
-        xy += (x * y) * mean[2];
+        xx += (x * x) * row[2];
+        xy += (x * y) * row[2];
     }
     float quad = xy / xx;
     rmse = 0;
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
         float y = row[1] - mean[1];
         y -= x * beta;
         y -= x * x * quad;
-        rmse += (y * y) * mean[2];
+        rmse += (y * y) * row[2];
     }
     rmse = sqrtf(rmse / mean[2]);
     // display means
@@ -113,8 +113,8 @@ int main(int argc, char **argv) {
         y -= x * beta;
         y -= x * x * quad;
         x = x * x * x;
-        xx += (x * x) * mean[2];
-        xy += (x * y) * mean[2];
+        xx += (x * x) * row[2];
+        xy += (x * y) * row[2];
     }
     float cube = xy / xx;
     rmse = 0;
@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
         y -= x * beta;
         y -= x * x * quad;
         y -= x * x * x * cube;
-        rmse += (y * y) * mean[2];
+        rmse += (y * y) * row[2];
     }
     rmse = sqrtf(rmse / mean[2]);
     // display means
@@ -133,15 +133,16 @@ int main(int argc, char **argv) {
     fflush(stdout);
 
     fprintf(stdout, "plot:\n");
-    fprintf(stdout, "temp,comp,linear,quadratic,cubic\n");
+    fprintf(stdout, "temp,som,linear,quadratic,cubic\n");
     for(auto &row : som) {
         fprintf(stdout, "%f,%f", row[0], row[1]);
         float x = row[0] - mean[0];
-        float y = (x * beta) + mean[1];
+        float y = mean[1];
+        y += x * beta;
         fprintf(stdout, ",%f", y);
         y += x * x * quad;
         fprintf(stdout, ",%f", y);
-        y += x * x * x * quad;
+        y += x * x * x * cube;
         fprintf(stdout, ",%f\n", y);
     }
     fflush(stdout);

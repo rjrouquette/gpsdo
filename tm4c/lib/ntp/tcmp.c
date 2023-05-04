@@ -301,11 +301,10 @@ unsigned statusSom(char *buffer) {
     end = append(end, "float som[32][3] = {\n");
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         end += fmtFloat(somComp[i][0], 0, 4, end);
-        end = append(end, "f, ");
+        end = append(end, ", ");
         end += fmtFloat(somComp[i][1] * 1e6f, 0, 4, end);
-        end = append(end, "f, ");
+        end = append(end, ", ");
         end += fmtFloat(somComp[i][2], 0, 6, end);
-        end = append(end, "f");
         if(i < SOM_NODE_CNT - 1)
             *(end++) = ',';
         *(end++) = '\n';
