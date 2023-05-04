@@ -39,6 +39,7 @@
 ## SNMP References:
 - [RFC 1155: Structure and Identification of Management Information for TCP/IP-based Internets](https://www.ietf.org/rfc/rfc1155.html)
 - [RFC 1157: A Simple Network Management Protocol (SNMP)](https://www.ietf.org/rfc/rfc1157.html)
+- [RFC 3433: Entity Sensor Management Information Base](https://www.rfc-editor.org/rfc/rfc3433.html)
 - [RFC 5907: Definitions of Managed Objects for Network Time Protocol Version 4 (NTPv4)](https://www.ietf.org/rfc/rfc5907.html)
 - [RFC 7577: Definition of Managed Objects for Battery Monitoring](https://www.ietf.org/rfc/rfc7577.html)
 - [RFC 8173: Precision Time Protocol Version 2 (PTPv2) Management Information Base](https://www.ietf.org/rfc/rfc8173.html)

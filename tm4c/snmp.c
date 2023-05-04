@@ -276,6 +276,10 @@ void sendSensors(uint8_t *frame) {
             dlen = SNMP_writeSensorValues(buffer);
             sendResults(frame, buffer, dlen);
             break;
+        case OID_SENSOR_STATUS:
+            dlen = SNMP_writeSensorStatuses(buffer);
+            sendResults(frame, buffer, dlen);
+            break;
         case OID_SENSOR_UNITS:
             dlen = SNMP_writeSensorUnits(buffer);
             sendResults(frame, buffer, dlen);

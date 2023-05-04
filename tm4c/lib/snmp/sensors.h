@@ -11,8 +11,10 @@
 #define OID_SENSOR_SCALE (2)
 #define OID_SENSOR_PREC (3)
 #define OID_SENSOR_VALUE (4)
-
+#define OID_SENSOR_STATUS (5)
 #define OID_SENSOR_UNITS (6)
+#define OID_SENSOR_UPDATE_TIME (7)
+#define OID_SENSOR_UPDATE_RATE (8)
 
 #define OID_SENSOR_TYPE_OTHER (1)
 #define OID_SENSOR_TYPE_UNKNOWN (2)
@@ -45,6 +47,9 @@
 #define OID_SENSOR_SCALE_1E21 (16)
 #define OID_SENSOR_SCALE_1E24 (17)
 
+#define OID_SENSOR_STATUS_OK (1)
+#define OID_SENSOR_STATUS_UNAVAILABLE (2)
+#define OID_SENSOR_STATUS_NON_OP (3)
 
 /**
  * Write SNMP response for Sensor Type OID
@@ -75,11 +80,32 @@ int SNMP_writeSensorPrecs(uint8_t *dst);
 int SNMP_writeSensorValues(uint8_t *dst);
 
 /**
+ * Write SNMP response for Sensor Status OID
+ * @param dst address of output buffer
+ * @return number of bytes written to buffer
+ */
+int SNMP_writeSensorStatuses(uint8_t *dst);
+
+/**
  * Write SNMP response for Sensor Units OID
  * @param dst address of output buffer
  * @return number of bytes written to buffer
  */
 int SNMP_writeSensorUnits(uint8_t *dst);
+
+/**
+ * Write SNMP response for Sensor Update Time OID
+ * @param dst address of output buffer
+ * @return number of bytes written to buffer
+ */
+int SNMP_writeSensorUpdateTimes(uint8_t *dst);
+
+/**
+ * Write SNMP response for Sensor Update Rate OID
+ * @param dst address of output buffer
+ * @return number of bytes written to buffer
+ */
+int SNMP_writeSensorUpdateRates(uint8_t *dst);
 
 
 
@@ -116,11 +142,35 @@ int SNMP_writeSensorPrec(uint8_t *dst, int precision);
 int SNMP_writeSensorValue(uint8_t *dst, int value);
 
 /**
+ * Write SNMP MIB for sensor precision
+ * @param dst address at which to encode sensor precision
+ * @param precision sensor precision divisor (log10)
+ * @return number of bytes written to destination
+ */
+int SNMP_writeSensorStatus(uint8_t *dst, int statusId);
+
+/**
  * Write SNMP MIB for sensor unit
  * @param dst address at which to encode sensor unit
  * @param unit string representation of senor unit
  * @return number of bytes written to destination
  */
 int SNMP_writeSensorUnit(uint8_t *dst, const char *unit);
+
+/**
+ * Write SNMP MIB for sensor update time
+ * @param dst address at which to encode sensor update time
+ * @param timeTicks timestamp of sensor update (SNMP TimeTick Format)
+ * @return number of bytes written to destination
+ */
+int SNMP_writeSensorUpdateTime(uint8_t *dst, uint32_t timeTicks);
+
+/**
+ * Write SNMP MIB for sensor update rate
+ * @param dst address at which to encode sensor update rate
+ * @param millis update rate in milliseconds
+ * @return number of bytes written to destination
+ */
+int SNMP_writeSensorUpdateRate(uint8_t *dst, int millis);
 
 #endif //GPSDO_LIB_SNMP_SENSORS_H
