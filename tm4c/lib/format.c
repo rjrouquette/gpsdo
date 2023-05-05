@@ -246,7 +246,7 @@ int fmtFloat(float value, int width, int places, char *origin) {
     }
 
     // width overflow
-    if(exponent > (width - places - 2)) {
+    if(width > 0 && exponent > (width - places - 2)) {
         len += toSci(result + len, exponent, rtrim);
         return padCopy(width, ' ', origin, result, len);
     }
