@@ -280,7 +280,7 @@ int fmtFloat(float value, int width, int places, char *origin) {
     if(places > 0) {
         result[len + exponent + 1] = '.';
         // pad zeros
-        int end = len + exponent + 2 + places;
+        end = len + exponent + 2 + places;
         len += 10;
         while (len < end)
             result[len++] = '0';
