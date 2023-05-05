@@ -18,9 +18,6 @@ int toBin(uint32_t value, int width, char padding, char *origin);
 int toOct(uint32_t value, int width, char padding, char *origin);
 int toDec(uint32_t value, int width, char padding, char *origin);
 int toHex(uint32_t value, int width, char padding, char *origin);
-int toHexLower(uint32_t value, int width, char padding, char *origin);
-
-int toTemp(int16_t value, char *origin);
 
 int toHMS(uint32_t value, char *origin);
 

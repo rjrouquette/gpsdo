@@ -83,13 +83,6 @@ int toHex(uint32_t value, int width, char padding, char *origin) {
     return fmtBase(value, 16, width, padding, origin);
 }
 
-int toTemp(int16_t value, char *origin) {
-    fmtFloat(ldexpf((float) value, -8), 7, 2, origin);
-    origin[7] = 0xBA;
-    origin[8] = 'C';
-    return 9;
-}
-
 int toHMS(uint32_t value, char *origin) {
     toDec(value % 60, 2, '0', origin + 6);
     value /= 60;
