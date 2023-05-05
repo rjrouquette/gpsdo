@@ -276,12 +276,15 @@ int fmtFloat(float value, int width, int places, char *origin) {
     for(int i = 8; i > exponent; i--)
         result[len + i + 1] = result[len +i];
     // insert decimal zeros
-    result[len+exponent+1] = '.';
-    // pad zeros
-    int end = len + exponent + 2 + places;
-    len += 10;
-    while(len < end)
-        result[len++] = '0';
+    int end = len + exponent + 1;
+    if(places > 0) {
+        result[len + exponent + 1] = '.';
+        // pad zeros
+        int end = len + exponent + 2 + places;
+        len += 10;
+        while (len < end)
+            result[len++] = '0';
+    }
     return padCopy(width, ' ', origin, result, end);
 }
 

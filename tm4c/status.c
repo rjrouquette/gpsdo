@@ -392,13 +392,13 @@ unsigned statusGPS(char *body) {
     end = append(end, " m\n");
 
     // clock bias
-    tmp[toBase(GPS_clkBias(), 10, tmp)] = 0;
+    tmp[fmtFloat((float) GPS_clkBias(), 0, 0, tmp)] = 0;
     end = append(end, "clock bias: ");
     end = append(end, tmp);
     end = append(end, " ns\n");
 
     // clock drift
-    tmp[toBase(GPS_clkDrift(), 10, tmp)] = 0;
+    tmp[fmtFloat((float) GPS_clkDrift(), 0, 0, tmp)] = 0;
     end = append(end, "clock drift: ");
     end = append(end, tmp);
     end = append(end, " ns/s\n");
