@@ -21,6 +21,8 @@
 #define SOM_EEPROM_BASE (0x0020)
 #define SOM_NODE_CNT (32)
 
+#define  REG_MIN_RMSE (100e-9f)
+
 static volatile uint32_t tempNext = 0;
 static volatile float tempValue;
 static volatile float tempSlow[TEMP_SLOW_CNT];
@@ -33,6 +35,7 @@ static volatile float tcmpValue;
 
 static volatile float tcmpOffset[2];
 static volatile float tcmpCoeff[3];
+static volatile float tcmpRmse;
 
 // SOM for filtering compensation samples
 static volatile float somComp[SOM_NODE_CNT][3];
@@ -195,6 +198,11 @@ unsigned TCMP_status(char *buffer) {
     end = append(end, tmp);
     end = append(end, " C\n");
 
+    tmp[fmtFloat(tcmpRmse * 1e6f, 12, 4, tmp)] = 0;
+    end = append(end, "  - rmse:    ");
+    end = append(end, tmp);
+    end = append(end, " ppm\n");
+
     tmp[fmtFloat(tcmpOffset[0], 12, 4, tmp)] = 0;
     end = append(end, "  - off[0]:  ");
     end = append(end, tmp);
@@ -318,13 +326,14 @@ static void updateRegression() {
     }
     mean[0] /= mean[2];
     mean[1] /= mean[2];
-    // update offsets
-    tcmpOffset[0] = mean[0];
-    tcmpOffset[1] = mean[1];
+
+    // scratch variables
+    float coeff[3];
+    float scratch[32][2];
+    float xx, xy;
 
     // linear coefficient
-    float scratch[32][2];
-    float xx = 0, xy = 0;
+    xx = 0; xy = 0;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         const volatile float *row = somComp[i];
         float x = scratch[i][0] = row[0] - mean[0];
@@ -332,31 +341,60 @@ static void updateRegression() {
         xx += x * x * row[2];
         xy += x * y * row[2];
     }
-    tcmpCoeff[0] = xy / xx;
+    coeff[0] = xy / xx;
 
     // quadratic coefficient
     xx = 0; xy = 0;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         const volatile float *row = somComp[i];
         float x = scratch[i][0];
-        float y = (scratch[i][1] -= x * tcmpCoeff[0]);
+        float y = (scratch[i][1] -= x * coeff[0]);
         x = x * x;
         xx += x * x * row[2];
         xy += x * y * row[2];
     }
-    tcmpCoeff[1] = xy / xx;
+    coeff[1] = xy / xx;
 
     // cubic coefficient
     xx = 0; xy = 0;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         const volatile float *row = somComp[i];
         float x = scratch[i][0];
-        float y = (scratch[i][1] -= x * x * tcmpCoeff[1]);
+        float y = (scratch[i][1] -= x * x * coeff[1]);
         x = x * x * x;
         xx += x * x * row[2];
         xy += x * y * row[2];
     }
-    tcmpCoeff[2] = xy / xx;
+    coeff[2] = xy / xx;
+
+
+    // compute RMS error
+    float rmse = 0;
+    for(int i = 0; i < SOM_NODE_CNT; i++) {
+        const volatile float *row = somComp[i];
+
+        float x = row[0] - mean[0];
+        float y = mean[1];
+        y += x * coeff[0];
+        y += x * x * coeff[1];
+        y += x * x * x * coeff[2];
+
+        float error = y - row[1];
+        rmse += error * error * row[2];
+    }
+    rmse = sqrtf(rmse / mean[2]);
+
+    // update offsets
+    tcmpOffset[0] = mean[0];
+    tcmpOffset[1] = mean[1];
+
+    // update coefficients
+    tcmpRmse = rmse;
+    if(rmse <= REG_MIN_RMSE) {
+        tcmpCoeff[0] = coeff[0];
+        tcmpCoeff[1] = coeff[1];
+        tcmpCoeff[2] = coeff[2];
+    }
 }
 
 static float tcmpEstimate(const float temp) {

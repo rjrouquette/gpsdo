@@ -19,7 +19,7 @@
 #include "snmp.h"
 #include "status.h"
 
-#define EEPROM_FORMAT (0x00000001)
+#define EEPROM_FORMAT (0x00000002)
 
 static void EEPROM_init();
 
