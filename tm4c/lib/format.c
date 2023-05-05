@@ -109,11 +109,6 @@ const static float lutPow10[86] = {
         1e+30f, 1e+31f, 1e+32f, 1e+33f, 1e+34f, 1e+35f, 1e+36f, 1e+37f, 1e+38f, INFINITY
 };
 
-static inline uint32_t x10(uint32_t value) {
-    value += value << 2;
-    return value << 1;
-}
-
 static int toSci(char *digits, int exponent, int trim) {
     // always at least two digits
     if(trim > 7) trim = 7;
@@ -192,9 +187,8 @@ int fmtFloat(float value, int width, int places, char *origin) {
         ++exponent;
     }
     // ensure alignment of mantissa
-    if(mantissa < 100000000u) {
-        mantissa = x10(mantissa);
-    }
+    if(mantissa < 100000000u)
+        mantissa *= 10;
 
     // convert mantissa to decimal digits
     for(int i = 8; i >= 0; i--) {
