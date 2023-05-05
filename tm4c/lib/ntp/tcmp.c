@@ -14,8 +14,6 @@
 #define TEMP_UPDT_INTV (122070) // 1024 Hz
 #define TEMP_ALPHA (0x1p-8f)
 
-#define TCMP_ALPHA (0x1p-14f)
-#define TCMP_EEPROM_BASE (0x0010)
 #define TCMP_SAVE_INTV (3600) // save state every hour
 #define TCMP_UPDT_INTV (CLK_FREQ / 16)  // 16 Hz
 
@@ -25,12 +23,12 @@
 static volatile uint32_t tempNext = 0;
 static volatile float tempValue;
 
-static volatile float tcmpBias;
-static volatile float tcmpCoef;
-static volatile float tcmpOff;
 static volatile uint32_t tcmpNext = 0;
 static volatile uint32_t tcmpSaved;
 static volatile float tcmpValue;
+
+static volatile float tcmpOffset[2];
+static volatile float tcmpCoeff[3];
 
 // SOM for filtering compensation samples
 static volatile float somComp[SOM_NODE_CNT][3];
@@ -80,6 +78,8 @@ static void loadSom();
 static void saveSom();
 static void seedSom(float temp, float comp);
 static void updateSom(float temp, float comp);
+static void updateRegression();
+static void updateComp();
 
 
 void TCMP_init() {
@@ -98,27 +98,6 @@ void TCMP_init() {
     ADC0.SS3.TSH.TSH0 = ADC_TSH_256;
     ADC0.ACTSS.ASEN3 = 1;
 
-    // load temperature compensation parameters
-    uint32_t word;
-    EEPROM_seek(TCMP_EEPROM_BASE);
-    word = EEPROM_read();
-    if(word != -1u) {
-        // set temperature coefficient
-        tcmpCoef = *(float *) &word;
-        // load temperature bias
-        word = EEPROM_read();
-        tcmpBias = *(float *) &word;
-        // load correction offset
-        word = EEPROM_read();
-        tcmpOff = *(float *) &word;
-    }
-    // reset if invalid
-    if(!isfinite(tcmpCoef) || !isfinite(tcmpBias) || !isfinite(tcmpOff)) {
-        tcmpCoef = 0;
-        tcmpBias = 0;
-        tcmpOff = 0;
-    }
-
     // take and discard some initial measurements
     for(int i = 0; i < 16; i++) {
         ADC0.PSSI.SS3 = 1;      // trigger temperature measurement
@@ -128,10 +107,12 @@ void TCMP_init() {
         while(!ADC0.SS3.FSTAT.EMPTY)
             tempValue = toCelsius(ADC0.SS3.FIFO.DATA);
     }
-    // set compensation value
-    tcmpValue = tcmpOff + (tcmpCoef * (tempValue - tcmpBias));
 
     loadSom();
+    if(isfinite(somComp[0][0])) {
+        updateRegression();
+        updateComp();
+    }
 }
 
 void TCMP_run() {
@@ -152,8 +133,7 @@ void TCMP_run() {
     if((GPTM0.TAV.raw - tcmpNext) > 0) {
         // set next update time
         tcmpNext += TCMP_UPDT_INTV;
-        // update compensation value
-        tcmpValue = tcmpOff + (tcmpCoef * (tempValue - tcmpBias));
+        updateComp();
     }
 }
 
@@ -166,36 +146,15 @@ float TCMP_get() {
 }
 
 void TCMP_update(const float target) {
-    if(tcmpBias == 0 && tcmpOff == 0) {
-        tcmpBias = tempValue;
-        tcmpOff = target;
-        return;
-    }
-
-    const float temp = tempValue;
-    tcmpBias += (temp - tcmpBias) * TCMP_ALPHA;
-    tcmpOff += (target - tcmpOff) * TCMP_ALPHA;
-
-    float error = target;
-    error -= tcmpOff;
-    error -= tcmpCoef * (temp - tcmpBias);
-    error *= TCMP_ALPHA;
-    error *= temp - tcmpBias;
-    tcmpCoef += error;
-
-    updateSom(temp, target);
+    updateSom(tempValue, target);
 
     const uint32_t now = CLK_MONO_INT();
     if(now - tcmpSaved > TCMP_SAVE_INTV) {
         tcmpSaved = now;
-        // save temperature compensation parameters
-        EEPROM_seek(TCMP_EEPROM_BASE);
-        EEPROM_write(*(uint32_t *) &tcmpCoef);
-        EEPROM_write(*(uint32_t *) &tcmpBias);
-        EEPROM_write(*(uint32_t *) &tcmpOff);
-
         saveSom();
     }
+
+    updateRegression();
 }
 
 unsigned TCMP_status(char *buffer) {
@@ -205,27 +164,37 @@ unsigned TCMP_status(char *buffer) {
     end = append(end, "tcomp status:\n");
 
     tmp[fmtFloat(tempValue, 12, 4, tmp)] = 0;
-    end = append(end, "  - temp:  " );
+    end = append(end, "  - temp:    ");
     end = append(end, tmp);
     end = append(end, " C\n");
 
-    tmp[fmtFloat(tcmpBias, 12, 4, tmp)] = 0;
-    end = append(end, "  - bias:  ");
+    tmp[fmtFloat(tcmpOffset[0], 12, 4, tmp)] = 0;
+    end = append(end, "  - off[0]:  ");
     end = append(end, tmp);
     end = append(end, " C\n");
 
-    tmp[fmtFloat(tcmpCoef * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - coef:  ");
-    end = append(end, tmp);
-    end = append(end, " ppm/C\n");
-
-    tmp[fmtFloat(tcmpOff * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - offs:  ");
+    tmp[fmtFloat(tcmpOffset[1] * 1e6f, 12, 4, tmp)] = 0;
+    end = append(end, "  - off[1]:  ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
+    tmp[fmtFloat(tcmpCoeff[0] * 1e6f, 12, 4, tmp)] = 0;
+    end = append(end, "  - coef[0]: ");
+    end = append(end, tmp);
+    end = append(end, " ppm/C\n");
+
+    tmp[fmtFloat(tcmpCoeff[1] * 1e6f, 12, 4, tmp)] = 0;
+    end = append(end, "  - coef[1]: ");
+    end = append(end, tmp);
+    end = append(end, " ppm/C^2\n");
+
+    tmp[fmtFloat(tcmpCoeff[2] * 1e6f, 12, 4, tmp)] = 0;
+    end = append(end, "  - coef[2]: ");
+    end = append(end, tmp);
+    end = append(end, " ppm/C^3\n");
+
     tmp[fmtFloat(tcmpValue * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - curr:  ");
+    end = append(end, "  - curr:    ");
     end = append(end, tmp);
     end = append(end, " ppm\n\n");
 
@@ -283,7 +252,7 @@ static void updateSom(float temp, float comp) {
     }
 
     // update nodes using dynamic learning rate
-    alpha = 0x1p-31f * (float) (1u << (31 - lroundf(alpha)));
+    alpha = 1.0f / (1.0f + (alpha * alpha));
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         // compute neighbor distance
         int ndist = i - best;
@@ -295,6 +264,67 @@ static void updateSom(float temp, float comp) {
         somComp[i][1] += (comp - somComp[i][1]) * w;
         somComp[i][2] += (1.0f - somComp[i][2]) * w;
     }
+}
+
+static void updateRegression() {
+    // compute means
+    float mean[3] = {0, 0, 0};
+    for(int i = 0; i < SOM_NODE_CNT; i++) {
+        const volatile float *row = somComp[i];
+        mean[0] += row[0] * row[2];
+        mean[1] += row[1] * row[2];
+        mean[2] += row[2];
+    }
+    mean[0] /= mean[2];
+    mean[1] /= mean[2];
+    // update offsets
+    tcmpOffset[0] = mean[0];
+    tcmpOffset[1] = mean[1];
+
+    // linear coefficient
+    float scratch[32][2];
+    float xx = 0, xy = 0;
+    for(int i = 0; i < SOM_NODE_CNT; i++) {
+        const volatile float *row = somComp[i];
+        float x = scratch[i][0] = row[0] - mean[0];
+        float y = scratch[i][1] = row[1] - mean[1];
+        xx += x * x * row[2];
+        xy += x * y * row[2];
+    }
+    tcmpCoeff[0] = xy / xx;
+
+    // quadratic coefficient
+    xx = 0; xy = 0;
+    for(int i = 0; i < SOM_NODE_CNT; i++) {
+        const volatile float *row = somComp[i];
+        float x = scratch[i][0];
+        float y = (scratch[i][1] -= x * tcmpCoeff[0]);
+        x = x * x;
+        xx += x * x * row[2];
+        xy += x * y * row[2];
+    }
+    tcmpCoeff[1] = xy / xx;
+
+    // cubic coefficient
+    xx = 0; xy = 0;
+    for(int i = 0; i < SOM_NODE_CNT; i++) {
+        const volatile float *row = somComp[i];
+        float x = scratch[i][0];
+        float y = (scratch[i][1] -= x * x * tcmpCoeff[1]);
+        x = x * x * x;
+        xx += x * x * row[2];
+        xy += x * y * row[2];
+    }
+    tcmpCoeff[2] = xy / xx;
+}
+
+static void updateComp() {
+    float x = tempValue - tcmpOffset[0];
+    float y = tcmpOffset[1];
+    y += x * tcmpCoeff[0];
+    y += x * x * tcmpCoeff[1];
+    y += x * x * x * tcmpCoeff[2];
+    tcmpValue = y;
 }
 
 unsigned statusSom(char *buffer) {
