@@ -20,8 +20,10 @@
 
 #define SOM_EEPROM_BASE (0x0020)
 #define SOM_NODE_CNT (32)
+#define SOM_FILL_OFF (2.0f)
+#define SOM_FILL_REG (8.0f)
 
-#define  REG_MIN_RMSE (100e-9f)
+#define REG_MIN_RMSE (100e-9f)
 
 static volatile uint32_t tempNext = 0;
 static volatile float tempValue;
@@ -33,12 +35,13 @@ static volatile uint32_t tcmpNext = 0;
 static volatile uint32_t tcmpSaved;
 static volatile float tcmpValue;
 
-static volatile float tcmpOffset[2];
+static volatile float tcmpMean[2];
 static volatile float tcmpCoeff[3];
 static volatile float tcmpRmse;
 
 // SOM for filtering compensation samples
 static volatile float somComp[SOM_NODE_CNT][3];
+static volatile float somFill;
 
 // neighbor weight = exp(-2.0f * dist)
 static const float somNW[SOM_NODE_CNT] = {
@@ -184,7 +187,6 @@ void TCMP_update(const float target) {
         tcmpSaved = now;
         saveSom();
     }
-
 }
 
 unsigned TCMP_status(char *buffer) {
@@ -198,18 +200,23 @@ unsigned TCMP_status(char *buffer) {
     end = append(end, tmp);
     end = append(end, " C\n");
 
+    tmp[fmtFloat(somFill, 12, 4, tmp)] = 0;
+    end = append(end, "  - fill:    ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
     tmp[fmtFloat(tcmpRmse * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - rmse:    ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
-    tmp[fmtFloat(tcmpOffset[0], 12, 4, tmp)] = 0;
-    end = append(end, "  - off[0]:  ");
+    tmp[fmtFloat(tcmpMean[0], 12, 4, tmp)] = 0;
+    end = append(end, "  - mean[0]: ");
     end = append(end, tmp);
     end = append(end, " C\n");
 
-    tmp[fmtFloat(tcmpOffset[1] * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - off[1]:  ");
+    tmp[fmtFloat(tcmpMean[1] * 1e6f, 12, 4, tmp)] = 0;
+    end = append(end, "  - mean[1]: ");
     end = append(end, tmp);
     end = append(end, " ppm\n");
 
@@ -301,6 +308,7 @@ static void updateSom(float temp, float comp) {
     }
 
     // update nodes using dynamic learning rate
+    somFill = alpha;
     alpha = 1.0f / (1.0f + (alpha * alpha));
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         // compute neighbor distance
@@ -316,6 +324,9 @@ static void updateSom(float temp, float comp) {
 }
 
 static void updateRegression() {
+    if(somFill < SOM_FILL_OFF)
+        return;
+
     // compute means
     float mean[3] = {0, 0, 0};
     for(int i = 0; i < SOM_NODE_CNT; i++) {
@@ -326,6 +337,12 @@ static void updateRegression() {
     }
     mean[0] /= mean[2];
     mean[1] /= mean[2];
+    // update means
+    tcmpMean[0] = mean[0];
+    tcmpMean[1] = mean[1];
+
+    if(somFill < SOM_FILL_REG)
+        return;
 
     // scratch variables
     float coeff[3];
@@ -382,15 +399,10 @@ static void updateRegression() {
         float error = y - row[1];
         rmse += error * error * row[2];
     }
-    rmse = sqrtf(rmse / mean[2]);
-
-    // update offsets
-    tcmpOffset[0] = mean[0];
-    tcmpOffset[1] = mean[1];
+    tcmpRmse = sqrtf(rmse / mean[2]);
 
     // update coefficients
-    tcmpRmse = rmse;
-    if(rmse <= REG_MIN_RMSE) {
+    if(tcmpRmse <= REG_MIN_RMSE) {
         tcmpCoeff[0] = coeff[0];
         tcmpCoeff[1] = coeff[1];
         tcmpCoeff[2] = coeff[2];
@@ -398,8 +410,8 @@ static void updateRegression() {
 }
 
 static float tcmpEstimate(const float temp) {
-    float x = temp - tcmpOffset[0];
-    float y = tcmpOffset[1];
+    float x = temp - tcmpMean[0];
+    float y = tcmpMean[1];
     y += x * tcmpCoeff[0];
     y += x * x * tcmpCoeff[1];
     y += x * x * x * tcmpCoeff[2];

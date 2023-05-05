@@ -35,13 +35,11 @@ static volatile float driftIntegral;
 
 // Temperature Compensation State
 static volatile float tcompCurrent;
-static volatile float tcompPrior;
 
 void PLL_init() {
     TCMP_init();
 
     tcompCurrent = TCMP_get();
-    tcompPrior = tcompCurrent;
     float comp = tcompCurrent + driftIntegral;
     CLK_COMP_setComp((int32_t) (0x1p32f * comp));
 }
@@ -49,20 +47,10 @@ void PLL_init() {
 void PLL_run() {
     TCMP_run();
 
-    // get current tcomp value and compute delta
+    // update frequency compensation
     tcompCurrent = TCMP_get();
-    float tcompDelta = tcompCurrent - tcompPrior;
-    tcompPrior = tcompCurrent;
-
-    // apply tcomp update
-    if (tcompDelta != 0) {
-        // prevent spurious frequency corrections
-        if (fabsf(tcompDelta) > 100e-9f)
-            driftIntegral -= tcompDelta;
-        // update compensation
-        float comp = tcompCurrent + driftIntegral;
-        CLK_COMP_setComp((int32_t) (0x1p32f * comp));
-    }
+    float comp = tcompCurrent + driftIntegral;
+    CLK_COMP_setComp((int32_t) (0x1p32f * comp));
 }
 
 
