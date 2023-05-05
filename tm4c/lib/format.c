@@ -96,7 +96,7 @@ int toHMS(uint32_t value, char *origin) {
 
 
 
-#define LUTPOW10_BASE (46)
+#define LUT_POW10_BASE (46)
 const static float lutPow10[86] = {
         0, 1e-45f, 1e-44f, 1e-43f, 1e-42f, 1e-41f,
         1e-40f, 1e-39f, 1e-38f, 1e-37f, 1e-36f, 1e-35f, 1e-34f, 1e-33f, 1e-32f, 1e-31f,
@@ -169,12 +169,23 @@ int fmtFloat(float value, int width, int places, char *origin) {
     }
 
     int exponent = (int) floorf(0.3010299957f * (float) ilogbf(value));
-    while(value > lutPow10[exponent + LUTPOW10_BASE + 1])
+    while(value > lutPow10[exponent + LUT_POW10_BASE + 1])
         ++exponent;
-    while(value < lutPow10[exponent + LUTPOW10_BASE - 1])
+    while(value < lutPow10[exponent + LUT_POW10_BASE - 1])
         --exponent;
 
-    uint32_t mantissa = lroundf(value * lutPow10[LUTPOW10_BASE + 8 - exponent]);
+    // assemble mantissa
+    uint32_t mantissa;
+    // cap exponent
+    if(exponent > 38) exponent = 38;
+    // tiny values need to be scaled twice to avoid overflow
+    if(exponent < -30) {
+        value *= lutPow10[LUT_POW10_BASE + 30];
+        mantissa = lroundf(value * lutPow10[LUT_POW10_BASE - 22 - exponent]);
+    } else {
+        mantissa = lroundf(value * lutPow10[LUT_POW10_BASE + 8 - exponent]);
+    }
+
     // exact powers of ten are typically over specified
     if(mantissa >= 1000000000u) {
         mantissa /= 10;
