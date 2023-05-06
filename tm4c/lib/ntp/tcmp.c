@@ -31,13 +31,12 @@ static volatile uint32_t tcmpNext = 0;
 static volatile uint32_t tcmpSaved;
 static volatile float tcmpValue;
 
-static volatile float tcmpMean[2];
+static volatile float tcmpMean[3];
 static volatile float tcmpCoeff[3];
 static volatile float tcmpRmse;
 
 // SOM for filtering compensation samples
 static volatile float somComp[SOM_NODE_CNT][3];
-static volatile float somFill;
 
 // neighbor weight = exp(-2.0f * dist)
 static const float somNW[SOM_NODE_CNT] = {
@@ -182,7 +181,7 @@ unsigned TCMP_status(char *buffer) {
     end = append(end, tmp);
     end = append(end, " C\n");
 
-    tmp[fmtFloat(somFill, 12, 4, tmp)] = 0;
+    tmp[fmtFloat(tcmpMean[2], 12, 4, tmp)] = 0;
     end = append(end, "  - fill:    ");
     end = append(end, tmp);
     end = append(end, "\n");
@@ -275,7 +274,6 @@ static void updateSom(float temp, float comp) {
     }
 
     // update nodes using dynamic learning rate
-    somFill = alpha;
     alpha = 1.0f / (1.0f + (alpha * alpha));
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         // compute neighbor distance
@@ -291,9 +289,6 @@ static void updateSom(float temp, float comp) {
 }
 
 static void updateRegression() {
-    if(somFill < SOM_FILL_OFF)
-        return;
-
     // compute means
     float mean[3] = {0, 0, 0};
     for(int i = 0; i < SOM_NODE_CNT; i++) {
@@ -302,13 +297,20 @@ static void updateRegression() {
         mean[1] += row[1] * row[2];
         mean[2] += row[2];
     }
+
+    // wait for sufficient data
+    if(mean[2] < SOM_FILL_OFF)
+        return;
+    // normalize means
     mean[0] /= mean[2];
     mean[1] /= mean[2];
     // update means
     tcmpMean[0] = mean[0];
     tcmpMean[1] = mean[1];
+    tcmpMean[2] = mean[2];
 
-    if(somFill < SOM_FILL_REG)
+    // wait for sufficient data
+    if(mean[2] < SOM_FILL_REG)
         return;
 
     // scratch variables
