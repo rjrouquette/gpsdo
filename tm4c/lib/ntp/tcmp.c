@@ -11,7 +11,7 @@
 #include "../../hw/timer.h"
 #include "tcmp.h"
 
-#define TEMP_UPDT_INTV (122070) // 1024 Hz
+#define TEMP_UPDT_INTV (CLK_FREQ / 1024) // 1024 Hz
 #define TEMP_ALPHA (0x1p-8f)
 
 #define TCMP_SAVE_INTV (3600) // save state every hour
@@ -129,10 +129,10 @@ void TCMP_init() {
 void TCMP_run() {
     // poll for next temperature update trigger
     if((GPTM0.TAV.raw - tempUpdated) >= TEMP_UPDT_INTV) {
-        // start next temperature measurement
-        ADC0.PSSI.SS3 = 1;
         // set next update time
         tempUpdated += TEMP_UPDT_INTV;
+        // start next temperature measurement
+        ADC0.PSSI.SS3 = 1;
     }
     // update temperature once data is ready
     while(!ADC0.SS3.FSTAT.EMPTY) {
