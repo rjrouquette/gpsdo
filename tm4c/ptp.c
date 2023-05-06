@@ -4,8 +4,7 @@
 
 #include <memory.h>
 #include <math.h>
-
-#include "ptp.h"
+#include "hw/timer.h"
 #include "lib/clk/mono.h"
 #include "lib/net.h"
 #include "lib/net/eth.h"
@@ -13,18 +12,19 @@
 #include "lib/net/udp.h"
 #include "lib/net/util.h"
 #include "lib/led.h"
+#include "ptp.h"
 
 
 #define PTP2_PORT_EVENT (319)
 #define PTP2_PORT_GENERAL (320)
 #define PTP2_MIN_SIZE (UDP_DATA_OFFSET + 34)
-#define PTP2_ANNOUNCE_INTERVAL (1ull << (32 + 4))
-#define PTP2_SYNC_INTERVAL (1ull << (32 - 4))
+#define PTP2_ANNOUNCE_INTERVAL (CLK_FREQ * 4) // 4s
+#define PTP2_SYNC_INTERVAL (CLK_FREQ / 4) // 4 Hz
 #define PTP2_MULTICAST (0x810100E0) // 224.0.1.129
 #define PTP2_MULTICAST_PEER (0x6B0000E0) // 224.0.0.107
 
 
-// PTP message yypes
+// PTP message types
 enum PTP2_MTYPE {
     PTP2_MT_SYNC = 0x0,
     PTP2_MT_DELAY_REQ,
@@ -112,7 +112,7 @@ struct PACKED PTP2_PDELAY_FOLLOW_UP {
 _Static_assert(sizeof(struct PTP2_PDELAY_RESP) == 20, "PTP2_PDELAY_FOLLOW_UP must be 34 bytes");
 
 
-static uint64_t nextSync, nextAnnounce;
+static uint32_t updatedSync, updatedAnnounce;
 static uint8_t clockId[8];
 
 static void processMessage(uint8_t *frame, int flen);
@@ -130,22 +130,20 @@ void PTP_init() {
     UDP_register(PTP2_PORT_GENERAL, processMessage);
     // set next update event
     uint64_t now = CLK_MONO();
-    nextAnnounce = now + PTP2_ANNOUNCE_INTERVAL;
-    nextSync = now + PTP2_SYNC_INTERVAL;
+    updatedAnnounce = now;
+    updatedSync = now;
 }
 
 void PTP_run() {
-    const uint64_t now = CLK_MONO();
-
     // check for sync event
-    if(((int64_t)(now - nextSync)) >= 0) {
-        nextSync += PTP2_SYNC_INTERVAL;
+    if((GPTM0.TAV.raw - updatedSync) >= PTP2_SYNC_INTERVAL) {
+        updatedSync += PTP2_SYNC_INTERVAL;
         sendSync();
     }
 
     // check for announce event
-    if(((int64_t)(now - nextAnnounce)) >= 0) {
-        nextAnnounce += PTP2_ANNOUNCE_INTERVAL;
+    if((GPTM0.TAV.raw - updatedAnnounce) >= PTP2_ANNOUNCE_INTERVAL) {
+        updatedAnnounce += PTP2_ANNOUNCE_INTERVAL;
         sendAnnounce();
     }
 }

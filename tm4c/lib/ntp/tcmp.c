@@ -24,10 +24,10 @@
 
 #define REG_MIN_RMSE (100e-9f)
 
-static volatile uint32_t tempNext = 0;
+static volatile uint32_t tempUpdated = 0;
 static volatile float tempValue;
 
-static volatile uint32_t tcmpNext = 0;
+static volatile uint32_t tcmpUpdated = 0;
 static volatile uint32_t tcmpSaved;
 static volatile float tcmpValue;
 
@@ -128,11 +128,11 @@ void TCMP_init() {
 
 void TCMP_run() {
     // poll for next temperature update trigger
-    if((GPTM0.TAV.raw - tempNext) > 0) {
+    if((GPTM0.TAV.raw - tempUpdated) >= TEMP_UPDT_INTV) {
         // start next temperature measurement
         ADC0.PSSI.SS3 = 1;
         // set next update time
-        tempNext += TEMP_UPDT_INTV;
+        tempUpdated += TEMP_UPDT_INTV;
         // update temperature data
         while(!ADC0.SS3.FSTAT.EMPTY) {
             float temp = toCelsius(ADC0.SS3.FIFO.DATA);
@@ -141,9 +141,9 @@ void TCMP_run() {
     }
 
     // poll for next compensation update trigger
-    if((GPTM0.TAV.raw - tcmpNext) > 0) {
+    if((GPTM0.TAV.raw - tcmpUpdated) >= TCMP_UPDT_INTV) {
         // set next update time
-        tcmpNext += TCMP_UPDT_INTV;
+        tcmpUpdated += TCMP_UPDT_INTV;
         // update temperature compensation
         tcmpValue = tcmpEstimate(tempValue);
     }

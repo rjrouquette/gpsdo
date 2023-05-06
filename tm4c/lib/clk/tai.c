@@ -14,7 +14,7 @@
 
 volatile uint64_t clkTaiUtcOffset = 0;
 
-static volatile uint32_t clkTaiUpdate = 0;
+static volatile uint32_t clkTaiUpdated = 0;
 static volatile uint32_t clkTaiRem = 0;
 volatile uint64_t clkTaiOffset = 0;
 volatile uint64_t clkTaiRef = 0;
@@ -27,8 +27,8 @@ void initClkTai() {
 
 void runClkTai() {
     // periodically update alignment to prevent numerical overflow
-    if((GPTM0.TAV.raw - clkTaiUpdate) > 0) {
-        clkTaiUpdate += MIN_UPDT_INTV;
+    if((GPTM0.TAV.raw - clkTaiUpdated) >= MIN_UPDT_INTV) {
+        clkTaiUpdated += MIN_UPDT_INTV;
         CLK_TAI_setTrim(clkTaiRate);
     }
 }

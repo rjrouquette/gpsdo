@@ -10,7 +10,7 @@
 
 #define MIN_UPDT_INTV (CLK_FREQ / 4) // 4 Hz
 
-static volatile uint32_t clkCompUpdate = 0;
+static volatile uint32_t clkCompUpdated = 0;
 static volatile uint32_t clkCompRem = 0;
 volatile uint64_t clkCompOffset = 0;
 volatile uint64_t clkCompRef = 0;
@@ -19,8 +19,8 @@ volatile int32_t clkCompRate = 0;
 
 void runClkComp() {
     // periodically update alignment to prevent numerical overflow
-    if((GPTM0.TAV.raw - clkCompUpdate) > 0) {
-        clkCompUpdate += MIN_UPDT_INTV;
+    if((GPTM0.TAV.raw - clkCompUpdated) >= MIN_UPDT_INTV) {
+        clkCompUpdated += MIN_UPDT_INTV;
         CLK_COMP_setComp(clkCompRate);
     }
 }
