@@ -226,7 +226,7 @@ unsigned statusClock(char *body) {
     tmp[10] = '.';
     toHex(pps[1], 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "pps trim:  ");
+    end = append(end, "pps comp:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
@@ -254,7 +254,7 @@ unsigned statusClock(char *body) {
     tmp[10] = '.';
     toHex(tsDebug[1], 8, '0', tmp+11);
     tmp[19] = 0;
-    end = append(end, "dbg trim:  ");
+    end = append(end, "dbg comp:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
