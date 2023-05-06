@@ -133,11 +133,11 @@ void TCMP_run() {
         ADC0.PSSI.SS3 = 1;
         // set next update time
         tempUpdated += TEMP_UPDT_INTV;
-        // update temperature data
-        while(!ADC0.SS3.FSTAT.EMPTY) {
-            float temp = toCelsius(ADC0.SS3.FIFO.DATA);
-            tempValue += (temp - tempValue) * TEMP_ALPHA;
-        }
+    }
+    // update temperature once data is ready
+    while(!ADC0.SS3.FSTAT.EMPTY) {
+        float temp = toCelsius(ADC0.SS3.FIFO.DATA);
+        tempValue += (temp - tempValue) * TEMP_ALPHA;
     }
 
     // poll for next compensation update trigger
