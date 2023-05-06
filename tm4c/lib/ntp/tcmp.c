@@ -27,9 +27,6 @@
 
 static volatile uint32_t tempNext = 0;
 static volatile float tempValue;
-static volatile float tempSlow[TEMP_SLOW_CNT];
-static volatile float tempSlowCoeff[TEMP_SLOW_CNT];
-static const float tempSlowRate[TEMP_SLOW_CNT] = { 0x1p-8f, 0x1p-9f, 0x1p-10f};
 
 static volatile uint32_t tcmpNext = 0;
 static volatile uint32_t tcmpSaved;
@@ -89,7 +86,6 @@ static void saveSom();
 static void seedSom(float temp, float comp);
 static void updateSom(float temp, float comp);
 static void updateRegression();
-static void updateComp();
 
 /**
  * Estimate temperature correction using 3rd order taylor series
@@ -124,14 +120,11 @@ void TCMP_init() {
         while(!ADC0.SS3.FSTAT.EMPTY)
             tempValue = toCelsius(ADC0.SS3.FIFO.DATA);
     }
-    // initialize slow averages
-    for(int i = 0; i < TEMP_SLOW_CNT; i++)
-        tempSlow[i] = tempValue;
 
     loadSom();
     if(isfinite(somComp[0][0])) {
         updateRegression();
-        updateComp();
+        tcmpValue = tcmpEstimate(tempValue);
     }
 }
 
@@ -153,11 +146,8 @@ void TCMP_run() {
     if((GPTM0.TAV.raw - tcmpNext) > 0) {
         // set next update time
         tcmpNext += TCMP_UPDT_INTV;
-        // update slow averages
-        for(int i = 0; i < TEMP_SLOW_CNT; i++)
-            tempSlow[i] += (tempValue - tempSlow[i]) * tempSlowRate[i];
         // update temperature compensation
-        updateComp();
+        tcmpValue = tcmpEstimate(tempValue);
     }
 }
 
@@ -170,17 +160,10 @@ float TCMP_get() {
 }
 
 void TCMP_update(const float target) {
-    const float temp = tempValue;
     updateSom(tempValue, target);
     updateRegression();
 
-    // update derivative coefficients
-    float error = target - tcmpEstimate(temp);
-    for (int i = 0; i < TEMP_SLOW_CNT; i++)
-        error -= (temp - tempSlow[i]) * tempSlowCoeff[i];
-    error *= 0x1p-10f;
-    for (int i = 0; i < TEMP_SLOW_CNT; i++)
-        tempSlowCoeff[i] += error * (temp - tempSlow[i]);
+    tcmpValue = tcmpEstimate(tempValue);
 
     const uint32_t now = CLK_MONO_INT();
     if(now - tcmpSaved > TCMP_SAVE_INTV) {
@@ -234,21 +217,6 @@ unsigned TCMP_status(char *buffer) {
     end = append(end, "  - coef[2]: ");
     end = append(end, tmp);
     end = append(end, " ppm/C^3\n");
-
-    tmp[fmtFloat(tempSlowCoeff[0] * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - slow[0]: ");
-    end = append(end, tmp);
-    end = append(end, " ppm/C\n");
-
-    tmp[fmtFloat(tempSlowCoeff[1] * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - slow[1]: ");
-    end = append(end, tmp);
-    end = append(end, " ppm/C\n");
-
-    tmp[fmtFloat(tempSlowCoeff[2] * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - slow[2]: ");
-    end = append(end, tmp);
-    end = append(end, " ppm/C\n");
 
     tmp[fmtFloat(tcmpValue * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - curr:    ");
@@ -416,16 +384,6 @@ static float tcmpEstimate(const float temp) {
     y += x * x * tcmpCoeff[1];
     y += x * x * x * tcmpCoeff[2];
     return y;
-}
-
-static void updateComp() {
-    const float temp = tempValue;
-    // get base correction
-    float y = tcmpEstimate(temp);
-    // apply derivative adjustments
-    for(int i = 0; i < TEMP_SLOW_CNT; i++)
-        y += (temp - tempSlow[i]) * tempSlowCoeff[i];
-    tcmpValue = y;
 }
 
 unsigned statusSom(char *buffer) {
