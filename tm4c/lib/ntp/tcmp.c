@@ -13,7 +13,6 @@
 
 #define TEMP_UPDT_INTV (122070) // 1024 Hz
 #define TEMP_ALPHA (0x1p-8f)
-#define TEMP_SLOW_CNT (3)
 
 #define TCMP_SAVE_INTV (3600) // save state every hour
 #define TCMP_UPDT_INTV (CLK_FREQ / 16)  // 16 Hz
