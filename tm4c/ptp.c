@@ -13,6 +13,8 @@
 #include "lib/net/util.h"
 #include "lib/led.h"
 #include "ptp.h"
+#include "lib/clk/util.h"
+#include "lib/clk/tai.h"
 
 
 #define PTP2_PORT_EVENT (319)
@@ -22,6 +24,9 @@
 #define PTP2_SYNC_INTERVAL (CLK_FREQ / 4) // 4 Hz
 #define PTP2_MULTICAST (0x810100E0) // 224.0.1.129
 #define PTP2_MULTICAST_PEER (0x6B0000E0) // 224.0.0.107
+#define PTP2_VERSION (2)
+#define PTP2_DOMAIN (1)
+#define PTP2_SYNC_LOG_INTV (-2)
 
 
 // PTP message types
@@ -114,6 +119,7 @@ _Static_assert(sizeof(struct PTP2_PDELAY_RESP) == 20, "PTP2_PDELAY_FOLLOW_UP mus
 
 static uint32_t updatedSync, updatedAnnounce;
 static uint8_t clockId[8];
+static volatile uint32_t seqId;
 
 static void processMessage(uint8_t *frame, int flen);
 static void processDelayRequest(uint8_t *frame, int flen);
@@ -121,6 +127,8 @@ static void processPDelayRequest(uint8_t *frame, int flen);
 
 static void sendAnnounce();
 static void sendSync();
+
+static void toPtpTimestamp(uint64_t ts, struct PTP2_TIMESTAMP *tsPtp);
 
 void PTP_init() {
     // set clock ID to MAC address
@@ -192,6 +200,7 @@ static void sendAnnounce() {
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
+    struct PTP2_ANNOUNCE *announce = (struct PTP2_ANNOUNCE *) (headerPTP + 1);
 
     // EtherType = IPv4
     headerEth->ethType = ETHTYPE_IPv4;
@@ -214,6 +223,33 @@ static void sendAnnounce() {
     NET_transmit(txDesc, flen);
 }
 
+static void syncFollowup(void *ref, uint8_t *txFrame, int flen) {
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    uint8_t *followup = NET_getTxBuff(txDesc);
+    memcpy(followup, txFrame, flen);
+
+    // get precise TX time
+    uint64_t stamps[3];
+    NET_getTxTime(txFrame, stamps);
+
+    // map headers
+    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) followup;
+    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
+    PTP2_SYNC *sync = (PTP2_SYNC *) (headerPTP + 1);
+
+    // set followup fields
+    headerPTP->messageType = PTP2_MT_FOLLOW_UP;
+    toPtpTimestamp(stamps[2], sync);
+
+    // transmit request
+    UDP_finalize(followup, flen);
+    IPv4_finalize(followup, flen);
+    NET_transmit(txDesc, flen);
+}
+
 static void sendSync() {
     int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
@@ -227,6 +263,7 @@ static void sendSync() {
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
+    PTP2_SYNC *sync = (PTP2_SYNC *) (headerPTP + 1);
 
     // EtherType = IPv4
     headerEth->ethType = ETHTYPE_IPv4;
@@ -241,10 +278,33 @@ static void sendSync() {
     headerUDP->portSrc = __builtin_bswap16(PTP2_PORT_EVENT);
     headerUDP->portDst = __builtin_bswap16(PTP2_PORT_EVENT);
 
-    // TODO set payload
+    headerPTP->versionPTP = PTP2_VERSION;
+    headerPTP->messageType = __builtin_bswap16(PTP2_MT_SYNC);
+    headerPTP->messageLength = __builtin_bswap16(sizeof(struct PTP2_HEADER) + sizeof(PTP2_SYNC));
+    memcpy(headerPTP->sourceIdentity.identity, clockId, sizeof(clockId));
+    headerPTP->sourceIdentity.portNumber = __builtin_bswap16(PTP2_PORT_EVENT);
+    headerPTP->domainNumber = PTP2_DOMAIN;
+    headerPTP->logMessageInterval = PTP2_SYNC_LOG_INTV;
+    headerPTP->sequenceId = __builtin_bswap16(seqId++);
+
+    // set preliminary timestamp
+    toPtpTimestamp(CLK_TAI(), sync);
 
     // transmit request
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
+    NET_setTxCallback(txDesc, syncFollowup, NULL);
     NET_transmit(txDesc, flen);
+}
+
+static void toPtpTimestamp(uint64_t ts, struct PTP2_TIMESTAMP *tsPtp) {
+    union fixed_32_32 scratch;
+    scratch.full = ts;
+    // set seconds
+    tsPtp->secondsHi = 0;
+    tsPtp->secondsLo = __builtin_bswap32(scratch.ipart);
+    // convert fraction to nanoseconds
+    scratch.ipart = 0;
+    scratch.full *= 1000000000u;
+    tsPtp->nanoseconds = __builtin_bswap32(scratch.ipart);
 }
