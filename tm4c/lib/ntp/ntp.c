@@ -115,6 +115,10 @@ void NTP_run() {
     }
 }
 
+uint32_t NTP_refId() {
+    return refId;
+}
+
 static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
     // map headers
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;

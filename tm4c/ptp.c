@@ -6,27 +6,31 @@
 #include <math.h>
 #include "hw/timer.h"
 #include "lib/clk/mono.h"
+#include "lib/clk/tai.h"
+#include "lib/clk/util.h"
+#include "lib/led.h"
 #include "lib/net.h"
 #include "lib/net/eth.h"
 #include "lib/net/ip.h"
 #include "lib/net/udp.h"
 #include "lib/net/util.h"
-#include "lib/led.h"
+#include "lib/ntp/ntp.h"
+#include "lib/ntp/pll.h"
 #include "ptp.h"
-#include "lib/clk/util.h"
-#include "lib/clk/tai.h"
 
+
+#define PTP2_ANNC_LOG_INTV (2) // 4 s
+#define PTP2_SYNC_LOG_INTV (-2) // 4 Hz
 
 #define PTP2_PORT_EVENT (319)
 #define PTP2_PORT_GENERAL (320)
 #define PTP2_MIN_SIZE (UDP_DATA_OFFSET + 34)
-#define PTP2_ANNOUNCE_INTERVAL (CLK_FREQ * 4) // 4s
-#define PTP2_SYNC_INTERVAL (CLK_FREQ / 4) // 4 Hz
+#define PTP2_ANNC_INTV (CLK_FREQ * 4) // 4 s
+#define PTP2_SYNC_INTV (CLK_FREQ / 4) // 4 Hz
 #define PTP2_MULTICAST (0x810100E0) // 224.0.1.129
 #define PTP2_MULTICAST_PEER (0x6B0000E0) // 224.0.0.107
 #define PTP2_VERSION (2)
 #define PTP2_DOMAIN (1)
-#define PTP2_SYNC_LOG_INTV (-2)
 
 
 // PTP message types
@@ -42,6 +46,24 @@ enum PTP2_MTYPE {
     PTP2_MT_ANNOUNCE,
     PTP2_MT_SIGNALING,
     PTP2_MT_MANAGEMENT
+};
+
+enum PTP2_CLK_CLASS {
+    PTP2_CLK_CLASS_PRIMARY = 6,
+    PTP2_CLK_CLASS_PRI_HOLD = 7,
+    PTP2_CLK_CLASS_PRI_FAIL = 52
+};
+
+// PTP time source
+enum PTP2_TSRC {
+    PTP2_TSRC_ATOMIC = 0x10,
+    PTP2_TSRC_GPS = 0x20,
+    PTP2_TSRC_RADIO = 0x30,
+    PTP2_TSRC_PTP = 0x40,
+    PTP2_TSRC_NTP = 0x50,
+    PTP2_TSRC_MANUAL = 0x60,
+    PTP2_TSRC_OTHER = 0x90,
+    PTP2_TSRC_INTERNAL = 0xA0
 };
 
 struct PACKED PTP2_SRC_IDENT {
@@ -121,6 +143,14 @@ static uint32_t updatedSync, updatedAnnounce;
 static uint8_t clockId[8];
 static volatile uint32_t seqId;
 
+static float lutClkAccuracy[17] = {
+        25e-9f, 100e-9f, 250e-9f, 1e-6f,
+        2.5e-6f, 10e-6f, 25e-6f, 100e-6f,
+        250e-6f, 1e-3f, 2.5e-3f, 10e-3f,
+        25e-6f, 100e-3f, 250e-3f, 1.0f,
+        10.0f
+};
+
 static void processMessage(uint8_t *frame, int flen);
 static void processDelayRequest(uint8_t *frame, int flen);
 static void processPDelayRequest(uint8_t *frame, int flen);
@@ -129,6 +159,7 @@ static void sendAnnounce();
 static void sendSync();
 
 static void toPtpTimestamp(uint64_t ts, struct PTP2_TIMESTAMP *tsPtp);
+static uint32_t toPtpClkAccuracy(float rmsError);
 
 void PTP_init() {
     // set clock ID to MAC address
@@ -143,16 +174,16 @@ void PTP_init() {
 }
 
 void PTP_run() {
-    // check for sync event
-    if((GPTM0.TAV.raw - updatedSync) >= PTP2_SYNC_INTERVAL) {
-        updatedSync += PTP2_SYNC_INTERVAL;
-        sendSync();
+    // check for announce event
+    if((GPTM0.TAV.raw - updatedAnnounce) >= PTP2_ANNC_INTV) {
+        updatedAnnounce += PTP2_ANNC_INTV;
+        sendAnnounce();
     }
 
-    // check for announce event
-    if((GPTM0.TAV.raw - updatedAnnounce) >= PTP2_ANNOUNCE_INTERVAL) {
-        updatedAnnounce += PTP2_ANNOUNCE_INTERVAL;
-        sendAnnounce();
+    // check for sync event
+    if((GPTM0.TAV.raw - updatedSync) >= PTP2_SYNC_INTV) {
+        updatedSync += PTP2_SYNC_INTV;
+        sendSync();
     }
 }
 
@@ -215,7 +246,25 @@ static void sendAnnounce() {
     headerUDP->portSrc = __builtin_bswap16(PTP2_PORT_EVENT);
     headerUDP->portDst = __builtin_bswap16(PTP2_PORT_EVENT);
 
-    // TODO set payload
+    // PTP header
+    headerPTP->versionPTP = PTP2_VERSION;
+    headerPTP->messageType = __builtin_bswap16(PTP2_MT_SYNC);
+    headerPTP->messageLength = __builtin_bswap16(sizeof(struct PTP2_HEADER) + sizeof(struct PTP2_ANNOUNCE));
+    memcpy(headerPTP->sourceIdentity.identity, clockId, sizeof(clockId));
+    headerPTP->sourceIdentity.portNumber = __builtin_bswap16(PTP2_PORT_EVENT);
+    headerPTP->domainNumber = PTP2_DOMAIN;
+    headerPTP->logMessageInterval = PTP2_ANNC_LOG_INTV;
+    headerPTP->sequenceId = __builtin_bswap16(seqId++);
+
+    // PTP Announce
+    announce->timeSource = (NTP_refId() == NTP_REF_GPS) ? PTP2_TSRC_GPS : PTP2_TSRC_NTP;
+    announce->currentUtcOffset = (clkTaiUtcOffset >> 32);
+    memcpy(announce->grandMasterIdentity, clockId, sizeof(clockId));
+    announce->grandMasterPriority = 0;
+    announce->grandMasterPriority2 = 0;
+    announce->stepsRemoved = 0;
+    announce->grandMasterClockQuality = toPtpClkAccuracy(PLL_offsetRms());
+    toPtpTimestamp(CLK_TAI(), &(announce->originTimestamp));
 
     // transmit request
     UDP_finalize(frame, flen);
@@ -307,4 +356,14 @@ static void toPtpTimestamp(uint64_t ts, struct PTP2_TIMESTAMP *tsPtp) {
     scratch.ipart = 0;
     scratch.full *= 1000000000u;
     tsPtp->nanoseconds = __builtin_bswap32(scratch.ipart);
+}
+
+static uint32_t toPtpClkAccuracy(float rmsError) {
+    // check accuracy thresholds
+    for(int i = 0; i < 17; i++) {
+        if(rmsError <= lutClkAccuracy[i])
+            return 0x20 + i;
+    }
+    // greater than 10s
+    return 0x31;
 }

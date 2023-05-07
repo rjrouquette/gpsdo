@@ -10,6 +10,7 @@
 #include "../clk/util.h"
 #include "../gps.h"
 #include "common.h"
+#include "ntp.h"
 #include "ref.h"
 
 static void NtpGPS_run(volatile void *pObj) {
@@ -90,7 +91,7 @@ void NtpGPS_init(volatile void *pObj) {
     this->source.version = 4;
     this->source.ntpMode = 4;
     // set id to "GPS"
-    this->source.id = 0x00535047;
+    this->source.id = NTP_REF_GPS;
     this->source.precision = NTP_CLK_PREC;
     // one second poll interval
     this->source.poll = 0;
