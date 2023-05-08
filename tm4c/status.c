@@ -34,8 +34,6 @@ unsigned statusClock(char *body);
 unsigned statusEEPROM(int block, char *body);
 unsigned statusETH(char *body);
 unsigned statusGPS(char *body);
-unsigned statusGPSDO(char *body);
-unsigned statusNTP(char *body);
 unsigned statusSystem(char *body);
 
 unsigned statusSom(char *buffer);

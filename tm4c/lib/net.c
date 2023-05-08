@@ -131,9 +131,15 @@ static void initHwAddr() {
     CRC.DIN = UNIQUEID.WORD[1];
     CRC.DIN = UNIQUEID.WORD[2];
     CRC.DIN = UNIQUEID.WORD[3];
-    // set MAC address (byte-order is reversed)
-    EMAC0.ADDR0.HI.ADDR = ((CRC.SEED & 0xFF) << 8) | ((CRC.SEED  >> 8) & 0xFF);
-    EMAC0.ADDR0.LO = (((CRC.SEED >> 16) & 0xFF) << 24) | 0x585554;
+    // set MAC address
+    uint8_t macAddr[6] = {
+            // "TUX" prefix borrowed from tuxgraphics.org
+            0x54, 0x55, 0x58,
+            (CRC.SEED >> 16) & 0xFF,
+            (CRC.SEED >> 8) & 0xFF,
+            (CRC.SEED >> 0) & 0xFF
+    };
+    EMAC_setMac(&(EMAC0.ADDR0), macAddr);
     // disable CRC module
     RCGCCCM.EN = 0;
 }

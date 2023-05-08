@@ -58,15 +58,19 @@ void IPv4_finalize(uint8_t *frame, int flen) {
     headerIPv4->chksum = RFC1071_checksum(headerIPv4, sizeof(struct HEADER_IPv4));
 }
 
+void IPv4_macMulticast(uint8_t *mac, uint32_t groupAddress) {
+    mac[0] = 0x01;
+    mac[1] = 0x00;
+    mac[2] = 0x5E;
+    mac[3] = (groupAddress >> 8) & 0x7F;
+    mac[4] = (groupAddress >> 16) & 0xFF;
+    mac[5] = (groupAddress >> 24) & 0xFF;
+}
+
 void IPv4_setMulticast(uint8_t *frame, uint32_t groupAddress) {
     // set MAC address
     struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    headerEth->macDst[0] = 0x01;
-    headerEth->macDst[1] = 0x00;
-    headerEth->macDst[2] = 0x5E;
-    headerEth->macDst[3] = (groupAddress >> 16) & 0x7F;
-    headerEth->macDst[4] = (groupAddress >> 8) & 0xFF;
-    headerEth->macDst[5] = (groupAddress >> 0) & 0xFF;
+    IPv4_macMulticast(headerEth->macDst, groupAddress);
     // set group address
     struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
     headerIPv4->dst = groupAddress;

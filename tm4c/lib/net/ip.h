@@ -60,6 +60,13 @@ void IPv4_init(uint8_t *frame);
 void IPv4_finalize(uint8_t *frame, int flen);
 void IPv4_setMulticast(uint8_t *frame, uint32_t groupAddress);
 
+/**
+ * Calculate MAC address for IPv4 multicast group
+ * @param mac resulting MAC address (network byte-order)
+ * @param groupAddress IPv4 group address (network byte-order)
+ */
+void IPv4_macMulticast(uint8_t *mac, uint32_t groupAddress);
+
 uint16_t RFC1071_checksum(volatile const void *buffer, int len);
 
 #endif //GPSDO_IP_H

@@ -4,6 +4,7 @@
 
 #include <memory.h>
 #include <math.h>
+#include "hw/emac.h"
 #include "hw/timer.h"
 #include "lib/clk/mono.h"
 #include "lib/clk/tai.h"
@@ -171,6 +172,17 @@ void PTP_init() {
     uint64_t now = CLK_MONO();
     updatedAnnounce = now;
     updatedSync = now;
+    // enable reception for multicast MACs
+    uint8_t mac[6];
+    // standard PTP multicast group
+    IPv4_macMulticast(mac, PTP2_MULTICAST);
+    EMAC_setMac(&(EMAC0.ADDR2), mac);
+    // peer PTP multicast group
+    IPv4_macMulticast(mac, PTP2_MULTICAST_PEER);
+    EMAC_setMac(&(EMAC0.ADDR3), mac);
+    // enable address matching
+    EMAC0.ADDR2.HI.AE = 1;
+    EMAC0.ADDR3.HI.AE = 1;
 }
 
 void PTP_run() {
