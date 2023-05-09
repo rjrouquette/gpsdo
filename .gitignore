@@ -14,3 +14,7 @@ gpsdo.csv
 
 # kicad backup file
 kicad/*-backups/
+
+# LTSpice
+*.log
+*.raw
