@@ -169,15 +169,15 @@ void NtpSource_updateStatus(NtpSource *this) {
     }
     else if(
             (this->reach & 0xF) == 0 &&
-            this->pollCounter >= 4 &&
-            this->poll > this->minPoll
+            this->pollCounter >= 4
     ) {
         // mark association as lost
         this->lost = true;
         // reset the counter
         this->pollCounter = 0;
         // decrease poll interval (increase update rate)
-        --this->poll;
+        if(this->poll > this->minPoll)
+            --this->poll;
     }
 
     // mark source for pruning if it is unreachable
