@@ -376,7 +376,7 @@ unsigned statusSom(char *buffer) {
     char *end = buffer;
 
     // export in C-style array syntax
-    end = append(end, "float som[32][3] = {\n");
+    end = append(end, "float som[16][3] = {\n");
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         end += fmtFloat(somComp[i][0], 0, -1, end);
         end = append(end, ", ");
