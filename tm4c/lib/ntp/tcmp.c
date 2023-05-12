@@ -18,9 +18,10 @@
 #define TCMP_UPDT_INTV (CLK_FREQ / 16)  // 16 Hz
 
 #define SOM_EEPROM_BASE (0x0020)
-#define SOM_NODE_CNT (32)
+#define SOM_NODE_CNT (16)
 #define SOM_FILL_OFF (2.0f)
 #define SOM_FILL_REG (8.0f)
+#define SOM_RATE_MAX (0.25f)
 
 #define REG_MIN_RMSE (100e-9f)
 
@@ -38,40 +39,24 @@ static volatile float tcmpRmse;
 // SOM for filtering compensation samples
 static volatile float somComp[SOM_NODE_CNT][3];
 
-// neighbor weight = exp(-2.0f * dist)
+// neighbor weight = 2 ^ (-3 * dist)
 static const float somNW[SOM_NODE_CNT] = {
-        1.0f,
-        1.35335283e-1f,
-        1.83156389e-2f,
-        2.47875218e-3f,
-        3.35462628e-4f,
-        4.53999298e-05f,
-        6.14421235e-06f,
-        8.31528719e-07f,
-        1.12535175e-07f,
-        1.52299797e-08f,
-        2.06115362e-09f,
-        2.78946809e-10f,
-        3.77513454e-11f,
-        5.10908903e-12f,
-        6.91440011e-13f,
-        9.35762297e-14f,
-        1.26641655e-14f,
-        1.71390843e-15f,
-        2.31952283e-16f,
-        3.13913279e-17f,
-        4.24835426e-18f,
-        5.74952226e-19f,
-        7.78113224e-20f,
-        1.05306176e-20f,
-        1.42516408e-21f,
-        1.92874985e-22f,
-        2.61027907e-23f,
-        3.53262857e-24f,
-        4.78089288e-25f,
-        6.47023493e-26f,
-        8.75651076e-27f,
-        1.18506486e-27f
+        0x1p-00f,
+        0x1p-03f,
+        0x1p-06f,
+        0x1p-09f,
+        0x1p-12f,
+        0x1p-15f,
+        0x1p-18f,
+        0x1p-21f,
+        0x1p-24f,
+        0x1p-27f,
+        0x1p-30f,
+        0x1p-33f,
+        0x1p-36f,
+        0x1p-39f,
+        0x1p-42f,
+        0x1p-45f
 };
 
 __attribute__((always_inline))
@@ -274,7 +259,7 @@ static void updateSom(float temp, float comp) {
     }
 
     // update nodes using dynamic learning rate
-    alpha = 1.0f / (1.0f + (alpha * alpha));
+    alpha = SOM_RATE_MAX / (1.0f + (alpha * alpha));
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         // compute neighbor distance
         int ndist = i - best;
