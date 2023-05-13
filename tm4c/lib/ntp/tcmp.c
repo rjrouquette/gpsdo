@@ -37,27 +37,8 @@ static volatile float tcmpCoeff[3];
 static volatile float tcmpRmse;
 
 // SOM for filtering compensation samples
-static volatile float somComp[SOM_NODE_CNT][3];
-
-// neighbor weight = 2 ^ (-3 * dist)
-static const float somNW[SOM_NODE_CNT] = {
-        0x1p-00f,
-        0x1p-03f,
-        0x1p-06f,
-        0x1p-09f,
-        0x1p-12f,
-        0x1p-15f,
-        0x1p-18f,
-        0x1p-21f,
-        0x1p-24f,
-        0x1p-27f,
-        0x1p-30f,
-        0x1p-33f,
-        0x1p-36f,
-        0x1p-39f,
-        0x1p-42f,
-        0x1p-45f
-};
+static volatile float somNode[SOM_NODE_CNT][3];
+static volatile float somNW[SOM_NODE_CNT];
 
 __attribute__((always_inline))
 static inline float toCelsius(int32_t adcValue) {
@@ -105,7 +86,7 @@ void TCMP_init() {
     }
 
     loadSom();
-    if(isfinite(somComp[0][0])) {
+    if(isfinite(somNode[0][0])) {
         updateRegression();
         tcmpValue = tcmpEstimate(tempValue);
     }
@@ -210,8 +191,12 @@ unsigned TCMP_status(char *buffer) {
 }
 
 static void loadSom() {
-    uint32_t *ptr = (uint32_t *) somComp;
-    uint32_t *end = ptr + (sizeof(somComp) / sizeof(uint32_t));
+    // initialize neighbor weights
+    for(int i = 0; i < SOM_NODE_CNT; i++)
+        somNW[i] = expf(-2.0f * (float) (i * i));
+
+    uint32_t *ptr = (uint32_t *) somNode;
+    uint32_t *end = ptr + (sizeof(somNode) / sizeof(uint32_t));
 
     // load SOM data
     EEPROM_seek(SOM_EEPROM_BASE);
@@ -220,8 +205,8 @@ static void loadSom() {
 }
 
 static void saveSom() {
-    uint32_t *ptr = (uint32_t *) somComp;
-    uint32_t *end = ptr + (sizeof(somComp) / sizeof(uint32_t));
+    uint32_t *ptr = (uint32_t *) somNode;
+    uint32_t *end = ptr + (sizeof(somNode) / sizeof(uint32_t));
 
     // load SOM data
     EEPROM_seek(SOM_EEPROM_BASE);
@@ -233,25 +218,25 @@ static void seedSom(float temp, float comp) {
     float norm = 0.01f / (float) SOM_NODE_CNT;
     int mid = SOM_NODE_CNT / 2;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
-        somComp[i][0] = temp + (norm * (float)(i - mid));
-        somComp[i][1] = comp;
-        somComp[i][2] = 0;
+        somNode[i][0] = temp + (norm * (float)(i - mid));
+        somNode[i][1] = comp;
+        somNode[i][2] = 0;
     }
 }
 
 static void updateSom(float temp, float comp) {
     // initialize som nodes if necessary
-    if(!isfinite(somComp[0][0])) {
+    if(!isfinite(somNode[0][0])) {
         seedSom(temp, comp);
     }
 
     // locate nearest node and measure learning progress
     float alpha = 0;
     int best = 0;
-    float dist = fabsf(temp - somComp[0][0]);
+    float dist = fabsf(temp - somNode[0][0]);
     for(int i = 1; i < SOM_NODE_CNT; i++) {
-        alpha += somComp[i][2];
-        float diff = fabsf(temp - somComp[i][0]);
+        alpha += somNode[i][2];
+        float diff = fabsf(temp - somNode[i][0]);
         if(diff < dist) {
             dist = diff;
             best = i;
@@ -267,9 +252,9 @@ static void updateSom(float temp, float comp) {
         // compute node alpha
         const float w = alpha * somNW[ndist];
         // update node weights
-        somComp[i][0] += (temp - somComp[i][0]) * w;
-        somComp[i][1] += (comp - somComp[i][1]) * w;
-        somComp[i][2] += (1.0f - somComp[i][2]) * w;
+        somNode[i][0] += (temp - somNode[i][0]) * w;
+        somNode[i][1] += (comp - somNode[i][1]) * w;
+        somNode[i][2] += (1.0f - somNode[i][2]) * w;
     }
 }
 
@@ -277,7 +262,7 @@ static void updateRegression() {
     // compute means
     float mean[3] = {0, 0, 0};
     for(int i = 0; i < SOM_NODE_CNT; i++) {
-        const volatile float *row = somComp[i];
+        const volatile float *row = somNode[i];
         mean[0] += row[0] * row[2];
         mean[1] += row[1] * row[2];
         mean[2] += row[2];
@@ -300,13 +285,13 @@ static void updateRegression() {
 
     // scratch variables
     float coeff[3];
-    float scratch[32][2];
+    float scratch[SOM_NODE_CNT][2];
     float xx, xy;
 
     // linear coefficient
     xx = 0; xy = 0;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
-        const volatile float *row = somComp[i];
+        const volatile float *row = somNode[i];
         float x = scratch[i][0] = row[0] - mean[0];
         float y = scratch[i][1] = row[1] - mean[1];
         xx += x * x * row[2];
@@ -317,7 +302,7 @@ static void updateRegression() {
     // quadratic coefficient
     xx = 0; xy = 0;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
-        const volatile float *row = somComp[i];
+        const volatile float *row = somNode[i];
         float x = scratch[i][0];
         float y = (scratch[i][1] -= x * coeff[0]);
         x = x * x;
@@ -329,7 +314,7 @@ static void updateRegression() {
     // cubic coefficient
     xx = 0; xy = 0;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
-        const volatile float *row = somComp[i];
+        const volatile float *row = somNode[i];
         float x = scratch[i][0];
         float y = (scratch[i][1] -= x * x * coeff[1]);
         x = x * x * x;
@@ -342,7 +327,7 @@ static void updateRegression() {
     // compute RMS error
     float rmse = 0;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
-        const volatile float *row = somComp[i];
+        const volatile float *row = somNode[i];
 
         float x = row[0] - mean[0];
         float y = mean[1];
@@ -378,11 +363,11 @@ unsigned statusSom(char *buffer) {
     // export in C-style array syntax
     end = append(end, "float som[16][3] = {\n");
     for(int i = 0; i < SOM_NODE_CNT; i++) {
-        end += fmtFloat(somComp[i][0], 0, -1, end);
+        end += fmtFloat(somNode[i][0], 0, -1, end);
         end = append(end, ", ");
-        end += fmtFloat(somComp[i][1] * 1e6f, 0, -1, end);
+        end += fmtFloat(somNode[i][1] * 1e6f, 0, -1, end);
         end = append(end, ", ");
-        end += fmtFloat(somComp[i][2], 0, -1, end);
+        end += fmtFloat(somNode[i][2], 0, -1, end);
         if(i < SOM_NODE_CNT - 1)
             *(end++) = ',';
         *(end++) = '\n';

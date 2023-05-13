@@ -10,7 +10,7 @@ project(gpsdo)
 find_program(OBJCOPY arm-none-eabi-objcopy)
 find_program(OBJDUMP arm-none-eabi-objdump)
 
-set(COMP_FLAGS "-ggdb -Os -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fno-math-errno")
+set(COMP_FLAGS "-ggdb -Os -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard")
 set(CMAKE_C_FLAGS "-std=c17 ${COMP_FLAGS}")
 set(CMAKE_CXX_FLAGS "-std=c++17 -fno-exceptions ${COMP_FLAGS}")
 
@@ -65,8 +65,8 @@ add_executable(
 target_link_libraries(
         gpsdo
         -static
-        -lc
         -lm
+        -lc
 )
 
 # a custom target that is always built
