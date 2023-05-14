@@ -2,15 +2,23 @@
 // Created by robert on 4/27/23.
 //
 
+#include "../../hw/gpio.h"
 #include "../../hw/interrupts.h"
 #include "../../hw/timer.h"
+#include "../delay.h"
+#include "../gps.h"
 #include "mono.h"
 #include "tai.h"
 #include "comp.h"
 #include "util.h"
-#include "../gps.h"
 
 #define MIN_UPDT_INTV (CLK_FREQ / 4) // 4 Hz
+
+#define PPS_TIMER GPTM2
+#define PPS_PORT PORTA
+#define PPS_PIN (1<<4)
+#define PPS_INTV_HI (CLK_FREQ / 10) // 100 ms
+#define PPS_INTV_LO (CLK_FREQ - PPS_INTV_HI) // 900 ms
 
 volatile uint64_t clkTaiUtcOffset = 0;
 
@@ -21,7 +29,55 @@ volatile uint64_t clkTaiRef = 0;
 volatile int32_t clkTaiRate = 0;
 
 
+// PPS output timer
+void ISR_Timer2A() {
+    // set next second boundary
+    if(PPS_TIMER.TAMR.TCACT == 0x3) {
+        // output is now high, schedule transition to low
+        PPS_TIMER.TAMR.TCACT = 0x2;
+        PPS_TIMER.TAILR = PPS_INTV_HI;
+    }
+    else {
+        // output is now low, schedule transition to high
+        PPS_TIMER.TAMR.TCACT = 0x3;
+        PPS_TIMER.TAILR = PPS_INTV_LO;
+    }
+    // clear interrupt flag
+    PPS_TIMER.ICR.TATO = 1;
+}
+
 void initClkTai() {
+    // Enable Timer 2
+    RCGCTIMER.EN_GPTM2 = 1;
+    delay_cycles_4();
+    // Configure Timer
+    PPS_TIMER.TAILR = PPS_INTV_LO;
+    PPS_TIMER.TAMR.MR = 0x2;
+    PPS_TIMER.TAMR.CDIR = 1;
+    // set CCP pin on timeout
+    PPS_TIMER.TAMR.TCACT = 0x3;
+    // enable interrupt
+    PPS_TIMER.IMR.TATO = 1;
+    // start timer
+    PPS_TIMER.CTL.TAEN = 1;
+
+    // enable CCP output on PA2
+    RCGCGPIO.EN_PORTA = 1;
+    delay_cycles_4();
+    // unlock GPIO config
+    PPS_PORT.LOCK = GPIO_LOCK_KEY;
+    PPS_PORT.CR = PPS_PIN;
+    // configure pins
+    PPS_PORT.DIR |= PPS_PIN;
+    PPS_PORT.DR8R |= PPS_PIN;
+    PPS_PORT.PCTL.PMC4 = 3;
+    PPS_PORT.AFSEL.ALT4 = 1;
+    PPS_PORT.DEN |= PPS_PIN;
+    // lock GPIO config
+    PPS_PORT.CR = 0;
+    PPS_PORT.LOCK = 0;
+
+    // initialize UTC offset
     clkTaiUtcOffset = ((uint64_t) GPS_taiOffset()) << 32;
 }
 

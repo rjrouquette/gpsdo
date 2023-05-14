@@ -54,16 +54,10 @@ int64_t corrValue(int32_t rate, int64_t delta) {
 
 int32_t corrFrac(int32_t rate, uint32_t delta, volatile uint32_t *rem) {
     union fixed_32_32 scratch;
-    int neg = rate < 0;
-
     scratch.ipart = 0;
-    scratch.fpart = neg ? -rate: rate;
-    scratch.full *= delta;
-    // reapply sign
-    if(neg) scratch.full = -scratch.full;
-    // apply prior remainder
+    scratch.fpart = delta;
+    scratch.full *= rate;
     scratch.full += *rem;
-    // update remainder
     *rem = scratch.fpart;
     return (int32_t) scratch.ipart;
 }
@@ -77,8 +71,9 @@ float toFloatU(uint64_t value) {
 }
 
 float toFloat(int64_t value) {
-    if(value < 0)
-        return -toFloatU((uint64_t) -value);
-    else
-        return toFloatU((uint64_t) value);
+    union fixed_32_32 scratch;
+    scratch.full = value;
+    float temp = 0x1p-32f * (float) scratch.fpart;
+    temp += (float) (int32_t) scratch.ipart;
+    return temp;
 }
