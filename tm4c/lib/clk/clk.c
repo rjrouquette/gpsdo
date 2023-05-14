@@ -45,6 +45,8 @@ static void initClkSys() {
 void initClkMono();
 void initClkEth();
 void initClkSync();
+// comp.c
+void initClkComp();
 // tai.c
 void initClkTai();
 
@@ -53,6 +55,7 @@ void CLK_init() {
     initClkMono();
     initClkSync();
     initClkEth();
+    initClkComp();
     initClkTai();
 }
 
