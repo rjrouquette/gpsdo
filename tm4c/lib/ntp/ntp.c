@@ -28,6 +28,7 @@
 #define MIN_DNS_INTV (16) // 16 seconds
 
 #define NTP_POOL_FQDN ("pool.ntp.org")
+#define NTP_MAX_SKEW (50e-6) // 50 ppm
 
 static NtpGPS srcGps;
 static NtpPeer peerSlots[MAX_NTP_PEERS];
@@ -294,8 +295,16 @@ static void ntpMain() {
     // select best clock
     selectedSource = NULL;
     for(int i = 0; i < cntSources; i++) {
-        if(sources[i]->lost || sources[i]->score == 0) {
+        if(sources[i]->lost) {
             sources[i]->state = RPY_SD_ST_UNSELECTED;
+            continue;
+        }
+        if(sources[i]->used < 8 || sources[i]->freqUsed < 4) {
+            sources[i]->state = RPY_SD_ST_FALSETICKER;
+            continue;
+        }
+        if(sources[i]->freqSkew > NTP_MAX_SKEW) {
+            sources[i]->state = RPY_SD_ST_JITTERY;
             continue;
         }
         sources[i]->state = RPY_SD_ST_SELECTABLE;
@@ -322,15 +331,10 @@ static void ntpMain() {
     rootDelay = source->rootDelay + (uint32_t) (0x1p16f * source->delayMean);
     rootDispersion = source->rootDispersion + (uint32_t) (0x1p16f * source->delayStdDev);
 
-    // guard against spurious sources
-    if(source->used < 8) return;
-
     // update offset compensation
     PLL_updateOffset(source->poll, source->pollSample[source->samplePtr].offset);
     // update frequency compensation
-    if(source->freqUsed > 4 && source->freqSkew < 25e-6f) {
-        PLL_updateDrift(source->poll, source->freqDrift);
-    }
+    PLL_updateDrift(source->poll, source->freqDrift);
 }
 
 volatile static struct NtpSource* ntpAllocPeer() {
