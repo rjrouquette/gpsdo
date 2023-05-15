@@ -99,11 +99,11 @@ void runClkTai() {
         union fixed_32_32 scratch;
         scratch.full = CLK_TAI();
         if(scratch.fpart >= (7u << 29)) {
-            // compute time for next TAI second boundary
+            // compute next TAI second boundary
             scratch.fpart = 0;
             ++scratch.ipart;
-            // translate to compensated domain
             uint32_t rem = 0;
+            // translate to compensated domain
             scratch.full -= clkTaiOffset;
             scratch.full += corrFrac(-clkTaiRate, scratch.full - clkTaiRef, &rem);
             // translate to monotonic domain
