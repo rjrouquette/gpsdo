@@ -147,8 +147,8 @@ uint64_t CLK_TAI_fromMono(uint64_t ts) {
 
 void CLK_TAI_setTrim(int32_t comp) {
     // prepare update values
-    uint64_t now = CLK_COMP();
-    uint64_t offset = corrFrac(clkTaiRate, (uint32_t) (now - clkTaiRef), &clkTaiRem);
+    const uint64_t now = CLK_COMP();
+    const int32_t offset = corrFrac(clkTaiRate, now - clkTaiRef, &clkTaiRem);
 
     // apply update
     __disable_irq();

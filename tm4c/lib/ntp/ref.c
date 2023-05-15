@@ -81,7 +81,7 @@ static void NtpGPS_run(volatile void *pObj) {
     // update filter
     NtpSource_update(&this->source);
     // update status
-
+    NtpGPS_updateStatus(this);
 }
 
 void NtpGPS_init(volatile void *pObj) {
