@@ -13,6 +13,14 @@
 #include "ntp.h"
 #include "ref.h"
 
+static void NtpGPS_updateStatus(NtpGPS *this) {
+    // update status
+    if(this->source.reach == 0)
+        this->source.lost = true;
+    else if(this->source.reach == 0xFFFF)
+        this->source.lost = false;
+}
+
 static void NtpGPS_run(volatile void *pObj) {
     NtpGPS *this = (struct NtpGPS *) pObj;
 
@@ -29,7 +37,7 @@ static void NtpGPS_run(volatile void *pObj) {
             this->source.reach <<= 1;
             ++this->source.txCount;
             // update status
-            NtpSource_updateStatus(&(this->source));
+            NtpGPS_updateStatus(this);
         }
         return;
     }
@@ -73,9 +81,7 @@ static void NtpGPS_run(volatile void *pObj) {
     // update filter
     NtpSource_update(&this->source);
     // update status
-    this->source.lost = this->source.reach == 0;
-    if(this->source.lost && this->source.reach == 0xFFFF)
-        this->source.lost = false;
+
 }
 
 void NtpGPS_init(volatile void *pObj) {
