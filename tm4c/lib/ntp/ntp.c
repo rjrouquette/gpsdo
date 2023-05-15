@@ -28,7 +28,7 @@
 #define MIN_DNS_INTV (16) // 16 seconds
 
 #define NTP_POOL_FQDN ("pool.ntp.org")
-#define NTP_MAX_SKEW (50e-6) // 50 ppm
+#define NTP_MAX_SKEW (50e-6f) // 50 ppm
 
 static NtpGPS srcGps;
 static NtpPeer peerSlots[MAX_NTP_PEERS];
