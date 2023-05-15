@@ -27,20 +27,8 @@ uint64_t CLK_TAI();
 uint64_t CLK_TAI_fromMono(uint64_t ts);
 
 /**
- * Adjust fractional part of TAI reference
- * @param fraction fractional seconds by which to adjust alignment
- */
-void CLK_TAI_align(int32_t fraction);
-
-/**
- * Set integer part of TAI reference
- * @param seconds 32-bit
- */
-void CLK_TAI_set(uint32_t seconds);
-
-/**
- * Set integer part of TAI reference
- * @param seconds  64-bit fixed-point format (31.32)
+ * Adjust TAI reference time
+ * @param seconds 64-bit fixed-point format (31.32)
  */
 void CLK_TAI_adjust(int64_t seconds);
 

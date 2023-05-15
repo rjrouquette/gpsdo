@@ -162,19 +162,6 @@ int32_t CLK_TAI_getTrim() {
     return clkTaiRate;
 }
 
-void CLK_TAI_align(int32_t fraction) {
-    __disable_irq();
-    clkTaiOffset += fraction;
-    __enable_irq();
-}
-
-void CLK_TAI_set(uint32_t seconds) {
-    uint64_t now = CLK_COMP();
-    __disable_irq();
-    ((uint32_t *) &clkTaiOffset)[1] = seconds - ((uint32_t *) &now)[1];
-    __enable_irq();
-}
-
 void CLK_TAI_adjust(int64_t delta) {
     __disable_irq();
     clkTaiOffset += delta;
