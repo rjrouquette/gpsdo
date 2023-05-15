@@ -54,15 +54,17 @@ static volatile uint32_t rootDispersion;
 
 
 // hash table for interleaved timestamps
-#define XLEAVE_COUNT (1024)
+#define XLEAVE_SIZE (10)
 static volatile struct TsXleave {
     uint64_t rxTime;
     uint64_t txTime;
-} tsXleave[XLEAVE_COUNT];
+} tsXleave[1u << XLEAVE_SIZE];
+
 // hash function for interleaved timestamp table
 static inline int hashXleave(uint32_t addr) {
-    return (int) (((addr * 0xDE9DB139) >> 22) & (XLEAVE_COUNT - 1));
+    return (int) (((addr * 0xDE9DB139u) >> (32 - XLEAVE_SIZE)) & ((1u << XLEAVE_SIZE) - 1));
 }
+
 
 // request handlers
 static void ntpRequest(uint8_t *frame, int flen);
