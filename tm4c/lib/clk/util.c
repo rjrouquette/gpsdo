@@ -64,16 +64,16 @@ int32_t corrFrac(int32_t rate, uint32_t delta, volatile uint32_t *rem) {
 
 float toFloatU(uint64_t value) {
     union fixed_32_32 scratch;
+    float result;
     scratch.full = value;
-    float temp = 0x1p-32f * (float) scratch.fpart;
-    temp += (float) scratch.ipart;
-    return temp;
+    result  = 0x1p-00f * (float) scratch.ipart;
+    result += 0x1p-32f * (float) scratch.fpart;
+    return result;
 }
 
 float toFloat(int64_t value) {
-    union fixed_32_32 scratch;
-    scratch.full = value;
-    float temp = 0x1p-32f * (float) scratch.fpart;
-    temp += (float) (int32_t) scratch.ipart;
-    return temp;
+    // sign conversion must be performed this way to prevent loss of precision
+    if(value < 0)
+        return -toFloatU(-value);
+    return toFloatU(value);
 }
