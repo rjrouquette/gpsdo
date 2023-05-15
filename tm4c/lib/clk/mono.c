@@ -194,6 +194,12 @@ void ISR_Timer4A() {
     clkMonoPps = timer;
 }
 
+// currently unused, but included for safety
+void ISR_Timer4B() {
+    // clear interrupt flag
+    GPTM4.ICR.CBE = 1;
+}
+
 // capture rising edge of ethernet PPS for offset measurement
 void ISR_Timer5A() {
     // snapshot edge time
