@@ -22,7 +22,7 @@ uint64_t fromClkMono(uint32_t timer, uint32_t offset, uint32_t integer) {
     ticks <<= 5;
     // compute correction value
     union fixed_32_32 scratch;
-    // convert from ticks to fractional seconds
+    // apply correction factor for the fractional portion of 4.294967296
     scratch.ipart = 0;
     scratch.fpart = ticks;
     scratch.full *= 0x12E0BE82;
