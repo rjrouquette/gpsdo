@@ -22,15 +22,17 @@ uint64_t fromClkMono(uint32_t timer, uint32_t offset, uint32_t integer) {
     ticks <<= 5;
     // compute correction value
     union fixed_32_32 scratch;
+    // convert from ticks to fractional seconds
     scratch.ipart = 0;
     scratch.fpart = ticks;
     scratch.full *= 0x12E0BE82;
-    // round up to minimize average error
+    // round-to-nearest to minimize average error
     scratch.ipart += scratch.fpart >> 31;
     // combine correction value with base value
     scratch.fpart = ticks + scratch.ipart;
-    // set seconds
+    // set integer seconds
     scratch.ipart = integer;
+    // return assembled result
     return scratch.full;
 }
 
@@ -54,11 +56,15 @@ int64_t corrValue(int32_t rate, int64_t delta) {
 
 int32_t corrFrac(int32_t rate, uint32_t delta, volatile uint32_t *rem) {
     union fixed_32_32 scratch;
+    // compute rate-based delta adjustment
     scratch.ipart = 0;
     scratch.fpart = delta;
     scratch.full *= rate;
+    // add prior remainder
     scratch.full += *rem;
+    // update remainder
     *rem = scratch.fpart;
+    // return rate-based delta adjustment
     return (int32_t) scratch.ipart;
 }
 
