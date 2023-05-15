@@ -220,7 +220,7 @@ void ISR_Timer5B() {
     clkMonoPpsEvent.timer = timer;
     clkMonoPpsEvent.offset = clkMonoOff;
     clkMonoPpsEvent.integer = clkMonoInt;
-    // compmed clock state
+    // compensated clock state
     clkMonoPpsEvent.compRate = clkCompRate;
     clkMonoPpsEvent.compRef = clkCompRef;
     clkMonoPpsEvent.compOff = clkCompOffset;
