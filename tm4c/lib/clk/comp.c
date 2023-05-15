@@ -15,7 +15,7 @@
 #define FRQ_TIMER GPTM1
 #define FRQ_PORT PORTA
 #define FRQ_PIN (1<<2)
-#define FRQ_INTV (CLK_FREQ / 20000) // 10 kHz
+#define FRQ_INTV (CLK_FREQ / 2000) // 1 kHz
 
 static volatile uint32_t clkCompUpdated = 0;
 static volatile uint32_t clkCompRem = 0;
