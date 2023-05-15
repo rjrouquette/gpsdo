@@ -73,7 +73,9 @@ static void NtpGPS_run(volatile void *pObj) {
     // update filter
     NtpSource_update(&this->source);
     // update status
-    NtpSource_updateStatus(&(this->source));
+    this->source.lost = this->source.reach == 0;
+    if(this->source.lost && this->source.reach == 0xFFFF)
+        this->source.lost = false;
 }
 
 void NtpGPS_init(volatile void *pObj) {

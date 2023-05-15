@@ -33,6 +33,8 @@ extern volatile uint32_t clkMonoInt;
 extern volatile uint32_t clkMonoOff;
 // timer tick offset between the ethernet clock and monotonic clock
 extern volatile uint32_t clkMonoEth;
+// timer tick capture of the PPS output
+extern volatile uint32_t clkMonoPps;
 // pps edge capture state
 extern volatile struct ClockEvent clkMonoPpsEvent;
 

@@ -83,7 +83,13 @@ void runClkComp() {
 }
 
 uint64_t CLK_COMP() {
-    return CLK_COMP_fromMono(CLK_MONO());
+    // get monotonic time
+    uint64_t scratch = CLK_MONO();
+    uint32_t rem = 0;
+    // translate to compensated domain
+    scratch += corrFrac(clkCompRate, scratch - clkCompRef, &rem);
+    scratch += clkCompOffset;
+    return scratch;
 }
 
 uint64_t CLK_COMP_fromMono(uint64_t ts) {
@@ -106,7 +112,9 @@ void CLK_COMP_setComp(int32_t comp) {
 
     // update frequency output
     union fixed_32_32 incr;
-    incr.ipart = corrFrac(-clkCompRate, FREQ_INTV, &incr.fpart);
+    incr.ipart = 0;
+    incr.fpart = FREQ_INTV;
+    incr.full *= -comp;
     incr.ipart += FREQ_INTV - 1;
     __disable_irq();
     freqOutInc = incr.full;

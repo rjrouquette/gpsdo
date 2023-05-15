@@ -17,6 +17,7 @@
 volatile uint32_t clkMonoInt = 0;
 volatile uint32_t clkMonoOff = 0;
 volatile uint32_t clkMonoEth = 0;
+volatile uint32_t clkMonoPps = 0;
 
 // pps edge capture state
 volatile struct ClockEvent clkMonoPpsEvent;
@@ -88,50 +89,64 @@ void initClkEth() {
     FLASHCONF.FPFOFF = 0;
 }
 
+static void initCaptureTimer(volatile struct GPTM_MAP *timer) {
+    // configure timer for capture mode
+    timer->CFG.GPTMCFG = 4;
+    timer->TAMR.MR = 0x3;
+    timer->TBMR.MR = 0x3;
+    // edge-time mode
+    timer->TAMR.CMR = 1;
+    timer->TBMR.CMR = 1;
+    // rising edge
+    timer->CTL.TAEVENT = 0;
+    timer->CTL.TBEVENT = 0;
+    // count up
+    timer->TAMR.CDIR = 1;
+    timer->TBMR.CDIR = 1;
+    // disable overflow interrupt
+    timer->TAMR.CINTD = 0;
+    timer->TBMR.CINTD = 0;
+    // full count range
+    timer->TAILR = -1;
+    timer->TBILR = -1;
+    // interrupts
+    timer->IMR.CAE = 1;
+    timer->IMR.CBE = 1;
+    // start timer
+    timer->CTL.TAEN = 1;
+    timer->CTL.TBEN = 1;
+}
+
 void initClkSync() {
+    // Enable Timer 4
+    RCGCTIMER.EN_GPTM4 = 1;
+    delay_cycles_4();
+    initCaptureTimer(&GPTM4);
+    // disable timer B interrupt
+    GPTM4.IMR.CBE = 0;
+
     // Enable Timer 5
     RCGCTIMER.EN_GPTM5 = 1;
     delay_cycles_4();
-    // Configure Timer 5 for capture mode
-    GPTM5.CFG.GPTMCFG = 4;
-    GPTM5.TAMR.MR = 0x3;
-    GPTM5.TBMR.MR = 0x3;
-    // edge-time mode
-    GPTM5.TAMR.CMR = 1;
-    GPTM5.TBMR.CMR = 1;
-    // rising edge
-    GPTM5.CTL.TAEVENT = 0;
-    GPTM5.CTL.TBEVENT = 0;
-    // count up
-    GPTM5.TAMR.CDIR = 1;
-    GPTM5.TBMR.CDIR = 1;
-    // disable overflow interrupt
-    GPTM5.TAMR.CINTD = 0;
-    GPTM5.TBMR.CINTD = 0;
-    // full count range
-    GPTM5.TAILR = -1;
-    GPTM5.TBILR = -1;
-    // interrupts
-    GPTM5.IMR.CAE = 1;
-    GPTM5.IMR.CBE = 1;
-    // start timer
-    GPTM5.CTL.TAEN = 1;
-    GPTM5.CTL.TBEN = 1;
-    // synchronize with monotonic clock
-    GPTM0.SYNC = 0x0c03;
+    initCaptureTimer(&GPTM5);
+
+    // synchronize timers with monotonic clock
+    GPTM0.SYNC = 0x0F03;
 
     // configure capture pins
     RCGCGPIO.EN_PORTM = 1;
     delay_cycles_4();
     // unlock GPIO config
     PORTM.LOCK = GPIO_LOCK_KEY;
-    PORTM.CR = 0xC0u;
+    PORTM.CR = 0xD0u;
     // configure pins;
+    PORTM.PCTL.PMC4 = 3;
     PORTM.PCTL.PMC6 = 3;
     PORTM.PCTL.PMC7 = 3;
+    PORTM.AFSEL.ALT4 = 1;
     PORTM.AFSEL.ALT6 = 1;
     PORTM.AFSEL.ALT7 = 1;
-    PORTM.DEN = 0xC0u;
+    PORTM.DEN = 0xD0u;
     // lock GPIO config
     PORTM.CR = 0;
     PORTM.LOCK = 0;
@@ -165,6 +180,18 @@ uint64_t CLK_MONO() {
     return fromClkMono(snapF, snapO, snapI);
 }
 
+
+// capture rising edge of PPS output for offset measurement
+void ISR_Timer4A() {
+    // snapshot edge time
+    uint32_t timer = GPTM0.TAV.raw;
+    uint32_t event = GPTM4.TAR.raw;
+    // clear interrupt flag
+    GPTM4.ICR.CAE = 1;
+    // compute ethernet clock offset
+    timer -= (timer - event) & 0xFFFF;
+    clkMonoPps = timer;
+}
 
 // capture rising edge of ethernet PPS for offset measurement
 void ISR_Timer5A() {
