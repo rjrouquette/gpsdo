@@ -239,11 +239,11 @@ static void runTxCallback(void *ref) {
         // check for callback
         CallbackNetTX pCall = txCallback[endTX].call;
         if(pCall) {
+            // invoke callback
+            (*pCall) (txCallback[endTX].ref, (uint8_t *) txBuffer[endTX], txDesc[endTX].TDES1.TBS1);
             // clear callback
             --txCallbackCnt;
             txCallback[endTX].call = NULL;
-            // invoke callback
-            (*pCall) (txCallback[endTX].ref, (uint8_t *) txBuffer[endTX], txDesc[endTX].TDES1.TBS1);
         }
         // advance pointer
         endTX = (endTX + 1) & TX_RING_MASK;
