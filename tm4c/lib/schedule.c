@@ -84,6 +84,12 @@ _Noreturn
 void runScheduler() {
     // infinite loop
     for (;;) {
+        // get current time
+        __disable_irq();
+        const uint32_t nowFrac = GPTM0.TAV.raw;
+        const uint32_t nowIntg = clkMonoInt;
+        __enable_irq();
+
         // iterate through task list
         for (int i = 0; i < taskCount; i++) {
             // disabled tasks
@@ -96,14 +102,9 @@ void runScheduler() {
                 continue;
             }
 
-            // snapshot current time
-            __disable_irq();
-            uint32_t snapF = GPTM0.TAV.raw;
-            uint32_t snapI = clkMonoInt;
-            __enable_irq();
             // verify that the task has been triggered
-            if ((int32_t) (snapI - taskSlots[i].nextIntg) < 0) continue;
-            if ((int32_t) (snapF - taskSlots[i].nextFrac) < 0) continue;
+            if ((int32_t) (nowIntg - taskSlots[i].nextIntg) < 0) continue;
+            if ((int32_t) (nowFrac - taskSlots[i].nextFrac) < 0) continue;
             // execute the task
             runTask(taskSlots + i);
             // schedule next run

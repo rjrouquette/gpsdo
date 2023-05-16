@@ -3,7 +3,6 @@
 //
 
 #include <memory.h>
-#include <math.h>
 #include "../chrony/candm.h"
 #include "../clk/mono.h"
 #include "../clk/tai.h"
@@ -254,6 +253,9 @@ static void finishPoll(NtpPeer *this) {
 static void run(volatile void *pObj) {
     // typecast "this" pointer
     NtpPeer *this = (NtpPeer *) pObj;
+
+    // requires hardware time synchronization
+    if(clkMonoEth == 0) return;
 
     // check MAC address
     if(checkMac(this)) return;

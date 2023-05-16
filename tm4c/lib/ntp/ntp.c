@@ -26,10 +26,11 @@
 
 #define MAX_NTP_PEERS (8)
 #define MAX_NTP_SRCS (9)
-#define MIN_DNS_INTV (16) // 16 seconds
 
 #define NTP_POOL_FQDN ("pool.ntp.org")
 #define NTP_MAX_SKEW (50e-6f) // 50 ppm
+
+#define SRC_UPDT_INTV (1ull << (32 - 4))
 
 static NtpGPS srcGps;
 static NtpPeer peerSlots[MAX_NTP_PEERS];
@@ -74,8 +75,8 @@ static void chronycRequest(uint8_t *frame, int flen);
 static void ntpResponse(uint8_t *frame, int flen);
 
 // internal operations
-static void ntpMain();
-static void ntpDnsCallback(void *ref, uint32_t addr);
+static void runSelect(void *ref);
+static void runDnsFill(void *ref);
 
 // called by PLL for hard TAI adjustments
 void ntpApplyOffset(int64_t offset) {
@@ -95,7 +96,6 @@ static void NTP_run(void *ref) {
         NtpSource *source = sources[runNext++];
         (*(source->run))(source);
     } else {
-        ntpMain();
         runNext = 0;
     }
 }
@@ -115,8 +115,13 @@ void NTP_init() {
     // initialize GPS reference and register it as a source
     NtpGPS_init(&srcGps);
     sources[cntSources++] = (void *) &srcGps;
+    // 16 Hz polling rate for sources
+    runInterval(SRC_UPDT_INTV, (SchedulerCallback) srcGps.source.run, (void *) &srcGps);
 
-    runAlways(NTP_run, NULL);
+    // update source selection at 16 Hz
+    runInterval(1ull << (32 - 4), runSelect, NULL);
+    // fill empty slots every 16 seconds
+    runInterval(1ull << (32 + 4), runDnsFill, NULL);
 }
 
 uint32_t NTP_refId() {
@@ -265,25 +270,7 @@ static void ntpResponse(uint8_t *frame, int flen) {
     }
 }
 
-static void ntpMain() {
-    // periodically attempt to fill empty source slots
-    uint32_t now = CLK_MONO_INT();
-    if ((now - lastDnsRequest) > MIN_DNS_INTV) {
-        lastDnsRequest = now;
-
-        if(cntSources < MAX_NTP_SRCS) {
-            // fill with DHCP provided addresses
-            uint32_t *addr;
-            int cnt;
-            DHCP_ntpAddr(&addr, &cnt);
-            for (int i = 0; i < cnt; i++)
-                ntpDnsCallback(NULL, addr[i]);
-
-            // fill with servers from public ntp pool
-            DNS_lookup(NTP_POOL_FQDN, ntpDnsCallback, NULL);
-        }
-    }
-
+static void runSelect(void *ref) {
     // prune defunct sources
     for(int i = 0; i < cntSources; i++) {
         // reference sources are excluded
@@ -348,6 +335,8 @@ volatile static struct NtpSource* ntpAllocPeer() {
             (*(slot->source.init))(slot);
             // append to source list
             sources[cntSources++] = (struct NtpSource *) slot;
+            // schedule source updates
+            runInterval(SRC_UPDT_INTV, (SchedulerCallback) slot->source.run, (void *) slot);
             // return instance
             return (struct NtpSource *) slot;
         }
@@ -360,6 +349,9 @@ static void ntpRemovePeer(NtpSource *peer) {
     if(peer == selectedSource)
         selectedSource = NULL;
 
+    // remove from task schedule
+    runRemove((SchedulerCallback) peer->run, (void *) peer);
+    // deregister peer
     peer->id = 0;
     uint32_t slot = -1u;
     for(uint32_t i = 0; i < cntSources; i++) {
@@ -396,6 +388,20 @@ static void ntpDnsCallback(void *ref, uint32_t addr) {
             // faster initial burst for local timeservers
             newSource->poll = 1;
         }
+    }
+}
+
+static void runDnsFill(void *ref) {
+    if(cntSources < MAX_NTP_SRCS) {
+        // fill with DHCP provided addresses
+        uint32_t *addr;
+        int cnt;
+        DHCP_ntpAddr(&addr, &cnt);
+        for (int i = 0; i < cnt; i++)
+            ntpDnsCallback(NULL, addr[i]);
+
+        // fill with servers from public ntp pool
+        DNS_lookup(NTP_POOL_FQDN, ntpDnsCallback, NULL);
     }
 }
 
