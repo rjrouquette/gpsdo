@@ -29,7 +29,7 @@ void runAlways(SchedulerCallback callback, void *ref);
 
 /**
  * Schedule task to execute at a regular interval
- * @param interval interval in 32.32 fixed point format (monotonic clock)
+ * @param interval interval in 32.32 fixed point format (16 second maximum, uses monotonic clock)
  * @param callback task entry point
  * @param ref context pointer for task
  */
