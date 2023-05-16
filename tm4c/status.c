@@ -115,8 +115,6 @@ void STATUS_process(uint8_t *frame, int flen) {
     NET_transmit(txDesc, flen);
 }
 
-uint64_t tsDebug[3];
-
 unsigned statusClock(char *body) {
     char tmp[32];
     char *end = body;
@@ -237,34 +235,6 @@ unsigned statusClock(char *body) {
     toHex(pps[2], 8, '0', tmp+11);
     tmp[19] = 0;
     end = append(end, "pps tai:   ");
-    end = append(end, tmp);
-    end = append(end, "\n\n");
-
-    // debug status
-    strcpy(tmp, "0x");
-    toHex(tsDebug[0]>>32, 8, '0', tmp+2);
-    tmp[10] = '.';
-    toHex(tsDebug[0], 8, '0', tmp+11);
-    tmp[19] = 0;
-    end = append(end, "dbg mono:  ");
-    end = append(end, tmp);
-    end = append(end, "\n");
-
-    strcpy(tmp, "0x");
-    toHex(tsDebug[1]>>32, 8, '0', tmp+2);
-    tmp[10] = '.';
-    toHex(tsDebug[1], 8, '0', tmp+11);
-    tmp[19] = 0;
-    end = append(end, "dbg comp:  ");
-    end = append(end, tmp);
-    end = append(end, "\n");
-
-    strcpy(tmp, "0x");
-    toHex(tsDebug[2]>>32, 8, '0', tmp+2);
-    tmp[10] = '.';
-    toHex(tsDebug[2], 8, '0', tmp+11);
-    tmp[19] = 0;
-    end = append(end, "dbg tai:   ");
     end = append(end, tmp);
     end = append(end, "\n\n");
 
