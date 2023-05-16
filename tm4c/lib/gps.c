@@ -106,8 +106,8 @@ void GPS_init() {
     delay_ms(125);
     GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
 
-    // wake every 0.25 seconds
-    runInterval(1u << (32 - 2), runHealth, NULL);
+    // wake every 0.5 seconds
+    runInterval(1u << (32 - 1), runHealth, NULL);
     // wake at 512 Hz for UART RX/TX
     runInterval(1u << (32 - 9), runRxTx, NULL);
     // wake at 32 Hz for message parser
