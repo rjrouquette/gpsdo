@@ -103,7 +103,7 @@ void NTP_init() {
     runInterval(SRC_UPDT_INTV, (SchedulerCallback) srcGps.source.run, (void *) &srcGps);
 
     // update source selection at 16 Hz
-    runInterval(1ull << (32 - 4), runSelect, NULL);
+    runInterval(SRC_UPDT_INTV, runSelect, NULL);
     // fill empty slots every 16 seconds
     runInterval(1ull << (32 + 4), runDnsFill, NULL);
 }
