@@ -24,39 +24,34 @@ enum TaskType {
 };
 
 #define SLOT_CNT (32)
-volatile struct SchedulerTask {
+typedef volatile struct SchedulerTask {
     enum TaskType type;
     SchedulerCallback callback;
     void *ref;
     uint32_t nextIntg, nextFrac;
     uint32_t intvIntg, intvFrac;
     uint32_t hits;
-    uint32_t time;
-} taskSlots[SLOT_CNT];
+    uint32_t ticks;
+} SchedulerTask;
 
-static volatile int taskCount = 0;
+SchedulerTask taskSlots[SLOT_CNT];
+
+static volatile int cntAlways, cntSchedule;
+volatile SchedulerTask * listAlways[SLOT_CNT];
+volatile SchedulerTask * queueSchedule[SLOT_CNT];
 
 
-static int allocSlot() {
-    int slot = taskCount;
-    for(int i = 0; i < taskCount; i++) {
-        if(taskSlots[i].type == TaskDisabled) {
-            slot = i;
-            break;
-        }
+static SchedulerTask * allocTask() {
+    for(int i = 0; i < SLOT_CNT; i++) {
+        if(taskSlots[i].type == TaskDisabled)
+            return taskSlots + i;
     }
 
     // halt and indicate fault if there are no scheduling slots left
-    if(slot >= SLOT_CNT)
-        faultBlink(3, 1);
-
-    // increase task count if necessary
-    if((slot + 1) > taskCount)
-        taskCount = slot + 1;
-    return slot;
+    faultBlink(3, 1);
 }
 
-static void scheduleNext(volatile struct SchedulerTask *task) {
+static void scheduleNext(SchedulerTask *task) {
     // advance timestamp
     task->nextIntg += task->intvIntg;
     task->nextFrac += task->intvFrac;
@@ -73,10 +68,10 @@ static void scheduleNext(volatile struct SchedulerTask *task) {
  * Run task and update scheduling statistics
  * @param task
  */
-static void runTask(volatile struct SchedulerTask *task) {
+static void runTask(SchedulerTask *task) {
     uint32_t start = GPTM0.TAV.raw;
     (*(task->callback))(task->ref);
-    task->time += GPTM0.TAV.raw - start;
+    task->ticks += GPTM0.TAV.raw - start;
     ++(task->hits);
 }
 
@@ -84,6 +79,10 @@ _Noreturn
 void runScheduler() {
     // infinite loop
     for (;;) {
+        // execute free-running tasks first
+        for (int i = 0; i < cntAlways; i++)
+            runTask(listAlways[i]);
+
         // get current time
         __disable_irq();
         const uint32_t nowFrac = GPTM0.TAV.raw;
@@ -91,117 +90,146 @@ void runScheduler() {
         __enable_irq();
 
         // iterate through task list
-        for (int i = 0; i < taskCount; i++) {
-            // disabled tasks
-            if (taskSlots[i].type == TaskDisabled)
-                continue;
-
-            // free-running tasks
-            if (taskSlots[i].type == TaskAlways) {
-                runTask(taskSlots + i);
-                continue;
-            }
+        for (int i = 0; i < cntSchedule; i++) {
+            SchedulerTask * const task = queueSchedule[i];
 
             // verify that the task has been triggered
-            if ((int32_t) (nowIntg - taskSlots[i].nextIntg) < 0) continue;
-            if ((int32_t) (nowFrac - taskSlots[i].nextFrac) < 0) continue;
+            if ((int32_t) (nowFrac - task->nextFrac) < 0) continue;
+            if ((int32_t) (nowIntg - task->nextIntg) < 0) continue;
             // execute the task
-            runTask(taskSlots + i);
+            runTask(task);
             // schedule next run
-            if (taskSlots[i].type == TaskOnce)
-                taskSlots[i].type = TaskDisabled;
+            if (task->type == TaskOnce)
+                task->type = TaskDisabled;
             else
-                scheduleNext(taskSlots + i);
+                scheduleNext(task);
         }
     }
 }
 
 void runAlways(SchedulerCallback callback, void *ref) {
-    int slot = allocSlot();
-    taskSlots[slot].type = TaskAlways;
-    taskSlots[slot].callback = callback;
-    taskSlots[slot].ref = ref;
-    taskSlots[slot].intvIntg = 0;
-    taskSlots[slot].intvFrac = 0;
-    taskSlots[slot].nextIntg = 0;
-    taskSlots[slot].nextFrac = 0;
+    SchedulerTask *task = allocTask();
+    task->type = TaskAlways;
+    task->callback = callback;
+    task->ref = ref;
+    task->intvIntg = 0;
+    task->intvFrac = 0;
+    task->nextIntg = 0;
+    task->nextFrac = 0;
+    listAlways[cntAlways++] = task;
 }
 
 void runInterval(uint64_t interval, SchedulerCallback callback, void *ref) {
-    int slot = allocSlot();
-    taskSlots[slot].type = TaskInterval;
-    taskSlots[slot].callback = callback;
-    taskSlots[slot].ref = ref;
+    SchedulerTask *task = allocTask();
+    task->type = TaskInterval;
+    task->callback = callback;
+    task->ref = ref;
 
     // convert fixed-point interval to raw monotonic domain
     union fixed_32_32 scratch;
     scratch.full = interval;
-    taskSlots[slot].intvIntg = scratch.ipart;
+    task->intvIntg = scratch.ipart;
     scratch.full *= CLK_FREQ;
-    taskSlots[slot].intvFrac = scratch.ipart;
+    task->intvFrac = scratch.ipart;
 
     // capture current time
     __disable_irq();
     uint32_t snapF = GPTM0.TAV.raw;
     uint32_t snapI = clkMonoInt;
     __enable_irq();
-    taskSlots[slot].nextFrac = snapF;
-    taskSlots[slot].nextIntg = snapI;
+    task->nextFrac = snapF;
+    task->nextIntg = snapI;
     // schedule execution
-    scheduleNext(taskSlots + slot);
+    scheduleNext(task);
+    queueSchedule[cntSchedule++] = task;
 }
 
 void runOnce(uint64_t when, SchedulerCallback callback, void *ref) {
-    int slot = allocSlot();
-    taskSlots[slot].type = TaskOnce;
-    taskSlots[slot].callback = callback;
-    taskSlots[slot].ref = ref;
-    taskSlots[slot].intvIntg = 0;
-    taskSlots[slot].intvFrac = 0;
+    SchedulerTask *task = allocTask();
+    task->type = TaskOnce;
+    task->callback = callback;
+    task->ref = ref;
+    task->intvIntg = 0;
+    task->intvFrac = 0;
 
     // convert fixed-point to raw monotonic domain
     union fixed_32_32 scratch;
     scratch.full = when;
-    taskSlots[slot].nextIntg = scratch.ipart;
+    task->nextIntg = scratch.ipart;
     scratch.full *= CLK_FREQ;
-    taskSlots[slot].nextFrac = scratch.ipart;
+    task->nextFrac = scratch.ipart;
+    queueSchedule[cntSchedule++] = task;
 }
 
 void runRemove(SchedulerCallback callback, void *ref) {
     if(ref == NULL) {
-        for(int i = 0; i < taskCount; i++) {
+        for(int i = 0; i < SLOT_CNT; i++) {
             if(taskSlots[i].callback == callback)
                 taskSlots[i].type = TaskDisabled;
         }
     } else {
-        for(int i = 0; i < taskCount; i++) {
+        for(int i = 0; i < SLOT_CNT; i++) {
             if(taskSlots[i].callback == callback && taskSlots[i].ref == ref)
                 taskSlots[i].type = TaskDisabled;
         }
     }
 
-    // compact task list
-    while(
-            taskCount > 0 &&
-            taskSlots[taskCount-1].type == TaskDisabled
-    ) --taskCount;
+    // compact "always" queue
+    int j = 0;
+    for(int i = 0; i < cntAlways; i++) {
+        if(listAlways[i]->type != TaskDisabled)
+            listAlways[j++] = listAlways[i];
+    }
+    cntAlways = j;
+
+    // compact "schedule" queue
+    j = 0;
+    for(int i = 0; i < cntSchedule; i++) {
+        if(queueSchedule[i]->type != TaskDisabled)
+            queueSchedule[j++] = queueSchedule[i];
+    }
+    cntSchedule = j;
 }
+
+
+static volatile uint32_t prevQuery;
+static volatile uint32_t prevHits[SLOT_CNT];
+static volatile uint32_t prevTicks[SLOT_CNT];
 
 unsigned runStatus(char *buffer) {
     char *end = buffer;
 
-    for(int i = 0; i < taskCount; i++) {
+    uint32_t elapsed = GPTM0.TAV.raw - prevQuery;
+    prevQuery += elapsed;
+    float scale = 125e6f / (float) elapsed;
+
+    uint32_t total = 0;
+    for(int i = 0; i < SLOT_CNT; i++) {
+        if(taskSlots[i].type == TaskDisabled)
+            continue;
+
+        uint32_t ticks = taskSlots[i].ticks - prevTicks[i];
+        prevTicks[i] += ticks;
+
+        uint32_t hits = taskSlots[i].hits - prevHits[i];
+        prevHits[i] += hits;
+
         end += toHex(taskSlots[i].type, 2, '0', end);
         *(end++) = ' ';
         end += toHex((uint32_t) taskSlots[i].callback, 6, '0', end);
         *(end++) = ' ';
         end += toHex((uint32_t) taskSlots[i].ref, 8, '0', end);
         *(end++) = ' ';
-        end += toDec((uint32_t) taskSlots[i].hits / CLK_MONO_INT(), 10, ' ', end);
+        end += fmtFloat(scale * (float) hits, 10, 1, end);
         *(end++) = ' ';
-        end += toDec((uint32_t) taskSlots[i].time / CLK_MONO_INT(), 10, ' ', end);
+        end += fmtFloat(scale * 0.008f * (float) ticks, 10, 1, end);
         *(end++) = '\n';
+
+        total += ticks;
     }
+
+    end += fmtFloat(scale * 0.008f * (float) total, 10, 1, end);
+    *(end++) = '\n';
 
     return end - buffer;
 }
