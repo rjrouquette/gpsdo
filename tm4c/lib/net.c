@@ -37,6 +37,7 @@ static int phyStatus = 0;
 static struct EMAC_RX_DESC rxDesc[RX_RING_SIZE];
 static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 
+static uint32_t txCallbackCnt;
 static struct { CallbackNetTX call; void *ref; } txCallback[TX_RING_SIZE];
 static struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
 static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
@@ -207,18 +208,7 @@ void ISR_EthernetMAC(void) {
     }
 }
 
-static void runRxTx(void *ref) {
-    // check for completed transmissions
-    while ((endTX != ptrTX) && !txDesc[endTX].TDES0.OWN) {
-        // invoke callback
-        CallbackNetTX pCall = txCallback[endTX].call;
-        if(pCall) { (*pCall) (txCallback[endTX].ref, txBuffer[endTX], txDesc[endTX].TDES1.TBS1); }
-        // clear callback
-        txCallback[endTX].call = 0;
-        // advance pointer
-        endTX = (endTX + 1) & TX_RING_MASK;
-    }
-
+static void runRx(void *ref) {
     // check for completed receptions
     for(;;) {
         struct EMAC_RX_DESC *pRxDesc = rxDesc + ptrRX;
@@ -239,6 +229,26 @@ static void runRxTx(void *ref) {
     }
 }
 
+static void runTxCallback(void *ref) {
+    // check for completed transmissions
+    while ((endTX != ptrTX) && !txDesc[endTX].TDES0.OWN) {
+        // invoke callback
+        CallbackNetTX pCall = txCallback[endTX].call;
+        if(pCall) {
+            (*pCall) (txCallback[endTX].ref, txBuffer[endTX], txDesc[endTX].TDES1.TBS1);
+            // clear callback
+            txCallback[endTX].call = 0;
+            --txCallbackCnt;
+        }
+        // advance pointer
+        endTX = (endTX + 1) & TX_RING_MASK;
+    }
+
+    // shutdown thread if there is no more work
+    if(txCallbackCnt == 0)
+        runRemove(runTxCallback, 0);
+}
+
 extern volatile uint16_t ipID;
 void NET_init() {
     initDescriptors();
@@ -251,8 +261,8 @@ void NET_init() {
     DHCP_init();
     DNS_init();
 
-    // schedule RX/TX processing
-    runAlways(runRxTx, 0);
+    // schedule RX processing
+    runInterval(1u << (32 - 17), runRx, 0);
 }
 
 void NET_getMacAddress(char *strAddr) {
@@ -294,6 +304,11 @@ void NET_transmit(int desc, int len) {
     txDesc[desc & TX_RING_MASK].TDES0.OWN = 1;
     // wake TX DMA
     EMAC0.TXPOLLD = 1;
+    // schedule callback
+    if(txCallback[desc & TX_RING_MASK].call) {
+        if(++txCallbackCnt == 1)
+            runInterval(1u << (32 - 17), runTxCallback, 0);
+    }
 }
 
 /**

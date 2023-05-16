@@ -116,6 +116,8 @@ static void queueRemove(QueueNode *node) {
     node->next->prev = node->prev;
 
     // push onto free stack
+    node->task = NULL;
+    node->prev = NULL;
     node->next = queueFree;
     queueFree = node;
 }
@@ -157,19 +159,21 @@ void runScheduler() {
         // check for schedule triggers
         while(queueRoot.next->task) {
             // check for task triggers
-            SchedulerTask * const task = queueRoot.next->task;
+            QueueNode *node = queueRoot.next;
+            SchedulerTask * const task = node->task;
             // verify that the task has been triggered
             if (((int32_t) (GPTM0.TAV.raw - task->next)) < 0)
                 break;
             // execute the task
             runTask(task);
             // remove from the queue
-            queueRemove(queueRoot.next);
+            if(node->task)
+                queueRemove(node);
             // schedule next run
-            if (task->type == TaskOnce)
-                task->type = TaskDisabled;
-            else
+            if (task->type == TaskInterval) {
+                // schedule next execution
                 scheduleNext(task);
+            }
         }
     }
 }
