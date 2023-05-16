@@ -42,10 +42,7 @@ static void ntpRemovePeer(NtpSource *peer);
 static NtpSource * volatile sources[MAX_NTP_SRCS];
 static NtpSource * volatile selectedSource = NULL;
 static volatile uint32_t cntSources = 0;
-static volatile uint32_t runNext = 0;
 static volatile uint64_t lastUpdate = 0;
-
-static volatile uint32_t lastDnsRequest = 0;
 
 // aggregate NTP state
 static volatile int leapIndicator;
@@ -84,19 +81,6 @@ void ntpApplyOffset(int64_t offset) {
         NtpSource *source = sources[i];
         if(source == NULL) continue;
         NtpSource_applyOffset(source, offset);
-    }
-}
-
-static void NTP_run(void *ref) {
-    // wait for hardware time synchronization
-    if(clkMonoEth == 0)
-        return;
-
-    if(runNext < cntSources) {
-        NtpSource *source = sources[runNext++];
-        (*(source->run))(source);
-    } else {
-        runNext = 0;
     }
 }
 
@@ -604,8 +588,6 @@ static uint16_t chronycSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRe
 }
 
 static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {
-    union fixed_32_32 scratch;
-
     cmdReply->reply = htons(RPY_TRACKING);
     cmdReply->data.tracking.ref_id = refId;
     cmdReply->data.tracking.stratum = htons(clockStratum);

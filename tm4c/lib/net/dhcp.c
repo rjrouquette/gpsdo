@@ -3,8 +3,6 @@
 //
 
 #include <memory.h>
-#include <stdint.h>
-
 #include "../../hw/sys.h"
 #include "../clk/mono.h"
 #include "../net.h"

@@ -30,7 +30,6 @@ struct NtpPeer {
     uint32_t lastArp;
 
     uint8_t pollBurst;
-    uint8_t pollRetry;
     bool pollActive;
     bool pollXleave;
     bool pktSent;

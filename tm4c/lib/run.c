@@ -11,14 +11,10 @@
 #include "run.h"
 
 
-struct SchedulerTask;
-typedef void (*SchedulerProcessor)(struct SchedulerTask *task);
-
 enum TaskType {
     TaskDisabled,
     TaskAlways,
-    TaskInterval,
-    TaskOnce
+    TaskInterval
 };
 
 #define SLOT_CNT (32)
@@ -48,7 +44,6 @@ static volatile QueueNode queuePool[SLOT_CNT];
 static volatile QueueNode queueRoot;
 #define queueTerminus (&queueRoot)
 
-static void queueInsAfter(QueueNode *pos, SchedulerTask *task);
 static void queueInsBefore(QueueNode *pos, SchedulerTask *task);
 static void queueRemove(QueueNode *node);
 
@@ -72,22 +67,6 @@ static SchedulerTask * allocTask() {
 
     // halt and indicate fault if there are no scheduling slots left
     faultBlink(3, 1);
-}
-
-static void queueInsAfter(QueueNode *pos, SchedulerTask *task) {
-    // get new node
-    QueueNode *node = queueFree;
-    queueFree = node->next;
-    if(node == NULL)
-        faultBlink(3, 3);
-
-    // set node task
-    node->task = task;
-    // link node
-    node->prev = pos;
-    node->next = pos->next;
-    pos->next = node;
-    node->next->prev = node;
 }
 
 static void queueInsBefore(QueueNode *pos, SchedulerTask *task) {

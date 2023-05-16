@@ -160,7 +160,6 @@ static void startPoll(NtpPeer *this) {
     this->pollStart = CLK_MONO();
     this->pollActive = true;
     this->pollBurst = 0xFF;
-    this->pollRetry = 0;
     this->pollXleave = false;
     this->filterTx = 0;
     this->filterRx = 0;

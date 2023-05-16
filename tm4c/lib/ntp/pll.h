@@ -19,7 +19,6 @@
 #define PLL_DRIFT_INT_RATE (0x1p-8f)
 
 void PLL_init();
-void PLL_run();
 
 /**
  * Update the TAI offset correction PLL.

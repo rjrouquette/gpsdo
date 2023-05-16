@@ -5,7 +5,6 @@
 #include <memory.h>
 #include <math.h>
 #include "hw/emac.h"
-#include "lib/clk/mono.h"
 #include "lib/clk/tai.h"
 #include "lib/clk/util.h"
 #include "lib/led.h"
@@ -138,7 +137,6 @@ struct PACKED PTP2_PDELAY_FOLLOW_UP {
 _Static_assert(sizeof(struct PTP2_PDELAY_RESP) == 20, "PTP2_PDELAY_FOLLOW_UP must be 34 bytes");
 
 
-static uint32_t updatedSync, updatedAnnounce;
 static uint8_t clockId[8];
 static volatile uint32_t seqId;
 
@@ -166,10 +164,6 @@ void PTP_init() {
     // register UDP listening ports
     UDP_register(PTP2_PORT_EVENT, processMessage);
     UDP_register(PTP2_PORT_GENERAL, processMessage);
-    // set next update event
-    uint64_t now = CLK_MONO();
-    updatedAnnounce = now;
-    updatedSync = now;
     // enable reception for multicast MACs
     uint8_t mac[6];
     // standard PTP multicast group

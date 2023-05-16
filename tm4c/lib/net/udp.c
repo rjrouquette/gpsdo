@@ -2,8 +2,6 @@
 // Created by robert on 5/20/22.
 //
 
-#include <memory.h>
-
 #include "eth.h"
 #include "ip.h"
 #include "udp.h"
