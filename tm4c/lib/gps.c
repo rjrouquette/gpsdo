@@ -3,6 +3,7 @@
 //
 
 #include <memory.h>
+#include <stdbool.h>
 #include "../hw/uart.h"
 #include "clk/clk.h"
 #include "clk/mono.h"
@@ -19,7 +20,11 @@
 #define GPS_RST_INTV (300)
 #define GPS_RST_THR (60)
 
-uint32_t gpsLastReset;
+#define INTV_HEALTH  (1u << (32 - 1))
+#define INTV_RX_PARS (1u << (32 - 5))
+#define INTV_RX_POLL (1u << (32 - 9))
+#define INTV_TX_POLL (1u << (32 - 9))
+
 
 static volatile uint8_t rxBuff[GPS_RING_SIZE];
 static volatile uint8_t txBuff[GPS_RING_SIZE];
@@ -29,6 +34,7 @@ static volatile int txHead, txTail;
 static volatile int lenNEMA, lenUBX;
 static volatile int endUBX;
 
+static volatile uint32_t lastReset;
 static volatile int fixGood;
 static volatile float locLat, locLon, locAlt;
 static volatile int clkBias, clkDrift, accTime, accFreq;
@@ -36,7 +42,8 @@ static volatile uint64_t taiEpochUpdate;
 static volatile uint32_t taiEpoch;
 static volatile int taiOffset = 37; // as of 2016-12-31
 
-static volatile int hasNema, hasPvt, hasGpsTime, hasClock;
+static volatile bool hasNema, hasPvt, hasGpsTime, hasClock;
+static volatile bool txRunning;
 
 static void processNEMA(char *msg, int len);
 
@@ -53,6 +60,8 @@ static void runHealth(void *ref);
 static void runRx(void *ref);
 static void runTx(void *ref);
 static void runParser(void *ref);
+
+static void startTx();
 
 void GPS_init() {
     // enable GPIO J
@@ -107,12 +116,10 @@ void GPS_init() {
     delay_ms(125);
     GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
 
-    // wake every 0.5 seconds
-    runInterval(1u << (32 - 1), runHealth, NULL);
-    // wake at 512 Hz for UART RX
-    runInterval(1u << (32 - 9), runRx, NULL);
-    // wake at 32 Hz for message parser
-    runInterval(1u << (32 - 5), runParser, NULL);
+    // start threads
+    runInterval(INTV_HEALTH, runHealth, NULL);
+    runInterval(INTV_RX_POLL, runRx, NULL);
+    runInterval(INTV_RX_PARS, runParser, NULL);
 }
 
 static void runHealth(void *ref) {
@@ -125,7 +132,7 @@ static void runHealth(void *ref) {
 
     // reset GPS if PPS has stopped
     uint32_t now = CLK_MONO_INT();
-    if((now - gpsLastReset) > GPS_RST_INTV) {
+    if((now - lastReset) > GPS_RST_INTV) {
         union fixed_32_32 age;
         age.full = CLK_MONO();
         uint64_t pps[3];
@@ -134,7 +141,7 @@ static void runHealth(void *ref) {
         if (age.ipart > GPS_RST_THR) {
             // reset GPS
             GPS_RST_PORT.DATA[GPS_RST_PIN] = 0;
-            gpsLastReset = now;
+            lastReset = now;
         }
     }
 }
@@ -155,8 +162,18 @@ static void runTx(void *ref) {
     }
 
     // shutdown thread if there is no more data
-    if(txHead == txTail)
-        runRemove(runTx, 0);
+    if(txHead == txTail) {
+        runRemove(runTx, NULL);
+        txRunning = false;
+    }
+}
+
+static void startTx() {
+    // start thread if there is pending data
+    if((txHead != txTail) && !txRunning) {
+        runInterval(INTV_TX_POLL, runTx, NULL);
+        txRunning = true;
+    }
 }
 
 static void runParser(void *ref) {
@@ -335,9 +352,6 @@ static void processUBX(uint8_t *msg, const int len) {
 static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload) {
     if(len > 512) return;
 
-    // check if TX thread should be started
-    int startThread = txHead == txTail;
-
     // send preamble
     txBuff[txHead++] = 0xB5;
     txHead &= GPS_RING_MASK;
@@ -382,10 +396,7 @@ static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload
     txBuff[txHead++] = chkB;
     txHead &= GPS_RING_MASK;
 
-    if(startThread) {
-        // wake at 512 Hz for UART TX
-        runInterval(1u << (32 - 9), runTx, NULL);
-    }
+    startTx();
 }
 
 static const uint8_t payloadDisableNMEA[] = {
@@ -424,9 +435,6 @@ static const uint8_t payloadEnableClock[] = {
 _Static_assert(sizeof(payloadEnableClock) == 3, "payloadEnableClock must be 3 bytes");
 
 static void configureGPS() {
-    // wait for empty TX buffer
-    if(txHead != txTail) return;
-
     // transmit configuration stanzas
     if(hasNema)
         sendUBX(0x06, 0x00, sizeof(payloadDisableNMEA), payloadDisableNMEA);
