@@ -30,18 +30,21 @@
 #define TX_RING_SIZE (32)
 #define TX_BUFF_SIZE (1520)
 
-static int ptrRX = 0;
-static int ptrTX = 0;
-static int endTX = 0;
-static int phyStatus = 0;
+#define RX_POLL_INTV (1u << (32 - 16))
+#define TX_POLL_INTV (1u << (32 - 16))
 
-static struct EMAC_RX_DESC rxDesc[RX_RING_SIZE];
-static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
+static volatile int ptrRX = 0;
+static volatile int ptrTX = 0;
+static volatile int endTX = 0;
+static volatile int phyStatus = 0;
 
-static uint32_t txCallbackCnt;
-static struct { CallbackNetTX call; void *ref; } txCallback[TX_RING_SIZE];
-static struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
-static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
+static volatile struct EMAC_RX_DESC rxDesc[RX_RING_SIZE];
+static volatile uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
+
+static volatile uint32_t txCallbackCnt;
+static volatile struct { CallbackNetTX call; void *ref; } txCallback[TX_RING_SIZE];
+static volatile struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
+static volatile uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
 static void initDescriptors() {
     // init receive descriptors
@@ -212,7 +215,7 @@ void ISR_EthernetMAC(void) {
 static void runRx(void *ref) {
     // check for completed receptions
     for(;;) {
-        struct EMAC_RX_DESC *pRxDesc = rxDesc + ptrRX;
+        volatile struct EMAC_RX_DESC *pRxDesc = rxDesc + ptrRX;
         // test for ownership
         if (pRxDesc->RDES0.OWN) break;
         // process frame if there was no error
@@ -233,13 +236,14 @@ static void runRx(void *ref) {
 static void runTxCallback(void *ref) {
     // check for completed transmissions
     while ((endTX != ptrTX) && !txDesc[endTX].TDES0.OWN) {
-        // invoke callback
+        // check for callback
         CallbackNetTX pCall = txCallback[endTX].call;
         if(pCall) {
-            (*pCall) (txCallback[endTX].ref, txBuffer[endTX], txDesc[endTX].TDES1.TBS1);
             // clear callback
-            txCallback[endTX].call = NULL;
             --txCallbackCnt;
+            txCallback[endTX].call = NULL;
+            // invoke callback
+            (*pCall) (txCallback[endTX].ref, (uint8_t *) txBuffer[endTX], txDesc[endTX].TDES1.TBS1);
         }
         // advance pointer
         endTX = (endTX + 1) & TX_RING_MASK;
@@ -263,7 +267,7 @@ void NET_init() {
     DNS_init();
 
     // schedule RX processing
-    runInterval(1u << (32 - 16), runRx, NULL);
+    runInterval(RX_POLL_INTV, runRx, NULL);
 }
 
 void NET_getMacAddress(char *strAddr) {
@@ -291,24 +295,26 @@ uint8_t * NET_getTxBuff(int desc) {
 }
 
 void NET_setTxCallback(int desc, CallbackNetTX callback, volatile void *ref) {
-    txCallback[desc & TX_RING_MASK].call = callback;
-    txCallback[desc & TX_RING_MASK].ref = (void *) ref;
+    desc &= TX_RING_MASK;
+    txCallback[desc].call = callback;
+    txCallback[desc].ref = (void *) ref;
 }
 
 void NET_transmit(int desc, int len) {
+    desc &= TX_RING_MASK;
     // restrict transmission length
     if(len < 60) len = 60;
     if(len > TX_BUFF_SIZE) len = TX_BUFF_SIZE;
     // set transmission size
-    txDesc[desc & TX_RING_MASK].TDES1.TBS1 = len;
+    txDesc[desc].TDES1.TBS1 = len;
     // release descriptor
-    txDesc[desc & TX_RING_MASK].TDES0.OWN = 1;
+    txDesc[desc].TDES0.OWN = 1;
     // wake TX DMA
     EMAC0.TXPOLLD = 1;
     // schedule callback
-    if(txCallback[desc & TX_RING_MASK].call) {
+    if(txCallback[desc].call) {
         if(++txCallbackCnt == 1)
-            runInterval(1u << (32 - 16), runTxCallback, NULL);
+            runInterval(TX_POLL_INTV, runTxCallback, NULL);
     }
 }
 
