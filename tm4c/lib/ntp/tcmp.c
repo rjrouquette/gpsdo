@@ -23,10 +23,8 @@
 
 #define REG_MIN_RMSE (100e-9f)
 
-static volatile uint32_t tempUpdated = 0;
 static volatile float tempValue;
 
-static volatile uint32_t tcmpUpdated = 0;
 static volatile uint32_t tcmpSaved;
 static volatile float tcmpValue;
 
@@ -56,15 +54,12 @@ static void updateRegression();
  */
 static float tcmpEstimate(float temp);
 
-
 static void runTemp(void *ref) {
     // start next temperature measurement
     ADC0.PSSI.SS3 = 1;
-    // update temperature once data is ready
-    while(!ADC0.SS3.FSTAT.EMPTY) {
-        float temp = toCelsius(ADC0.SS3.FIFO.DATA);
-        tempValue += (temp - tempValue) * TEMP_ALPHA;
-    }
+    // update temperature
+    float temp = toCelsius(ADC0.SS3.FIFO.DATA);
+    tempValue += (temp - tempValue) * TEMP_ALPHA;\
 }
 
 static void runComp(void *ref) {
@@ -87,7 +82,6 @@ void TCMP_init() {
     ADC0.SS3.CTL.TS0 = 1;
     ADC0.SS3.TSH.TSH0 = ADC_TSH_256;
     ADC0.ACTSS.ASEN3 = 1;
-
     // take and discard some initial measurements
     for(int i = 0; i < 16; i++) {
         ADC0.PSSI.SS3 = 1;      // trigger temperature measurement
@@ -97,6 +91,8 @@ void TCMP_init() {
         while(!ADC0.SS3.FSTAT.EMPTY)
             tempValue = toCelsius(ADC0.SS3.FIFO.DATA);
     }
+    // start next temperature measurement
+    ADC0.PSSI.SS3 = 1;
 
     loadSom();
     if(isfinite(somNode[0][0])) {
