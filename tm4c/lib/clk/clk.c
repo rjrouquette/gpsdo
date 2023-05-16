@@ -59,13 +59,34 @@ void CLK_init() {
     initClkTai();
 }
 
+
+// internal state for CLK_PPS (reduces overhead)
+static volatile struct ClockEvent ppsEvent;
+static volatile uint64_t ppsStamp[3];
+
 void CLK_PPS(uint64_t *tsResult) {
-    struct ClockEvent ppsEvent;
+    if(
+            ppsEvent.timer == clkMonoPpsEvent.timer &&
+            ppsEvent.integer == clkMonoPpsEvent.integer
+    ) {
+        tsResult[0] = ppsStamp[0];
+        tsResult[1] = ppsStamp[1];
+        tsResult[2] = ppsStamp[2];
+        return;
+    }
+
     __disable_irq();
     ppsEvent = clkMonoPpsEvent;
     __enable_irq();
 
-    tsResult[0] = fromClkMono(ppsEvent.timer, ppsEvent.offset, ppsEvent.integer);
-    tsResult[1] = tsResult[0] + corrValue(ppsEvent.compRate, (int64_t) (tsResult[0] - ppsEvent.compRef)) + ppsEvent.compOff;
-    tsResult[2] = tsResult[1] + corrValue(ppsEvent.taiRate, (int64_t) (tsResult[1] - ppsEvent.taiRef)) + ppsEvent.taiOff;
+    // convert snapshot to timestamps
+    uint32_t rem = 0;
+    ppsStamp[0] = fromClkMono(ppsEvent.timer, ppsEvent.offset, ppsEvent.integer);
+    ppsStamp[1] = ppsStamp[0] + corrFrac(ppsEvent.compRate, ppsStamp[0] - ppsEvent.compRef, &rem) + ppsEvent.compOff;
+    ppsStamp[2] = ppsStamp[1] + corrFrac(ppsEvent.taiRate, ppsStamp[1] - ppsEvent.taiRef, &rem) + ppsEvent.taiOff;
+
+    // return result
+    tsResult[0] = ppsStamp[0];
+    tsResult[1] = ppsStamp[1];
+    tsResult[2] = ppsStamp[2];
 }
