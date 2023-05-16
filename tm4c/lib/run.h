@@ -2,8 +2,8 @@
 // Created by robert on 5/15/23.
 //
 
-#ifndef GPSDO_LIB_SCHEDULE_H
-#define GPSDO_LIB_SCHEDULE_H
+#ifndef GPSDO_LIB_RUN_H
+#define GPSDO_LIB_RUN_H
 
 #include <stdint.h>
 
@@ -49,4 +49,4 @@ void runRemove(SchedulerCallback callback, void *ref);
  */
 unsigned runStatus(char *buffer);
 
-#endif //GPSDO_LIB_SCHEDULE_H
+#endif //GPSDO_LIB_RUN_H

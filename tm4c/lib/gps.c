@@ -9,7 +9,7 @@
 #include "clk/util.h"
 #include "delay.h"
 #include "gps.h"
-#include "schedule.h"
+#include "run.h"
 
 #define GPS_RING_SIZE (256)
 #define GPS_RING_MASK (GPS_RING_SIZE - 1)
@@ -50,7 +50,8 @@ static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload
 static void configureGPS();
 
 static void runHealth(void *ref);
-static void runRxTx(void *ref);
+static void runRx(void *ref);
+static void runTx(void *ref);
 static void runParser(void *ref);
 
 void GPS_init() {
@@ -108,8 +109,8 @@ void GPS_init() {
 
     // wake every 0.5 seconds
     runInterval(1u << (32 - 1), runHealth, NULL);
-    // wake at 512 Hz for UART RX/TX
-    runInterval(1u << (32 - 9), runRxTx, NULL);
+    // wake at 512 Hz for UART RX
+    runInterval(1u << (32 - 9), runRx, NULL);
     // wake at 32 Hz for message parser
     runInterval(1u << (32 - 5), runParser, NULL);
 }
@@ -138,18 +139,24 @@ static void runHealth(void *ref) {
     }
 }
 
-static void runRxTx(void *ref) {
+static void runRx(void *ref) {
     // drain UART FIFO
     while (!UART3.FR.RXFE) {
         rxBuff[rxHead++] = UART3.DR.DATA;
         rxHead &= GPS_RING_MASK;
     }
+}
 
+static void runTx(void *ref) {
     // fill UART FIFO
     while ((!UART3.FR.TXFF) && (txTail != txHead)) {
         UART3.DR.DATA = txBuff[txTail++];
         txTail &= GPS_RING_MASK;
     }
+
+    // shutdown thread if there is no more data
+    if(txHead == txTail)
+        runRemove(runTx, 0);
 }
 
 static void runParser(void *ref) {
@@ -328,6 +335,9 @@ static void processUBX(uint8_t *msg, const int len) {
 static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload) {
     if(len > 512) return;
 
+    // check if TX thread should be started
+    int startThread = txHead == txTail;
+
     // send preamble
     txBuff[txHead++] = 0xB5;
     txHead &= GPS_RING_MASK;
@@ -371,6 +381,11 @@ static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload
     txHead &= GPS_RING_MASK;
     txBuff[txHead++] = chkB;
     txHead &= GPS_RING_MASK;
+
+    if(startThread) {
+        // wake at 512 Hz for UART TX
+        runInterval(1u << (32 - 9), runTx, NULL);
+    }
 }
 
 static const uint8_t payloadDisableNMEA[] = {

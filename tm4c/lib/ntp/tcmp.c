@@ -8,7 +8,7 @@
 #include "../clk/mono.h"
 #include "../delay.h"
 #include "../format.h"
-#include "../schedule.h"
+#include "../run.h"
 #include "tcmp.h"
 
 #define TEMP_ALPHA (0x1p-8f)

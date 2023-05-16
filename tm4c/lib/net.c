@@ -2,6 +2,7 @@
 // Created by robert on 4/26/22.
 //
 
+#include <stddef.h>
 #include "../hw/crc.h"
 #include "../hw/emac.h"
 #include "../hw/interrupts.h"
@@ -19,7 +20,7 @@
 #include "net/ip.h"
 #include "net/util.h"
 #include "net/dns.h"
-#include "schedule.h"
+#include "run.h"
 
 #define RX_RING_MASK (31)
 #define RX_RING_SIZE (32)
@@ -237,7 +238,7 @@ static void runTxCallback(void *ref) {
         if(pCall) {
             (*pCall) (txCallback[endTX].ref, txBuffer[endTX], txDesc[endTX].TDES1.TBS1);
             // clear callback
-            txCallback[endTX].call = 0;
+            txCallback[endTX].call = NULL;
             --txCallbackCnt;
         }
         // advance pointer
@@ -246,7 +247,7 @@ static void runTxCallback(void *ref) {
 
     // shutdown thread if there is no more work
     if(txCallbackCnt == 0)
-        runRemove(runTxCallback, 0);
+        runRemove(runTxCallback, NULL);
 }
 
 extern volatile uint16_t ipID;
@@ -262,7 +263,7 @@ void NET_init() {
     DNS_init();
 
     // schedule RX processing
-    runInterval(1u << (32 - 16), runRx, 0);
+    runInterval(1u << (32 - 16), runRx, NULL);
 }
 
 void NET_getMacAddress(char *strAddr) {
@@ -307,7 +308,7 @@ void NET_transmit(int desc, int len) {
     // schedule callback
     if(txCallback[desc & TX_RING_MASK].call) {
         if(++txCallbackCnt == 1)
-            runInterval(1u << (32 - 16), runTxCallback, 0);
+            runInterval(1u << (32 - 16), runTxCallback, NULL);
     }
 }
 

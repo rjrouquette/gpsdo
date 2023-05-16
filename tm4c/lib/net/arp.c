@@ -5,7 +5,7 @@
 #include <strings.h>
 #include "../clk/mono.h"
 #include "../net.h"
-#include "../schedule.h"
+#include "../run.h"
 #include "arp.h"
 #include "eth.h"
 #include "ip.h"

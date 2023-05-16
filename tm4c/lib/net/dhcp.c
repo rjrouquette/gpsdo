@@ -8,7 +8,7 @@
 #include "../../hw/sys.h"
 #include "../clk/mono.h"
 #include "../net.h"
-#include "../schedule.h"
+#include "../run.h"
 #include "arp.h"
 #include "dhcp.h"
 #include "dns.h"

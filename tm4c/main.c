@@ -13,7 +13,7 @@
 #include "lib/net.h"
 #include "lib/ntp/ntp.h"
 #include "lib/rand.h"
-#include "lib/schedule.h"
+#include "lib/run.h"
 
 #include "gitversion.h"
 #include "ptp.h"

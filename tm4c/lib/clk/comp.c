@@ -2,11 +2,12 @@
 // Created by robert on 4/26/23.
 //
 
+#include <stddef.h>
 #include "../../hw/gpio.h"
 #include "../../hw/interrupts.h"
 #include "../../hw/timer.h"
 #include "../delay.h"
-#include "../schedule.h"
+#include "../run.h"
 #include "mono.h"
 #include "comp.h"
 #include "util.h"
@@ -83,7 +84,7 @@ void initClkComp() {
 
     CLK_COMP_setComp(0);
     // schedule updates
-    runInterval(1u << (32 - 2), runClkComp, 0);
+    runInterval(1u << (32 - 2), runClkComp, NULL);
 }
 
 uint64_t CLK_COMP() {

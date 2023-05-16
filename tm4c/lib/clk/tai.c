@@ -2,12 +2,13 @@
 // Created by robert on 4/27/23.
 //
 
+#include <stddef.h>
 #include "../../hw/gpio.h"
 #include "../../hw/interrupts.h"
 #include "../../hw/timer.h"
 #include "../delay.h"
 #include "../gps.h"
-#include "../schedule.h"
+#include "../run.h"
 #include "mono.h"
 #include "tai.h"
 #include "comp.h"
@@ -123,8 +124,8 @@ void initClkTai() {
     // initialize UTC offset
     clkTaiUtcOffset = ((uint64_t) GPS_taiOffset()) << 32;
     // schedule updates
-    runInterval(1u << (32 - 2), runClkTai, 0);
-    runInterval(1u << (32 - 6), runPpsTai, 0);
+    runInterval(1u << (32 - 2), runClkTai, NULL);
+    runInterval(1u << (32 - 6), runPpsTai, NULL);
 }
 
 uint64_t CLK_TAI() {

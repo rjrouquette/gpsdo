@@ -15,7 +15,7 @@
 #include "../net/dhcp.h"
 #include "../net/dns.h"
 #include "../net/eth.h"
-#include "../schedule.h"
+#include "../run.h"
 
 #include "common.h"
 #include "gitversion.h"
