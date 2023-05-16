@@ -29,6 +29,8 @@ int main(void) {
     CPAC.CP10 = 3;
     CPAC.CP11 = 3;
 
+    // initialize task scheduler
+    initScheduler();
     // initialize system clock
     CLK_init();
     // initialize status LEDs

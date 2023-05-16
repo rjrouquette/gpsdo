@@ -10,6 +10,11 @@
 typedef void (*SchedulerCallback)(void *ref);
 
 /**
+ * Initialize scheduler
+ */
+void initScheduler();
+
+/**
  * Run scheduler (infinite loop)
  */
 _Noreturn
@@ -29,14 +34,6 @@ void runAlways(SchedulerCallback callback, void *ref);
  * @param ref context pointer for task
  */
 void runInterval(uint64_t interval, SchedulerCallback callback, void *ref);
-
-/**
- * Schedule task to execute at a specific time in the future.  The task is removed from the queue when run.
- * @param when timestamp in 32.32 fixed point format (monotonic clock)
- * @param callback task entry point
- * @param ref context pointer for task
- */
-void runOnce(uint64_t when, SchedulerCallback callback, void *ref);
 
 /**
  * Remove task with associated callback and reference pointer from the scheduler queue
