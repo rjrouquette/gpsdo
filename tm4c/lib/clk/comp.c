@@ -14,7 +14,7 @@
 #define FRQ_TIMER GPTM1
 #define FRQ_PORT PORTA
 #define FRQ_PIN (1<<2)
-#define FRQ_INTV (CLK_FREQ / 2000) // 1 kHz
+#define FRQ_INTV (CLK_FREQ / 20000) // 10 kHz
 
 static volatile uint32_t clkCompRem = 0;
 volatile uint64_t clkCompOffset = 0;
@@ -62,6 +62,8 @@ void initClkComp() {
     FRQ_TIMER.IMR.TATO = 1;
     // start timer
     FRQ_TIMER.CTL.TAEN = 1;
+    // reduce interrupt priority
+    ISR_priority(ISR_Timer1A, 6);
 
     // enable CCP output on PA2
     RCGCGPIO.EN_PORTA = 1;

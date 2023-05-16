@@ -101,6 +101,8 @@ void initClkTai() {
     PPS_TIMER.IMR.TATO = 1;
     // start timer
     PPS_TIMER.CTL.TAEN = 1;
+    // reduce interrupt priority
+    ISR_priority(ISR_Timer2A, 7);
 
     // enable CCP output on PA2
     RCGCGPIO.EN_PORTA = 1;
