@@ -262,7 +262,7 @@ void NET_init() {
     DNS_init();
 
     // schedule RX processing
-    runInterval(1u << (32 - 17), runRx, 0);
+    runInterval(1u << (32 - 16), runRx, 0);
 }
 
 void NET_getMacAddress(char *strAddr) {
@@ -307,7 +307,7 @@ void NET_transmit(int desc, int len) {
     // schedule callback
     if(txCallback[desc & TX_RING_MASK].call) {
         if(++txCallbackCnt == 1)
-            runInterval(1u << (32 - 17), runTxCallback, 0);
+            runInterval(1u << (32 - 16), runTxCallback, 0);
     }
 }
 

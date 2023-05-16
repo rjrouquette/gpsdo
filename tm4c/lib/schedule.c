@@ -262,21 +262,21 @@ unsigned runStatus(char *buffer) {
         uint32_t hits = taskSlots[i].hits - prevHits[i];
         prevHits[i] += hits;
 
-        end += toHex(taskSlots[i].type, 2, '0', end);
+        end += toHex(taskSlots[i].type, 1, '0', end);
         *(end++) = ' ';
         end += toHex((uint32_t) taskSlots[i].callback, 6, '0', end);
         *(end++) = ' ';
         end += toHex((uint32_t) taskSlots[i].ref, 8, '0', end);
         *(end++) = ' ';
-        end += fmtFloat(scale * (float) hits, 10, 1, end);
+        end += fmtFloat(scale * (float) hits, 8, 1, end);
         *(end++) = ' ';
-        end += fmtFloat(scale * 0.008f * (float) ticks, 10, 1, end);
+        end += fmtFloat(scale * 0.008f * (float) ticks, 8, 1, end);
         *(end++) = '\n';
 
         total += ticks;
     }
 
-    end += fmtFloat(scale * 0.008f * (float) total, 10, 1, end);
+    end += fmtFloat(scale * 0.008f * (float) total, 35, 1, end);
     *(end++) = '\n';
 
     return end - buffer;
