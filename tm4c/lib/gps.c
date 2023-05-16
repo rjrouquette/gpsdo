@@ -4,11 +4,12 @@
 
 #include <memory.h>
 #include "../hw/uart.h"
+#include "clk/clk.h"
 #include "clk/mono.h"
+#include "clk/util.h"
 #include "delay.h"
 #include "gps.h"
-#include "clk/clk.h"
-#include "clk/util.h"
+#include "schedule.h"
 
 #define GPS_RING_MASK (1023)
 #define GPS_RING_SIZE (1024)
@@ -47,6 +48,9 @@ static void processUbxGpsTime(const uint8_t *payload);
 static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload);
 
 static void configureGPS();
+
+static void runHealth(void *ref);
+static void runRxTx(void *ref);
 
 void GPS_init() {
     // enable GPIO J
@@ -100,35 +104,38 @@ void GPS_init() {
     GPS_RST_PORT.DATA[GPS_RST_PIN] = 0;
     delay_ms(125);
     GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
+
+    // continuously poll for serial data
+    runAlways(runRxTx, NULL);
+    // wake every 0.25 seconds
+    runInterval(1u << (32 - 2), runHealth, NULL);
 }
 
-uint32_t prevSecond = 0;
-void GPS_run() {
+static void runHealth(void *ref) {
+    // check GPS message configuration
+    configureGPS();
+
+    // release reset pin if it is held down
+    if(!GPS_RST_PORT.DATA[GPS_RST_PIN])
+        GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
+
+    // reset GPS if PPS has stopped
     uint32_t now = CLK_MONO_INT();
-    if(prevSecond != now) {
-        prevSecond = now;
-        // check GPS message configuration
-        configureGPS();
-
-        // release reset pin if it held down
-        if(!GPS_RST_PORT.DATA[GPS_RST_PIN])
-            GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
-
-        // reset GPS if PPS has stopped
-        if((now - gpsLastReset) > GPS_RST_INTV) {
-            union fixed_32_32 age;
-            age.full = CLK_MONO();
-            uint64_t pps[3];
-            CLK_PPS(pps);
-            age.full -= pps[0];
-            if (age.ipart > GPS_RST_THR) {
-                // reset GPS
-                GPS_RST_PORT.DATA[GPS_RST_PIN] = 0;
-                gpsLastReset = now;
-            }
+    if((now - gpsLastReset) > GPS_RST_INTV) {
+        union fixed_32_32 age;
+        age.full = CLK_MONO();
+        uint64_t pps[3];
+        CLK_PPS(pps);
+        age.full -= pps[0];
+        if (age.ipart > GPS_RST_THR) {
+            // reset GPS
+            GPS_RST_PORT.DATA[GPS_RST_PIN] = 0;
+            gpsLastReset = now;
         }
     }
+}
 
+static void runRxTx(void *ref) {
     // read GPS serial data
     while (!UART3.FR.RXFE) {
         rxBuff[rxHead++] = UART3.DR.DATA;

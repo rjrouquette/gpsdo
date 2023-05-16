@@ -15,8 +15,10 @@ void LED1_ON();
 void LED1_OFF();
 void LED1_TGL();
 
-void LED_run();
 void LED_act0();
 void LED_act1();
+
+_Noreturn
+void faultBlink(int a, int b);
 
 #endif //GPSDO_LED_H

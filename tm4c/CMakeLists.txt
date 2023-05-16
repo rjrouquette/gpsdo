@@ -58,6 +58,7 @@ add_executable(
         lib/ntp/src.c
         lib/ntp/tcmp.c
         lib/rand.c
+        lib/schedule.c
         lib/snmp/sensors.c
         lib/snmp/util.c
 )

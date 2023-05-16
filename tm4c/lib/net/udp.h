@@ -23,11 +23,41 @@ _Static_assert(sizeof(struct HEADER_UDP) == 8, "HEADER_UDP must be 8 bytes");
 
 typedef void (*CallbackUDP)(uint8_t *frame, int flen);
 
+/**
+ * Process received UDP frame
+ * @param frame raw frame buffer
+ * @param flen raw frame length
+ */
 void UDP_process(uint8_t *frame, int flen);
+
+/**
+ * Finalize raw UDP frame for transmission
+ * @param frame raw frame buffer
+ * @param flen raw frame buffer length
+ */
 void UDP_finalize(uint8_t *frame, int flen);
+
+/**
+ * Modify headers from a received frame to create a direct reply to the sender
+ * @param frame raw frame buffer
+ * @param ipAddr new source address
+ * @param port new source port
+ */
 void UDP_returnToSender(uint8_t *frame, uint32_t ipAddr, uint16_t port);
 
+/**
+ * Register callback to receive inbound UDP port traffic
+ * @param port port number to register
+ * @param callback function to receive data
+ * @return 0 on success, -1 on conflict, -2 if port table is full
+ */
 int UDP_register(uint16_t port, CallbackUDP callback);
+
+/**
+ * Delete UDP port registration
+ * @param port port number to deregister
+ * @return 0 on success, -1 if port was not registered
+ */
 int UDP_deregister(uint16_t port);
 
 #endif //GPSDO_UDP_H

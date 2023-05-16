@@ -35,8 +35,8 @@ typedef void (*CallbackARP)(void *ref, uint32_t remoteAddress, uint8_t *macAddre
 
 extern volatile uint8_t macRouter[6];
 
-void ARP_announce();
-void ARP_run();
+void ARP_init();
+
 void ARP_process(uint8_t *frame, int flen);
 int ARP_request(uint32_t remoteAddress, CallbackARP callback, volatile void *ref);
 void ARP_refreshRouter();

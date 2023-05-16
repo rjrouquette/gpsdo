@@ -25,6 +25,7 @@
 
 #include "gitversion.h"
 #include "status.h"
+#include "lib/schedule.h"
 
 #define STATUS_PORT (23) // telnet port
 
@@ -89,7 +90,9 @@ void STATUS_process(uint8_t *frame, int flen) {
         size = PLL_status(body);
     } else if(strncmp(body, "system", 6) == 0 && hasTerminus(body, 6)) {
         size = statusSystem(body);
-    } else if(strncmp(body, "som", 3) == 0 && hasTerminus(body, 3)) {
+    } else if(strncmp(body, "run", 3) == 0 && hasTerminus(body, 3)) {
+        size = runStatus(body);
+    }  else if(strncmp(body, "som", 3) == 0 && hasTerminus(body, 3)) {
         size = statusSom(body);
     } else {
         char tmp[32];

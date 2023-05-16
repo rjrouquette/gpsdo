@@ -6,6 +6,5 @@
 #define GPSDO_PTP_H
 
 void PTP_init();
-void PTP_run();
 
 #endif //GPSDO_PTP_H

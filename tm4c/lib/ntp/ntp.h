@@ -9,8 +9,6 @@
 
 void NTP_init();
 
-void NTP_run();
-
 uint32_t NTP_refId();
 
 #endif //GPSDO_NTP_H

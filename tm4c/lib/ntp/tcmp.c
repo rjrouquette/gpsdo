@@ -3,19 +3,17 @@
 //
 
 #include <math.h>
+#include "../../hw/adc.h"
+#include "../../hw/eeprom.h"
 #include "../clk/mono.h"
 #include "../delay.h"
 #include "../format.h"
-#include "../../hw/adc.h"
-#include "../../hw/eeprom.h"
-#include "../../hw/timer.h"
+#include "../schedule.h"
 #include "tcmp.h"
 
-#define TEMP_UPDT_INTV (CLK_FREQ / 1024) // 1024 Hz
 #define TEMP_ALPHA (0x1p-8f)
 
 #define TCMP_SAVE_INTV (3600) // save state every hour
-#define TCMP_UPDT_INTV (CLK_FREQ / 16)  // 16 Hz
 
 #define SOM_EEPROM_BASE (0x0020)
 #define SOM_NODE_CNT (16)
@@ -59,6 +57,21 @@ static void updateRegression();
 static float tcmpEstimate(float temp);
 
 
+static void runTemp(void *ref) {
+    // start next temperature measurement
+    ADC0.PSSI.SS3 = 1;
+    // update temperature once data is ready
+    while(!ADC0.SS3.FSTAT.EMPTY) {
+        float temp = toCelsius(ADC0.SS3.FIFO.DATA);
+        tempValue += (temp - tempValue) * TEMP_ALPHA;
+    }
+}
+
+static void runComp(void *ref) {
+    // update temperature compensation
+    tcmpValue = tcmpEstimate(tempValue);
+}
+
 void TCMP_init() {
     // Enable ADC0
     RCGCADC.EN_ADC0 = 1;
@@ -90,29 +103,11 @@ void TCMP_init() {
         updateRegression();
         tcmpValue = tcmpEstimate(tempValue);
     }
-}
 
-void TCMP_run() {
-    // poll for next temperature update trigger
-    if((GPTM0.TAV.raw - tempUpdated) >= TEMP_UPDT_INTV) {
-        // set next update time
-        tempUpdated += TEMP_UPDT_INTV;
-        // start next temperature measurement
-        ADC0.PSSI.SS3 = 1;
-    }
-    // update temperature once data is ready
-    while(!ADC0.SS3.FSTAT.EMPTY) {
-        float temp = toCelsius(ADC0.SS3.FIFO.DATA);
-        tempValue += (temp - tempValue) * TEMP_ALPHA;
-    }
-
-    // poll for next compensation update trigger
-    if((GPTM0.TAV.raw - tcmpUpdated) >= TCMP_UPDT_INTV) {
-        // set next update time
-        tcmpUpdated += TCMP_UPDT_INTV;
-        // update temperature compensation
-        tcmpValue = tcmpEstimate(tempValue);
-    }
+    // update temperature at 1024 Hz
+    runInterval(1u << (32 - 10), runTemp, NULL);
+    // update compensation at 16 Hz
+    runInterval(1u << (32 - 4), runComp, NULL);
 }
 
 float TCMP_temp() {

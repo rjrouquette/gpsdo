@@ -7,7 +7,6 @@
 
 
 void GPS_init();
-void GPS_run();
 
 float GPS_locLat();
 float GPS_locLon();

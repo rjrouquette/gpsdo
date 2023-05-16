@@ -79,12 +79,29 @@ struct NtpSource {
 };
 typedef volatile struct NtpSource NtpSource;
 
+/**
+ * Advance source sample pointer
+ * @param this pointer to source structure
+ */
 void NtpSource_incr(NtpSource *this);
 
+/**
+ * Update source statistics
+ * @param this pointer to source structure
+ */
 void NtpSource_update(NtpSource *this);
 
+/**
+ * Update source connectivity status
+ * @param this pointer to source structure
+ */
 void NtpSource_updateStatus(NtpSource *this);
 
+/**
+ * Apply offset correction to samples
+ * @param this pointer to source structure
+ * @param offset correction to apply
+ */
 void NtpSource_applyOffset(NtpSource *this, int64_t offset);
 
 #endif //GPSDO_SRC_H

@@ -5,6 +5,7 @@
 #include <strings.h>
 #include "../clk/mono.h"
 #include "../net.h"
+#include "../schedule.h"
 #include "arp.h"
 #include "eth.h"
 #include "ip.h"
@@ -65,15 +66,27 @@ void makeArpIp4(
     payload->TPA = ipTrg;
 }
 
-void ARP_run() {
-    // announce presence
-    const uint32_t now = CLK_MONO_INT();
-    if(((int32_t)(nextAnnounce - now)) <= 0) {
-        nextAnnounce = now + ANNOUNCE_INTERVAL;
-        ARP_announce();
-    }
+static void arpAnnounce() {
+    // our IP address must be valid
+    if(ipAddress == 0) return;
+    // get TX descriptor
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    // create request frame
+    uint8_t wildCard[6] = { 0, 0, 0, 0, 0, 0 };
+    uint8_t *packetTX = NET_getTxBuff(txDesc);
+    makeArpIp4(
+            packetTX, ARP_OP_REQUEST,
+            wildCard, ipAddress
+    );
+    broadcastMAC(((struct FRAME_ETH *)packetTX)->macDst);
+    // transmit frame
+    NET_transmit(txDesc, ARP_FRAME_LEN);
+}
 
+static void arpRun() {
     // process request expiration
+    const uint32_t now = CLK_MONO_INT();
     for(int i = 0; i < MAX_REQUESTS; i++) {
         volatile struct ArpRequest *request = requests + i;
         // skip empty slots
@@ -86,9 +99,24 @@ void ARP_run() {
         bzero((void *) request, sizeof(struct ArpRequest));
     }
 
+    // link must be up to send packets
+    if(!(NET_getPhyStatus() & PHY_STATUS_LINK))
+        return;
+
+    // announce presence
+    if(((int32_t)(nextAnnounce - now)) <= 0) {
+        nextAnnounce = now + ANNOUNCE_INTERVAL;
+        arpAnnounce();
+    }
+
     // refresh router MAC address
     if((now - lastRouterPoll) > ARP_MAX_AGE)
         ARP_refreshRouter();
+}
+
+void ARP_init() {
+    // wake every 0.5 seconds
+    runInterval(1u << (32 - 1), arpRun, NULL);
 }
 
 void ARP_process(uint8_t *frame, int flen) {
@@ -160,22 +188,4 @@ int ARP_request(uint32_t remoteAddress, CallbackARP callback, volatile void *ref
         return 0;
     }
     return -1;
-}
-
-void ARP_announce() {
-    // our IP address must be valid
-    if(ipAddress == 0) return;
-    // get TX descriptor
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
-    // create request frame
-    uint8_t wildCard[6] = { 0, 0, 0, 0, 0, 0 };
-    uint8_t *packetTX = NET_getTxBuff(txDesc);
-    makeArpIp4(
-            packetTX, ARP_OP_REQUEST,
-            wildCard, ipAddress
-    );
-    broadcastMAC(((struct FRAME_ETH *)packetTX)->macDst);
-    // transmit frame
-    NET_transmit(txDesc, ARP_FRAME_LEN);
 }

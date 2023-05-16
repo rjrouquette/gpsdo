@@ -5,7 +5,6 @@
 #include <memory.h>
 #include <math.h>
 #include "hw/emac.h"
-#include "hw/timer.h"
 #include "lib/clk/mono.h"
 #include "lib/clk/tai.h"
 #include "lib/clk/util.h"
@@ -17,6 +16,7 @@
 #include "lib/net/util.h"
 #include "lib/ntp/ntp.h"
 #include "lib/ntp/pll.h"
+#include "lib/schedule.h"
 #include "ptp.h"
 
 
@@ -26,8 +26,6 @@
 #define PTP2_PORT_EVENT (319)
 #define PTP2_PORT_GENERAL (320)
 #define PTP2_MIN_SIZE (UDP_DATA_OFFSET + 34)
-#define PTP2_ANNC_INTV (CLK_FREQ * 4) // 4 s
-#define PTP2_SYNC_INTV (CLK_FREQ / 4) // 4 Hz
 #define PTP2_MULTICAST (0x810100E0) // 224.0.1.129
 #define PTP2_MULTICAST_PEER (0x6B0000E0) // 224.0.0.107
 #define PTP2_VERSION (2)
@@ -156,8 +154,8 @@ static void processMessage(uint8_t *frame, int flen);
 static void processDelayRequest(uint8_t *frame, int flen);
 static void processPDelayRequest(uint8_t *frame, int flen);
 
-static void sendAnnounce();
-static void sendSync();
+static void sendAnnounce(void *ref);
+static void sendSync(void *ref);
 
 static void toPtpTimestamp(uint64_t ts, struct PTP2_TIMESTAMP *tsPtp);
 static uint32_t toPtpClkAccuracy(float rmsError);
@@ -183,20 +181,10 @@ void PTP_init() {
     // enable address matching
     EMAC0.ADDR2.HI.AE = 1;
     EMAC0.ADDR3.HI.AE = 1;
-}
 
-void PTP_run() {
-    // check for announce event
-    if((GPTM0.TAV.raw - updatedAnnounce) >= PTP2_ANNC_INTV) {
-        updatedAnnounce += PTP2_ANNC_INTV;
-        sendAnnounce();
-    }
-
-    // check for sync event
-    if((GPTM0.TAV.raw - updatedSync) >= PTP2_SYNC_INTV) {
-        updatedSync += PTP2_SYNC_INTV;
-        sendSync();
-    }
+    // schedule periodic message transmission
+    runInterval(1ull << (32 + PTP2_ANNC_LOG_INTV), sendAnnounce, NULL);
+    runInterval(1ull << (32 + PTP2_SYNC_LOG_INTV), sendSync, NULL);
 }
 
 void processMessage(uint8_t *frame, int flen) {
@@ -230,7 +218,7 @@ static void processPDelayRequest(uint8_t *frame, int flen) {
 
 }
 
-static void sendAnnounce() {
+static void sendAnnounce(void *ref) {
     int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
     // allocate and clear frame buffer
@@ -311,7 +299,7 @@ static void syncFollowup(void *ref, uint8_t *txFrame, int flen) {
     NET_transmit(txDesc, flen);
 }
 
-static void sendSync() {
+static void sendSync(void *ref) {
     int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
     // allocate and clear frame buffer

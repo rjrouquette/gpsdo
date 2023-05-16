@@ -9,7 +9,6 @@
 #define DHCP_PORT_CLI (68)
 
 void DHCP_init();
-void DHCP_run();
 void DHCP_renew();
 uint32_t DHCP_expires();
 

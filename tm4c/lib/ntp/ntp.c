@@ -15,6 +15,7 @@
 #include "../net/dhcp.h"
 #include "../net/dns.h"
 #include "../net/eth.h"
+#include "../schedule.h"
 
 #include "common.h"
 #include "gitversion.h"
@@ -85,6 +86,20 @@ void ntpApplyOffset(int64_t offset) {
     }
 }
 
+static void NTP_run(void *ref) {
+    // wait for hardware time synchronization
+    if(clkMonoEth == 0)
+        return;
+
+    if(runNext < cntSources) {
+        NtpSource *source = sources[runNext++];
+        (*(source->run))(source);
+    } else {
+        ntpMain();
+        runNext = 0;
+    }
+}
+
 void NTP_init() {
     PLL_init();
 
@@ -100,22 +115,8 @@ void NTP_init() {
     // initialize GPS reference and register it as a source
     NtpGPS_init(&srcGps);
     sources[cntSources++] = (void *) &srcGps;
-}
 
-void NTP_run() {
-    PLL_run();
-
-    // wait for hardware time synchronization
-    if(clkMonoEth == 0)
-        return;
-
-    if(runNext < cntSources) {
-        NtpSource *source = sources[runNext++];
-        (*(source->run))(source);
-    } else {
-        ntpMain();
-        runNext = 0;
-    }
+    runAlways(NTP_run, NULL);
 }
 
 uint32_t NTP_refId() {

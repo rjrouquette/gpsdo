@@ -59,17 +59,6 @@ void CLK_init() {
     initClkTai();
 }
 
-
-// comp.c
-void runClkComp();
-// tai.c
-void runClkTai();
-
-void CLK_run() {
-    runClkComp();
-    runClkTai();
-}
-
 void CLK_PPS(uint64_t *tsResult) {
     struct ClockEvent ppsEvent;
     __disable_irq();

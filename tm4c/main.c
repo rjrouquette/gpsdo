@@ -13,6 +13,7 @@
 #include "lib/net.h"
 #include "lib/ntp/ntp.h"
 #include "lib/rand.h"
+#include "lib/schedule.h"
 
 #include "gitversion.h"
 #include "ptp.h"
@@ -28,10 +29,10 @@ int main(void) {
     CPAC.CP10 = 3;
     CPAC.CP11 = 3;
 
-    // initialize status LEDs
-    LED_init();
     // initialize system clock
     CLK_init();
+    // initialize status LEDs
+    LED_init();
     // initialize RNG
     RAND_init();
     // initialize EEPROM
@@ -45,42 +46,24 @@ int main(void) {
     SNMP_init();
     STATUS_init();
 
-    // main loop
-    for(;;) {
-        CLK_run();
-        GPS_run();
-        LED_run();
-        NET_run();
-        NTP_run();
-        PTP_run();
-    }
-}
-
-void debugBlink(int cnt) {
-    LED1_OFF();
-    delay_ms(2000);
-    while(cnt--) {
-        LED1_TGL();
-        delay_ms(250);
-        LED1_TGL();
-        delay_ms(250);
-    }
+    // run task scheduler
+    runScheduler();
 }
 
 void Fault_Hard() {
-    debugBlink(2);
+    faultBlink(2, 1);
 }
 
 void Fault_Memory() {
-    debugBlink(3);
+    faultBlink(2, 2);
 }
 
 void Fault_Bus() {
-    debugBlink(4);
+    faultBlink(2, 3);
 }
 
 void Fault_Usage() {
-    debugBlink(5);
+    faultBlink(2, 4);
 }
 
 static void EEPROM_init() {

@@ -6,6 +6,7 @@
 #include "../clk/comp.h"
 #include "../clk/tai.h"
 #include "../format.h"
+#include "../schedule.h"
 #include "pll.h"
 #include "tcmp.h"
 
@@ -36,21 +37,26 @@ static volatile float driftIntegral;
 // Temperature Compensation State
 static volatile float tcompCurrent;
 
+static void runUpdate(void *ref) {
+    // check for updated temperature compensation
+    float newComp = TCMP_get();
+    if(newComp == tcompCurrent) return;
+
+    // update frequency temperature compensation
+    tcompCurrent = newComp;
+    float comp = tcompCurrent + driftIntegral;
+    CLK_COMP_setComp((int32_t) (0x1p32f * comp));
+}
+
 void PLL_init() {
     TCMP_init();
 
     tcompCurrent = TCMP_get();
     float comp = tcompCurrent + driftIntegral;
     CLK_COMP_setComp((int32_t) (0x1p32f * comp));
-}
 
-void PLL_run() {
-    TCMP_run();
-
-    // update frequency compensation
-    tcompCurrent = TCMP_get();
-    float comp = tcompCurrent + driftIntegral;
-    CLK_COMP_setComp((int32_t) (0x1p32f * comp));
+    // check for temperature compensation updates (64 Hz)
+    runInterval(1u << (32 - 6), runUpdate, NULL);
 }
 
 

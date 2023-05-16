@@ -6,18 +6,16 @@
 #include "../../hw/interrupts.h"
 #include "../../hw/timer.h"
 #include "../delay.h"
+#include "../schedule.h"
 #include "mono.h"
 #include "comp.h"
 #include "util.h"
-
-#define MIN_UPDT_INTV (CLK_FREQ / 4) // 4 Hz
 
 #define FRQ_TIMER GPTM1
 #define FRQ_PORT PORTA
 #define FRQ_PIN (1<<2)
 #define FRQ_INTV (CLK_FREQ / 2000) // 1 kHz
 
-static volatile uint32_t clkCompUpdated = 0;
 static volatile uint32_t clkCompRem = 0;
 volatile uint64_t clkCompOffset = 0;
 volatile uint64_t clkCompRef = 0;
@@ -36,6 +34,18 @@ void ISR_Timer1A() {
     FRQ_TIMER.TAILR = scratch >> 32;
     // clear interrupt flag
     FRQ_TIMER.ICR.TATO = 1;
+}
+
+void runClkComp(void *ref) {
+    // prepare update values
+    const uint64_t now = CLK_MONO();
+    const int32_t offset = corrFrac(clkCompRate, now - clkCompRef, &clkCompRem);
+
+    // apply update
+    __disable_irq();
+    clkCompRef = now;
+    clkCompOffset += offset;
+    __enable_irq();
 }
 
 void initClkComp() {
@@ -70,14 +80,8 @@ void initClkComp() {
     FRQ_PORT.LOCK = 0;
 
     CLK_COMP_setComp(0);
-}
-
-void runClkComp() {
-    // periodically update alignment to prevent numerical overflow
-    if((GPTM0.TAV.raw - clkCompUpdated) >= MIN_UPDT_INTV) {
-        clkCompUpdated += MIN_UPDT_INTV;
-        CLK_COMP_setComp(clkCompRate);
-    }
+    // schedule updates
+    runInterval(1u << (32 - 2), runClkComp, 0);
 }
 
 uint64_t CLK_COMP() {

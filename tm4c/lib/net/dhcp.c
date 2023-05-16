@@ -8,6 +8,7 @@
 #include "../../hw/sys.h"
 #include "../clk/mono.h"
 #include "../net.h"
+#include "../schedule.h"
 #include "arp.h"
 #include "dhcp.h"
 #include "dns.h"
@@ -93,6 +94,19 @@ static void initPacket(void *frame) {
     headerDHCP->MAGIC = DHCP_MAGIC;
 }
 
+static void dhcpRun() {
+    // link must be up to send packets
+    if(!(NET_getPhyStatus() & PHY_STATUS_LINK))
+        return;
+
+    const uint32_t now = CLK_MONO_INT();
+    if(((int32_t)(now - dhcpLeaseExpire)) >= 0) {
+        // re-attempt if renewal fails
+        dhcpLeaseExpire += REATTEMPT_INTVL;
+        DHCP_renew();
+    }
+}
+
 void DHCP_init() {
     // compute UUID
     dhcpUUID = UNIQUEID.WORD[0];
@@ -108,15 +122,8 @@ void DHCP_init() {
 
     // register DHCP client port
     UDP_register(DHCP_PORT_CLI, processFrame);
-}
-
-void DHCP_run() {
-    const uint32_t now = CLK_MONO_INT();
-    if(((int32_t)(now - dhcpLeaseExpire)) >= 0) {
-        // re-attempt if renewal fails
-        dhcpLeaseExpire += REATTEMPT_INTVL;
-        DHCP_renew();
-    }
+    // wake every 0.5 seconds
+    runInterval(1u << (32 - 1), dhcpRun, NULL);
 }
 
 void DHCP_renew() {

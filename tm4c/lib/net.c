@@ -19,6 +19,7 @@
 #include "net/ip.h"
 #include "net/util.h"
 #include "net/dns.h"
+#include "schedule.h"
 
 #define RX_RING_MASK (31)
 #define RX_RING_SIZE (32)
@@ -206,29 +207,7 @@ void ISR_EthernetMAC(void) {
     }
 }
 
-extern volatile uint16_t ipID;
-void NET_init() {
-    initDescriptors();
-    initMAC();
-
-    // unique IP identifier seed
-    ipID = EMAC0.ADDR0.HI.ADDR;
-    // initialize network services
-    DHCP_init();
-    DNS_init();
-}
-
-void NET_getMacAddress(char *strAddr) {
-    uint8_t mac[6];
-    getMAC(mac);
-    macToStr(mac, strAddr);
-}
-
-int NET_getPhyStatus() {
-    return phyStatus;
-}
-
-void NET_run() {
+static void runRxTx(void *ref) {
     // check for completed transmissions
     while ((endTX != ptrTX) && !txDesc[endTX].TDES0.OWN) {
         // invoke callback
@@ -258,12 +237,32 @@ void NET_run() {
         // advance pointer
         ptrRX = (ptrRX + 1) & RX_RING_MASK;
     }
+}
 
-    // if link is up, poll ARP and DHCP state
-    if(phyStatus & 1) {
-        ARP_run();
-        DHCP_run();
-    }
+extern volatile uint16_t ipID;
+void NET_init() {
+    initDescriptors();
+    initMAC();
+
+    // unique IP identifier seed
+    ipID = EMAC0.ADDR0.HI.ADDR;
+    // initialize network services
+    ARP_init();
+    DHCP_init();
+    DNS_init();
+
+    // schedule RX/TX processing
+    runAlways(runRxTx, 0);
+}
+
+void NET_getMacAddress(char *strAddr) {
+    uint8_t mac[6];
+    getMAC(mac);
+    macToStr(mac, strAddr);
+}
+
+int NET_getPhyStatus() {
+    return phyStatus;
 }
 
 int NET_getTxDesc() {
