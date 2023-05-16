@@ -11,8 +11,8 @@
 #include "gps.h"
 #include "schedule.h"
 
-#define GPS_RING_MASK (1023)
-#define GPS_RING_SIZE (1024)
+#define GPS_RING_SIZE (256)
+#define GPS_RING_MASK (GPS_RING_SIZE - 1)
 
 #define GPS_RST_PORT (PORTP)
 #define GPS_RST_PIN (1<<5)
@@ -21,22 +21,22 @@
 
 uint32_t gpsLastReset;
 
-static uint8_t rxBuff[GPS_RING_SIZE];
-static uint8_t txBuff[GPS_RING_SIZE];
-static uint8_t msgBuff[256];
-static int rxHead, rxTail;
-static int txHead, txTail;
-static int lenNEMA, lenUBX;
-static int endUBX;
+static volatile uint8_t rxBuff[GPS_RING_SIZE];
+static volatile uint8_t txBuff[GPS_RING_SIZE];
+static volatile uint8_t msgBuff[256];
+static volatile int rxHead, rxTail;
+static volatile int txHead, txTail;
+static volatile int lenNEMA, lenUBX;
+static volatile int endUBX;
 
-static int fixGood;
-static float locLat, locLon, locAlt;
-static int clkBias, clkDrift, accTime, accFreq;
+static volatile int fixGood;
+static volatile float locLat, locLon, locAlt;
+static volatile int clkBias, clkDrift, accTime, accFreq;
 static volatile uint64_t taiEpochUpdate;
 static volatile uint32_t taiEpoch;
 static volatile int taiOffset = 37; // as of 2016-12-31
 
-static int hasNema, hasPvt, hasGpsTime, hasClock;
+static volatile int hasNema, hasPvt, hasGpsTime, hasClock;
 
 static void processNEMA(char *msg, int len);
 
@@ -51,6 +51,7 @@ static void configureGPS();
 
 static void runHealth(void *ref);
 static void runRxTx(void *ref);
+static void runParser(void *ref);
 
 void GPS_init() {
     // enable GPIO J
@@ -105,10 +106,12 @@ void GPS_init() {
     delay_ms(125);
     GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
 
-    // continuously poll for serial data
-    runAlways(runRxTx, NULL);
     // wake every 0.25 seconds
     runInterval(1u << (32 - 2), runHealth, NULL);
+    // wake at 512 Hz for UART RX/TX
+    runInterval(1u << (32 - 9), runRxTx, NULL);
+    // wake at 32 Hz for message parser
+    runInterval(1u << (32 - 5), runParser, NULL);
 }
 
 static void runHealth(void *ref) {
@@ -136,75 +139,76 @@ static void runHealth(void *ref) {
 }
 
 static void runRxTx(void *ref) {
-    // read GPS serial data
+    // drain UART FIFO
     while (!UART3.FR.RXFE) {
         rxBuff[rxHead++] = UART3.DR.DATA;
         rxHead &= GPS_RING_MASK;
     }
 
-    // send GPS serial data
-    while (txTail != txHead && !UART3.FR.TXFF) {
+    // fill UART FIFO
+    while ((!UART3.FR.TXFF) && (txTail != txHead)) {
         UART3.DR.DATA = txBuff[txTail++];
         txTail &= GPS_RING_MASK;
     }
+}
 
-    // check for data in buffer
-    if(rxTail == rxHead)
-        return;
-    // get next byte
-    uint8_t byte = rxBuff[rxTail++];
-    rxTail &= GPS_RING_MASK;
+static void runParser(void *ref) {
+    while(rxTail != rxHead) {
+        // get next byte
+        uint8_t byte = rxBuff[rxTail++];
+        rxTail &= GPS_RING_MASK;
 
-    // process UBX message
-    if(lenUBX) {
-        // determine end of UBX block
-        if(lenUBX == 6) {
-            // validate second sync byte
-            if(msgBuff[1] != 0x62) {
-                lenUBX = 0;
-                return;
+        // process UBX message
+        if(lenUBX) {
+            // determine end of UBX block
+            if(lenUBX == 6) {
+                // validate second sync byte
+                if(msgBuff[1] != 0x62) {
+                    lenUBX = 0;
+                    continue;
+                }
+                endUBX = 8 + *(uint16_t *) (msgBuff + 4);
             }
-            endUBX = 8 + *(uint16_t *) (msgBuff + 4);
+            // append character to message buffer
+            if(lenUBX < sizeof(msgBuff))
+                msgBuff[lenUBX] = byte;
+            // end of message
+            if(++lenUBX >= endUBX) {
+                if(lenUBX > sizeof(msgBuff))
+                    lenUBX = sizeof(msgBuff);
+                processUBX((uint8_t *) msgBuff, lenUBX);
+                lenUBX = 0;
+                endUBX = 0;
+            }
+            continue;
         }
-        // append character to message buffer
-        if(lenUBX < sizeof(msgBuff))
-            msgBuff[lenUBX] = byte;
-        // end of message
-        if(++lenUBX >= endUBX) {
-            if(lenUBX > sizeof(msgBuff))
-                lenUBX = sizeof(msgBuff);
-            processUBX(msgBuff, lenUBX);
-            lenUBX = 0;
-            endUBX = 0;
-        }
-        return;
-    }
 
-    // process NEMA message
-    if(lenNEMA) {
-        // append character to message buffer
-        if(lenNEMA < sizeof(msgBuff))
+        // process NEMA message
+        if(lenNEMA) {
+            // append character to message buffer
+            if(lenNEMA < sizeof(msgBuff))
+                msgBuff[lenNEMA++] = byte;
+            // end of message
+            if(byte == '\r' || byte == '\n') {
+                msgBuff[lenNEMA--] = 0;
+                processNEMA((char *) msgBuff, lenNEMA);
+                // reset parser state
+                lenNEMA = 0;
+            }
+            continue;
+        }
+
+        // search for NEMA message start
+        if(byte == '$') {
             msgBuff[lenNEMA++] = byte;
-        // end of message
-        if(byte == '\r' || byte == '\n') {
-            msgBuff[lenNEMA--] = 0;
-            processNEMA((char *) msgBuff, lenNEMA);
-            // reset parser state
-            lenNEMA = 0;
+            continue;
         }
-        return;
-    }
-
-    // search for NEMA message start
-    if(byte == '$') {
-        msgBuff[lenNEMA++] = byte;
-        return;
-    }
-    // search for UBX message start
-    if(byte == 0xB5) {
-        endUBX = 8;
-        msgBuff[lenUBX++] = byte;
-        return;
+        // search for UBX message start
+        if(byte == 0xB5) {
+            endUBX = 8;
+            msgBuff[lenUBX++] = byte;
+            continue;
+        }
     }
 }
 

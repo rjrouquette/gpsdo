@@ -30,6 +30,8 @@ volatile struct SchedulerTask {
     void *ref;
     uint32_t nextIntg, nextFrac;
     uint32_t intvIntg, intvFrac;
+    uint32_t hits;
+    uint32_t time;
 } taskSlots[SLOT_CNT];
 
 static volatile int taskCount = 0;
@@ -67,6 +69,17 @@ static void scheduleNext(volatile struct SchedulerTask *task) {
     }
 }
 
+/**
+ * Run task and update scheduling statistics
+ * @param task
+ */
+static void runTask(volatile struct SchedulerTask *task) {
+    uint32_t start = GPTM0.TAV.raw;
+    (*(task->callback))(task->ref);
+    task->time += GPTM0.TAV.raw - start;
+    ++(task->hits);
+}
+
 _Noreturn
 void runScheduler() {
     // infinite loop
@@ -79,7 +92,7 @@ void runScheduler() {
 
             // free-running tasks
             if (taskSlots[i].type == TaskAlways) {
-                (*(taskSlots[i].callback))(taskSlots[i].ref);
+                runTask(taskSlots + i);
                 continue;
             }
 
@@ -92,7 +105,7 @@ void runScheduler() {
             if ((int32_t) (snapI - taskSlots[i].nextIntg) < 0) continue;
             if ((int32_t) (snapF - taskSlots[i].nextFrac) < 0) continue;
             // execute the task
-            (*(taskSlots[i].callback))(taskSlots[i].ref);
+            runTask(taskSlots + i);
             // schedule next run
             if (taskSlots[i].type == TaskOnce)
                 taskSlots[i].type = TaskDisabled;
@@ -179,17 +192,13 @@ unsigned runStatus(char *buffer) {
     for(int i = 0; i < taskCount; i++) {
         end += toHex(taskSlots[i].type, 2, '0', end);
         *(end++) = ' ';
-        end += toHex((uint32_t) taskSlots[i].callback, 8, '0', end);
+        end += toHex((uint32_t) taskSlots[i].callback, 6, '0', end);
         *(end++) = ' ';
         end += toHex((uint32_t) taskSlots[i].ref, 8, '0', end);
         *(end++) = ' ';
-        end += toHex((uint32_t) taskSlots[i].intvIntg, 8, '0', end);
+        end += toDec((uint32_t) taskSlots[i].hits / CLK_MONO_INT(), 10, ' ', end);
         *(end++) = ' ';
-        end += toHex((uint32_t) taskSlots[i].intvFrac, 8, '0', end);
-        *(end++) = ' ';
-        end += toHex((uint32_t) taskSlots[i].nextIntg, 8, '0', end);
-        *(end++) = ' ';
-        end += toHex((uint32_t) taskSlots[i].nextFrac, 8, '0', end);
+        end += toDec((uint32_t) taskSlots[i].time / CLK_MONO_INT(), 10, ' ', end);
         *(end++) = '\n';
     }
 
