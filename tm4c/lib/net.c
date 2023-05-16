@@ -3,6 +3,7 @@
 //
 
 #include <stddef.h>
+#include <stdbool.h>
 #include "../hw/crc.h"
 #include "../hw/emac.h"
 #include "../hw/interrupts.h"
@@ -41,7 +42,7 @@ static volatile int phyStatus = 0;
 static volatile struct EMAC_RX_DESC rxDesc[RX_RING_SIZE];
 static volatile uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 
-static volatile uint32_t txCallbackCnt;
+static volatile bool txRunning;
 static volatile struct { CallbackNetTX call; void *ref; } txCallback[TX_RING_SIZE];
 static volatile struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
 static volatile uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
@@ -233,7 +234,7 @@ static void runRx(void *ref) {
     }
 }
 
-static void runTxCallback(void *ref) {
+static void runTx(void *ref) {
     // check for completed transmissions
     while ((endTX != ptrTX) && !txDesc[endTX].TDES0.OWN) {
         // check for callback
@@ -242,7 +243,6 @@ static void runTxCallback(void *ref) {
             // invoke callback
             (*pCall) (txCallback[endTX].ref, (uint8_t *) txBuffer[endTX], txDesc[endTX].TDES1.TBS1);
             // clear callback
-            --txCallbackCnt;
             txCallback[endTX].call = NULL;
         }
         // advance pointer
@@ -250,8 +250,10 @@ static void runTxCallback(void *ref) {
     }
 
     // shutdown thread if there is no more work
-    if(txCallbackCnt == 0)
-        runRemove(runTxCallback, NULL);
+    if(endTX == ptrTX) {
+        runRemove(runTx, NULL);
+        txRunning = false;
+    }
 }
 
 extern volatile uint16_t ipID;
@@ -311,10 +313,10 @@ void NET_transmit(int desc, int len) {
     txDesc[desc].TDES0.OWN = 1;
     // wake TX DMA
     EMAC0.TXPOLLD = 1;
-    // schedule callback
-    if(txCallback[desc].call) {
-        if(++txCallbackCnt == 1)
-            runInterval(TX_POLL_INTV, runTxCallback, NULL);
+    // start thread
+    if(!txRunning) {
+        runInterval(TX_POLL_INTV, runTx, NULL);
+        txRunning = true;
     }
 }
 

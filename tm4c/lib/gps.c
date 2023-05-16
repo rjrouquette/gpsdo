@@ -170,7 +170,7 @@ static void runTx(void *ref) {
 
 static void startTx() {
     // start thread if there is pending data
-    if((txHead != txTail) && !txRunning) {
+    if(!txRunning) {
         runInterval(INTV_TX_POLL, runTx, NULL);
         txRunning = true;
     }
