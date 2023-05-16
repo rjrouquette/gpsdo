@@ -23,7 +23,7 @@ enum TaskType {
     TaskOnce
 };
 
-#define SLOT_CNT (64)
+#define SLOT_CNT (32)
 volatile struct SchedulerTask {
     enum TaskType type;
     SchedulerCallback callback;
