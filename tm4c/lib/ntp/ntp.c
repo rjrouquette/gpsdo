@@ -30,7 +30,8 @@
 #define NTP_POOL_FQDN ("pool.ntp.org")
 #define NTP_MAX_SKEW (50e-6f) // 50 ppm
 
-#define SRC_UPDT_INTV (1ull << (32 - 4))
+#define DNS_UPDT_INTV (1ull << (32 + 4))    // every 16 seconds
+#define SRC_UPDT_INTV (1ull << (32 - 4))    // 16 Hz
 
 static NtpGPS srcGps;
 static NtpPeer peerSlots[MAX_NTP_PEERS];
@@ -105,7 +106,7 @@ void NTP_init() {
     // update source selection at 16 Hz
     runInterval(SRC_UPDT_INTV, runSelect, NULL);
     // fill empty slots every 16 seconds
-    runInterval(1ull << (32 + 4), runDnsFill, NULL);
+    runInterval(DNS_UPDT_INTV, runDnsFill, NULL);
 }
 
 uint32_t NTP_refId() {
