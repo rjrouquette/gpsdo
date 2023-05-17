@@ -14,7 +14,8 @@
 enum TaskType {
     TaskDisabled,
     TaskAlways,
-    TaskInterval
+    TaskInterval,
+    TaskPeriodic
 };
 
 #define SLOT_CNT (32)
@@ -101,7 +102,11 @@ static void queueRemove(QueueNode *node) {
 
 static void scheduleNext(SchedulerTask *task) {
     // advance timestamp
-    task->next += task->intv;
+    if(task->type == TaskPeriodic) {
+        task->next += task->intv;
+    } else {
+        task->next = GPTM0.TAV.raw + task->intv;
+    }
     // insert task into schedule queue
     QueueNode *ins = queueRoot.next;
     while(ins->task) {
