@@ -29,12 +29,14 @@ int main(void) {
     CPAC.CP10 = 3;
     CPAC.CP11 = 3;
 
+    // initialize system clock
+    CLK_initSys();
     // initialize task scheduler
     initScheduler();
-    // initialize system clock
-    CLK_init();
     // initialize status LEDs
     LED_init();
+    // initialize clock
+    CLK_init();
     // initialize RNG
     RAND_init();
     // initialize EEPROM

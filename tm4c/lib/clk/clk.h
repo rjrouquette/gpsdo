@@ -5,6 +5,7 @@
 #ifndef GPSDO_CLK_H
 #define GPSDO_CLK_H
 
+void CLK_initSys();
 void CLK_init();
 
 /**

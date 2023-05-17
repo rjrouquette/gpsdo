@@ -50,9 +50,12 @@ void initClkComp();
 // tai.c
 void initClkTai();
 
-void CLK_init() {
+void CLK_initSys() {
     initClkSys();
     initClkMono();
+}
+
+void CLK_init() {
     initClkSync();
     initClkEth();
     initClkComp();
