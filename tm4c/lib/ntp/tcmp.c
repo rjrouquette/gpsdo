@@ -11,7 +11,10 @@
 #include "../run.h"
 #include "tcmp.h"
 
-#define TEMP_ALPHA (0x1p-8f)
+#define TEMP_ALPHA (0x1p-9f)
+
+#define INTV_TEMP (1u << (32 - 10)) // 1024 Hz
+#define INTV_TCMP (1u << (32 - 4))  // 16 Hz
 
 #define TCMP_SAVE_INTV (3600) // save state every hour
 
@@ -100,10 +103,9 @@ void TCMP_init() {
         tcmpValue = tcmpEstimate(tempValue);
     }
 
-    // update temperature at 1024 Hz
-    runInterval(1u << (32 - 10), runTemp, NULL);
-    // update compensation at 16 Hz
-    runInterval(1u << (32 - 4), runComp, NULL);
+    // schedule threads
+    runInterval(INTV_TEMP, runTemp, NULL);
+    runInterval(INTV_TCMP, runComp, NULL);
 }
 
 float TCMP_temp() {
