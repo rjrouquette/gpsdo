@@ -14,7 +14,7 @@
 enum TaskType {
     TaskDisabled,
     TaskAlways,
-    TaskInterval,
+    TaskSleep,
     TaskPeriodic,
     TaskOnce
 };
@@ -105,7 +105,7 @@ static void scheduleNext(SchedulerTask *task) {
     // compute next run time
     if(task->type == TaskPeriodic)
         task->next += task->intv;
-    else if(task->type == TaskInterval)
+    else if(task->type == TaskSleep)
         task->next = GPTM0.TAV.raw + task->intv;
     else
         return;
@@ -172,7 +172,7 @@ void runAlways(SchedulerCallback callback, void *ref) {
 
 void runSleep(uint64_t delay, SchedulerCallback callback, void *ref) {
     SchedulerTask *task = allocTask();
-    task->type = TaskInterval;
+    task->type = TaskSleep;
     task->callback = callback;
     task->ref = ref;
 
@@ -206,7 +206,7 @@ void runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref) {
     scheduleNext(task);
 }
 
-void runLater(uint64_t delay, SchedulerCallback callback, void *ref) {
+void runOnce(uint64_t delay, SchedulerCallback callback, void *ref) {
     SchedulerTask *task = allocTask();
     task->type = TaskOnce;
     task->callback = callback;
@@ -262,6 +262,10 @@ static volatile uint32_t prevQuery;
 static volatile uint32_t prevHits[SLOT_CNT];
 static volatile uint32_t prevTicks[SLOT_CNT];
 
+static const char typeCode[5] = {
+        'D', 'A', 'S', 'P', 'O'
+};
+
 unsigned runStatus(char *buffer) {
     char *end = buffer;
 
@@ -280,7 +284,7 @@ unsigned runStatus(char *buffer) {
         uint32_t hits = taskSlots[i].hits - prevHits[i];
         prevHits[i] += hits;
 
-        end += toHex(taskSlots[i].type, 1, '0', end);
+        *(end++) = typeCode[taskSlots[i].type];
         *(end++) = ' ';
         end += toHex((uint32_t) taskSlots[i].callback, 6, '0', end);
         *(end++) = ' ';

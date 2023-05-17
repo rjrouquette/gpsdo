@@ -49,7 +49,7 @@ void runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref);
  * @param callback task entry point
  * @param ref context pointer for task
  */
-void runLater(uint64_t delay, SchedulerCallback callback, void *ref);
+void runOnce(uint64_t delay, SchedulerCallback callback, void *ref);
 
 /**
  * Cancel execution of task with associated callback and reference pointer from the scheduler queue
