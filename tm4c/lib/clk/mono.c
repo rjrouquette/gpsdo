@@ -29,15 +29,15 @@ void initClkMono() {
     RCGCTIMER.EN_GPTM0 = 1;
     delay_cycles_4();
     // Configure Timer 0
-    GPTM0.TAILR = -1;
-    GPTM0.TAMATCHR = CLK_FREQ;
-    GPTM0.TAMR.MR = 0x2;
-    GPTM0.TAMR.CDIR = 1;
-    GPTM0.TAMR.CINTD = 0;
-    GPTM0.IMR.TAM = 1;
-    GPTM0.TAMR.MIE = 1;
+    TIMER_MONO.TAILR = -1;
+    TIMER_MONO.TAMATCHR = CLK_FREQ;
+    TIMER_MONO.TAMR.MR = 0x2;
+    TIMER_MONO.TAMR.CDIR = 1;
+    TIMER_MONO.TAMR.CINTD = 0;
+    TIMER_MONO.IMR.TAM = 1;
+    TIMER_MONO.TAMR.MIE = 1;
     // start timer
-    GPTM0.CTL.TAEN = 1;
+    TIMER_MONO.CTL.TAEN = 1;
 }
 
 void initClkEth() {
@@ -132,7 +132,7 @@ void initClkSync() {
     initCaptureTimer(&GPTM5);
 
     // synchronize timers with monotonic clock
-    GPTM0.SYNC = 0x0F03;
+    TIMER_MONO.SYNC = 0x0F03;
 
     // configure capture pins
     RCGCGPIO.EN_PORTM = 1;
@@ -159,9 +159,9 @@ void ISR_Timer0A() {
     clkMonoOff += CLK_FREQ;
     ++clkMonoInt;
     // set next second boundary
-    GPTM0.TAMATCHR = clkMonoOff + CLK_FREQ;
+    TIMER_MONO.TAMATCHR = clkMonoOff + CLK_FREQ;
     // clear interrupt flag
-    GPTM0.ICR.TAM = 1;
+    TIMER_MONO.ICR.TAM = 1;
 }
 
 // return integer part of current time
@@ -173,7 +173,7 @@ uint32_t CLK_MONO_INT() {
 uint64_t CLK_MONO() {
     // capture current time
     __disable_irq();
-    uint32_t snapF = GPTM0.TAV.raw;
+    uint32_t snapF = CLK_MONO_RAW;
     uint32_t snapI = clkMonoInt;
     uint32_t snapO = clkMonoOff;
     __enable_irq();
@@ -185,7 +185,7 @@ uint64_t CLK_MONO() {
 // capture rising edge of PPS output for offset measurement
 void ISR_Timer4A() {
     // snapshot edge time
-    uint32_t timer = GPTM0.TAV.raw;
+    uint32_t timer = CLK_MONO_RAW;
     uint32_t event = GPTM4.TAR.raw;
     // clear interrupt flag
     GPTM4.ICR.CAE = 1;
@@ -203,7 +203,7 @@ void ISR_Timer4B() {
 // capture rising edge of ethernet PPS for offset measurement
 void ISR_Timer5A() {
     // snapshot edge time
-    uint32_t timer = GPTM0.TAV.raw;
+    uint32_t timer = CLK_MONO_RAW;
     uint32_t event = GPTM5.TAR.raw;
     // clear interrupt flag
     GPTM5.ICR.CAE = 1;
@@ -216,7 +216,7 @@ void ISR_Timer5A() {
 // capture rising edge of GPS PPS for offset measurement
 void ISR_Timer5B() {
     // snapshot edge time
-    uint32_t timer = GPTM0.TAV.raw;
+    uint32_t timer = CLK_MONO_RAW;
     uint32_t event = GPTM5.TBR.raw;
     // clear interrupt flag
     GPTM5.ICR.CBE = 1;

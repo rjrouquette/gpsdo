@@ -6,9 +6,10 @@
 #define GPSDO_CLK_MONO_H
 
 #include <stdint.h>
+#include "../hw/timer.h"
 
 #define CLK_FREQ (125000000)
-
+#define TIMER_MONO (GPTM0)
 
 /**
  * Precision Clock Event Structure
@@ -49,6 +50,11 @@ uint32_t CLK_MONO_INT();
  * @return 64-bit fixed-point format (32.32)
  */
 uint64_t CLK_MONO();
+
+/**
+ * Returns the raw value of the system clock timer
+ */
+#define CLK_MONO_RAW (TIMER_MONO.TAV.raw)
 
 
 #endif //GPSDO_CLK_MONO_H
