@@ -117,9 +117,9 @@ void GPS_init() {
     GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
 
     // start threads
-    runInterval(INTV_HEALTH, runHealth, NULL);
-    runInterval(INTV_RX_POLL, runRx, NULL);
-    runInterval(INTV_RX_PARS, runParser, NULL);
+    runSleep(INTV_HEALTH, runHealth, NULL);
+    runSleep(INTV_RX_POLL, runRx, NULL);
+    runSleep(INTV_RX_PARS, runParser, NULL);
 }
 
 static void runHealth(void *ref) {
@@ -163,7 +163,7 @@ static void runTx(void *ref) {
 
     // shutdown thread if there is no more data
     if(txHead == txTail) {
-        runRemove(runTx, NULL);
+        runCancel(runTx, NULL);
         txRunning = false;
     }
 }
@@ -171,7 +171,7 @@ static void runTx(void *ref) {
 static void startTx() {
     // start thread if there is pending data
     if(!txRunning) {
-        runInterval(INTV_TX_POLL, runTx, NULL);
+        runSleep(INTV_TX_POLL, runTx, NULL);
         txRunning = true;
     }
 }

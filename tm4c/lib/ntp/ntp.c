@@ -101,12 +101,12 @@ void NTP_init() {
     NtpGPS_init(&srcGps);
     sources[cntSources++] = (void *) &srcGps;
     // 16 Hz polling rate for sources
-    runInterval(SRC_UPDT_INTV, (SchedulerCallback) srcGps.source.run, (void *) &srcGps);
+    runSleep(SRC_UPDT_INTV, (SchedulerCallback) srcGps.source.run, (void *) &srcGps);
 
     // update source selection at 16 Hz
-    runInterval(SRC_UPDT_INTV, runSelect, NULL);
+    runSleep(SRC_UPDT_INTV, runSelect, NULL);
     // fill empty slots every 16 seconds
-    runInterval(DNS_UPDT_INTV, runDnsFill, NULL);
+    runSleep(DNS_UPDT_INTV, runDnsFill, NULL);
 }
 
 uint32_t NTP_refId() {
@@ -321,7 +321,7 @@ volatile static struct NtpSource* ntpAllocPeer() {
             // append to source list
             sources[cntSources++] = (struct NtpSource *) slot;
             // schedule source updates
-            runInterval(SRC_UPDT_INTV, (SchedulerCallback) slot->source.run, (void *) slot);
+            runSleep(SRC_UPDT_INTV, (SchedulerCallback) slot->source.run, (void *) slot);
             // return instance
             return (struct NtpSource *) slot;
         }
@@ -335,7 +335,7 @@ static void ntpRemovePeer(NtpSource *peer) {
         selectedSource = NULL;
 
     // remove from task schedule
-    runRemove((SchedulerCallback) peer->run, (void *) peer);
+    runCancel((SchedulerCallback) peer->run, (void *) peer);
     // deregister peer
     peer->id = 0;
     uint32_t slot = -1u;

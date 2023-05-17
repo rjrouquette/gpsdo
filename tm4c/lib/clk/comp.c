@@ -84,7 +84,7 @@ void initClkComp() {
 
     CLK_COMP_setComp(0);
     // schedule updates
-    runInterval(1u << (32 - 2), runClkComp, NULL);
+    runSleep(1u << (32 - 2), runClkComp, NULL);
 }
 
 uint64_t CLK_COMP() {

@@ -104,8 +104,8 @@ void TCMP_init() {
     }
 
     // schedule threads
-    runInterval(INTV_TEMP, runTemp, NULL);
-    runInterval(INTV_TCMP, runComp, NULL);
+    runPeriodic(INTV_TEMP, runTemp, NULL);
+    runPeriodic(INTV_TCMP, runComp, NULL);
 }
 
 float TCMP_temp() {

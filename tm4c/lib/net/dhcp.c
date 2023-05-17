@@ -121,7 +121,7 @@ void DHCP_init() {
     // register DHCP client port
     UDP_register(DHCP_PORT_CLI, processFrame);
     // wake every 0.5 seconds
-    runInterval(1u << (32 - 1), dhcpRun, NULL);
+    runSleep(1u << (32 - 1), dhcpRun, NULL);
 }
 
 void DHCP_renew() {

@@ -124,8 +124,8 @@ void initClkTai() {
     // initialize UTC offset
     clkTaiUtcOffset = ((uint64_t) GPS_taiOffset()) << 32;
     // schedule updates
-    runInterval(1u << (32 - 2), runClkTai, NULL);
-    runInterval(1u << (32 - 6), runPpsTai, NULL);
+    runSleep(1u << (32 - 2), runClkTai, NULL);
+    runSleep(1u << (32 - 6), runPpsTai, NULL);
 }
 
 uint64_t CLK_TAI() {

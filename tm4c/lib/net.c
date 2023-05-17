@@ -251,7 +251,7 @@ static void runTx(void *ref) {
 
     // shutdown thread if there is no more work
     if(endTX == ptrTX) {
-        runRemove(runTx, NULL);
+        runCancel(runTx, NULL);
         txRunning = false;
     }
 }
@@ -269,7 +269,7 @@ void NET_init() {
     DNS_init();
 
     // schedule RX processing
-    runInterval(RX_POLL_INTV, runRx, NULL);
+    runSleep(RX_POLL_INTV, runRx, NULL);
 }
 
 void NET_getMacAddress(char *strAddr) {
@@ -315,7 +315,7 @@ void NET_transmit(int desc, int len) {
     EMAC0.TXPOLLD = 1;
     // start thread
     if(!txRunning) {
-        runInterval(TX_POLL_INTV, runTx, NULL);
+        runSleep(TX_POLL_INTV, runTx, NULL);
         txRunning = true;
     }
 }

@@ -56,7 +56,7 @@ void PLL_init() {
     CLK_COMP_setComp((int32_t) (0x1p32f * comp));
 
     // check for temperature compensation updates (64 Hz)
-    runInterval(1u << (32 - 6), runUpdate, NULL);
+    runSleep(1u << (32 - 6), runUpdate, NULL);
 }
 
 

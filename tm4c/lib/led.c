@@ -34,7 +34,7 @@ void LED_init() {
     PORTN.LOCK = 0;
 
     // schedule LED update to run at 16 Hz
-    runInterval(1u << (32 - 4), runLed, NULL);
+    runSleep(1u << (32 - 4), runLed, NULL);
 }
 
 void LED0_ON() { PORTN.DATA[0x01u] = 0x01u; }

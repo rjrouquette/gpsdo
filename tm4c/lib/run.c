@@ -15,7 +15,8 @@ enum TaskType {
     TaskDisabled,
     TaskAlways,
     TaskInterval,
-    TaskPeriodic
+    TaskPeriodic,
+    TaskOnce
 };
 
 #define SLOT_CNT (32)
@@ -101,12 +102,14 @@ static void queueRemove(QueueNode *node) {
 }
 
 static void scheduleNext(SchedulerTask *task) {
-    // advance timestamp
-    if(task->type == TaskPeriodic) {
+    // compute next run time
+    if(task->type == TaskPeriodic)
         task->next += task->intv;
-    } else {
+    else if(task->type == TaskInterval)
         task->next = GPTM0.TAV.raw + task->intv;
-    }
+    else
+        return;
+
     // insert task into schedule queue
     QueueNode *ins = queueRoot.next;
     while(ins->task) {
@@ -148,12 +151,9 @@ void runScheduler() {
                 break;
             // execute the task
             runTask(task);
-            // remove from the queue
-            if(node->task)
+            // schedule next run if task was not cancelled
+            if(node->task) {
                 queueRemove(node);
-            // schedule next run
-            if (task->type == TaskInterval) {
-                // schedule next execution
                 scheduleNext(task);
             }
         }
@@ -170,9 +170,27 @@ void runAlways(SchedulerCallback callback, void *ref) {
     listAlways[cntAlways++] = task;
 }
 
-void runInterval(uint64_t interval, SchedulerCallback callback, void *ref) {
+void runSleep(uint64_t delay, SchedulerCallback callback, void *ref) {
     SchedulerTask *task = allocTask();
     task->type = TaskInterval;
+    task->callback = callback;
+    task->ref = ref;
+
+    // convert fixed-point interval to raw monotonic domain
+    union fixed_32_32 scratch;
+    scratch.full = delay;
+    scratch.full *= CLK_FREQ;
+    task->intv = scratch.ipart;
+
+    // capture current time
+    task->next = GPTM0.TAV.raw;
+    // schedule execution
+    scheduleNext(task);
+}
+
+void runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref) {
+    SchedulerTask *task = allocTask();
+    task->type = TaskPeriodic;
     task->callback = callback;
     task->ref = ref;
 
@@ -188,7 +206,25 @@ void runInterval(uint64_t interval, SchedulerCallback callback, void *ref) {
     scheduleNext(task);
 }
 
-void runRemove(SchedulerCallback callback, void *ref) {
+void runLater(uint64_t delay, SchedulerCallback callback, void *ref) {
+    SchedulerTask *task = allocTask();
+    task->type = TaskOnce;
+    task->callback = callback;
+    task->ref = ref;
+    task->intv = 0;
+
+    // convert fixed-point interval to raw monotonic domain
+    union fixed_32_32 scratch;
+    scratch.full = delay;
+    scratch.full *= CLK_FREQ;
+
+    // capture current time
+    task->next = GPTM0.TAV.raw + scratch.ipart;
+    // schedule execution
+    scheduleNext(task);
+}
+
+void runCancel(SchedulerCallback callback, void *ref) {
     if(ref == NULL) {
         for(int i = 0; i < SLOT_CNT; i++) {
             if(taskSlots[i].callback == callback)

@@ -177,8 +177,8 @@ void PTP_init() {
     EMAC0.ADDR3.HI.AE = 1;
 
     // schedule periodic message transmission
-    runInterval(1ull << (32 + PTP2_ANNC_LOG_INTV), sendAnnounce, NULL);
-    runInterval(1ull << (32 + PTP2_SYNC_LOG_INTV), sendSync, NULL);
+    runSleep(1ull << (32 + PTP2_ANNC_LOG_INTV), sendAnnounce, NULL);
+    runSleep(1ull << (32 + PTP2_SYNC_LOG_INTV), sendSync, NULL);
 }
 
 void processMessage(uint8_t *frame, int flen) {

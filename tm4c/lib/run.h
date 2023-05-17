@@ -28,19 +28,35 @@ void runScheduler();
 void runAlways(SchedulerCallback callback, void *ref);
 
 /**
- * Schedule task to execute at a regular interval
+ * Schedule task to sleep for a fixed delay between executions
+ * @param delay interval in 32.32 fixed point format (16 second maximum, uses monotonic clock)
+ * @param callback task entry point
+ * @param ref context pointer for task
+ */
+void runSleep(uint64_t delay, SchedulerCallback callback, void *ref);
+
+/**
+ * Schedule task to execute at a regular interval (exact execution rate)
  * @param interval interval in 32.32 fixed point format (16 second maximum, uses monotonic clock)
  * @param callback task entry point
  * @param ref context pointer for task
  */
-void runInterval(uint64_t interval, SchedulerCallback callback, void *ref);
+void runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref);
 
 /**
- * Remove task with associated callback and reference pointer from the scheduler queue
+ * Schedule task to execute after a delay
+ * @param delay delay in 32.32 fixed point format (16 second maximum, uses monotonic clock)
+ * @param callback task entry point
+ * @param ref context pointer for task
+ */
+void runLater(uint64_t delay, SchedulerCallback callback, void *ref);
+
+/**
+ * Cancel execution of task with associated callback and reference pointer from the scheduler queue
  * @param callback task entry point
  * @param ref context pointer for task (if NULL, all entries matching callback are removed)
  */
-void runRemove(SchedulerCallback callback, void *ref);
+void runCancel(SchedulerCallback callback, void *ref);
 
 /**
  * Write current status of the scheduler to a buffer
