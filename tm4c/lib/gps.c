@@ -22,8 +22,8 @@
 
 #define INTV_HEALTH  (1u << (32 - 1))
 #define INTV_RX_PARS (1u << (32 - 5))
-#define INTV_RX_POLL (1u << (32 - 9))
-#define INTV_TX_POLL (1u << (32 - 9))
+#define INTV_RX_POLL (1u << (32 - 10))
+#define INTV_TX_POLL (1u << (32 - 10))
 
 
 static volatile uint8_t rxBuff[GPS_RING_SIZE];
