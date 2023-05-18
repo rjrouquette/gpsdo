@@ -242,7 +242,7 @@ static void runTx(void *ref) {
     // check for completed transmissions
     const int ptr = ptrTX;
     int end = endTX;
-    while ((end != ptr) && !txDesc[endTX].TDES0.OWN) {
+    while ((end != ptr) && !txDesc[end].TDES0.OWN) {
         // check for callback
         CallbackNetTX pCall = txCallback[end].call;
         if(pCall) {
