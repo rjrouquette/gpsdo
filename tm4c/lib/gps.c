@@ -170,12 +170,14 @@ void ISR_UART3() {
 }
 
 static void startTx() {
+    // disable interrupt to prevent clobbering of pointers
     UART3.IM.TX = 0;
     // fill UART FIFO
     while ((!UART3.FR.TXFF) && (txTail != txHead)) {
         UART3.DR.DATA = txBuff[txTail++];
         txTail &= GPS_RING_MASK;
     }
+    // enable interrupt to complete any deferred bytes
     UART3.IM.TX = 1;
 }
 
