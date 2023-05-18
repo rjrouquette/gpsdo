@@ -4,6 +4,7 @@
 
 #include <memory.h>
 #include <stdbool.h>
+#include "../hw/interrupts.h"
 #include "../hw/uart.h"
 #include "clk/clk.h"
 #include "clk/mono.h"
@@ -22,7 +23,6 @@
 
 #define INTV_HEALTH  (1u << (32 - 1))
 #define INTV_RX_PARS (1u << (32 - 5))
-#define INTV_RX_POLL (1u << (32 - 10))
 #define INTV_TX_POLL (1u << (32 - 10))
 
 
@@ -57,7 +57,6 @@ static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload
 static void configureGPS();
 
 static void runHealth(void *ref);
-static void runRx(void *ref);
 static void runTx(void *ref);
 static void runParser(void *ref);
 
@@ -106,6 +105,9 @@ void GPS_init() {
     UART3.LCRH.WLEN = 3;
     // enable FIFO
     UART3.LCRH.FEN = 1;
+    // enable interrupt
+    UART3.IM.RT = 1;
+    UART3.IM.RX = 1;
     // enable UART
     UART3.CTL.RXE = 1;
     UART3.CTL.TXE = 1;
@@ -118,7 +120,6 @@ void GPS_init() {
 
     // start threads
     runSleep(INTV_HEALTH, runHealth, NULL);
-    runSleep(INTV_RX_POLL, runRx, NULL);
     runSleep(INTV_RX_PARS, runParser, NULL);
 }
 
@@ -146,8 +147,8 @@ static void runHealth(void *ref) {
     }
 }
 
-static void runRx(void *ref) {
-    // drain UART FIFO
+void ISR_UART3() {
+    // drain UART FIFO (clears interrupt)
     while (!UART3.FR.RXFE) {
         rxBuff[rxHead++] = UART3.DR.DATA;
         rxHead &= GPS_RING_MASK;
