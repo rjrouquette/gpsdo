@@ -21,13 +21,6 @@ _Noreturn
 void runScheduler();
 
 /**
- * Schedule task for continuous polling
- * @param callback task entry point
- * @param ref context pointer for task
- */
-void runAlways(SchedulerCallback callback, void *ref);
-
-/**
  * Schedule task to sleep for a fixed delay between executions
  * @param delay interval in 32.32 fixed point format (16 second maximum, uses monotonic clock)
  * @param callback task entry point

@@ -13,7 +13,6 @@
 
 enum TaskType {
     TaskInvalid,
-    TaskAlways,
     TaskSleep,
     TaskPeriodic,
     TaskOnce
@@ -27,7 +26,7 @@ typedef volatile struct QueueNode {
     // task structure
     struct {
         enum TaskType type;
-        SchedulerCallback callback;
+        SchedulerCallback run;
         void *ref;
         uint32_t next;
         uint32_t intv;
@@ -40,16 +39,11 @@ typedef volatile struct QueueNode {
 #define SLOT_CNT (32)
 static volatile QueueNode *queueFree;
 static volatile QueueNode queuePool[SLOT_CNT];
-static volatile QueueNode queueAlways;
 static volatile QueueNode queueSchedule;
 
 static QueueNode * allocNode();
 static void freeNode(QueueNode *node);
 
-static void queueInsBefore(QueueNode *ins, QueueNode *node);
-static void queueRemove(QueueNode *node);
-
-static void insSchedule(QueueNode  *node);
 
 void initScheduler() {
     // initialize queue nodes
@@ -57,9 +51,6 @@ void initScheduler() {
     for(int i = 0; i < SLOT_CNT; i++)
         freeNode(queuePool + i);
 
-    // initialize queue pointers
-    queueAlways.next = &queueAlways;
-    queueAlways.prev = &queueAlways;
     // initialize queue pointers
     queueSchedule.next = &queueSchedule;
     queueSchedule.prev = &queueSchedule;
@@ -81,16 +72,8 @@ static void freeNode(QueueNode *node) {
     queueFree = node;
 }
 
-static void queueInsBefore(QueueNode *ins, QueueNode *node) {
-    node->next = ins;
-    node->prev = ins->prev;
-    ins->prev = node;
-    node->prev->next = node;
-}
-
-static void queueRemove(QueueNode *node) {
-    if(node == node->next)
-        faultBlink(3, 2);
+__attribute__((always_inline))
+static inline void queueRemove(QueueNode *node) {
     node->prev->next = node->next;
     node->next->prev = node->prev;
 }
@@ -99,93 +82,65 @@ static void insSchedule(QueueNode *node) {
     // ordered insertion into schedule queue
     QueueNode *ins = queueSchedule.next;
     while(ins->task.type) {
-        if(((int32_t) (node->task.next - ins->task.next)) < 0) {
-            queueInsBefore(ins, node);
-            return;
-        }
+        if(((int32_t) (node->task.next - ins->task.next)) < 0)
+            break;
         ins = ins->next;
     }
-    // insert at end of queue if all other tasks in queue are scheduled sooner
-    queueInsBefore(ins, node);
+
+    // insert task into the scheduling queue
+    node->next = ins;
+    node->prev = ins->prev;
+    ins->prev = node;
+    node->prev->next = node;
 }
 
-static void scheduleNext(QueueNode *node) {
-    // remove from queue
-    queueRemove(node);
-
-    // compute next run time
-    if(node->task.type == TaskPeriodic)
-        node->task.next += node->task.intv;
-    else if(node->task.type == TaskSleep)
-        node->task.next = CLK_MONO_RAW + node->task.intv;
-    else {
-        // release node if task is complete
-        freeNode(node);
-        return;
-    }
-
-    // add to schedule
-    insSchedule(node);
-}
-
-/**
- * Run task and update scheduling statistics
- * @param task
- */
-static void runTask(QueueNode *node) {
-    uint32_t start = CLK_MONO_RAW;
-    (*(node->task.callback))(node->task.ref);
-    node->task.ticks += CLK_MONO_RAW - start;
-    ++(node->task.hits);
-}
-
+__attribute__((optimize(3)))
 _Noreturn
 void runScheduler() {
-    QueueNode *next;
+    QueueNode *node = &queueSchedule;
+    uint32_t now = CLK_MONO_RAW;
 
-    // infinite loop, round-robin
+    // infinite loop
     for (;;) {
-        // check for always running tasks
-        next = queueAlways.next;
-        if(next->task.type) {
-            runTask(next);
-            // move task to end of queue if task was not cancelled
-            if(next->task.type) {
-                queueRemove(next);
-                queueInsBefore(&queueAlways, next);
-            }
-        }
+        // record time spent on prior task
+        uint32_t prior = now;
+        now = CLK_MONO_RAW;
+        ++(node->task.hits);
+        node->task.ticks += now - prior;
 
         // check for scheduled tasks
-        next = queueSchedule.next;
-        if(next->task.type) {
-            // check clock
-            if (((int32_t) (CLK_MONO_RAW - next->task.next)) >= 0) {
-                // run the task
-                runTask(next);
-                // schedule next run if task was not cancelled
-                if (next->task.type) {
-                    scheduleNext(next);
-                }
-            }
+        node = queueSchedule.next;
+        if(((int32_t) (now - node->task.next)) < 0) {
+            // credit time spent to the scheduler
+            node = &queueSchedule;
+            continue;
         }
-    }
-}
 
-void runAlways(SchedulerCallback callback, void *ref) {
-    QueueNode *node = allocNode();
-    node->task.type = TaskAlways;
-    node->task.callback = callback;
-    node->task.ref = ref;
-    node->task.intv = 0;
-    node->task.next = 0;
-    queueInsBefore(&queueAlways, node);
+        // run the task
+        (*(node->task.run))(node->task.ref);
+        // remove from queue
+        queueRemove(node);
+        // compute next run time
+        if(node->task.type == TaskSleep)
+            node->task.next = CLK_MONO_RAW + node->task.intv;
+        else if(node->task.type == TaskPeriodic)
+            node->task.next += node->task.intv;
+        else {
+            // release node if task is complete
+            freeNode(node);
+            // credit time spent to the scheduler
+            node = &queueSchedule;
+            continue;
+        }
+        // add to schedule
+        insSchedule(node);
+    }
 }
 
 void runSleep(uint64_t delay, SchedulerCallback callback, void *ref) {
     QueueNode *node = allocNode();
     node->task.type = TaskSleep;
-    node->task.callback = callback;
+    node->task.run = callback;
     node->task.ref = ref;
 
     // convert fixed-point interval to raw monotonic domain
@@ -203,7 +158,7 @@ void runSleep(uint64_t delay, SchedulerCallback callback, void *ref) {
 void runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref) {
     QueueNode *node = allocNode();
     node->task.type = TaskPeriodic;
-    node->task.callback = callback;
+    node->task.run = callback;
     node->task.ref = ref;
 
     // convert fixed-point interval to raw monotonic domain
@@ -221,14 +176,14 @@ void runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref) {
 void runOnce(uint64_t delay, SchedulerCallback callback, void *ref) {
     QueueNode *node = allocNode();
     node->task.type = TaskOnce;
-    node->task.callback = callback;
+    node->task.run = callback;
     node->task.ref = ref;
-    node->task.intv = 0;
 
     // convert fixed-point interval to raw monotonic domain
     union fixed_32_32 scratch;
     scratch.full = delay;
     scratch.full *= CLK_FREQ;
+    node->task.intv = scratch.ipart;
 
     // start after delay
     node->task.next = CLK_MONO_RAW + scratch.ipart;
@@ -236,32 +191,36 @@ void runOnce(uint64_t delay, SchedulerCallback callback, void *ref) {
     insSchedule(node);
 }
 
-static void purgeFromQueue(QueueNode *next, SchedulerCallback callback, void *ref) {
+void runCancel(SchedulerCallback callback, void *ref) {
+    QueueNode *next = queueSchedule.next;
     while(next->task.type) {
         QueueNode *node = next;
         next = next->next;
 
-        if(node->task.callback == callback) {
+        if(node->task.run == callback) {
             if((ref == NULL) || (node->task.ref == ref)) {
-                queueRemove(node);
-                freeNode(node);
+                // check if the currently running task is being cancelled
+                if(node == queueSchedule.next) {
+                    // if so, defer cleanup to main loop
+                    node->task.type = TaskOnce;
+                } else {
+                    // if not, explicitly cancel task and free memory
+                    queueRemove(node);
+                    freeNode(node);
+                }
             }
         }
     }
 }
 
-void runCancel(SchedulerCallback callback, void *ref) {
-    purgeFromQueue(queueAlways.next, callback, ref);
-    purgeFromQueue(queueSchedule.next, callback, ref);
-}
 
-
-static volatile uint32_t prevQuery;
+static volatile uint32_t prevQuery, idleHits, idleTicks;
 static volatile uint32_t prevHits[SLOT_CNT];
 static volatile uint32_t prevTicks[SLOT_CNT];
+static volatile int topList[SLOT_CNT];
 
 static const char typeCode[5] = {
-        'D', 'A', 'S', 'P', 'O'
+        '-', 'S', 'P', 'O'
 };
 
 static char * writeNode(char *ptr, float scale, uint32_t *totalTicks, QueueNode *node) {
@@ -277,13 +236,13 @@ static char * writeNode(char *ptr, float scale, uint32_t *totalTicks, QueueNode 
 
     *(ptr++) = typeCode[node->task.type];
     *(ptr++) = ' ';
-    ptr += toHex((uint32_t) node->task.callback, 6, '0', ptr);
+    ptr += toHex((uint32_t) node->task.run, 6, '0', ptr);
     *(ptr++) = ' ';
     ptr += toHex((uint32_t) node->task.ref, 8, '0', ptr);
     *(ptr++) = ' ';
-    ptr += fmtFloat(scale * (float) hits, 8, 1, ptr);
+    ptr += fmtFloat(scale * (float) hits, 8, 0, ptr);
     *(ptr++) = ' ';
-    ptr += fmtFloat(scale * 0.008f * (float) ticks, 8, 1, ptr);
+    ptr += fmtFloat(scale * 0.008f * (float) ticks, 8, 0, ptr);
     *(ptr++) = '\n';
 
     return ptr;
@@ -291,29 +250,80 @@ static char * writeNode(char *ptr, float scale, uint32_t *totalTicks, QueueNode 
 
 unsigned runStatus(char *buffer) {
     char *end = buffer;
-
     uint32_t elapsed = CLK_MONO_RAW - prevQuery;
     prevQuery += elapsed;
     float scale = 125e6f / (float) elapsed;
 
-    uint32_t total = 0;
-
-    QueueNode *next = queueAlways.next;
+    // collect active tasks
+    int cnt = 0;
+    QueueNode *next = queueSchedule.next;
     while(next->task.type) {
-        QueueNode *node = next;
+        topList[cnt++] = next - queuePool;
         next = next->next;
-        end = writeNode(end, scale, &total, node);
     }
 
-    next = queueSchedule.next;
-    while(next->task.type) {
-        QueueNode *node = next;
-        next = next->next;
-        end = writeNode(end, scale, &total, node);
+    for(int i = 0; i < cnt; i++) {
+        int j = topList[i];
+        prevHits[j] = queuePool[j].task.hits - prevHits[j];
+        prevTicks[j] = queuePool[j].task.ticks - prevTicks[j];
     }
 
-    end += fmtFloat(scale * 0.008f * (float) total, 35, 1, end);
+    // sort active tasks
+    for(int i = 0; i < cnt; i++) {
+        for(int j = i + 1; j < cnt; j++) {
+            int a = topList[i];
+            int b = topList[j];
+            if(prevTicks[a] < prevTicks[b]) {
+                topList[i] = b;
+                topList[j] = a;
+            }
+        }
+    }
+
+    // header row
+    end = append(end, "  Call   Context  Hits     Micros  \n");
+
+    uint32_t totalTicks = 0, totalHits = 0;
+    for(int i = 0; i < cnt; i++) {
+        int j = topList[i];
+        QueueNode *node = queuePool + j;
+        
+        *(end++) = typeCode[node->task.type];
+        *(end++) = ' ';
+        end += toHex((uint32_t) node->task.run, 6, '0', end);
+        *(end++) = ' ';
+        end += toHex((uint32_t) node->task.ref, 8, '0', end);
+        *(end++) = ' ';
+        end += fmtFloat(scale * (float) prevHits[j], 8, 0, end);
+        *(end++) = ' ';
+        end += fmtFloat(scale * 0.008f * (float) prevTicks[j], 8, 0, end);
+        *(end++) = '\n';
+
+        totalHits += prevHits[j];
+        totalTicks += prevTicks[j];
+    }
+
     *(end++) = '\n';
+    end += padCopy(18, ' ', end, "Used ", 5);
+    end += fmtFloat(scale * (float) totalHits, 8, 0, end);
+    *(end++) = ' ';
+    end += fmtFloat(scale * 0.008f * (float) totalTicks, 8, 0, end);
+    *(end++) = '\n';
+
+    end += padCopy(18, ' ', end, "Idle ", 5);
+    end += fmtFloat(scale * (float) (queueSchedule.task.hits - idleHits), 8, 0, end);
+    *(end++) = ' ';
+    end += fmtFloat(scale * 0.008f * (float) (queueSchedule.task.ticks - idleTicks), 8, 0, end);
+    *(end++) = '\n';
+
+    idleHits = queueSchedule.task.hits;
+    idleTicks = queueSchedule.task.ticks;
+
+    for(int i = 0; i < cnt; i++) {
+        int j = topList[i];
+        prevHits[j] = queuePool[j].task.hits;
+        prevTicks[j] = queuePool[j].task.ticks;
+    }
 
     return end - buffer;
 }

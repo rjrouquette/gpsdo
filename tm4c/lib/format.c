@@ -260,13 +260,17 @@ int fmtFloat(float value, int width, int places, char *origin) {
         }
         // insert leading zeros
         result[len+0] = '0';
-        result[len+1] = '.';
-        for(int i = 2; i < shift; i++) {
-            int j = len + i;
-            if(j < sizeof(result))
-                result[len + i] = '0';
+        if(places > 0) {
+            result[len + 1] = '.';
+            for (int i = 2; i < shift; i++) {
+                int j = len + i;
+                if (j < sizeof(result))
+                    result[len + i] = '0';
+            }
+            len += 2 + places;
+        } else {
+            ++len;
         }
-        len += 2 + places;
         return padCopy(width, ' ', origin, result, len);
     }
 
