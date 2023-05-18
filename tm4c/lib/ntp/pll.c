@@ -77,6 +77,7 @@ void PLL_updateOffset(int interval, int64_t offset) {
     float rate = offsetRms / PLL_OFFSET_CORR_BASIS;
     // limit proportional rate
     if(rate > PLL_OFFSET_CORR_MAX) rate = PLL_OFFSET_CORR_MAX;
+    if(rate < PLL_OFFSET_CORR_MIN) rate = PLL_OFFSET_CORR_MIN;
     // adjust rate to match polling interval
     rate *= 0x1p-16f * (float) (1u << (16 - interval));
     // update offset compensation

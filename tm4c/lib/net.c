@@ -14,6 +14,7 @@
 #include "clk/tai.h"
 #include "clk/util.h"
 #include "delay.h"
+#include "led.h"
 #include "net.h"
 #include "net/arp.h"
 #include "net/dhcp.h"
@@ -33,6 +34,9 @@
 
 #define RX_POLL_INTV (1u << (32 - 16))
 #define TX_POLL_INTV (1u << (32 - 16))
+
+#define ADV_RING_RX(ptr) ((ptr) = ((ptr) + 1) & RX_RING_MASK)
+#define ADV_RING_TX(ptr) ((ptr) = ((ptr) + 1) & TX_RING_MASK)
 
 static volatile int ptrRX = 0;
 static volatile int ptrTX = 0;
@@ -230,30 +234,33 @@ static void runRx(void *ref) {
         // restore ownership to DMA
         pRxDesc->RDES0.OWN = 1;
         // advance pointer
-        ptrRX = (ptrRX + 1) & RX_RING_MASK;
+        ADV_RING_RX(ptrRX);
     }
 }
 
 static void runTx(void *ref) {
     // check for completed transmissions
-    while ((endTX != ptrTX) && !txDesc[endTX].TDES0.OWN) {
+    const int ptr = ptrTX;
+    int end = endTX;
+    while ((end != ptr) && !txDesc[endTX].TDES0.OWN) {
         // check for callback
-        CallbackNetTX pCall = txCallback[endTX].call;
+        CallbackNetTX pCall = txCallback[end].call;
         if(pCall) {
             // invoke callback
-            (*pCall) (txCallback[endTX].ref, (uint8_t *) txBuffer[endTX], txDesc[endTX].TDES1.TBS1);
+            (*pCall) (txCallback[end].ref, (uint8_t *) txBuffer[end], txDesc[end].TDES1.TBS1);
             // clear callback
-            txCallback[endTX].call = NULL;
+            txCallback[end].call = NULL;
         }
         // advance pointer
-        endTX = (endTX + 1) & TX_RING_MASK;
+        ADV_RING_TX(end);
     }
 
     // shutdown thread if there is no more work
-    if(endTX == ptrTX) {
+    if(end == ptr) {
         runCancel(runTx, NULL);
         txRunning = false;
     }
+    endTX = end;
 }
 
 extern volatile uint16_t ipID;
@@ -284,11 +291,10 @@ int NET_getPhyStatus() {
 
 int NET_getTxDesc() {
     if(txDesc[ptrTX].TDES0.OWN)
-        return -1;
+        faultBlink(4, 4);
 
     int temp = ptrTX;
-    ++ptrTX;
-    ptrTX &= TX_RING_MASK;
+    ADV_RING_TX(ptrTX);
     return temp;
 }
 
@@ -306,7 +312,7 @@ void NET_transmit(int desc, int len) {
     desc &= TX_RING_MASK;
     // restrict transmission length
     if(len < 60) len = 60;
-    if(len > TX_BUFF_SIZE) len = TX_BUFF_SIZE;
+    if(len > TX_BUFF_SIZE) faultBlink(4, 3);
     // set transmission size
     txDesc[desc].TDES1.TBS1 = len;
     // release descriptor
@@ -342,24 +348,24 @@ static inline void toStamps(uint32_t timer, volatile uint64_t *stamps) {
 
 void NET_getRxTime(const uint8_t *rxFrame, volatile uint64_t *stamps) {
     // compute descriptor offset
-    uint32_t rxId = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
-    if(rxId >= RX_RING_SIZE) return;
+    const int i = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
+    if(i >= RX_RING_SIZE) faultBlink(4, 1);
     // retrieve timestamp
     uint32_t timer;
-    timer  = rxDesc[rxId].RTSH * CLK_FREQ;
-    timer += rxDesc[rxId].RTSL >> 3;
+    timer  = rxDesc[i].RTSH * CLK_FREQ;
+    timer += rxDesc[i].RTSL >> 3;
     // assemble timestamps
     toStamps(timer, stamps);
 }
 
 void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps) {
     // compute descriptor offset
-    uint32_t txId = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
-    if(txId >= TX_RING_SIZE) return;
+    const int i = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
+    if(i >= TX_RING_SIZE) faultBlink(4, 2);
     // retrieve timestamp
     uint32_t timer;
-    timer  = txDesc[txId].TTSH * CLK_FREQ;
-    timer += txDesc[txId].TTSL >> 3;
+    timer  = txDesc[i].TTSH * CLK_FREQ;
+    timer += txDesc[i].TTSL >> 3;
     // assemble timestamps
     toStamps(timer, stamps);
 }

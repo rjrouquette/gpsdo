@@ -61,7 +61,10 @@ static void runClkTai(void *ref) {
 static void runPpsTai(void *ref) {
     // update PPS output alignment
     union fixed_32_32 scratch;
-    scratch.full = CLK_TAI();
+    // use imprecise TAI calculation to reduce overhead
+    scratch.full = CLK_MONO();
+    scratch.full += clkCompOffset;
+    scratch.full += clkTaiOffset;
     if(scratch.fpart >= (7u << 29)) {
         // compute next TAI second boundary
         scratch.fpart = 0;

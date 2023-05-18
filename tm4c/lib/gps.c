@@ -23,8 +23,8 @@
 
 #define INTV_HEALTH  (1u << (32 - 1))
 #define INTV_RX_PARS (1u << (32 - 5))
-#define INTV_TX_POLL (1u << (32 - 10))
 
+#define ADV_RING(ptr) ((ptr) = ((ptr) + 1) & GPS_RING_MASK)
 
 static volatile uint8_t rxBuff[GPS_RING_SIZE];
 static volatile uint8_t txBuff[GPS_RING_SIZE];
@@ -44,13 +44,16 @@ static volatile int taiOffset = 37; // as of 2016-12-31
 
 static volatile bool hasNema, hasPvt, hasGpsTime, hasClock;
 
+__attribute__((noinline))
 static void processNEMA(char *msg, int len);
 
+__attribute__((noinline))
 static void processUBX(uint8_t *msg, int len);
 static void processUbxClock(const uint8_t *payload);
 static void processUbxPVT(const uint8_t *payload);
 static void processUbxGpsTime(const uint8_t *payload);
 
+__attribute__((noinline))
 static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload);
 
 static void configureGPS();
@@ -151,19 +154,24 @@ void ISR_UART3() {
     // RX FIFO watermark or RX timeout
     if(flags & 0x50) {
         // drain UART FIFO (clears interrupt)
+        int head = rxHead;
         while (!UART3.FR.RXFE) {
-            rxBuff[rxHead++] = UART3.DR.DATA;
-            rxHead &= GPS_RING_MASK;
+            rxBuff[head] = UART3.DR.DATA;
+            ADV_RING(head);
         }
+        rxHead = head;
     }
 
     // TX FIFO watermark
     if(flags & 0x20) {
         // fill UART FIFO
-        while ((!UART3.FR.TXFF) && (txTail != txHead)) {
-            UART3.DR.DATA = txBuff[txTail++];
-            txTail &= GPS_RING_MASK;
+        const int head = txHead;
+        int tail = txTail;
+        while ((!UART3.FR.TXFF) && (tail != head)) {
+            UART3.DR.DATA = txBuff[tail];
+            ADV_RING(tail);
         }
+        txTail = tail;
         // explicitly clear flag
         UART3.ICR.TX = 1;
     }
@@ -173,19 +181,24 @@ static void startTx() {
     // disable interrupt to prevent clobbering of pointers
     UART3.IM.TX = 0;
     // fill UART FIFO
-    while ((!UART3.FR.TXFF) && (txTail != txHead)) {
-        UART3.DR.DATA = txBuff[txTail++];
-        txTail &= GPS_RING_MASK;
+    const int head = txHead;
+    int tail = txTail;
+    while ((!UART3.FR.TXFF) && (tail != head)) {
+        UART3.DR.DATA = txBuff[tail];
+        ADV_RING(tail);
     }
+    txTail = tail;
     // enable interrupt to complete any deferred bytes
     UART3.IM.TX = 1;
 }
 
 static void runParser(void *ref) {
-    while(rxTail != rxHead) {
+    const int head = rxHead;
+    int tail = rxTail;
+    while(tail != head) {
         // get next byte
-        uint8_t byte = rxBuff[rxTail++];
-        rxTail &= GPS_RING_MASK;
+        uint8_t byte = rxBuff[tail];
+        ADV_RING(tail);
 
         // process UBX message
         if(lenUBX) {
@@ -224,7 +237,6 @@ static void runParser(void *ref) {
                 // reset parser state
                 lenNEMA = 0;
             }
-            continue;
         }
 
         // search for NEMA message start
@@ -239,6 +251,7 @@ static void runParser(void *ref) {
             continue;
         }
     }
+    rxTail = tail;
 }
 
 float GPS_locLat() {
@@ -356,51 +369,53 @@ static void processUBX(uint8_t *msg, const int len) {
 
 static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload) {
     if(len > 512) return;
+    int head = txHead;
 
     // send preamble
-    txBuff[txHead++] = 0xB5;
-    txHead &= GPS_RING_MASK;
-    txBuff[txHead++] = 0x62;
-    txHead &= GPS_RING_MASK;
+    txBuff[head] = 0xB5;
+    ADV_RING(head);
+    txBuff[head] = 0x62;
+    ADV_RING(head);
 
     // initialize checksum
     uint8_t chkA = 0, chkB = 0;
 
     // send class
-    txBuff[txHead++] = _class;
-    txHead &= GPS_RING_MASK;
+    txBuff[head] = _class;
+    ADV_RING(head);
     chkA += _class;
     chkB += chkA;
 
     // send id
-    txBuff[txHead++] = _id;
-    txHead &= GPS_RING_MASK;
+    txBuff[head] = _id;
+    ADV_RING(head);
     chkA += _id;
     chkB += chkA;
 
     // send length
     uint8_t *_len = (uint8_t *) & len;
     for(int i = 0; i < 2; i++) {
-        txBuff[txHead++] = _len[i];
-        txHead &= GPS_RING_MASK;
+        txBuff[head] = _len[i];
+        ADV_RING(head);
         chkA += _len[i];
         chkB += chkA;
     }
 
     // send payload
     for(int i = 0; i < len; i++) {
-        txBuff[txHead++] = payload[i];
-        txHead &= GPS_RING_MASK;
+        txBuff[head] = payload[i];
+        ADV_RING(head);
         chkA += payload[i];
         chkB += chkA;
     }
 
     // send checksum
-    txBuff[txHead++] = chkA;
-    txHead &= GPS_RING_MASK;
-    txBuff[txHead++] = chkB;
-    txHead &= GPS_RING_MASK;
+    txBuff[head] = chkA;
+    ADV_RING(head);
+    txBuff[head] = chkB;
+    ADV_RING(head);
 
+    txHead = head;
     startTx();
 }
 
