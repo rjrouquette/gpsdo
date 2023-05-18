@@ -372,6 +372,8 @@ static void ntpDnsCallback(void *ref, uint32_t addr) {
         if(!IPv4_testSubnet(ipSubnet, ipAddress, addr)) {
             // faster initial burst for local timeservers
             newSource->poll = 1;
+            newSource->minPoll = 2;
+            newSource->maxPoll = 4;
         }
     }
 }
