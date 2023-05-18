@@ -5,6 +5,7 @@
 #include <math.h>
 #include "../../hw/adc.h"
 #include "../../hw/eeprom.h"
+#include "../clk/comp.h"
 #include "../clk/mono.h"
 #include "../delay.h"
 #include "../format.h"
@@ -68,6 +69,7 @@ static void runTemp(void *ref) {
 static void runComp(void *ref) {
     // update temperature compensation
     tcmpValue = tcmpEstimate(tempValue);
+    CLK_COMP_setComp((int32_t) (0x1p32f * tcmpValue));
 }
 
 void TCMP_init() {
@@ -100,7 +102,7 @@ void TCMP_init() {
     loadSom();
     if(isfinite(somNode[0][0])) {
         updateRegression();
-        tcmpValue = tcmpEstimate(tempValue);
+        runComp(NULL);
     }
 
     // schedule threads
@@ -119,8 +121,6 @@ float TCMP_get() {
 void TCMP_update(const float target) {
     updateSom(tempValue, target);
     updateRegression();
-
-    tcmpValue = tcmpEstimate(tempValue);
 
     const uint32_t now = CLK_MONO_INT();
     if(now - tcmpSaved > TCMP_SAVE_INTV) {

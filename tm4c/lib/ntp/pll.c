@@ -6,7 +6,6 @@
 #include "../clk/comp.h"
 #include "../clk/tai.h"
 #include "../format.h"
-#include "../run.h"
 #include "pll.h"
 #include "tcmp.h"
 
@@ -26,37 +25,16 @@ static volatile float driftVar;
 static volatile float driftMS;
 static volatile float driftStdDev;
 static volatile float driftRms;
+static volatile float driftFreq;
 
 // PLL proportional terms
 static volatile float offsetProportion;
 
 // PLL integral terms
 static volatile float offsetIntegral;
-static volatile float driftIntegral;
-
-// Temperature Compensation State
-static volatile float tcompCurrent;
-
-static void runUpdate(void *ref) {
-    // check for updated temperature compensation
-    float newComp = TCMP_get();
-    if(newComp == tcompCurrent) return;
-
-    // update frequency temperature compensation
-    tcompCurrent = newComp;
-    float comp = tcompCurrent + driftIntegral;
-    CLK_COMP_setComp((int32_t) (0x1p32f * comp));
-}
 
 void PLL_init() {
     TCMP_init();
-
-    tcompCurrent = TCMP_get();
-    float comp = tcompCurrent + driftIntegral;
-    CLK_COMP_setComp((int32_t) (0x1p32f * comp));
-
-    // check for temperature compensation updates (64 Hz)
-    runSleep(1u << (32 - 6), runUpdate, NULL);
 }
 
 
@@ -116,7 +94,8 @@ void PLL_updateOffset(int interval, int64_t offset) {
 
 void PLL_updateDrift(int interval, float drift) {
     // update temperature compensation
-    TCMP_update(drift + (0x1p-32f * (float) CLK_COMP_getComp()));
+    driftFreq = drift + (0x1p-32f * (float) CLK_COMP_getComp());
+    TCMP_update(driftFreq);
 
     // update stats
     driftLast = drift;
@@ -126,17 +105,6 @@ void PLL_updateDrift(int interval, float drift) {
     driftMean += diff * PLL_STATS_ALPHA;
     driftStdDev = sqrtf(driftVar);
     driftRms = sqrtf(driftMS);
-
-    // update integral term
-    driftIntegral += drift * PLL_DRIFT_INT_RATE;
-    // limit integration range
-    if(driftIntegral >  PLL_MAX_FREQ_TRIM) driftIntegral =  PLL_MAX_FREQ_TRIM;
-    if(driftIntegral < -PLL_MAX_FREQ_TRIM) driftIntegral = -PLL_MAX_FREQ_TRIM;
-    // limit compensation range
-    float comp = tcompCurrent + driftIntegral;
-    if(comp >  PLL_MAX_FREQ_TRIM) comp =  PLL_MAX_FREQ_TRIM;
-    if(comp < -PLL_MAX_FREQ_TRIM) comp = -PLL_MAX_FREQ_TRIM;
-    CLK_COMP_setComp((int32_t) (0x1p32f * comp));
 }
 
 unsigned PLL_status(char *buffer) {
@@ -186,16 +154,6 @@ unsigned PLL_status(char *buffer) {
     tmp[fmtFloat(driftRms * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - rms:   ");
     end = append(end, tmp);
-    end = append(end, " ppm\n");
-
-    tmp[fmtFloat(driftIntegral * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - pll i: ");
-    end = append(end, tmp);
-    end = append(end, " ppm\n");
-
-    tmp[fmtFloat(tcompCurrent * 1e6f, 12, 4, tmp)] = 0;
-    end = append(end, "  - tcomp: ");
-    end = append(end, tmp);
     end = append(end, " ppm\n\n");
 
     end += TCMP_status(end);
@@ -217,6 +175,5 @@ float PLL_driftLast() { return driftLast; }
 float PLL_driftMean() { return driftMean; }
 float PLL_driftRms() { return driftRms; }
 float PLL_driftStdDev() { return driftStdDev; }
-float PLL_driftInt() { return driftIntegral; }
-float PLL_driftTcmp() { return tcompCurrent; }
 float PLL_driftCorr() { return 0x1p-32f * (float) CLK_COMP_getComp(); }
+float PLL_driftFreq() { return driftFreq; }

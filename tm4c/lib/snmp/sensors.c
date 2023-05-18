@@ -32,9 +32,8 @@ static int getPllDriftLast()    { return lroundf(PLL_driftLast() * 1e10f); }
 static int getPllDriftMean()    { return lroundf(PLL_driftMean() * 1e10f); }
 static int getPllDriftRms()     { return lroundf(PLL_driftRms() * 1e10f); }
 static int getPllDriftStdDev()  { return lroundf(PLL_driftStdDev() * 1e10f); }
-static int getPllDriftInt()     { return lroundf(PLL_driftInt() * 1e10f); }
-static int getPllDriftTcmp()    { return lroundf(PLL_driftTcmp() * 1e10f); }
 static int getPllDriftCorr()    { return lroundf(PLL_driftCorr() * 1e10f); }
+static int getPllDriftFreq()    { return lroundf(PLL_driftFreq() * 1e10f); }
 
 
 // SNMP Sensor Registry
@@ -66,9 +65,8 @@ static const struct SnmpSensor {
         { "pll.drift.mean",     "s/s",  OID_SENSOR_TYPE_OTHER,    OID_SENSOR_SCALE_1E_6,  4, getPllDriftMean    },
         { "pll.drift.rms",      "s/s",  OID_SENSOR_TYPE_OTHER,    OID_SENSOR_SCALE_1E_6,  4, getPllDriftRms     },
         { "pll.drift.stddev",   "s/s",  OID_SENSOR_TYPE_OTHER,    OID_SENSOR_SCALE_1E_6,  4, getPllDriftStdDev  },
-        { "pll.drift.int",      "s/s",  OID_SENSOR_TYPE_OTHER,    OID_SENSOR_SCALE_1E_6,  4, getPllDriftInt     },
-        { "pll.drift.tcmp",     "s/s",  OID_SENSOR_TYPE_OTHER,    OID_SENSOR_SCALE_1E_6,  4, getPllDriftTcmp    },
-        { "pll.drift.corr",     "s/s",  OID_SENSOR_TYPE_OTHER,    OID_SENSOR_SCALE_1E_6,  4, getPllDriftCorr    }
+        { "pll.drift.corr",     "s/s",  OID_SENSOR_TYPE_OTHER,    OID_SENSOR_SCALE_1E_6,  4, getPllDriftCorr    },
+        { "pll.drift.freq",     "s/s",  OID_SENSOR_TYPE_OTHER,    OID_SENSOR_SCALE_1E_6,  4, getPllDriftFreq    }
 };
 #define SNMP_SENS_CNT (sizeof(snmpSensors) / sizeof(struct SnmpSensor))
 

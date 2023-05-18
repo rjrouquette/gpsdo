@@ -16,7 +16,6 @@
 #define PLL_OFFSET_CORR_MAX (0.5f) // 0.5 to dampen oscillation
 #define PLL_OFFSET_INT_RATE (0x1p-5f)
 
-#define PLL_DRIFT_INT_RATE (0x1p-8f)
 
 void PLL_init();
 
@@ -55,8 +54,7 @@ float PLL_driftLast();
 float PLL_driftMean();
 float PLL_driftRms();
 float PLL_driftStdDev();
-float PLL_driftInt();
-float PLL_driftTcmp();
 float PLL_driftCorr();
+float PLL_driftFreq();
 
 #endif //GPSDO_PLL_H
