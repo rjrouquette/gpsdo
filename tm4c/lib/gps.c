@@ -43,7 +43,6 @@ static volatile uint32_t taiEpoch;
 static volatile int taiOffset = 37; // as of 2016-12-31
 
 static volatile bool hasNema, hasPvt, hasGpsTime, hasClock;
-static volatile bool txRunning;
 
 static void processNEMA(char *msg, int len);
 
@@ -57,7 +56,6 @@ static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload
 static void configureGPS();
 
 static void runHealth(void *ref);
-static void runTx(void *ref);
 static void runParser(void *ref);
 
 static void startTx();
@@ -148,33 +146,37 @@ static void runHealth(void *ref) {
 }
 
 void ISR_UART3() {
-    // drain UART FIFO (clears interrupt)
-    while (!UART3.FR.RXFE) {
-        rxBuff[rxHead++] = UART3.DR.DATA;
-        rxHead &= GPS_RING_MASK;
+    const uint32_t flags = UART3.MIS.raw;
+
+    // RX FIFO watermark or RX timeout
+    if(flags & 0x50) {
+        // drain UART FIFO (clears interrupt)
+        while (!UART3.FR.RXFE) {
+            rxBuff[rxHead++] = UART3.DR.DATA;
+            rxHead &= GPS_RING_MASK;
+        }
+    }
+
+    // TX FIFO watermark
+    if(flags & 0x20) {
+        // fill UART FIFO
+        while ((!UART3.FR.TXFF) && (txTail != txHead)) {
+            UART3.DR.DATA = txBuff[txTail++];
+            txTail &= GPS_RING_MASK;
+        }
+        // explicitly clear flag
+        UART3.ICR.TX = 1;
     }
 }
 
-static void runTx(void *ref) {
+static void startTx() {
+    UART3.IM.TX = 0;
     // fill UART FIFO
     while ((!UART3.FR.TXFF) && (txTail != txHead)) {
         UART3.DR.DATA = txBuff[txTail++];
         txTail &= GPS_RING_MASK;
     }
-
-    // shutdown thread if there is no more data
-    if(txHead == txTail) {
-        runCancel(runTx, NULL);
-        txRunning = false;
-    }
-}
-
-static void startTx() {
-    // start thread if there is pending data
-    if(!txRunning) {
-        runSleep(INTV_TX_POLL, runTx, NULL);
-        txRunning = true;
-    }
+    UART3.IM.TX = 1;
 }
 
 static void runParser(void *ref) {
