@@ -223,31 +223,6 @@ static const char typeCode[5] = {
         '-', 'S', 'P', 'O'
 };
 
-static char * writeNode(char *ptr, float scale, uint32_t *totalTicks, QueueNode *node) {
-    int i = node - queuePool;
-
-    uint32_t ticks = node->task.ticks - prevTicks[i];
-    prevTicks[i] += ticks;
-
-    uint32_t hits = node->task.hits - prevHits[i];
-    prevHits[i] += hits;
-
-    *totalTicks += ticks;
-
-    *(ptr++) = typeCode[node->task.type];
-    *(ptr++) = ' ';
-    ptr += toHex((uint32_t) node->task.run, 6, '0', ptr);
-    *(ptr++) = ' ';
-    ptr += toHex((uint32_t) node->task.ref, 8, '0', ptr);
-    *(ptr++) = ' ';
-    ptr += fmtFloat(scale * (float) hits, 8, 0, ptr);
-    *(ptr++) = ' ';
-    ptr += fmtFloat(scale * 0.008f * (float) ticks, 8, 0, ptr);
-    *(ptr++) = '\n';
-
-    return ptr;
-}
-
 unsigned runStatus(char *buffer) {
     char *end = buffer;
     uint32_t elapsed = CLK_MONO_RAW - prevQuery;
