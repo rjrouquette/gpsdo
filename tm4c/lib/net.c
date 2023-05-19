@@ -226,16 +226,14 @@ static void runRx(void *ref) {
         if (pRxDesc->RDES0.OWN) break;
         // process frame if there was no error
         if (!pRxDesc->RDES0.ES) {
-            // get frame buffer and frame length
-            uint8_t *frame = (uint8_t *) pRxDesc->BUFF1;
-            int flen = pRxDesc->RDES0.FL;
             // extract ether type
+            uint8_t *frame = (uint8_t *) pRxDesc->BUFF1;
             uint16_t ethType = ((HEADER_ETH *) frame)->ethType;
             // dispatch frame processor
             if (ethType == ETHTYPE_ARP)
-                ARP_process(frame, flen);
+                ARP_process(frame, pRxDesc->RDES0.FL);
             else if (ethType == ETHTYPE_IPv4)
-                IPv4_process(frame, flen);
+                IPv4_process(frame, pRxDesc->RDES0.FL);
         }
         // restore ownership to DMA
         pRxDesc->RDES0.OWN = 1;
