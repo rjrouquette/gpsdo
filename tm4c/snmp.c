@@ -40,16 +40,16 @@ void SNMP_init() {
 
 void SNMP_process(uint8_t *frame, int flen) {
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
     uint8_t *dataSNMP = (uint8_t *) (headerUDP + 1);
-    int dlen = flen - (int) sizeof(struct FRAME_ETH);
-    dlen -= sizeof(struct HEADER_IPv4);
-    dlen -= sizeof(struct HEADER_UDP);
+    int dlen = flen - (int) sizeof(HEADER_ETH);
+    dlen -= sizeof(HEADER_IP4);
+    dlen -= sizeof(HEADER_UDP);
 
     // verify destination
-    if(headerIPv4->dst != ipAddress) return;
+    if(headerIP4->dst != ipAddress) return;
     // status activity
     LED_act1();
 
@@ -218,15 +218,15 @@ int readOID(const uint8_t *data, int offset, int dlen, void *result, int *rlen) 
 
 void sendResults(uint8_t *frame, uint8_t *data, int dlen) {
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
 
     // modify ethernet frame header
     copyMAC(headerEth->macDst, headerEth->macSrc);
     // modify IP header
-    headerIPv4->dst = headerIPv4->src;
-    headerIPv4->src = ipAddress;
+    headerIP4->dst = headerIP4->src;
+    headerIP4->src = ipAddress;
     // modify UDP header
     headerUDP->portDst = headerUDP->portSrc;
     headerUDP->portSrc = __builtin_bswap16(SNMP_PORT);

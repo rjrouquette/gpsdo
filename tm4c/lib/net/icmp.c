@@ -13,12 +13,12 @@ static void sendPingResponse(uint8_t *frame, int flen);
 
 void ICMP_process(uint8_t *frame, int flen) {
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_ICMPv4 *headerICMP = (struct HEADER_ICMPv4 *) (headerIPv4 + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_ICMP4 *headerICMP = (HEADER_ICMP4 *) (headerIP4 + 1);
 
     // verify destination
-    if(headerIPv4->dst != ipAddress) return;
+    if(headerIP4->dst != ipAddress) return;
 
     switch (headerICMP->type) {
         // echo request
@@ -31,9 +31,9 @@ void ICMP_process(uint8_t *frame, int flen) {
 
 static void sendPingResponse(uint8_t *frame, int flen) {
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_ICMPv4 *headerICMP = (struct HEADER_ICMPv4 *) (headerIPv4 + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_ICMP4 *headerICMP = (HEADER_ICMP4 *) (headerIP4 + 1);
 
     // change type to echo response
     headerICMP->type = 0;
@@ -43,8 +43,8 @@ static void sendPingResponse(uint8_t *frame, int flen) {
     headerICMP->chksum[0] += 0x08;
 
     // modify IP header
-    headerIPv4->dst = headerIPv4->src;
-    headerIPv4->src = ipAddress;
+    headerIP4->dst = headerIP4->src;
+    headerIP4->src = ipAddress;
     IPv4_finalize(frame, flen);
 
     // modify ethernet frame header

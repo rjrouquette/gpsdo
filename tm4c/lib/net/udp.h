@@ -11,12 +11,12 @@
 #define PACKED __attribute__((packed))
 #endif
 
-struct PACKED HEADER_UDP {
+typedef struct PACKED HEADER_UDP {
     uint16_t portSrc;
     uint16_t portDst;
     uint16_t length;
     uint16_t chksum;
-};
+} HEADER_UDP;
 _Static_assert(sizeof(struct HEADER_UDP) == 8, "HEADER_UDP must be 8 bytes");
 
 #define UDP_DATA_OFFSET (14+20+8)

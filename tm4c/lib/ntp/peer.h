@@ -38,13 +38,13 @@ struct NtpPeer {
     // remote mac address
     const uint8_t macAddr[6];
 };
-typedef volatile struct NtpPeer NtpPeer;
+typedef struct NtpPeer NtpPeer;
 
 /**
  * Initialize peer structure
  * @param pObj pointer to peer structure
  */
-void NtpPeer_init(volatile void *pObj);
+void NtpPeer_init(void *pObj);
 
 /**
  * Process received frame for peer
@@ -52,6 +52,6 @@ void NtpPeer_init(volatile void *pObj);
  * @param frame pointer to received frame
  * @param flen length of received frame
  */
-void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen);
+void NtpPeer_recv(void *pObj, uint8_t *frame, int flen);
 
 #endif //GPSDO_PEER_H

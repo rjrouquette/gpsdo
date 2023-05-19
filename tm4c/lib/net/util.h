@@ -7,13 +7,13 @@
 
 #include <stdint.h>
 
-void getMAC(volatile void *mac);
-void broadcastMAC(volatile void *mac);
+void getMAC(void *mac);
+void broadcastMAC(void *mac);
 
-int isNullMAC(const volatile void *mac);
-void copyMAC(volatile void *dst, volatile const void *src);
+int isNullMAC(const void *mac);
+void copyMAC(void *dst, const void *src);
 
 char* addrToStr(uint32_t addr, char *str);
-char* macToStr(const volatile uint8_t *mac, volatile char *str);
+char* macToStr(const uint8_t *mac, char *str);
 
 #endif //GPSDO_UTIL_H

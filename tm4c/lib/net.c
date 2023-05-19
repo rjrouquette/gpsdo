@@ -43,13 +43,13 @@ static volatile int ptrTX = 0;
 static volatile int endTX = 0;
 static volatile int phyStatus = 0;
 
-static volatile struct EMAC_RX_DESC rxDesc[RX_RING_SIZE];
-static volatile uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
+static EMAC_RX_DESC rxDesc[RX_RING_SIZE];
+static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 
 static volatile bool txRunning;
-static volatile struct { CallbackNetTX call; void *ref; } txCallback[TX_RING_SIZE];
-static volatile struct EMAC_TX_DESC txDesc[TX_RING_SIZE];
-static volatile uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
+static struct { CallbackNetTX call; void *ref; } txCallback[TX_RING_SIZE];
+static EMAC_TX_DESC txDesc[TX_RING_SIZE];
+static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
 static void initDescriptors() {
     // init receive descriptors
@@ -217,19 +217,25 @@ void ISR_EthernetMAC(void) {
     }
 }
 
+__attribute__((optimize(3)))
 static void runRx(void *ref) {
     // check for completed receptions
     for(;;) {
-        volatile struct EMAC_RX_DESC *pRxDesc = rxDesc + ptrRX;
+        EMAC_RX_DESC *pRxDesc = rxDesc + ptrRX;
         // test for ownership
         if (pRxDesc->RDES0.OWN) break;
         // process frame if there was no error
         if (!pRxDesc->RDES0.ES) {
-            uint8_t *buffer = (uint8_t *) pRxDesc->BUFF1;
-            if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_ARP)
-                ARP_process(buffer, pRxDesc->RDES0.FL);
-            else if (((struct FRAME_ETH *) buffer)->ethType == ETHTYPE_IPv4)
-                IPv4_process(buffer, pRxDesc->RDES0.FL);
+            // get frame buffer and frame length
+            uint8_t *frame = (uint8_t *) pRxDesc->BUFF1;
+            int flen = pRxDesc->RDES0.FL;
+            // extract ether type
+            uint16_t ethType = ((HEADER_ETH *) frame)->ethType;
+            // dispatch frame processor
+            if (ethType == ETHTYPE_ARP)
+                ARP_process(frame, flen);
+            else if (ethType == ETHTYPE_IPv4)
+                IPv4_process(frame, flen);
         }
         // restore ownership to DMA
         pRxDesc->RDES0.OWN = 1;
@@ -238,6 +244,7 @@ static void runRx(void *ref) {
     }
 }
 
+__attribute__((optimize(3)))
 static void runTx(void *ref) {
     // check for completed transmissions
     const int ptr = ptrTX;

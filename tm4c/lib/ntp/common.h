@@ -26,7 +26,7 @@
 
 #define NTP_UTC_OFFSET (0x83AA7E8000000000ull)
 
-struct PACKED HEADER_NTPv4 {
+typedef struct PACKED HEADER_NTP {
         uint16_t mode: 3;
         uint16_t version: 3;
         uint16_t status: 2;
@@ -40,8 +40,8 @@ struct PACKED HEADER_NTPv4 {
         uint64_t origTime;
         uint64_t rxTime;
         uint64_t txTime;
-};
-_Static_assert(sizeof(struct HEADER_NTPv4) == 48, "HEADER_NTPv4 must be 48 bytes");
+} HEADER_NTP;
+_Static_assert(sizeof(struct HEADER_NTP) == 48, "HEADER_NTP4 must be 48 bytes");
 
 
 #endif //GPSDO_NTP_COMMON_H

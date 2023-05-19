@@ -15,7 +15,7 @@
 #define IP_PROTO_TCP    (6)
 #define IP_PROTO_UDP    (17)
 
-struct PACKED HEADER_IPv4 {
+typedef struct PACKED HEADER_IP4 {
     union PACKED {
         struct PACKED {
             unsigned IHL: 4;
@@ -34,8 +34,8 @@ struct PACKED HEADER_IPv4 {
     uint16_t chksum;
     uint32_t src;
     uint32_t dst;
-};
-_Static_assert(sizeof(struct HEADER_IPv4) == 20, "HEADER_IPv4 must be 20 bytes");
+} HEADER_IP4;
+_Static_assert(sizeof(struct HEADER_IP4) == 20, "HEADER_IP4 must be 20 bytes");
 
 extern volatile uint32_t ipBroadcast;
 extern volatile uint32_t ipAddress;

@@ -18,7 +18,7 @@
 #define DHCP_MAGIC (0x63538263)
 #define REATTEMPT_INTVL (10)
 
-struct PACKED HEADER_DHCP {
+typedef struct PACKED HEADER_DHCP {
     uint8_t OP;
     uint8_t HTYPE;
     uint8_t HLEN;
@@ -34,7 +34,7 @@ struct PACKED HEADER_DHCP {
     uint8_t SNAME[64];
     uint8_t FILE[128];
     uint32_t MAGIC;
-};
+} HEADER_DHCP;
 _Static_assert(sizeof(struct HEADER_DHCP) == 240, "HEADER_DHCP must be 240 bytes");
 
 static uint32_t dhcpUUID;
@@ -53,7 +53,7 @@ static uint32_t ntpAddr[8];
 static int ntpLen;
 
 static void processFrame(uint8_t *frame, int flen);
-static void sendReply(struct HEADER_DHCP *response);
+static void sendReply(HEADER_DHCP *response);
 
 __attribute__((always_inline))
 static inline void pad_opts(uint8_t *frame, int *flen) {
@@ -61,16 +61,16 @@ static inline void pad_opts(uint8_t *frame, int *flen) {
 }
 
 static void initPacket(void *frame) {
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_DHCP *headerDHCP = (struct HEADER_DHCP *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    HEADER_DHCP *headerDHCP = (HEADER_DHCP *) (headerUDP + 1);
 
     // clear frame buffer
-    memset(headerEth, 0, sizeof(struct FRAME_ETH));
-    memset(headerIPv4, 0, sizeof(struct HEADER_IPv4));
-    memset(headerUDP, 0, sizeof(struct HEADER_UDP));
-    memset(headerDHCP, 0, sizeof(struct HEADER_DHCP));
+    memset(headerEth, 0, sizeof(HEADER_ETH));
+    memset(headerIP4, 0, sizeof(HEADER_IP4));
+    memset(headerUDP, 0, sizeof(HEADER_UDP));
+    memset(headerDHCP, 0, sizeof(HEADER_DHCP));
 
     // broadcast MAC address
     broadcastMAC(headerEth->macDst);
@@ -78,8 +78,8 @@ static void initPacket(void *frame) {
     headerEth->ethType = ETHTYPE_IPv4;
     // IPv4 Header
     IPv4_init(frame);
-    headerIPv4->dst = 0xFFFFFFFF;
-    headerIPv4->proto = IP_PROTO_UDP;
+    headerIP4->dst = 0xFFFFFFFF;
+    headerIP4->proto = IP_PROTO_UDP;
     // UDP Header
     headerUDP->portSrc = __builtin_bswap16(DHCP_PORT_CLI);
     headerUDP->portDst = __builtin_bswap16(DHCP_PORT_SRV);
@@ -135,15 +135,15 @@ void DHCP_renew() {
     // initialize frame
     uint8_t *frame = NET_getTxBuff(txDesc);
     initPacket(frame);
-    int flen = sizeof(struct FRAME_ETH);
-    flen += sizeof(struct HEADER_IPv4);
-    flen += sizeof(struct HEADER_UDP);
-    flen += sizeof(struct HEADER_DHCP);
+    int flen = sizeof(HEADER_ETH);
+    flen += sizeof(HEADER_IP4);
+    flen += sizeof(HEADER_UDP);
+    flen += sizeof(HEADER_DHCP);
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_DHCP *headerDHCP = (struct HEADER_DHCP *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    HEADER_DHCP *headerDHCP = (HEADER_DHCP *) (headerUDP + 1);
 
     if(ipAddress == 0) {
         // acquire a new lease
@@ -164,7 +164,7 @@ void DHCP_renew() {
         pad_opts(frame, &flen);
     } else {
         // renew existing lease
-        headerIPv4->src = ipAddress;
+        headerIP4->src = ipAddress;
         headerDHCP->CIADDR = ipAddress;
         // DHCPREQUEST
         memcpy(frame + flen, DHCP_OPT_REQUEST, sizeof(DHCP_OPT_REQUEST));
@@ -191,10 +191,10 @@ static void processFrame(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < 282) return;
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_DHCP *headerDHCP = (struct HEADER_DHCP *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    HEADER_DHCP *headerDHCP = (HEADER_DHCP *) (headerUDP + 1);
     // discard if not from a server
     if(headerUDP->portSrc != __builtin_bswap16(DHCP_PORT_SRV))
         return;
@@ -333,22 +333,22 @@ static void processFrame(uint8_t *frame, int flen) {
     }
 }
 
-static void sendReply(struct HEADER_DHCP *response) {
+static void sendReply(HEADER_DHCP *response) {
     // get TX descriptor
     int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
     // initialize frame
     uint8_t *frame = NET_getTxBuff(txDesc);
     initPacket(frame);
-    int flen = sizeof(struct FRAME_ETH);
-    flen += sizeof(struct HEADER_IPv4);
-    flen += sizeof(struct HEADER_UDP);
-    flen += sizeof(struct HEADER_DHCP);
+    int flen = sizeof(HEADER_ETH);
+    flen += sizeof(HEADER_IP4);
+    flen += sizeof(HEADER_UDP);
+    flen += sizeof(HEADER_DHCP);
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_DHCP *headerDHCP = (struct HEADER_DHCP *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    HEADER_DHCP *headerDHCP = (HEADER_DHCP *) (headerUDP + 1);
     // request proposed lease
     headerDHCP->CIADDR = response->YIADDR;
     headerDHCP->SIADDR = response->SIADDR;

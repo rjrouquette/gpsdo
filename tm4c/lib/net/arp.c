@@ -15,17 +15,18 @@
 #define MAX_REQUESTS (16)
 #define REQUEST_EXPIRE (5) //  5 seconds
 
-volatile struct ArpRequest {
+typedef struct ArpRequest {
     uint32_t expire;
     uint32_t remoteAddress;
     CallbackARP callback;
     void *ref;
-} requests[MAX_REQUESTS];
+} ArpRequest;
+ArpRequest requests[MAX_REQUESTS];
 
-volatile uint8_t macRouter[6];
+uint8_t macRouter[6];
 
-static volatile uint32_t nextAnnounce = 0;
-static volatile uint32_t lastRouterPoll = 0;
+static uint32_t nextAnnounce = 0;
+static uint32_t lastRouterPoll = 0;
 
 
 static void arpRouter(void *ref, uint32_t remoteAddress, uint8_t *macAddress) {
@@ -44,13 +45,13 @@ void ARP_refreshRouter() {
 void makeArpIp4(
         void *packet,
         const uint16_t op,
-        const volatile void *macTrg,
-        const volatile uint32_t ipTrg
+        const void *macTrg,
+        const uint32_t ipTrg
 ) {
     bzero(packet, ARP_FRAME_LEN);
 
-    struct FRAME_ETH *header = (struct FRAME_ETH *) packet;
-    struct PAYLOAD_ARP_IP4 *payload = (struct PAYLOAD_ARP_IP4 *) (header + 1);
+    HEADER_ETH *header = (HEADER_ETH *) packet;
+    ARP_IP4 *payload = (ARP_IP4 *) (header + 1);
 
     // ARP frame type
     header->ethType = ETHTYPE_ARP;
@@ -79,7 +80,7 @@ static void arpAnnounce() {
             packetTX, ARP_OP_REQUEST,
             wildCard, ipAddress
     );
-    broadcastMAC(((struct FRAME_ETH *)packetTX)->macDst);
+    broadcastMAC(((HEADER_ETH *)packetTX)->macDst);
     // transmit frame
     NET_transmit(txDesc, ARP_FRAME_LEN);
 }
@@ -88,7 +89,7 @@ static void arpRun() {
     // process request expiration
     const uint32_t now = CLK_MONO_INT();
     for(int i = 0; i < MAX_REQUESTS; i++) {
-        volatile struct ArpRequest *request = requests + i;
+        ArpRequest *request = requests + i;
         // skip empty slots
         if(request->remoteAddress == 0) continue;
         // skip fresh requests
@@ -96,7 +97,7 @@ static void arpRun() {
         // report expiration
         uint8_t nullMac[6] = {0,0,0,0,0,0};
         (*(request->callback))(request->ref, request->remoteAddress, nullMac);
-        bzero((void *) request, sizeof(struct ArpRequest));
+        bzero(request, sizeof(ArpRequest));
     }
 
     // link must be up to send packets
@@ -123,8 +124,8 @@ void ARP_process(uint8_t *frame, int flen) {
     // reject if packet is incorrect size
     if(flen != ARP_FRAME_LEN) return;
     // map header and payload
-    struct FRAME_ETH *header = (struct FRAME_ETH *) frame;
-    struct PAYLOAD_ARP_IP4 *payload = (struct PAYLOAD_ARP_IP4 *) (header + 1);
+    HEADER_ETH *header = (HEADER_ETH *) frame;
+    ARP_IP4 *payload = (ARP_IP4 *) (header + 1);
     // verify payload fields
     if(payload->HTYPE != 0x0100) return;
     if(payload->PTYPE != ETHTYPE_IPv4) return;
@@ -142,7 +143,7 @@ void ARP_process(uint8_t *frame, int flen) {
                             packetTX, ARP_OP_REPLY,
                             payload->SHA, payload->SPA
                     );
-                    copyMAC(((struct FRAME_ETH *)packetTX)->macDst, header->macSrc);
+                    copyMAC(((HEADER_ETH *)packetTX)->macDst, header->macSrc);
                     NET_transmit(txDesc, ARP_FRAME_LEN);
                 }
             }
@@ -154,14 +155,14 @@ void ARP_process(uint8_t *frame, int flen) {
             for(int i = 0; i < MAX_REQUESTS; i++) {
                 if(requests[i].remoteAddress == payload->SPA) {
                     (*requests[i].callback)(requests[i].ref, requests[i].remoteAddress, payload->SHA);
-                    bzero((void *) (requests + i), sizeof(struct ArpRequest));
+                    bzero((void *) (requests + i), sizeof(ArpRequest));
                 }
             }
         }
     }
 }
 
-int ARP_request(uint32_t remoteAddress, CallbackARP callback, volatile void *ref) {
+int ARP_request(uint32_t remoteAddress, CallbackARP callback, void *ref) {
     uint32_t now = CLK_MONO_INT();
     for(int i = 0; i < MAX_REQUESTS; i++) {
         // look for empty slot
@@ -177,10 +178,10 @@ int ARP_request(uint32_t remoteAddress, CallbackARP callback, volatile void *ref
                 packetTX, ARP_OP_REQUEST,
                 wildCard, remoteAddress
         );
-        broadcastMAC(((struct FRAME_ETH *)packetTX)->macDst);
+        broadcastMAC(((HEADER_ETH *)packetTX)->macDst);
         // register callback
         requests[i].callback = callback;
-        requests[i].ref = (void *) ref;
+        requests[i].ref = ref;
         requests[i].remoteAddress = remoteAddress;
         requests[i].expire = now + REQUEST_EXPIRE;
         // transmit frame

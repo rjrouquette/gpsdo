@@ -26,9 +26,9 @@
 
 #define ADV_RING(ptr) ((ptr) = ((ptr) + 1) & GPS_RING_MASK)
 
-static volatile uint8_t rxBuff[GPS_RING_SIZE];
-static volatile uint8_t txBuff[GPS_RING_SIZE];
-static volatile uint8_t msgBuff[256];
+static uint8_t rxBuff[GPS_RING_SIZE];
+static uint8_t txBuff[GPS_RING_SIZE];
+static uint8_t msgBuff[256];
 static volatile int rxHead, rxTail;
 static volatile int txHead, txTail;
 static volatile int lenNEMA, lenUBX;

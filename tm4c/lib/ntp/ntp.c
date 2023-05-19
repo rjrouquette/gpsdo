@@ -40,8 +40,8 @@ static NtpSource* ntpAllocPeer();
 // deallocate peer
 static void ntpRemovePeer(NtpSource *peer);
 
-static NtpSource * volatile sources[MAX_NTP_SRCS];
-static NtpSource * volatile selectedSource = NULL;
+static NtpSource * sources[MAX_NTP_SRCS];
+static NtpSource * selectedSource = NULL;
 static volatile uint32_t cntSources = 0;
 static volatile uint64_t lastUpdate = 0;
 
@@ -101,7 +101,7 @@ void NTP_init() {
     NtpGPS_init(&srcGps);
     sources[cntSources++] = (void *) &srcGps;
     // 16 Hz polling rate for sources
-    runSleep(SRC_UPDT_INTV, (SchedulerCallback) srcGps.source.run, (void *) &srcGps);
+    runSleep(SRC_UPDT_INTV, (SchedulerCallback) srcGps.source.run, &srcGps);
 
     // update source selection at 16 Hz
     runSleep(SRC_UPDT_INTV, runSelect, NULL);
@@ -115,10 +115,10 @@ uint32_t NTP_refId() {
 
 static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    HEADER_NTP *headerNTP = (HEADER_NTP *) (headerUDP + 1);
 
     // retrieve hardware transmit time
     uint64_t stamps[3];
@@ -126,7 +126,7 @@ static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
     const uint64_t txTime = (stamps[2] - clkTaiUtcOffset) + NTP_UTC_OFFSET;
 
     // record hardware transmit time
-    uint32_t cell = hashXleave(headerIPv4->dst);
+    uint32_t cell = hashXleave(headerIP4->dst);
     tsXleave[cell].rxTime = headerNTP->rxTime;
     tsXleave[cell].txTime = __builtin_bswap64(txTime);
 }
@@ -136,15 +136,15 @@ static void ntpRequest(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < NTP4_SIZE) return;
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    HEADER_NTP *headerNTP = (HEADER_NTP *) (headerUDP + 1);
 
     // verify destination
-    if(headerIPv4->dst != ipAddress) return;
+    if(headerIP4->dst != ipAddress) return;
     // prevent loopback
-    if(headerIPv4->src == ipAddress) return;
+    if(headerIP4->src == ipAddress) return;
     // filter non-client frames
     if(headerNTP->mode != NTP_MODE_CLI) return;
     // indicate time-server activity
@@ -170,10 +170,10 @@ static void ntpRequest(uint8_t *frame, int flen) {
     UDP_returnToSender(frame, ipAddress, NTP_PORT_SRV);
 
     // remap headers
-    headerEth = (struct FRAME_ETH *) frame;
-    headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+    headerEth = (HEADER_ETH *) frame;
+    headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    headerNTP = (HEADER_NTP *) (headerUDP + 1);
 
     // check for interleaved request
     int xleave = -1;
@@ -183,7 +183,7 @@ static void ntpRequest(uint8_t *frame, int flen) {
             headerNTP->rxTime != headerNTP->txTime
             ) {
         // load TX timestamp if available
-        int cell = hashXleave(headerIPv4->dst);
+        int cell = hashXleave(headerIP4->dst);
         if(orgTime == tsXleave[cell].rxTime)
             xleave = cell;
     }
@@ -225,24 +225,24 @@ static void ntpResponse(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < NTP4_SIZE) return;
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    HEADER_NTP *headerNTP = (HEADER_NTP *) (headerUDP + 1);
 
     // verify destination
-    if(headerIPv4->dst != ipAddress) return;
+    if(headerIP4->dst != ipAddress) return;
     // prevent loopback
-    if(headerIPv4->src == ipAddress) return;
+    if(headerIP4->src == ipAddress) return;
     // filter non-server frames
     if(headerNTP->mode != NTP_MODE_SRV) return;
     // filter invalid frames
     if(headerNTP->origTime == 0) return;
 
     // locate recipient
-    uint32_t srcAddr = headerIPv4->src;
+    uint32_t srcAddr = headerIP4->src;
     for(uint32_t i = 0; i < cntSources; i++) {
-        volatile struct NtpSource *source = sources[i];
+        NtpSource *source = sources[i];
 
         // check for matching peer
         if(source == NULL) return;
@@ -312,18 +312,18 @@ static void runSelect(void *ref) {
     PLL_updateDrift(source->poll, source->freqDrift);
 }
 
-volatile static struct NtpSource* ntpAllocPeer() {
+static NtpSource* ntpAllocPeer() {
     for(int i = 0; i < MAX_NTP_PEERS; i++) {
         NtpPeer *slot = peerSlots + i;
         if(slot->source.id == 0) {
             // initialize peer record
             (*(slot->source.init))(slot);
             // append to source list
-            sources[cntSources++] = (struct NtpSource *) slot;
+            sources[cntSources++] = (NtpSource *) slot;
             // schedule source updates
             runSleep(SRC_UPDT_INTV, (SchedulerCallback) slot->source.run, (void *) slot);
             // return instance
-            return (struct NtpSource *) slot;
+            return (NtpSource *) slot;
         }
     }
     return NULL;
@@ -460,9 +460,9 @@ static void chronycRequest(uint8_t *frame, int flen) {
     if(flen > (UDP_DATA_OFFSET + REQ_MAX_LEN)) return;
 
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
     CMD_Request *cmdRequest = (CMD_Request *) (headerUDP + 1);
 
     // drop invalid packets
@@ -486,9 +486,9 @@ static void chronycRequest(uint8_t *frame, int flen) {
     UDP_returnToSender(resp, ipAddress, DEFAULT_CANDM_PORT);
 
     // remap headers
-    headerEth = (struct FRAME_ETH *) resp;
-    headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    headerEth = (HEADER_ETH *) resp;
+    headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    headerUDP = (HEADER_UDP *) (headerIP4 + 1);
     CMD_Reply *cmdReply = (CMD_Reply *) (headerUDP + 1);
 
     // begin response

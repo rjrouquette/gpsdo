@@ -82,10 +82,10 @@ static void sendPoll(NtpPeer *this) {
     memset(frame, 0, NTP4_SIZE);
 
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    HEADER_NTP *headerNTP = (HEADER_NTP *) (headerUDP + 1);
 
     // EtherType = IPv4
     headerEth->ethType = ETHTYPE_IPv4;
@@ -94,9 +94,9 @@ static void sendPoll(NtpPeer *this) {
 
     // IPv4 Header
     IPv4_init(frame);
-    headerIPv4->dst = this->source.id;
-    headerIPv4->src = ipAddress;
-    headerIPv4->proto = IP_PROTO_UDP;
+    headerIP4->dst = this->source.id;
+    headerIP4->src = ipAddress;
+    headerIP4->proto = IP_PROTO_UDP;
 
     // UDP Header
     headerUDP->portSrc = __builtin_bswap16(NTP_PORT_CLI);
@@ -251,7 +251,7 @@ static void finishPoll(NtpPeer *this) {
 }
 
 
-static void run(volatile void *pObj) {
+static void NtpPeer_run(void *pObj) {
     // typecast "this" pointer
     NtpPeer *this = (NtpPeer *) pObj;
 
@@ -271,7 +271,7 @@ static void run(volatile void *pObj) {
         runPoll(this);
 }
 
-void NtpPeer_init(volatile void *pObj) {
+void NtpPeer_init(void *pObj) {
     // clear structure contents
     memset((void *) pObj, 0, sizeof(struct NtpPeer));
 
@@ -279,7 +279,7 @@ void NtpPeer_init(volatile void *pObj) {
     NtpPeer *this = (NtpPeer *) pObj;
     // set virtual functions
     this->source.init = NtpPeer_init;
-    this->source.run = run;
+    this->source.run = NtpPeer_run;
     // set mode and state
     this->source.lost = true;
     this->source.mode = RPY_SD_MD_CLIENT;
@@ -291,16 +291,16 @@ void NtpPeer_init(volatile void *pObj) {
     this->pollNext = CLK_MONO();
 }
 
-void NtpPeer_recv(volatile void *pObj, uint8_t *frame, int flen) {
+void NtpPeer_recv(void *pObj, uint8_t *frame, int flen) {
     // typecast "this" pointer
     NtpPeer *this = (NtpPeer *) pObj;
     ++this->source.rxCount;
 
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_NTPv4 *headerNTP = (struct HEADER_NTPv4 *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    HEADER_NTP *headerNTP = (HEADER_NTP *) (headerUDP + 1);
 
     // check for interleaved response
     if(this->pollXleave) {

@@ -13,12 +13,12 @@ struct NtpGPS {
     uint64_t lastPoll;
     uint64_t lastPps;
 };
-typedef volatile struct NtpGPS NtpGPS;
+typedef struct NtpGPS NtpGPS;
 
 /**
  * Initialize GPS structure
  * @param pObj pointer to GPS structure
  */
-void NtpGPS_init(volatile void *pObj);
+void NtpGPS_init(void *pObj);
 
 #endif //GPSDO_REF_H

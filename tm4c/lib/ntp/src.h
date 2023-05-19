@@ -18,11 +18,11 @@ struct NtpPollSample {
     uint32_t taiSkew;
     uint64_t comp;
 };
-typedef volatile struct NtpPollSample NtpPollSample;
+typedef struct NtpPollSample NtpPollSample;
 
 struct NtpSource {
-    void (*init)(volatile void *);
-    void (*run)(volatile void *);
+    void (*init)(void *);
+    void (*run)(void *);
 
     // filter samples
     struct NtpPollSample pollSample[NTP_MAX_HISTORY];
@@ -78,7 +78,7 @@ struct NtpSource {
     bool lost;
     bool unstable;
 };
-typedef volatile struct NtpSource NtpSource;
+typedef struct NtpSource NtpSource;
 
 /**
  * Advance source sample pointer

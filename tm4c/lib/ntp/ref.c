@@ -21,7 +21,7 @@ static void NtpGPS_updateStatus(NtpGPS *this) {
         this->source.lost = false;
 }
 
-static void NtpGPS_run(volatile void *pObj) {
+static void NtpGPS_run(void *pObj) {
     NtpGPS *this = (struct NtpGPS *) pObj;
 
     // get pps timestamps
@@ -82,7 +82,7 @@ static void NtpGPS_run(volatile void *pObj) {
     NtpGPS_updateStatus(this);
 }
 
-void NtpGPS_init(volatile void *pObj) {
+void NtpGPS_init(void *pObj) {
     // clear structure contents
     memset((void *) pObj, 0, sizeof(struct NtpGPS));
 

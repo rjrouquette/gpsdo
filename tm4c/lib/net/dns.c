@@ -19,7 +19,7 @@
 #define MAX_REQUESTS (16)
 #define REQUEST_EXPIRE (5)
 
-struct PACKED HEADER_DNS {
+typedef struct PACKED HEADER_DNS {
     uint16_t id;
     uint16_t rd:1;
     uint16_t tc:1;
@@ -33,10 +33,10 @@ struct PACKED HEADER_DNS {
     uint16_t ancount;
     uint16_t nscount;
     uint16_t arcount;
-};
+} HEADER_DNS;
 _Static_assert(sizeof(struct HEADER_DNS) == 12, "HEADER_DNS must be 12 bytes");
 
-static volatile struct {
+static struct {
     uint32_t expire;
     uint32_t requestId;
     CallbackDNS callback;
@@ -112,12 +112,12 @@ static void processFrame(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < DNS_HEAD_SIZE) return;
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_DNS *headerDNS = (struct HEADER_DNS *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    HEADER_DNS *headerDNS = (HEADER_DNS *) (headerUDP + 1);
     // verify destination
-    if(headerIPv4->dst != ipAddress) return;
+    if(headerIP4->dst != ipAddress) return;
 
     // must be a query response
     if(headerDNS->qr != 1) return;
@@ -176,8 +176,7 @@ static void processFrame(uint8_t *frame, int flen) {
         if(next >= end) return;
         uint16_t atype = __builtin_bswap16(*(uint16_t *)next); next += 2;
         uint16_t aclass = __builtin_bswap16(*(uint16_t *)next); next += 2;
-        // uint32_t ttl = __builtin_bswap32(*(uint32_t *)next); next += 4;
-        next += 4;
+        next += 4; // skip TTL field
         uint16_t length = __builtin_bswap16(*(uint16_t *)next); next += 2;
         // guard against malformed packets
         if(next >= end) return;
@@ -203,10 +202,10 @@ static void sendRequest(const char *hostname, uint16_t requestId) {
     memset(frame, 0, DNS_HEAD_SIZE);
 
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct HEADER_DNS *headerDNS = (struct HEADER_DNS *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    HEADER_DNS *headerDNS = (HEADER_DNS *) (headerUDP + 1);
 
     // EtherType = IPv4
     headerEth->ethType = ETHTYPE_IPv4;
@@ -215,9 +214,9 @@ static void sendRequest(const char *hostname, uint16_t requestId) {
 
     // IPv4 Header
     IPv4_init(frame);
-    headerIPv4->dst = ipDNS;
-    headerIPv4->src = ipAddress;
-    headerIPv4->proto = IP_PROTO_UDP;
+    headerIP4->dst = ipDNS;
+    headerIP4->src = ipAddress;
+    headerIP4->proto = IP_PROTO_UDP;
 
     // UDP Header
     headerUDP->portSrc = __builtin_bswap16(DNS_CLIENT_PORT);

@@ -14,8 +14,8 @@ static volatile CallbackUDP registryCallback[MAX_ENTRIES];
 
 void UDP_process(uint8_t *frame, int flen) {
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
+    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
 
     // load port number
@@ -33,12 +33,12 @@ void UDP_process(uint8_t *frame, int flen) {
 }
 
 void UDP_finalize(uint8_t *frame, int flen) {
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct FRAME_ETH));
+    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (frame + sizeof(struct HEADER_ETH));
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
 
     // compute UDP length
-    flen -= sizeof(struct FRAME_ETH);
-    flen -= sizeof(struct HEADER_IPv4);
+    flen -= sizeof(struct HEADER_ETH);
+    flen -= sizeof(struct HEADER_IP4);
     // set UDP length
     headerUDP->length = __builtin_bswap16(flen);
     // clear checksum field
@@ -75,8 +75,8 @@ void UDP_finalize(uint8_t *frame, int flen) {
 
 void UDP_returnToSender(uint8_t *frame, uint32_t ipAddr, uint16_t port) {
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
+    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
 
     // modify ethernet frame header

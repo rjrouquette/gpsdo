@@ -54,13 +54,13 @@ void STATUS_process(uint8_t *frame, int flen) {
     // restrict length
     if(flen > 128) return;
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
     // verify destination
-    if(headerIPv4->dst != ipAddress) return;
+    if(headerIP4->dst != ipAddress) return;
     // restrict length
-    unsigned size = __builtin_bswap16(headerUDP->length) - sizeof(struct HEADER_UDP);
+    unsigned size = __builtin_bswap16(headerUDP->length) - sizeof(HEADER_UDP);
     if(size > 31) return;
     // status activity
     LED_act1();
@@ -68,8 +68,8 @@ void STATUS_process(uint8_t *frame, int flen) {
     // modify ethernet frame header
     copyMAC(headerEth->macDst, headerEth->macSrc);
     // modify IP header
-    headerIPv4->dst = headerIPv4->src;
-    headerIPv4->src = ipAddress;
+    headerIP4->dst = headerIP4->src;
+    headerIP4->src = ipAddress;
     // modify UDP header
     headerUDP->portDst = headerUDP->portSrc;
     headerUDP->portSrc = __builtin_bswap16(STATUS_PORT);

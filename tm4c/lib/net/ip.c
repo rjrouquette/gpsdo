@@ -17,7 +17,7 @@ void IPv4_process(uint8_t *frame, int flen) {
     // discard malformed frames
     if(flen < 60) return;
 
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct FRAME_ETH));
+    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (frame + sizeof(struct HEADER_ETH));
     // must be version 4
     if(headerIPv4->head.VER != 4) return;
     // must standard 5 word header
@@ -37,7 +37,7 @@ void IPv4_process(uint8_t *frame, int flen) {
 
 volatile uint16_t ipID = 0x1234;
 void IPv4_init(uint8_t *frame) {
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct FRAME_ETH));
+    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (frame + sizeof(struct HEADER_ETH));
     headerIPv4->head.VER = 4;
     headerIPv4->head.IHL = 5;
     headerIPv4->id = __builtin_bswap16(ipID);
@@ -47,15 +47,15 @@ void IPv4_init(uint8_t *frame) {
 }
 
 void IPv4_finalize(uint8_t *frame, int flen) {
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (frame + sizeof(struct FRAME_ETH));
+    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (frame + sizeof(struct HEADER_ETH));
     // compute IPv4 length
-    flen -= sizeof(struct FRAME_ETH);
+    flen -= sizeof(struct HEADER_ETH);
     // set IPv4 length
     headerIPv4->len = __builtin_bswap16(flen);
     // clear checksum
     headerIPv4->chksum = 0;
     // compute checksum
-    headerIPv4->chksum = RFC1071_checksum(headerIPv4, sizeof(struct HEADER_IPv4));
+    headerIPv4->chksum = RFC1071_checksum(headerIPv4, sizeof(struct HEADER_IP4));
 }
 
 void IPv4_macMulticast(uint8_t *mac, uint32_t groupAddress) {
@@ -69,10 +69,10 @@ void IPv4_macMulticast(uint8_t *mac, uint32_t groupAddress) {
 
 void IPv4_setMulticast(uint8_t *frame, uint32_t groupAddress) {
     // set MAC address
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
+    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
     IPv4_macMulticast(headerEth->macDst, groupAddress);
     // set group address
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
     headerIPv4->dst = groupAddress;
 }
 

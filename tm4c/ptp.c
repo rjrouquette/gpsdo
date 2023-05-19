@@ -185,8 +185,8 @@ void processMessage(uint8_t *frame, int flen) {
     // discard malformed packets
     if(flen < PTP2_MIN_SIZE) return;
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
+    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
 
@@ -221,8 +221,8 @@ static void sendAnnounce(void *ref) {
     memset(frame, 0, flen);
 
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
+    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
     struct PTP2_ANNOUNCE *announce = (struct PTP2_ANNOUNCE *) (headerPTP + 1);
@@ -277,8 +277,8 @@ static void syncFollowup(void *ref, uint8_t *txFrame, int flen) {
     NET_getTxTime(txFrame, stamps);
 
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) followup;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) followup;
+    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
     PTP2_SYNC *sync = (PTP2_SYNC *) (headerPTP + 1);
@@ -302,8 +302,8 @@ static void sendSync(void *ref) {
     memset(frame, 0, flen);
 
     // map headers
-    struct FRAME_ETH *headerEth = (struct FRAME_ETH *) frame;
-    struct HEADER_IPv4 *headerIPv4 = (struct HEADER_IPv4 *) (headerEth + 1);
+    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
+    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
     struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
     struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
     PTP2_SYNC *sync = (PTP2_SYNC *) (headerPTP + 1);

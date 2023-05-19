@@ -18,10 +18,10 @@ enum TaskType {
     TaskOnce
 };
 
-typedef volatile struct QueueNode {
+typedef struct QueueNode {
     // queue pointers
-    volatile struct QueueNode *next;
-    volatile struct QueueNode *prev;
+    struct QueueNode *next;
+    struct QueueNode *prev;
 
     // task structure
     struct {
@@ -37,8 +37,8 @@ typedef volatile struct QueueNode {
 
 
 #define SLOT_CNT (32)
-static volatile QueueNode *queueFree;
-static volatile QueueNode queuePool[SLOT_CNT];
+static QueueNode *queueFree;
+static QueueNode queuePool[SLOT_CNT];
 static volatile QueueNode queueSchedule;
 
 static QueueNode * allocNode();
@@ -52,8 +52,8 @@ void initScheduler() {
         freeNode(queuePool + i);
 
     // initialize queue pointers
-    queueSchedule.next = &queueSchedule;
-    queueSchedule.prev = &queueSchedule;
+    queueSchedule.next = (QueueNode *) &queueSchedule;
+    queueSchedule.prev = (QueueNode *) &queueSchedule;
 }
 
 static QueueNode * allocNode() {
@@ -97,7 +97,7 @@ static void insSchedule(QueueNode *node) {
 __attribute__((optimize(3)))
 _Noreturn
 void runScheduler() {
-    QueueNode *node = &queueSchedule;
+    QueueNode *node = (QueueNode *) &queueSchedule;
     uint32_t now = CLK_MONO_RAW;
 
     // infinite loop
@@ -112,7 +112,7 @@ void runScheduler() {
         node = queueSchedule.next;
         if(((int32_t) (now - node->task.next)) < 0) {
             // credit time spent to the scheduler
-            node = &queueSchedule;
+            node = (QueueNode *) &queueSchedule;
             continue;
         }
 
@@ -129,7 +129,7 @@ void runScheduler() {
             // release node if task is complete
             freeNode(node);
             // credit time spent to the scheduler
-            node = &queueSchedule;
+            node = (QueueNode *) &queueSchedule;
             continue;
         }
         // add to schedule
