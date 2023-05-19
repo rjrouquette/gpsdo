@@ -35,15 +35,26 @@ typedef struct QueueNode {
     } task;
 } QueueNode;
 
+typedef struct OnceExtended {
+    struct OnceExtended *nextFree;
+    QueueNode *node;
+    SchedulerCallback run;
+    void *ref;
+    uint32_t countDown;
+    uint32_t finalIntv;
+} OnceExtended;
+
 
 #define SLOT_CNT (32)
 static QueueNode *queueFree;
 static QueueNode queuePool[SLOT_CNT];
 static volatile QueueNode queueSchedule;
 
+static OnceExtended *extFree;
+static OnceExtended extPool[SLOT_CNT];
+
 static QueueNode * allocNode();
 static void freeNode(QueueNode *node);
-
 
 void initScheduler() {
     // initialize queue nodes
@@ -54,6 +65,11 @@ void initScheduler() {
     // initialize queue pointers
     queueSchedule.next = (QueueNode *) &queueSchedule;
     queueSchedule.prev = (QueueNode *) &queueSchedule;
+
+    // initialize extended pool
+    extFree = extPool;
+    for(int i = 0; i < SLOT_CNT - 1; i++)
+        extPool[i].nextFree = extPool + i + 1;
 }
 
 static QueueNode * allocNode() {
@@ -173,17 +189,75 @@ void runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref) {
     insSchedule(node);
 }
 
+static void doOnceExtended(void *ref) {
+    OnceExtended *this = (OnceExtended *) ref;
+
+    if(this->countDown == 0) {
+        // run the task
+        (*(this->run))(this->ref);
+        // flag for removal from queue
+        this->node->task.type = TaskOnce;
+        // free extension object
+        this->nextFree = extFree;
+        extFree = this;
+    }
+    else if(--this->countDown == 0) {
+        // sent final interval once countdown is complete
+        this->node->task.intv = this->finalIntv;
+    }
+}
+
+static void runOnceExtended(uint64_t delay, SchedulerCallback callback, void *ref) {
+    // allocate extension object
+    OnceExtended *extended = extFree;
+    extFree = extended->nextFree;
+
+    // allocate queue node
+    QueueNode *node = allocNode();
+    node->task.type = TaskPeriodic;
+    node->task.run = doOnceExtended;
+    node->task.ref = extended;
+    node->task.intv = CLK_FREQ;
+
+    // configure extension
+    extended->nextFree = NULL;
+    extended->node = node;
+    extended->run = callback;
+    extended->ref = ref;
+
+    // convert fixed-point interval to raw monotonic domain
+    union fixed_32_32 scratch;
+    scratch.full = delay;
+    // set countdown
+    extended->countDown = scratch.ipart - 1;
+    // set final interval
+    scratch.ipart = 1;
+    scratch.full *= CLK_FREQ;
+    extended->finalIntv = scratch.ipart;
+
+    // start countdown immediately
+    node->task.next = CLK_MONO_RAW;
+    // add to schedule
+    insSchedule(node);
+}
+
 void runOnce(uint64_t delay, SchedulerCallback callback, void *ref) {
+    // check if extended interval support is required
+    if((delay >> 32) > 8) {
+        runOnceExtended(delay, callback, ref);
+        return;
+    }
+
     QueueNode *node = allocNode();
     node->task.type = TaskOnce;
     node->task.run = callback;
     node->task.ref = ref;
+    node->task.intv = 0;
 
     // convert fixed-point interval to raw monotonic domain
     union fixed_32_32 scratch;
     scratch.full = delay;
     scratch.full *= CLK_FREQ;
-    node->task.intv = scratch.ipart;
 
     // start after delay
     node->task.next = CLK_MONO_RAW + scratch.ipart;
@@ -262,12 +336,21 @@ unsigned runStatus(char *buffer) {
     for(int i = 0; i < cnt; i++) {
         int j = topList[i];
         QueueNode *node = queuePool + j;
-        
-        *(end++) = typeCode[node->task.type];
-        *(end++) = ' ';
-        end += toHex((uint32_t) node->task.run, 6, '0', end);
-        *(end++) = ' ';
-        end += toHex((uint32_t) node->task.ref, 8, '0', end);
+
+        if(node->task.run == doOnceExtended) {
+            OnceExtended *ext = (OnceExtended *) node->task.ref;
+            *(end++) = 'E';
+            *(end++) = ' ';
+            end += toHex((uint32_t) ext->run, 6, '0', end);
+            *(end++) = ' ';
+            end += toHex((uint32_t) ext->ref, 8, '0', end);
+        } else {
+            *(end++) = typeCode[node->task.type];
+            *(end++) = ' ';
+            end += toHex((uint32_t) node->task.run, 6, '0', end);
+            *(end++) = ' ';
+            end += toHex((uint32_t) node->task.ref, 8, '0', end);
+        }
         *(end++) = ' ';
         end += fmtFloat(scale * (float) prevHits[j], 8, 0, end);
         *(end++) = ' ';

@@ -7,13 +7,19 @@
 #include "../clk/mono.h"
 #include "../clk/tai.h"
 #include "../clk/util.h"
-#include "../rand.h"
 #include "../net.h"
 #include "../net/arp.h"
 #include "../net/eth.h"
 #include "../net/util.h"
+#include "../rand.h"
+#include "../run.h"
 #include "common.h"
 #include "peer.h"
+#include "../led.h"
+
+
+#define IDLE_INTV (1u << (32 - 1))
+#define ACTV_INTV (1u << (32 - 4))
 
 
 // average two 64-bit numbers
@@ -28,7 +34,7 @@ static void updateMac(NtpPeer *this);
 static int checkMac(NtpPeer *this);
 static void sendPoll(NtpPeer *this);
 static void startPoll(NtpPeer *this);
-static void runPoll(NtpPeer *this);
+static int runPoll(NtpPeer *this);
 static void finishPoll(NtpPeer *this);
 
 
@@ -140,45 +146,13 @@ static void sendPoll(NtpPeer *this) {
     NET_transmit(txDesc, NTP4_SIZE);
 }
 
-static void startPoll(NtpPeer *this) {
-    if(this->pollActive) {
-        // prior poll never completed
-        NtpSource_updateStatus(&(this->source));
-    }
-
-    // add random fuzz to polling interval to temporally disperse poll requests
-    // (maximum of 1/16 of polling interval)
-    union fixed_32_32 scratch;
-    scratch.fpart = 0;
-    scratch.ipart = RAND_next();
-    scratch.full >>= 36 - this->source.poll;
-    scratch.full |= 1ull << (32 + this->source.poll);
-    // set next poll
-    this->pollNext += scratch.full;
-
-    // start poll
-    this->pollStart = CLK_MONO();
-    this->pollActive = true;
-    this->pollBurst = 0xFF;
-    this->pollXleave = false;
-    this->filterTx = 0;
-    this->filterRx = 0;
-}
-
-static void runPoll(NtpPeer *this) {
-    // start of poll
-    if(this->pollBurst == 0xFF) {
-        this->source.reach <<= 1;
-        this->pollBurst = 0;
-        this->pktSent = false;
-    }
-
+static int runPoll(NtpPeer *this) {
     // send packet
     if(!this->pktSent) {
         this->pktSent = true;
         this->pktRecv = false;
         sendPoll(this);
-        return;
+        return 1;
     }
 
     // receive packet
@@ -188,13 +162,13 @@ static void runPoll(NtpPeer *this) {
         if(!this->pollXleave && !IPv4_testSubnet(ipSubnet, ipAddress, this->source.id)) {
             this->pollXleave = true;
             sendPoll(this);
-            return;
+            return 1;
         }
         // complete poll
         finishPoll(this);
     } else {
-        uint64_t now = CLK_MONO();
-        if((now - this->pollStart) > PEER_RESPONSE_TIMEOUT) {
+        uint64_t elapsed = CLK_MONO() - this->pollStart;
+        if(elapsed > PEER_RESPONSE_TIMEOUT) {
             // fallback to original response if we were waiting for an interleaved followup
             if(this->pollXleave) {
                 this->source.xleave = false;
@@ -210,7 +184,9 @@ static void runPoll(NtpPeer *this) {
     if(!this->pollActive) {
         // update status
         NtpSource_updateStatus(&(this->source));
+        return 0;
     }
+    return 1;
 }
 
 static void finishPoll(NtpPeer *this) {
@@ -256,19 +232,41 @@ static void NtpPeer_run(void *pObj) {
     NtpPeer *this = (NtpPeer *) pObj;
 
     // requires hardware time synchronization
-    if(clkMonoEth == 0) return;
+    // wait for valid MAC address
+    if(clkMonoEth == 0 || checkMac(this)) {
+        runOnce(IDLE_INTV, NtpPeer_run, this);
+        return;
+    }
 
-    // check MAC address
-    if(checkMac(this)) return;
+    // a poll is currently active
+    if(this->pollActive) {
+        if(runPoll(this)) {
+            runOnce(ACTV_INTV, NtpPeer_run, this);
+            return;
+        }
 
-    // check for start of poll
-    const uint64_t now = CLK_MONO();
-    if(((int64_t)(now - this->pollNext)) > 0)
-        startPoll(this);
+        // add random fuzz to polling interval to temporally disperse poll requests
+        // (maximum of 1/16 of polling interval)
+        union fixed_32_32 scratch;
+        scratch.fpart = 0;
+        scratch.ipart = RAND_next();
+        scratch.full >>= 36 - this->source.poll;
+        scratch.full |= 1ull << (32 + this->source.poll);
+        // schedule next poll
+        runOnce(scratch.full, NtpPeer_run, this);
+        return;
+    }
 
-    // run current poll
-    if(this->pollActive)
-        runPoll(this);
+    // start poll
+    this->pollStart = CLK_MONO();
+    this->pollActive = true;
+    this->pollXleave = false;
+    this->filterTx = 0;
+    this->filterRx = 0;
+    this->pktSent = false;
+    this->source.reach <<= 1;
+    runOnce(0, NtpPeer_run, this);
+    LED_act0();
 }
 
 void NtpPeer_init(void *pObj) {
@@ -288,7 +286,6 @@ void NtpPeer_init(void *pObj) {
     this->source.maxPoll = PEER_MAX_POLL;
     this->source.minPoll = PEER_MIN_POLL;
     this->source.poll = PEER_MIN_POLL;
-    this->pollNext = CLK_MONO();
 }
 
 void NtpPeer_recv(void *pObj, uint8_t *frame, int flen) {

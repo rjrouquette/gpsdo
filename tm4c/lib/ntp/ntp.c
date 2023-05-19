@@ -321,7 +321,7 @@ static NtpSource* ntpAllocPeer() {
             // append to source list
             sources[cntSources++] = (NtpSource *) slot;
             // schedule source updates
-            runSleep(SRC_UPDT_INTV, (SchedulerCallback) slot->source.run, (void *) slot);
+            runOnce(0, slot->source.run, slot);
             // return instance
             return (NtpSource *) slot;
         }
@@ -335,7 +335,7 @@ static void ntpRemovePeer(NtpSource *peer) {
         selectedSource = NULL;
 
     // remove from task schedule
-    runCancel((SchedulerCallback) peer->run, (void *) peer);
+    runCancel((SchedulerCallback) peer->run, peer);
     // deregister peer
     peer->id = 0;
     uint32_t slot = -1u;

@@ -13,7 +13,7 @@
 #define PEER_MAX_POLL (6)
 
 struct NtpPeer {
-    struct NtpSource source;
+    NtpSource source;
 
     // packet timestamp filters
     uint64_t filterTx;
@@ -25,11 +25,9 @@ struct NtpPeer {
     uint64_t local_rx_hw[3];
 
     // state machine
-    uint64_t pollNext;
     uint64_t pollStart;
     uint32_t lastArp;
 
-    uint8_t pollBurst;
     bool pollActive;
     bool pollXleave;
     bool pktSent;

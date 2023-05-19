@@ -8,7 +8,7 @@
 #include "src.h"
 
 struct NtpGPS {
-    struct NtpSource source;
+    NtpSource source;
 
     uint64_t lastPoll;
     uint64_t lastPps;
