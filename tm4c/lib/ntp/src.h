@@ -13,16 +13,25 @@
 #define NTP_MAX_DELAY (50e-3f)
 
 struct NtpPollSample {
-    uint64_t comp;
-    uint64_t tai;
     int64_t offset;
     float delay;
+    uint32_t taiSkew;
+    uint64_t comp;
 };
 typedef volatile struct NtpPollSample NtpPollSample;
 
 struct NtpSource {
     void (*init)(volatile void *);
     void (*run)(volatile void *);
+
+    // filter samples
+    struct NtpPollSample pollSample[NTP_MAX_HISTORY];
+    uint8_t samplePtr;
+    uint8_t sampleCount;
+    uint8_t usedOffset;
+    uint8_t usedDrift;
+    // time span
+    int span;
 
     uint64_t lastUpdate;
     uint64_t refTime;
@@ -47,17 +56,10 @@ struct NtpSource {
     uint8_t version;
     uint8_t ntpMode;
 
-    // filter state
-    struct NtpPollSample pollSample[NTP_MAX_HISTORY];
-    int samplePtr;
-    int sampleCount;
     // last sample offset
     float lastOffset;
     float lastOffsetOrig;
     float lastDelay;
-    // time span
-    int span;
-    int used;
     // offset stats
     float offsetMean;
     float offsetStdDev;
@@ -65,7 +67,6 @@ struct NtpSource {
     float delayMean;
     float delayStdDev;
     // frequency stats
-    int freqUsed;
     float freqDrift;
     float freqSkew;
     // overall score

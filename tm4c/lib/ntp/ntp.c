@@ -274,7 +274,7 @@ static void runSelect(void *ref) {
             sources[i]->state = RPY_SD_ST_UNSELECTED;
             continue;
         }
-        if(sources[i]->used < 8 || sources[i]->freqUsed < 4) {
+        if(sources[i]->usedOffset < 8 || sources[i]->usedDrift < 4) {
             sources[i]->state = RPY_SD_ST_FALSETICKER;
             continue;
         }
@@ -581,7 +581,7 @@ static uint16_t chronycSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRe
     }
 
     cmdReply->data.sourcestats.n_samples = htonl(source->sampleCount);
-    cmdReply->data.sourcestats.n_runs = htonl(source->used);
+    cmdReply->data.sourcestats.n_runs = htonl(source->usedOffset);
     cmdReply->data.sourcestats.span_seconds = htonl(source->span);
     cmdReply->data.sourcestats.est_offset.f = htonf(source->offsetMean);
     cmdReply->data.sourcestats.sd.f = htonf(source->offsetStdDev);

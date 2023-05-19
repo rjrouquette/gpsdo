@@ -67,7 +67,7 @@ static void NtpGPS_run(volatile void *pObj) {
     NtpPollSample *sample = this->source.pollSample + this->source.samplePtr;
     // store PPS timestamps
     sample->comp = ppsTime[1];
-    sample->tai = ppsTime[2];
+    sample->taiSkew = ppsTime[2] - ppsTime[1];
     // compute TAI offset
     scratch.full = ppsTime[0];
     scratch.full -= GPS_taiEpochUpdate();

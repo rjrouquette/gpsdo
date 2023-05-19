@@ -229,11 +229,13 @@ static void finishPoll(NtpPeer *this) {
     // set current sample
     NtpPollSample *sample = this->source.pollSample + this->source.samplePtr;
     // set compensated reference time
-    sample->comp = avg64(this->local_tx_hw[1], this->local_rx_hw[1]);
+    const uint64_t comp = avg64(this->local_tx_hw[1], this->local_rx_hw[1]);
+    sample->comp = comp;
     // set TAI reference time
-    sample->tai = avg64(this->local_tx_hw[2], this->local_rx_hw[2]);
+    const uint64_t tai = avg64(this->local_tx_hw[2], this->local_rx_hw[2]);
+    sample->taiSkew = tai - comp;
     // compute TAI offset
-    uint64_t offset = avg64(remote_rx, remote_tx) - sample->tai;
+    uint64_t offset = avg64(remote_rx, remote_tx) - tai;
     sample->offset = (int64_t) offset;
     // compute delay (use compensated clock for best accuracy)
     uint64_t responseTime = remote_tx - remote_rx;

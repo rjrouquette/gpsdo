@@ -64,7 +64,7 @@ void NtpSource_update(NtpSource *this) {
             getMeanVar(cnt, offset, &mean, &var);
     }
     // update offset stats
-    this->used = cnt;
+    this->usedOffset = cnt;
     this->offsetMean = mean;
     this->offsetStdDev = sqrtf(var);
 
@@ -76,10 +76,9 @@ void NtpSource_update(NtpSource *this) {
         NtpPollSample *previous = this->pollSample + index[i+1];
 
         // all three deltas are required to isolate drift from offset adjustments
-        int64_t a = (int64_t) (current->tai - previous->tai);
-        int64_t b = (int64_t) (current->comp - previous->comp);
-        int64_t c = (int64_t) (current->offset - previous->offset);
-        drift[i] = toFloat(c + a - b) / toFloat(b);
+        uint32_t a = current->taiSkew - previous->taiSkew;
+        uint32_t b = ((uint32_t) current->offset) - ((uint32_t) previous->offset);
+        drift[i] = 0x1p-32f * ((float) (int32_t) (a + b)) / toFloatU(current->comp - previous->comp);
     }
     // compute mean and variance
     getMeanVar(cnt, drift, &mean, &var);
@@ -100,7 +99,7 @@ void NtpSource_update(NtpSource *this) {
             getMeanVar(cnt, drift, &mean, &var);
     }
     // set frequency status
-    this->freqUsed = cnt;
+    this->usedDrift = cnt;
     this->freqDrift = mean;
     this->freqSkew = sqrtf(var);
     // set overall score
@@ -185,12 +184,12 @@ void NtpSource_updateStatus(NtpSource *this) {
     // mark source for pruning if its stratum is too high
     this->prune |= this->stratum > NTP_MAX_STRAT;
     // mark source for pruning if its delay is too high
-    this->prune |= (this->used > 7) && (this->delayMean > NTP_MAX_DELAY);
+    this->prune |= (this->usedOffset > 7) && (this->delayMean > NTP_MAX_DELAY);
 }
 
 void NtpSource_applyOffset(NtpSource *this, int64_t offset) {
     for (int i = 0; i < NTP_MAX_HISTORY; i++) {
-        this->pollSample[i].tai += offset;
+        this->pollSample[i].taiSkew += offset;
         this->pollSample[i].offset -= offset;
     }
 }
