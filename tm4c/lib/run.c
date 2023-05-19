@@ -284,6 +284,25 @@ void runCancel(SchedulerCallback callback, void *ref) {
                 }
             }
         }
+        else if(node->task.run == doOnceExtended) {
+            // additional check for extended tasks
+            OnceExtended *ext = (OnceExtended *) ref;
+            if(ext->run == callback) {
+                if ((ref == NULL) || (ext->ref == ref)) {
+                    // check if the currently running task is being cancelled
+                    if (node == queueSchedule.next) {
+                        // if so, defer cleanup to main loop
+                        node->task.type = TaskOnce;
+                    } else {
+                        // if not, explicitly cancel task and free memory
+                        queueRemove(node);
+                        freeNode(node);
+                        ext->nextFree = extFree;
+                        extFree = ext;
+                    }
+                }
+            }
+        }
     }
 }
 
