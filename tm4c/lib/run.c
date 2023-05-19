@@ -286,7 +286,7 @@ void runCancel(SchedulerCallback callback, void *ref) {
         }
         else if(node->task.run == doOnceExtended) {
             // additional check for extended tasks
-            OnceExtended *ext = (OnceExtended *) ref;
+            OnceExtended *ext = (OnceExtended *) node->task.ref;
             if(ext->run == callback) {
                 if ((ref == NULL) || (ext->ref == ref)) {
                     // check if the currently running task is being cancelled
