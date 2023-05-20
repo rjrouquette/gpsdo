@@ -34,7 +34,7 @@ enum PTP2_MTYPE {
 
     PTP2_MT_FOLLOW_UP = 0x8,
     PTP2_MT_DELAY_RESP,
-    PTP2_MT_PDELAY_RESP_FOLLOW_UP,
+    PTP2_MT_PDELAY_FOLLOW_UP,
     PTP2_MT_ANNOUNCE,
     PTP2_MT_SIGNALING,
     PTP2_MT_MANAGEMENT
@@ -102,10 +102,6 @@ typedef struct PACKED PTP2_ANNOUNCE {
 } PTP2_ANNOUNCE;
 _Static_assert(sizeof(struct PTP2_ANNOUNCE) == 30, "PTP2_ANNOUNCE must be 34 bytes");
 
-typedef struct PTP2_TIMESTAMP PTP2_SYNC;
-typedef struct PTP2_TIMESTAMP PTP2_DELAY_REQ;
-typedef struct PTP2_TIMESTAMP PTP2_FOLLOW_UP;
-
 typedef struct PACKED PTP2_DELAY_RESP {
     PTP2_TIMESTAMP receiveTimestamp;
     PTP2_SRC_IDENT requestingIdentity;
@@ -119,20 +115,20 @@ typedef struct PACKED PTP2_PDELAY_REQ {
 _Static_assert(sizeof(struct PTP2_PDELAY_REQ) == 20, "PTP2_PDELAY_REQ must be 34 bytes");
 
 typedef struct PACKED PTP2_PDELAY_RESP {
-    PTP2_TIMESTAMP receiveReceiptTimestamp;
+    PTP2_TIMESTAMP receiveTimestamp;
     PTP2_SRC_IDENT requestingIdentity;
 } PTP2_PDELAY_RESP;
 _Static_assert(sizeof(struct PTP2_PDELAY_RESP) == 20, "PTP2_PDELAY_RESP must be 34 bytes");
 
 typedef struct PACKED PTP2_PDELAY_FOLLOW_UP {
-    PTP2_TIMESTAMP responseOriginTimestamp;
+    PTP2_TIMESTAMP responseTimestamp;
     PTP2_SRC_IDENT requestingIdentity;
 } PTP2_PDELAY_FOLLOW_UP;
 _Static_assert(sizeof(struct PTP2_PDELAY_RESP) == 20, "PTP2_PDELAY_FOLLOW_UP must be 34 bytes");
 
 
-// PTPoE broadcast MAC address (01:80:C2:00:00:0E)
-static const uint8_t ptpMultiMac[6] = { 0x01, 0x80, 0xC2, 0x00, 0x00, 0x0E };
+// IEEE 802.1AS broadcast MAC address (01:80:C2:00:00:0E)
+static const uint8_t gPtpMac[6] = {0x01, 0x80, 0xC2, 0x00, 0x00, 0x0E };
 static uint8_t clockId[8];
 static volatile uint32_t seqId;
 
@@ -156,8 +152,8 @@ static uint32_t toPtpClkAccuracy(float rmsError);
 void PTP_init() {
     // set clock ID to MAC address
     getMAC(clockId + 2);
-    // PTPoE multicast address
-    EMAC_setMac(&(EMAC0.ADDR2), ptpMultiMac);
+    // IEEE 802.1AS multicast address
+    EMAC_setMac(&(EMAC0.ADDR2), gPtpMac);
     // enable address matching
     EMAC0.ADDR2.HI.AE = 1;
 
@@ -193,11 +189,105 @@ void PTP_process(uint8_t *frame, int flen) {
 }
 
 static void processDelayRequest(uint8_t *frame, int flen) {
+    // verify request length
+    if(flen < (PTP2_MIN_SIZE + sizeof(PTP2_TIMESTAMP)))
+        return;
 
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    // allocate and copy frame buffer
+    uint8_t *txFrame = NET_getTxBuff(txDesc);
+    memcpy(txFrame, frame, flen);
+    // resize frame
+    flen = PTP2_MIN_SIZE + sizeof(PTP2_DELAY_RESP);
+
+    // map headers
+    HEADER_ETH *headerEth = (HEADER_ETH *) txFrame;
+    HEADER_PTP *headerPTP = (HEADER_PTP *) (headerEth + 1);
+    PTP2_DELAY_RESP *resp = (PTP2_DELAY_RESP *) (headerPTP + 1);
+
+    // copy source identity
+    resp->requestingIdentity = headerPTP->sourceIdentity;
+    // set RX time
+    uint64_t stamps[3];
+    NET_getRxTime(frame, stamps);
+    toPtpTimestamp(stamps[2], &(resp->receiveTimestamp));
+
+    // PTP header
+    headerPTP->versionPTP = PTP2_VERSION;
+    headerPTP->messageType = PTP2_MT_DELAY_RESP;
+    headerPTP->messageLength = __builtin_bswap16(sizeof(HEADER_PTP) + sizeof(PTP2_DELAY_RESP));
+    memcpy(headerPTP->sourceIdentity.identity, clockId, sizeof(clockId));
+    headerPTP->sourceIdentity.portNumber = 0;
+    headerPTP->domainNumber = PTP2_DOMAIN;
+    headerPTP->logMessageInterval = 0;
+
+    // transmit response
+    NET_transmit(txDesc, flen);
+}
+
+static void peerDelayRespFollowup(void *ref, uint8_t *txFrame, int flen) {
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    uint8_t *followup = NET_getTxBuff(txDesc);
+    memcpy(followup, txFrame, flen);
+    flen = PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_FOLLOW_UP);
+
+    // get precise TX time
+    uint64_t stamps[3];
+    NET_getTxTime(txFrame, stamps);
+
+    // map headers
+    HEADER_ETH *headerEth = (HEADER_ETH *) followup;
+    HEADER_PTP *headerPTP = (HEADER_PTP *) (headerEth + 1);
+    PTP2_PDELAY_FOLLOW_UP *followUp = (PTP2_PDELAY_FOLLOW_UP *) (headerPTP + 1);
+
+    // set followup fields
+    headerPTP->messageType = PTP2_MT_PDELAY_FOLLOW_UP;
+    headerPTP->messageLength = __builtin_bswap16(sizeof(HEADER_PTP) + sizeof(PTP2_PDELAY_FOLLOW_UP));
+    toPtpTimestamp(stamps[2], &(followUp->responseTimestamp));
+
+    // transmit request
+    NET_transmit(txDesc, flen);
 }
 
 static void processPDelayRequest(uint8_t *frame, int flen) {
+    // verify request length
+    if(flen < (PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_REQ)))
+        return;
 
+    int txDesc = NET_getTxDesc();
+    if(txDesc < 0) return;
+    // allocate and copy frame buffer
+    uint8_t *txFrame = NET_getTxBuff(txDesc);
+    memcpy(txFrame, frame, flen);
+    // resize frame
+    flen = PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_RESP);
+
+    // map headers
+    HEADER_ETH *headerEth = (HEADER_ETH *) txFrame;
+    HEADER_PTP *headerPTP = (HEADER_PTP *) (headerEth + 1);
+    PTP2_PDELAY_RESP *resp = (PTP2_PDELAY_RESP *) (headerPTP + 1);
+
+    // copy source identity
+    resp->requestingIdentity = headerPTP->sourceIdentity;
+    // set RX time
+    uint64_t stamps[3];
+    NET_getRxTime(frame, stamps);
+    toPtpTimestamp(stamps[2], &(resp->receiveTimestamp));
+
+    // PTP header
+    headerPTP->versionPTP = PTP2_VERSION;
+    headerPTP->messageType = PTP2_MT_PDELAY_RESP;
+    headerPTP->messageLength = __builtin_bswap16(sizeof(HEADER_PTP) + sizeof(PTP2_PDELAY_RESP));
+    memcpy(headerPTP->sourceIdentity.identity, clockId, sizeof(clockId));
+    headerPTP->sourceIdentity.portNumber = 0;
+    headerPTP->domainNumber = PTP2_DOMAIN;
+    headerPTP->logMessageInterval = 0;
+
+    // transmit response
+    NET_setTxCallback(txDesc, peerDelayRespFollowup, NULL);
+    NET_transmit(txDesc, flen);
 }
 
 static void sendAnnounce(void *ref) {
@@ -213,13 +303,13 @@ static void sendAnnounce(void *ref) {
     HEADER_PTP *headerPTP = (HEADER_PTP *) (headerEth + 1);
     PTP2_ANNOUNCE *announce = (PTP2_ANNOUNCE *) (headerPTP + 1);
 
-    // PTPoE
+    // IEEE 802.1AS
     headerEth->ethType = ETHTYPE_PTP;
-    copyMAC(headerEth->macDst, ptpMultiMac);
+    copyMAC(headerEth->macDst, gPtpMac);
 
     // PTP header
     headerPTP->versionPTP = PTP2_VERSION;
-    headerPTP->messageType = __builtin_bswap16(PTP2_MT_SYNC);
+    headerPTP->messageType = PTP2_MT_ANNOUNCE;
     headerPTP->messageLength = __builtin_bswap16(sizeof(HEADER_PTP) + sizeof(PTP2_ANNOUNCE));
     memcpy(headerPTP->sourceIdentity.identity, clockId, sizeof(clockId));
     headerPTP->sourceIdentity.portNumber = 0;
@@ -254,7 +344,7 @@ static void syncFollowup(void *ref, uint8_t *txFrame, int flen) {
     // map headers
     HEADER_ETH *headerEth = (HEADER_ETH *) followup;
     HEADER_PTP *headerPTP = (HEADER_PTP *) (headerEth + 1);
-    PTP2_SYNC *sync = (PTP2_SYNC *) (headerPTP + 1);
+    PTP2_TIMESTAMP *sync = (PTP2_TIMESTAMP *) (headerPTP + 1);
 
     // set followup fields
     headerPTP->messageType = PTP2_MT_FOLLOW_UP;
@@ -268,22 +358,22 @@ static void sendSync(void *ref) {
     int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
     // allocate and clear frame buffer
-    const int flen = PTP2_MIN_SIZE + sizeof(PTP2_SYNC);
+    const int flen = PTP2_MIN_SIZE + sizeof(PTP2_TIMESTAMP);
     uint8_t *frame = NET_getTxBuff(txDesc);
     memset(frame, 0, flen);
 
     // map headers
     HEADER_ETH *headerEth = (HEADER_ETH *) frame;
     HEADER_PTP *headerPTP = (HEADER_PTP *) (headerEth + 1);
-    PTP2_SYNC *sync = (PTP2_SYNC *) (headerPTP + 1);
+    PTP2_TIMESTAMP *sync = (PTP2_TIMESTAMP *) (headerPTP + 1);
 
-    // PTPoE
+    // IEEE 802.1AS
     headerEth->ethType = ETHTYPE_PTP;
-    copyMAC(headerEth->macDst, ptpMultiMac);
+    copyMAC(headerEth->macDst, gPtpMac);
 
     headerPTP->versionPTP = PTP2_VERSION;
-    headerPTP->messageType = __builtin_bswap16(PTP2_MT_SYNC);
-    headerPTP->messageLength = __builtin_bswap16(sizeof(HEADER_PTP) + sizeof(PTP2_SYNC));
+    headerPTP->messageType = PTP2_MT_SYNC;
+    headerPTP->messageLength = __builtin_bswap16(sizeof(HEADER_PTP) + sizeof(PTP2_TIMESTAMP));
     memcpy(headerPTP->sourceIdentity.identity, clockId, sizeof(clockId));
     headerPTP->sourceIdentity.portNumber = 0;
     headerPTP->domainNumber = PTP2_DOMAIN;
