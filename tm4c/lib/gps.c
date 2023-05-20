@@ -113,6 +113,8 @@ void GPS_init() {
     UART3.CTL.RXE = 1;
     UART3.CTL.TXE = 1;
     UART3.CTL.UARTEN = 1;
+    // reduce interrupt priority
+    ISR_priority(ISR_UART3, 7);
 
     // reset GPS
     GPS_RST_PORT.DATA[GPS_RST_PIN] = 0;
