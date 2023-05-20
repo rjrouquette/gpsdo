@@ -152,10 +152,6 @@ static uint32_t toPtpClkAccuracy(float rmsError);
 void PTP_init() {
     // set clock ID to MAC address
     getMAC(clockId + 2);
-    // IEEE 802.1AS multicast address
-    EMAC_setMac(&(EMAC0.ADDR2), gPtpMac);
-    // enable address matching
-    EMAC0.ADDR2.HI.AE = 1;
 
     // schedule periodic message transmission
     runSleep(1ull << (32 + PTP2_ANNC_LOG_INTV), sendAnnounce, NULL);

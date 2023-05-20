@@ -157,10 +157,6 @@ static void initHwAddr() {
     EMAC_setMac(&(EMAC0.ADDR0), macAddr);
     // disable CRC module
     RCGCCCM.EN = 0;
-
-    // enable reception of ARP broadcast packets
-    EMAC_setMac(&(EMAC0.ADDR1), arpMultiMac);
-    EMAC0.ADDR1.HI.AE = 1;
 }
 
 static void initMAC() {
@@ -185,8 +181,7 @@ static void initMAC() {
     EMAC0.DMAOPMODE.SR = 1;
 
     // set frame filter moe
-    EMAC0.FRAMEFLTR.PM = 1;
-    EMAC0.FRAMEFLTR.VTFE = 1;
+    EMAC0.FRAMEFLTR.RA = 1;
     // verify all checksum
     EMAC0.CFG.IPC = 1;
     // prevent loopback of data in half-duplex mode
