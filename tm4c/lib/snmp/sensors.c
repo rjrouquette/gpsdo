@@ -45,7 +45,7 @@ static const struct SnmpSensor {
     uint8_t precision;
     int (*getter)();
 } snmpSensors[] = {
-        // GPS temperature
+        // CPU temperature
         { "cpu.temp",           "C",    OID_SENSOR_TYPE_CELSIUS,  OID_SENSOR_SCALE_1,     4, getCpuTemp         },
         // GPS timing status
         { "gps.hasFix",         "",     OID_SENSOR_TYPE_BOOL,     OID_SENSOR_SCALE_1,     0, getGpsHasFix       },
