@@ -189,6 +189,7 @@ void runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref) {
     insSchedule(node);
 }
 
+__attribute__((optimize(3)))
 static void doOnceExtended(void *ref) {
     OnceExtended *this = (OnceExtended *) ref;
 
@@ -236,7 +237,7 @@ static void runOnceExtended(uint64_t delay, SchedulerCallback callback, void *re
     extended->finalIntv = scratch.ipart;
 
     // start countdown immediately
-    node->task.next = CLK_MONO_RAW;
+    node->task.next = CLK_MONO_RAW + CLK_FREQ;
     // add to schedule
     insSchedule(node);
 }
