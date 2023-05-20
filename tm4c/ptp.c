@@ -131,6 +131,7 @@ typedef struct PACKED PTP2_PDELAY_FOLLOW_UP {
 _Static_assert(sizeof(struct PTP2_PDELAY_RESP) == 20, "PTP2_PDELAY_FOLLOW_UP must be 34 bytes");
 
 
+// PTPoE broadcast MAC address (01:80:C2:00:00:0E)
 static const uint8_t ptpMultiMac[6] = { 0x01, 0x80, 0xC2, 0x00, 0x00, 0x0E };
 static uint8_t clockId[8];
 static volatile uint32_t seqId;
