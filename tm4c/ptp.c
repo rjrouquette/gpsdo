@@ -10,8 +10,6 @@
 #include "lib/led.h"
 #include "lib/net.h"
 #include "lib/net/eth.h"
-#include "lib/net/ip.h"
-#include "lib/net/udp.h"
 #include "lib/net/util.h"
 #include "lib/ntp/ntp.h"
 #include "lib/ntp/pll.h"
@@ -22,11 +20,7 @@
 #define PTP2_ANNC_LOG_INTV (2) // 4 s
 #define PTP2_SYNC_LOG_INTV (-2) // 4 Hz
 
-#define PTP2_PORT_EVENT (319)
-#define PTP2_PORT_GENERAL (320)
-#define PTP2_MIN_SIZE (UDP_DATA_OFFSET + 34)
-#define PTP2_MULTICAST (0x810100E0) // 224.0.1.129
-#define PTP2_MULTICAST_PEER (0x6B0000E0) // 224.0.0.107
+#define PTP2_MIN_SIZE (sizeof(HEADER_ETH) + sizeof(HEADER_PTP))
 #define PTP2_VERSION (2)
 #define PTP2_DOMAIN (1)
 
@@ -64,20 +58,20 @@ enum PTP2_TSRC {
     PTP2_TSRC_INTERNAL = 0xA0
 };
 
-struct PACKED PTP2_SRC_IDENT {
+typedef struct PACKED PTP2_SRC_IDENT {
     uint8_t identity[8];
     uint16_t portNumber;
-};
-_Static_assert(sizeof(struct PTP2_SRC_IDENT) == 10, "PTP_SRC_PORT must be 10 bytes");
+} PTP2_SRC_IDENT;
+_Static_assert(sizeof(struct PTP2_SRC_IDENT) == 10, "PTP2_SRC_IDENT must be 10 bytes");
 
-struct PACKED PTP2_TIMESTAMP {
+typedef struct PACKED PTP2_TIMESTAMP {
     uint16_t secondsHi;
     uint32_t secondsLo;
     uint32_t nanoseconds;
-};
+} PTP2_TIMESTAMP;
 _Static_assert(sizeof(struct PTP2_TIMESTAMP) == 10, "PTP2_TIMESTAMP must be 10 bytes");
 
-struct PACKED PTP2_HEADER {
+typedef struct PACKED HEADER_PTP {
     uint16_t messageType: 4;        // lower nibble
     uint16_t transportSpecific: 4;  // upper nibble
     uint16_t versionPTP: 4;         // lower nibble
@@ -88,15 +82,15 @@ struct PACKED PTP2_HEADER {
     uint16_t flags;
     uint64_t correctionField;
     uint32_t reserved2;
-    struct PTP2_SRC_IDENT sourceIdentity;
+    PTP2_SRC_IDENT sourceIdentity;
     uint16_t sequenceId;
     uint8_t controlField;
     uint8_t logMessageInterval;
-};
-_Static_assert(sizeof(struct PTP2_HEADER) == 34, "PTP2_HEADER must be 34 bytes");
+} HEADER_PTP;
+_Static_assert(sizeof(struct HEADER_PTP) == 34, "HEADER_PTP must be 34 bytes");
 
-struct PACKED PTP2_ANNOUNCE {
-    struct PTP2_TIMESTAMP originTimestamp;
+typedef struct PACKED PTP2_ANNOUNCE {
+    PTP2_TIMESTAMP originTimestamp;
     uint16_t currentUtcOffset;
     uint8_t reserved;
     uint8_t grandMasterPriority;
@@ -105,38 +99,39 @@ struct PACKED PTP2_ANNOUNCE {
     uint8_t grandMasterIdentity[8];
     uint16_t stepsRemoved;
     uint8_t timeSource;
-};
+} PTP2_ANNOUNCE;
 _Static_assert(sizeof(struct PTP2_ANNOUNCE) == 30, "PTP2_ANNOUNCE must be 34 bytes");
 
 typedef struct PTP2_TIMESTAMP PTP2_SYNC;
 typedef struct PTP2_TIMESTAMP PTP2_DELAY_REQ;
 typedef struct PTP2_TIMESTAMP PTP2_FOLLOW_UP;
 
-struct PACKED PTP2_DELAY_RESP {
-    struct PTP2_TIMESTAMP receiveTimestamp;
-    struct PTP2_SRC_IDENT requestingIdentity;
-};
+typedef struct PACKED PTP2_DELAY_RESP {
+    PTP2_TIMESTAMP receiveTimestamp;
+    PTP2_SRC_IDENT requestingIdentity;
+} PTP2_DELAY_RESP;
 _Static_assert(sizeof(struct PTP2_DELAY_RESP) == 20, "PTP2_DELAY_RESP must be 34 bytes");
 
-struct PACKED PTP2_PDELAY_REQ {
-    struct PTP2_TIMESTAMP receiveTimestamp;
+typedef struct PACKED PTP2_PDELAY_REQ {
+    PTP2_TIMESTAMP receiveTimestamp;
     uint8_t reserved[10];
-};
+} PTP2_PDELAY_REQ;
 _Static_assert(sizeof(struct PTP2_PDELAY_REQ) == 20, "PTP2_PDELAY_REQ must be 34 bytes");
 
-struct PACKED PTP2_PDELAY_RESP {
-    struct PTP2_TIMESTAMP receiveReceiptTimestamp;
-    struct PTP2_SRC_IDENT requestingIdentity;
-};
+typedef struct PACKED PTP2_PDELAY_RESP {
+    PTP2_TIMESTAMP receiveReceiptTimestamp;
+    PTP2_SRC_IDENT requestingIdentity;
+} PTP2_PDELAY_RESP;
 _Static_assert(sizeof(struct PTP2_PDELAY_RESP) == 20, "PTP2_PDELAY_RESP must be 34 bytes");
 
-struct PACKED PTP2_PDELAY_FOLLOW_UP {
-    struct PTP2_TIMESTAMP responseOriginTimestamp;
-    struct PTP2_SRC_IDENT requestingIdentity;
-};
+typedef struct PACKED PTP2_PDELAY_FOLLOW_UP {
+    PTP2_TIMESTAMP responseOriginTimestamp;
+    PTP2_SRC_IDENT requestingIdentity;
+} PTP2_PDELAY_FOLLOW_UP;
 _Static_assert(sizeof(struct PTP2_PDELAY_RESP) == 20, "PTP2_PDELAY_FOLLOW_UP must be 34 bytes");
 
 
+static const uint8_t ptpMultiMac[6] = { 0x01, 0x80, 0xC2, 0x00, 0x00, 0x0E };
 static uint8_t clockId[8];
 static volatile uint32_t seqId;
 
@@ -148,52 +143,44 @@ static float lutClkAccuracy[17] = {
         10.0f
 };
 
-static void processMessage(uint8_t *frame, int flen);
 static void processDelayRequest(uint8_t *frame, int flen);
 static void processPDelayRequest(uint8_t *frame, int flen);
 
 static void sendAnnounce(void *ref);
 static void sendSync(void *ref);
 
-static void toPtpTimestamp(uint64_t ts, struct PTP2_TIMESTAMP *tsPtp);
+static void toPtpTimestamp(uint64_t ts, PTP2_TIMESTAMP *tsPtp);
 static uint32_t toPtpClkAccuracy(float rmsError);
 
 void PTP_init() {
     // set clock ID to MAC address
     getMAC(clockId + 2);
-    // register UDP listening ports
-    UDP_register(PTP2_PORT_EVENT, processMessage);
-    UDP_register(PTP2_PORT_GENERAL, processMessage);
-    // enable reception for multicast MACs
-    uint8_t mac[6];
-    // standard PTP multicast group
-    IPv4_macMulticast(mac, PTP2_MULTICAST);
-    EMAC_setMac(&(EMAC0.ADDR2), mac);
-    // peer PTP multicast group
-    IPv4_macMulticast(mac, PTP2_MULTICAST_PEER);
-    EMAC_setMac(&(EMAC0.ADDR3), mac);
+    // PTPoE multicast address
+    EMAC_setMac(&(EMAC0.ADDR2), ptpMultiMac);
     // enable address matching
     EMAC0.ADDR2.HI.AE = 1;
-    EMAC0.ADDR3.HI.AE = 1;
 
     // schedule periodic message transmission
     runSleep(1ull << (32 + PTP2_ANNC_LOG_INTV), sendAnnounce, NULL);
     runSleep(1ull << (32 + PTP2_SYNC_LOG_INTV), sendSync, NULL);
 }
 
-void processMessage(uint8_t *frame, int flen) {
-    // discard malformed packets
-    if(flen < PTP2_MIN_SIZE) return;
-    // map headers
-    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
-    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
+/**
+ * Handles raw ethernet PTP frames
+ * @param frame
+ * @param flen
+ */
+void PTP_process(uint8_t *frame, int flen) {
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_PTP *headerPTP = (HEADER_PTP *) (headerEth + 1);
 
-    // verify destination
-    if(headerIPv4->dst != ipAddress) return;
+    // ignore anything we sent ourselves
+    if(isMyMAC(headerEth->macSrc) == 0)
+        return;
     // ignore unsupported versions
     if(headerPTP->versionPTP != 2) return;
+    // flip mac address for reply
+    copyMAC(headerEth->macDst, headerEth->macSrc);
 
     // indicate time-server activity
     LED_act0();
@@ -216,36 +203,25 @@ static void sendAnnounce(void *ref) {
     int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
     // allocate and clear frame buffer
-    const int flen = PTP2_MIN_SIZE + sizeof(struct PTP2_ANNOUNCE);
+    const int flen = PTP2_MIN_SIZE + sizeof(PTP2_ANNOUNCE);
     uint8_t *frame = NET_getTxBuff(txDesc);
     memset(frame, 0, flen);
 
     // map headers
-    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
-    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
-    struct PTP2_ANNOUNCE *announce = (struct PTP2_ANNOUNCE *) (headerPTP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_PTP *headerPTP = (HEADER_PTP *) (headerEth + 1);
+    PTP2_ANNOUNCE *announce = (PTP2_ANNOUNCE *) (headerPTP + 1);
 
-    // EtherType = IPv4
-    headerEth->ethType = ETHTYPE_IPv4;
-
-    // IPv4 Header
-    IPv4_init(frame);
-    IPv4_setMulticast(frame, PTP2_MULTICAST);
-    headerIPv4->src = ipAddress;
-    headerIPv4->proto = IP_PROTO_UDP;
-
-    // UDP Header
-    headerUDP->portSrc = __builtin_bswap16(PTP2_PORT_EVENT);
-    headerUDP->portDst = __builtin_bswap16(PTP2_PORT_EVENT);
+    // PTPoE
+    headerEth->ethType = ETHTYPE_PTP;
+    copyMAC(headerEth->macDst, ptpMultiMac);
 
     // PTP header
     headerPTP->versionPTP = PTP2_VERSION;
     headerPTP->messageType = __builtin_bswap16(PTP2_MT_SYNC);
-    headerPTP->messageLength = __builtin_bswap16(sizeof(struct PTP2_HEADER) + sizeof(struct PTP2_ANNOUNCE));
+    headerPTP->messageLength = __builtin_bswap16(sizeof(HEADER_PTP) + sizeof(PTP2_ANNOUNCE));
     memcpy(headerPTP->sourceIdentity.identity, clockId, sizeof(clockId));
-    headerPTP->sourceIdentity.portNumber = __builtin_bswap16(PTP2_PORT_EVENT);
+    headerPTP->sourceIdentity.portNumber = 0;
     headerPTP->domainNumber = PTP2_DOMAIN;
     headerPTP->logMessageInterval = PTP2_ANNC_LOG_INTV;
     headerPTP->sequenceId = __builtin_bswap16(seqId++);
@@ -261,8 +237,6 @@ static void sendAnnounce(void *ref) {
     toPtpTimestamp(CLK_TAI(), &(announce->originTimestamp));
 
     // transmit request
-    UDP_finalize(frame, flen);
-    IPv4_finalize(frame, flen);
     NET_transmit(txDesc, flen);
 }
 
@@ -277,10 +251,8 @@ static void syncFollowup(void *ref, uint8_t *txFrame, int flen) {
     NET_getTxTime(txFrame, stamps);
 
     // map headers
-    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) followup;
-    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) followup;
+    HEADER_PTP *headerPTP = (HEADER_PTP *) (headerEth + 1);
     PTP2_SYNC *sync = (PTP2_SYNC *) (headerPTP + 1);
 
     // set followup fields
@@ -288,8 +260,6 @@ static void syncFollowup(void *ref, uint8_t *txFrame, int flen) {
     toPtpTimestamp(stamps[2], sync);
 
     // transmit request
-    UDP_finalize(followup, flen);
-    IPv4_finalize(followup, flen);
     NET_transmit(txDesc, flen);
 }
 
@@ -302,30 +272,19 @@ static void sendSync(void *ref) {
     memset(frame, 0, flen);
 
     // map headers
-    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
-    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
-    struct PTP2_HEADER *headerPTP = (struct PTP2_HEADER *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_PTP *headerPTP = (HEADER_PTP *) (headerEth + 1);
     PTP2_SYNC *sync = (PTP2_SYNC *) (headerPTP + 1);
 
-    // EtherType = IPv4
-    headerEth->ethType = ETHTYPE_IPv4;
-
-    // IPv4 Header
-    IPv4_init(frame);
-    IPv4_setMulticast(frame, PTP2_MULTICAST);
-    headerIPv4->src = ipAddress;
-    headerIPv4->proto = IP_PROTO_UDP;
-
-    // UDP Header
-    headerUDP->portSrc = __builtin_bswap16(PTP2_PORT_EVENT);
-    headerUDP->portDst = __builtin_bswap16(PTP2_PORT_EVENT);
+    // PTPoE
+    headerEth->ethType = ETHTYPE_PTP;
+    copyMAC(headerEth->macDst, ptpMultiMac);
 
     headerPTP->versionPTP = PTP2_VERSION;
     headerPTP->messageType = __builtin_bswap16(PTP2_MT_SYNC);
-    headerPTP->messageLength = __builtin_bswap16(sizeof(struct PTP2_HEADER) + sizeof(PTP2_SYNC));
+    headerPTP->messageLength = __builtin_bswap16(sizeof(HEADER_PTP) + sizeof(PTP2_SYNC));
     memcpy(headerPTP->sourceIdentity.identity, clockId, sizeof(clockId));
-    headerPTP->sourceIdentity.portNumber = __builtin_bswap16(PTP2_PORT_EVENT);
+    headerPTP->sourceIdentity.portNumber = 0;
     headerPTP->domainNumber = PTP2_DOMAIN;
     headerPTP->logMessageInterval = PTP2_SYNC_LOG_INTV;
     headerPTP->sequenceId = __builtin_bswap16(seqId++);
@@ -334,13 +293,11 @@ static void sendSync(void *ref) {
     toPtpTimestamp(CLK_TAI(), sync);
 
     // transmit request
-    UDP_finalize(frame, flen);
-    IPv4_finalize(frame, flen);
     NET_setTxCallback(txDesc, syncFollowup, NULL);
     NET_transmit(txDesc, flen);
 }
 
-static void toPtpTimestamp(uint64_t ts, struct PTP2_TIMESTAMP *tsPtp) {
+static void toPtpTimestamp(uint64_t ts, PTP2_TIMESTAMP *tsPtp) {
     union fixed_32_32 scratch;
     scratch.full = ts;
     // set seconds

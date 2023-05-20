@@ -23,6 +23,7 @@
 #include "peer.h"
 #include "ref.h"
 #include "pll.h"
+#include "../net/util.h"
 
 #define MAX_NTP_PEERS (8)
 #define MAX_NTP_SRCS (9)
@@ -101,7 +102,7 @@ void NTP_init() {
     NtpGPS_init(&srcGps);
     sources[cntSources++] = (void *) &srcGps;
     // 16 Hz polling rate for sources
-    runSleep(SRC_UPDT_INTV, (SchedulerCallback) srcGps.source.run, &srcGps);
+    runSleep(SRC_UPDT_INTV, srcGps.source.run, &srcGps);
 
     // update source selection at 16 Hz
     runSleep(SRC_UPDT_INTV, runSelect, NULL);
@@ -231,6 +232,7 @@ static void ntpResponse(uint8_t *frame, int flen) {
     HEADER_NTP *headerNTP = (HEADER_NTP *) (headerUDP + 1);
 
     // verify destination
+    if(isMyMAC(headerEth->macDst)) return;
     if(headerIP4->dst != ipAddress) return;
     // prevent loopback
     if(headerIP4->src == ipAddress) return;

@@ -58,6 +58,7 @@ void STATUS_process(uint8_t *frame, int flen) {
     HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
     HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
     // verify destination
+    if(isMyMAC(headerEth->macDst)) return;
     if(headerIP4->dst != ipAddress) return;
     // restrict length
     unsigned size = __builtin_bswap16(headerUDP->length) - sizeof(HEADER_UDP);

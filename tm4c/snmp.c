@@ -49,6 +49,7 @@ void SNMP_process(uint8_t *frame, int flen) {
     dlen -= sizeof(HEADER_UDP);
 
     // verify destination
+    if(isMyMAC(headerEth->macDst)) return;
     if(headerIP4->dst != ipAddress) return;
     // status activity
     LED_act1();

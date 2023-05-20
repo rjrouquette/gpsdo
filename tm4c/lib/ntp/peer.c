@@ -91,8 +91,6 @@ static void sendPoll(NtpPeer *this) {
     HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
     HEADER_NTP *headerNTP = (HEADER_NTP *) (headerUDP + 1);
 
-    // EtherType = IPv4
-    headerEth->ethType = ETHTYPE_IPv4;
     // MAC address
     copyMAC(headerEth->macDst, this->macAddr);
 

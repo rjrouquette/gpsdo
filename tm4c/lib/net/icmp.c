@@ -18,6 +18,7 @@ void ICMP_process(uint8_t *frame, int flen) {
     HEADER_ICMP4 *headerICMP = (HEADER_ICMP4 *) (headerIP4 + 1);
 
     // verify destination
+    if(isMyMAC(headerEth->macDst)) return;
     if(headerIP4->dst != ipAddress) return;
 
     switch (headerICMP->type) {

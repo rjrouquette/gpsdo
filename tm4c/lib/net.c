@@ -51,6 +51,10 @@ static struct { CallbackNetTX call; void *ref; } txCallback[TX_RING_SIZE];
 static EMAC_TX_DESC txDesc[TX_RING_SIZE];
 static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
+static const uint8_t arpMultiMac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+
+void PTP_process(uint8_t *frame, int flen);
+
 static void initDescriptors() {
     // init receive descriptors
     for(int i = 0; i < RX_RING_SIZE; i++) {
@@ -153,6 +157,10 @@ static void initHwAddr() {
     EMAC_setMac(&(EMAC0.ADDR0), macAddr);
     // disable CRC module
     RCGCCCM.EN = 0;
+
+    // enable reception of ARP broadcast packets
+    EMAC_setMac(&(EMAC0.ADDR1), arpMultiMac);
+    EMAC0.ADDR1.HI.AE = 1;
 }
 
 static void initMAC() {
@@ -228,12 +236,19 @@ static void runRx(void *ref) {
         if (!pRxDesc->RDES0.ES) {
             // extract ether type
             uint8_t *frame = (uint8_t *) pRxDesc->BUFF1;
-            uint16_t ethType = ((HEADER_ETH *) frame)->ethType;
-            // dispatch frame processor
-            if (ethType == ETHTYPE_ARP)
-                ARP_process(frame, pRxDesc->RDES0.FL);
-            else if (ethType == ETHTYPE_IPv4)
-                IPv4_process(frame, pRxDesc->RDES0.FL);
+            HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+            // only process the frame if the source MAC is not a broadcast address
+            // (prevents packet amplification attacks)
+            if(!(headerEth->macSrc[0] & 1)) {
+                const uint16_t ethType = headerEth->ethType;
+                // dispatch frame processor
+                if (ethType == ETHTYPE_ARP)
+                    ARP_process(frame, pRxDesc->RDES0.FL);
+                else if (ethType == ETHTYPE_IP4)
+                    IPv4_process(frame, pRxDesc->RDES0.FL);
+                else if (ethType == ETHTYPE_PTP)
+                    PTP_process(frame, pRxDesc->RDES0.FL);
+            }
         }
         // restore ownership to DMA
         pRxDesc->RDES0.OWN = 1;
@@ -373,4 +388,11 @@ void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps) {
     timer += txDesc[i].TTSL >> 3;
     // assemble timestamps
     toStamps(timer, stamps);
+}
+
+
+// defined as a weak reference so it may be overriden
+__attribute__((weak))
+void PTP_process(uint8_t *frame, int flen) {
+    __asm volatile("nop");
 }

@@ -74,8 +74,6 @@ static void initPacket(void *frame) {
 
     // broadcast MAC address
     broadcastMAC(headerEth->macDst);
-    // EtherType = IPv4
-    headerEth->ethType = ETHTYPE_IPv4;
     // IPv4 Header
     IPv4_init(frame);
     headerIP4->dst = 0xFFFFFFFF;
@@ -195,6 +193,8 @@ static void processFrame(uint8_t *frame, int flen) {
     HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
     HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
     HEADER_DHCP *headerDHCP = (HEADER_DHCP *) (headerUDP + 1);
+    // discard if not directly addressed to us
+    if(isMyMAC(headerEth->macDst)) return;
     // discard if not from a server
     if(headerUDP->portSrc != __builtin_bswap16(DHCP_PORT_SRV))
         return;

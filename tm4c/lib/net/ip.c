@@ -47,15 +47,20 @@ void IPv4_init(uint8_t *frame) {
 }
 
 void IPv4_finalize(uint8_t *frame, int flen) {
-    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (frame + sizeof(struct HEADER_ETH));
+    // map headers
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+
+    // set EtherType
+    headerEth->ethType = ETHTYPE_IP4;
     // compute IPv4 length
-    flen -= sizeof(struct HEADER_ETH);
+    flen -= sizeof(HEADER_ETH);
     // set IPv4 length
-    headerIPv4->len = __builtin_bswap16(flen);
+    headerIP4->len = __builtin_bswap16(flen);
     // clear checksum
-    headerIPv4->chksum = 0;
+    headerIP4->chksum = 0;
     // compute checksum
-    headerIPv4->chksum = RFC1071_checksum(headerIPv4, sizeof(struct HEADER_IP4));
+    headerIP4->chksum = RFC1071_checksum(headerIP4, sizeof(HEADER_IP4));
 }
 
 void IPv4_macMulticast(uint8_t *mac, uint32_t groupAddress) {
@@ -68,12 +73,14 @@ void IPv4_macMulticast(uint8_t *mac, uint32_t groupAddress) {
 }
 
 void IPv4_setMulticast(uint8_t *frame, uint32_t groupAddress) {
+    // map headers
+    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+
     // set MAC address
-    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
     IPv4_macMulticast(headerEth->macDst, groupAddress);
     // set group address
-    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
-    headerIPv4->dst = groupAddress;
+    headerIP4->dst = groupAddress;
 }
 
 uint16_t RFC1071_checksum(volatile const void *buffer, int len) {

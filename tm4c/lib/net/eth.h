@@ -16,9 +16,11 @@ typedef struct PACKED HEADER_ETH {
     uint8_t macSrc[6];
     uint16_t ethType;
 } HEADER_ETH;
-_Static_assert(sizeof(struct HEADER_ETH) == 14, "FRAME_ETH must be 14 bytes");
+_Static_assert(sizeof(struct HEADER_ETH) == 14, "HEADER_ETH must be 14 bytes");
 
 #define ETHTYPE_ARP (0x0608)
-#define ETHTYPE_IPv4 (0x0008)
+#define ETHTYPE_IP4 (0x0008)
+#define ETHTYPE_IP6 (0xDD86)
+#define ETHTYPE_PTP (0xF788)
 
 #endif //GPSDO_ETH_H

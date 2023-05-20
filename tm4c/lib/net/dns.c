@@ -117,6 +117,7 @@ static void processFrame(uint8_t *frame, int flen) {
     HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
     HEADER_DNS *headerDNS = (HEADER_DNS *) (headerUDP + 1);
     // verify destination
+    if(isMyMAC(headerEth->macDst)) return;
     if(headerIP4->dst != ipAddress) return;
 
     // must be a query response
@@ -207,8 +208,6 @@ static void sendRequest(const char *hostname, uint16_t requestId) {
     HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
     HEADER_DNS *headerDNS = (HEADER_DNS *) (headerUDP + 1);
 
-    // EtherType = IPv4
-    headerEth->ethType = ETHTYPE_IPv4;
     // MAC address
     copyMAC(headerEth->macDst, dnsMAC);
 

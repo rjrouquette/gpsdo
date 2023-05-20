@@ -57,7 +57,7 @@ void makeArpIp4(
     header->ethType = ETHTYPE_ARP;
     // ARP payload
     payload->HTYPE = 0x0100;
-    payload->PTYPE = ETHTYPE_IPv4;
+    payload->PTYPE = ETHTYPE_IP4;
     payload->HLEN = 6;
     payload->PLEN = 4;
     payload->OPER = op;
@@ -128,7 +128,7 @@ void ARP_process(uint8_t *frame, int flen) {
     ARP_IP4 *payload = (ARP_IP4 *) (header + 1);
     // verify payload fields
     if(payload->HTYPE != 0x0100) return;
-    if(payload->PTYPE != ETHTYPE_IPv4) return;
+    if(payload->PTYPE != ETHTYPE_IP4) return;
     if(payload->HLEN != 6) return;
     if(payload->PLEN != 4) return;
     // perform operation
@@ -150,6 +150,8 @@ void ARP_process(uint8_t *frame, int flen) {
         }
     }
     else if(payload->OPER == ARP_OP_REPLY) {
+        // discard if not directly addressed to us
+        if(isMyMAC(header->macDst)) return;
         // process reply
         if(payload->SPA != 0) {
             for(int i = 0; i < MAX_REQUESTS; i++) {
