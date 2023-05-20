@@ -320,8 +320,8 @@ static NtpSource* ntpAllocPeer() {
             (*(slot->source.init))(slot);
             // append to source list
             sources[cntSources++] = (NtpSource *) slot;
-            // schedule source updates
-            runOnce(0, slot->source.run, slot);
+            // start source updates
+            runOnce((1u << 31), slot->source.run, slot);
             // return instance
             return (NtpSource *) slot;
         }

@@ -15,7 +15,6 @@
 #include "../run.h"
 #include "common.h"
 #include "peer.h"
-#include "../led.h"
 
 
 #define IDLE_INTV (1u << (32 - 1))
@@ -33,7 +32,6 @@ static void txCallback(void *ref, uint8_t *frame, int flen);
 static void updateMac(NtpPeer *this);
 static int checkMac(NtpPeer *this);
 static void sendPoll(NtpPeer *this);
-static void startPoll(NtpPeer *this);
 static int runPoll(NtpPeer *this);
 static void finishPoll(NtpPeer *this);
 
@@ -231,19 +229,10 @@ static void NtpPeer_run(void *pObj) {
     // typecast "this" pointer
     NtpPeer *this = (NtpPeer *) pObj;
 
-    // requires hardware time synchronization
-    // wait for valid MAC address
-    if(clkMonoEth == 0 || checkMac(this)) {
-        runOnce(IDLE_INTV, NtpPeer_run, this);
-        return;
-    }
-
-    // a poll is currently active
+    // check if a poll is currently active
     if(this->pollActive) {
-        if(runPoll(this)) {
-            runOnce(ACTV_INTV, NtpPeer_run, this);
+        if(runPoll(this))
             return;
-        }
 
         // add random fuzz to polling interval to temporally disperse poll requests
         // (maximum of 1/16 of polling interval)
@@ -253,7 +242,16 @@ static void NtpPeer_run(void *pObj) {
         scratch.full >>= 36 - this->source.poll;
         scratch.full |= 1ull << (32 + this->source.poll);
         // schedule next poll
+        runCancel(NtpPeer_run, this);
         runOnce(scratch.full, NtpPeer_run, this);
+        return;
+    }
+
+    // requires hardware time synchronization
+    // wait for valid MAC address
+    if(clkMonoEth == 0 || checkMac(this)) {
+        runCancel(NtpPeer_run, this);
+        runOnce(IDLE_INTV, NtpPeer_run, this);
         return;
     }
 
@@ -263,10 +261,12 @@ static void NtpPeer_run(void *pObj) {
     this->pollXleave = false;
     this->filterTx = 0;
     this->filterRx = 0;
-    this->pktSent = false;
     this->source.reach <<= 1;
-    runOnce(0, NtpPeer_run, this);
-    LED_act0();
+    // send poll packet
+    sendPoll(this);
+    this->pktSent = true;
+    runCancel(NtpPeer_run, this);
+    runSleep(ACTV_INTV, NtpPeer_run, this);
 }
 
 void NtpPeer_init(void *pObj) {
