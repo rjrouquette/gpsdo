@@ -4,7 +4,6 @@
 
 #include <memory.h>
 #include <math.h>
-#include "hw/emac.h"
 #include "lib/clk/tai.h"
 #include "lib/clk/util.h"
 #include "lib/led.h"
@@ -18,7 +17,7 @@
 
 
 #define PTP2_ANNC_LOG_INTV (2) // 4 s
-#define PTP2_SYNC_LOG_INTV (-2) // 4 Hz
+#define PTP2_SYNC_LOG_INTV (-3) // 8 Hz
 
 #define PTP2_MIN_SIZE (sizeof(HEADER_ETH) + sizeof(HEADER_PTP))
 #define PTP2_VERSION (2)
