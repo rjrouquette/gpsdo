@@ -366,7 +366,7 @@ unsigned runStatus(char *buffer) {
         } else {
             *(end++) = typeCode[node->task.type];
             *(end++) = ' ';
-            end += toHex((uint32_t) node->task.run, 6, '0', end);
+            end += toHex((uint32_t) node->task.run, 5, '0', end);
             *(end++) = ' ';
             end += toHex((uint32_t) node->task.ref, 8, '0', end);
         }
@@ -381,13 +381,13 @@ unsigned runStatus(char *buffer) {
     }
 
     *(end++) = '\n';
-    end += padCopy(18, ' ', end, "Used ", 5);
+    end += padCopy(17, ' ', end, "Used ", 5);
     end += fmtFloat(scale * (float) totalHits, 8, 0, end);
     *(end++) = ' ';
     end += fmtFloat(scale * 0.008f * (float) totalTicks, 8, 0, end);
     *(end++) = '\n';
 
-    end += padCopy(18, ' ', end, "Idle ", 5);
+    end += padCopy(17, ' ', end, "Idle ", 5);
     end += fmtFloat(scale * (float) (queueSchedule.task.hits - idleHits), 8, 0, end);
     *(end++) = ' ';
     end += fmtFloat(scale * 0.008f * (float) (queueSchedule.task.ticks - idleTicks), 8, 0, end);
