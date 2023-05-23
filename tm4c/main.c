@@ -12,11 +12,11 @@
 #include "lib/led.h"
 #include "lib/net.h"
 #include "lib/ntp/ntp.h"
+#include "lib/ptp/ptp.h"
 #include "lib/rand.h"
 #include "lib/run.h"
 
 #include "gitversion.h"
-#include "ptp.h"
 #include "snmp.h"
 #include "status.h"
 

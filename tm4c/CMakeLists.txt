@@ -27,7 +27,6 @@ add_executable(
         gpsdo
 
         main.c
-        ptp.c
         snmp.c
         status.c
         hw/eeprom.c
@@ -57,6 +56,8 @@ add_executable(
         lib/ntp/ref.c
         lib/ntp/src.c
         lib/ntp/tcmp.c
+        lib/ptp/common.c
+        lib/ptp/ptp.c
         lib/rand.c
         lib/run.c
         lib/snmp/sensors.c
