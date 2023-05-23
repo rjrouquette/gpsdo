@@ -24,7 +24,7 @@ typedef struct QueueNode {
     struct QueueNode *prev;
 
     // task structure
-    struct {
+    struct Task {
         enum TaskType type;
         SchedulerCallback run;
         void *ref;
@@ -32,6 +32,8 @@ typedef struct QueueNode {
         uint32_t intv;
         uint32_t hits;
         uint32_t ticks;
+        uint32_t prevHits;
+        uint32_t prevTicks;
     } task;
 } QueueNode;
 
@@ -309,8 +311,6 @@ void runCancel(SchedulerCallback callback, void *ref) {
 
 
 static volatile uint32_t prevQuery, idleHits, idleTicks;
-static volatile uint32_t prevHits[SLOT_CNT];
-static volatile uint32_t prevTicks[SLOT_CNT];
 static volatile int topList[SLOT_CNT];
 
 static const char typeCode[5] = {
@@ -332,9 +332,9 @@ unsigned runStatus(char *buffer) {
     }
 
     for(int i = 0; i < cnt; i++) {
-        int j = topList[i];
-        prevHits[j] = queuePool[j].task.hits - prevHits[j];
-        prevTicks[j] = queuePool[j].task.ticks - prevTicks[j];
+        QueueNode *node = queuePool + topList[i];
+        node->task.prevHits = node->task.hits - node->task.prevHits;
+        node->task.prevTicks = node->task.ticks - node->task.prevTicks;
     }
 
     // sort active tasks
@@ -342,7 +342,7 @@ unsigned runStatus(char *buffer) {
         for(int j = i + 1; j < cnt; j++) {
             int a = topList[i];
             int b = topList[j];
-            if(prevTicks[a] < prevTicks[b]) {
+            if(queuePool[a].task.prevTicks < queuePool[b].task.prevTicks) {
                 topList[i] = b;
                 topList[j] = a;
             }
@@ -350,18 +350,17 @@ unsigned runStatus(char *buffer) {
     }
 
     // header row
-    end = append(end, "  Call   Context  Hits     Micros  \n");
+    end = append(end, "  Call  Context  Hits     Micros  \n");
 
     uint32_t totalTicks = 0, totalHits = 0;
     for(int i = 0; i < cnt; i++) {
-        int j = topList[i];
-        QueueNode *node = queuePool + j;
+        QueueNode *node = queuePool + topList[i];
 
         if(node->task.run == doOnceExtended) {
             OnceExtended *ext = (OnceExtended *) node->task.ref;
             *(end++) = 'E';
             *(end++) = ' ';
-            end += toHex((uint32_t) ext->run, 6, '0', end);
+            end += toHex((uint32_t) ext->run, 5, '0', end);
             *(end++) = ' ';
             end += toHex((uint32_t) ext->ref, 8, '0', end);
         } else {
@@ -372,13 +371,13 @@ unsigned runStatus(char *buffer) {
             end += toHex((uint32_t) node->task.ref, 8, '0', end);
         }
         *(end++) = ' ';
-        end += fmtFloat(scale * (float) prevHits[j], 8, 0, end);
+        end += fmtFloat(scale * (float) node->task.prevHits, 8, 0, end);
         *(end++) = ' ';
-        end += fmtFloat(scale * 0.008f * (float) prevTicks[j], 8, 0, end);
+        end += fmtFloat(scale * 0.008f * (float) node->task.prevTicks, 8, 0, end);
         *(end++) = '\n';
 
-        totalHits += prevHits[j];
-        totalTicks += prevTicks[j];
+        totalHits += node->task.prevHits;
+        totalTicks += node->task.prevTicks;
     }
 
     *(end++) = '\n';
@@ -398,9 +397,9 @@ unsigned runStatus(char *buffer) {
     idleTicks = queueSchedule.task.ticks;
 
     for(int i = 0; i < cnt; i++) {
-        int j = topList[i];
-        prevHits[j] = queuePool[j].task.hits;
-        prevTicks[j] = queuePool[j].task.ticks;
+        QueueNode *node = queuePool + topList[i];
+        node->task.prevHits = node->task.hits;
+        node->task.prevTicks = node->task.ticks;
     }
 
     return end - buffer;
