@@ -294,9 +294,18 @@ static void runSelect(void *ref) {
         }
     }
 
+    // indicate complete loss of tracking
+    if(selectedSource == NULL) {
+        refId = 0;
+        clockStratum = 16;
+        leapIndicator = 3;
+        rootDelay = 0;
+        rootDispersion = 0;
+        return;
+    }
+
     // sanity check source and check for update
     NtpSource *source = selectedSource;
-    if(source == NULL) return;
     source->state = RPY_SD_ST_SELECTED;
     if(source->lastUpdate == lastUpdate) return;
     lastUpdate = source->lastUpdate;

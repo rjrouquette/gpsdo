@@ -199,7 +199,10 @@ static void sendAnnounce(void *ref) {
     announce->grandMasterPriority = 0;
     announce->grandMasterPriority2 = 0;
     announce->stepsRemoved = 0;
-    announce->grandMasterClockQuality = toPtpClkAccuracy(PLL_offsetRms());
+    if(NTP_refId())
+        announce->grandMasterClockQuality = toPtpClkAccuracy(PLL_offsetRms());
+    else
+        announce->grandMasterClockQuality = 0x31;
     toPtpTimestamp(CLK_TAI(), &(announce->originTimestamp));
 
     // transmit request
