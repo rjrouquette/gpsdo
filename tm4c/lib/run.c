@@ -13,10 +13,9 @@
 
 
 enum TaskType {
-    TaskInvalid,
+    TaskOnce,
     TaskSleep,
-    TaskPeriodic,
-    TaskOnce
+    TaskPeriodic
 };
 
 typedef struct QueueNode {
@@ -51,6 +50,7 @@ typedef struct OnceExtended {
 static QueueNode *queueFree;
 static QueueNode queuePool[SLOT_CNT];
 static volatile QueueNode queueSchedule;
+#define queueRoot ((QueueNode *) &queueSchedule)
 
 static OnceExtended *extFree;
 static OnceExtended extPool[SLOT_CNT];
@@ -69,8 +69,8 @@ void initScheduler() {
     }
 
     // initialize queue pointers
-    queueSchedule.next = (QueueNode *) &queueSchedule;
-    queueSchedule.prev = (QueueNode *) &queueSchedule;
+    queueSchedule.next = queueRoot;
+    queueSchedule.prev = queueRoot;
 }
 
 static QueueNode * allocNode() {
@@ -103,18 +103,22 @@ static void destroyNode(QueueNode *node) {
 __attribute__((optimize(3)))
 static void reschedule(QueueNode *node) {
     __disable_irq();
-    // remove from queue
-    node->prev->next = node->next;
-    node->next->prev = node->prev;
+    // set next run time
+    uint32_t nextRun = node->task.intv;
+    nextRun += (node->task.type == TaskPeriodic) ? node->task.next: CLK_MONO_RAW;
+    node->task.next = nextRun;
 
     // locate optimal insertion point
     QueueNode *ins = queueSchedule.next;
-    while(ins->task.type) {
-        if(((int32_t) (node->task.next - ins->task.next)) < 0)
+    while(ins != queueRoot) {
+        if(((int32_t) (nextRun - ins->task.next)) < 0)
             break;
         ins = ins->next;
     }
 
+    // remove from queue
+    node->prev->next = node->next;
+    node->next->prev = node->prev;
     // insert task into the scheduling queue
     node->next = ins;
     node->prev = ins->prev;
@@ -126,7 +130,7 @@ static void reschedule(QueueNode *node) {
 __attribute__((optimize(3)))
 _Noreturn
 void runScheduler() {
-    QueueNode *node = (QueueNode *) &queueSchedule;
+    QueueNode *node = queueRoot;
     uint32_t now = CLK_MONO_RAW;
 
     // infinite loop
@@ -141,26 +145,21 @@ void runScheduler() {
         node = queueSchedule.next;
         if(((int32_t) (now - node->task.next)) < 0) {
             // credit time spent to the scheduler
-            node = (QueueNode *) &queueSchedule;
+            node = queueRoot;
             continue;
         }
 
         // run the task
         (*(node->task.run))(node->task.ref);
 
-        // compute next run time
-        if(node->task.type == TaskSleep)
-            node->task.next = CLK_MONO_RAW + node->task.intv;
-        else if(node->task.type == TaskPeriodic)
-            node->task.next += node->task.intv;
-        else {
+        if(node->task.type == TaskOnce) {
             // task is complete
             destroyNode(node);
-            // credit time spent to the scheduler
-            node = (QueueNode *) &queueSchedule;
-            continue;
+            node = queueRoot;
+        } else {
+            // schedule next run time
+            reschedule(node);
         }
-        reschedule(node);
     }
 }
 
@@ -168,7 +167,7 @@ static void schedule(QueueNode *node) {
     __disable_irq();
     // locate optimal insertion point
     QueueNode *ins = queueSchedule.next;
-    while(ins->task.type) {
+    while(ins != queueRoot) {
         if(((int32_t) (node->task.next - ins->task.next)) < 0)
             break;
         ins = ins->next;
@@ -294,19 +293,40 @@ void * runOnce(uint64_t delay, SchedulerCallback callback, void *ref) {
 }
 
 void runWake(void *taskHandle) {
+    __disable_irq();
     QueueNode *node = taskHandle;
     // schedule task to run immediately
     if (node->task.run == doOnceExtended) {
         OnceExtended *ext = (OnceExtended *) node->task.ref;
         ext->countDown = 0;
     }
-    node->task.next = CLK_MONO_RAW;
-    reschedule(node);
+
+    // set next run time
+    const uint32_t nextRun = CLK_MONO_RAW;
+    node->task.next = nextRun;
+
+    // locate optimal insertion point
+    QueueNode *ins = queueSchedule.next;
+    while(ins != queueRoot) {
+        if(((int32_t) (nextRun - ins->task.next)) < 0)
+            break;
+        ins = ins->next;
+    }
+
+    // remove from queue
+    node->prev->next = node->next;
+    node->next->prev = node->prev;
+    // insert task into the scheduling queue
+    node->next = ins;
+    node->prev = ins->prev;
+    ins->prev = node;
+    node->prev->next = node;
+    __enable_irq();
 }
 
 void runCancel(SchedulerCallback callback, void *ref) {
     QueueNode *next = queueSchedule.next;
-    while(next->task.type) {
+    while(next != queueRoot) {
         QueueNode *node = next;
         next = next->next;
 
@@ -338,11 +358,7 @@ void runRemove(void *taskHandle) {
 
 
 static volatile uint32_t prevQuery, idleHits, idleTicks;
-static volatile int topList[SLOT_CNT];
-
-static const char typeCode[4] = {
-        '-', 'S', 'P', 'O'
-};
+static const char typeCode[3] = "OSP";
 
 unsigned runStatus(char *buffer) {
     char *end = buffer;
@@ -351,9 +367,10 @@ unsigned runStatus(char *buffer) {
     float scale = 125e6f / (float) elapsed;
 
     // collect active tasks
+    int topList[SLOT_CNT];
     int cnt = 0;
     QueueNode *next = queueSchedule.next;
-    while(next->task.type) {
+    while(next != queueRoot) {
         topList[cnt++] = next - queuePool;
         next = next->next;
     }
