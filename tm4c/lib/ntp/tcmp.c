@@ -13,7 +13,7 @@
 #include "tcmp.h"
 
 #define ADC_TO_32(x) ((x) << 20)
-#define TEMP_RATE (11)
+#define TEMP_RATE (12)
 #define TEMP_SCALE (0x1p-20f)
 
 #define INTV_TEMP (1u << (32 - 10)) // 1024 Hz
