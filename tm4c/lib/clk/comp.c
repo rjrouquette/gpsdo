@@ -22,8 +22,8 @@ volatile uint64_t clkCompOffset = 0;
 volatile uint64_t clkCompRef = 0;
 volatile int32_t clkCompRate = 0;
 
-static volatile uint64_t frqInc;
-static volatile uint32_t frqRem;
+static uint64_t frqInc;
+static uint32_t frqRem;
 
 
 // frequency output timer
