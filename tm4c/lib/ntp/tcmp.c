@@ -12,7 +12,9 @@
 #include "../run.h"
 #include "tcmp.h"
 
-#define TEMP_ALPHA (0x1p-9f)
+#define ADC_TO_32(x) ((x) << 20)
+#define TEMP_RATE (11)
+#define TEMP_SCALE (0x1p-20f)
 
 #define INTV_TEMP (1u << (32 - 10)) // 1024 Hz
 #define INTV_TCMP (1u << (32 - 4))  // 16 Hz
@@ -25,8 +27,9 @@
 #define SOM_FILL_REG (8.0f)
 #define SOM_RATE_MAX (0.25f)
 
-#define REG_MIN_RMSE (100e-9f)
+#define REG_MIN_RMSE (250e-9f)
 
+static volatile uint32_t adcValue;
 static volatile float tempValue;
 
 static volatile uint32_t tcmpSaved;
@@ -40,16 +43,12 @@ static volatile float tcmpRmse;
 static volatile float somNode[SOM_NODE_CNT][3];
 static volatile float somNW[SOM_NODE_CNT];
 
-__attribute__((always_inline))
-static inline float toCelsius(int32_t adcValue) {
-    return -0.0604248047f * (float) (adcValue - 2441);
-}
-
 static void loadSom();
 static void saveSom();
 static void seedSom(float temp, float comp);
 static void updateSom(float temp, float comp);
 static void updateRegression();
+static void fitLinear(const float *data, int cnt, float *coef, float *mean);
 
 /**
  * Estimate temperature correction using 3rd order taylor series
@@ -59,15 +58,19 @@ static void updateRegression();
 static float tcmpEstimate(float temp);
 
 static void runTemp(void *ref) {
-    // start next temperature measurement
-    ADC0.PSSI.SS3 = 1;
-    // update temperature
-    float temp = toCelsius(ADC0.SS3.FIFO.DATA);
-    tempValue += (temp - tempValue) * TEMP_ALPHA;\
+    uint32_t temp = adcValue;
+    while(!ADC0.SS0.FSTAT.EMPTY) {
+        int32_t delta = ADC0.SS0.FIFO.DATA;
+        delta = ADC_TO_32(delta) - temp;
+        temp += delta >> TEMP_RATE;
+    }
+    adcValue = temp;
+    ADC0.PSSI.SS0 = 1;
 }
 
 static void runComp(void *ref) {
     // update temperature compensation
+    tempValue = 147.5f - (0.0604248047f * TEMP_SCALE * (float) adcValue);
     tcmpValue = tcmpEstimate(tempValue);
     CLK_COMP_setComp((int32_t) (0x1p32f * tcmpValue));
 }
@@ -80,24 +83,36 @@ void TCMP_init() {
     // configure ADC0 for temperature measurement
     ADC0.CC.CLKDIV = 0;
     ADC0.CC.CS = ADC_CLK_MOSC;
-    ADC0.SAC.AVG = 6;
-    ADC0.EMUX.EM3 = ADC_SS_TRIG_SOFT;
-    ADC0.SS3.CTL.IE0 = 1;
-    ADC0.SS3.CTL.END0 = 1;
-    ADC0.SS3.CTL.TS0 = 1;
-    ADC0.SS3.TSH.TSH0 = ADC_TSH_256;
-    ADC0.ACTSS.ASEN3 = 1;
+    ADC0.SAC.AVG = 0;
+    ADC0.EMUX.EM0 = ADC_SS_TRIG_SOFT;
+    ADC0.SS0.CTL.TS0 = 1;
+    ADC0.SS0.TSH.TSH0 = ADC_TSH_256;
+    ADC0.SS0.CTL.TS1 = 1;
+    ADC0.SS0.TSH.TSH1 = ADC_TSH_256;
+    ADC0.SS0.CTL.TS2 = 1;
+    ADC0.SS0.TSH.TSH2 = ADC_TSH_256;
+    ADC0.SS0.CTL.TS3 = 1;
+    ADC0.SS0.TSH.TSH3 = ADC_TSH_256;
+    ADC0.SS0.CTL.TS4 = 1;
+    ADC0.SS0.TSH.TSH4 = ADC_TSH_256;
+    ADC0.SS0.CTL.TS5 = 1;
+    ADC0.SS0.TSH.TSH5 = ADC_TSH_256;
+    ADC0.SS0.CTL.TS6 = 1;
+    ADC0.SS0.TSH.TSH6 = ADC_TSH_256;
+    ADC0.SS0.CTL.TS7 = 1;
+    ADC0.SS0.TSH.TSH7 = ADC_TSH_256;
+    ADC0.SS0.CTL.IE7 = 1;
+    ADC0.SS0.CTL.END7 = 1;
+    ADC0.ACTSS.ASEN0 = 1;
     // take and discard some initial measurements
-    for(int i = 0; i < 16; i++) {
-        ADC0.PSSI.SS3 = 1;      // trigger temperature measurement
-        while(!ADC0.RIS.INR3);  // wait for data
-        ADC0.ISC.IN3 = 1;       // clear flag
-        // drain FIFO
-        while(!ADC0.SS3.FSTAT.EMPTY)
-            tempValue = toCelsius(ADC0.SS3.FIFO.DATA);
-    }
-    // start next temperature measurement
-    ADC0.PSSI.SS3 = 1;
+    ADC0.PSSI.SS0 = 1;      // trigger temperature measurement
+    while(!ADC0.RIS.INR0);  // wait for data
+    ADC0.ISC.IN0 = 1;       // clear flag
+    // drain FIFO
+    uint32_t adc;
+    while(!ADC0.SS0.FSTAT.EMPTY)
+        adc = ADC0.SS0.FIFO.DATA;
+    adcValue = ADC_TO_32(adc);
 
     loadSom();
     if(isfinite(somNode[0][0])) {
@@ -105,8 +120,8 @@ void TCMP_init() {
         runComp(NULL);
     }
 
-    // schedule threads
-    runPeriodic(INTV_TEMP, runTemp, NULL);
+    // schedule thread
+    runSleep(INTV_TEMP, runTemp, NULL);
     runPeriodic(INTV_TCMP, runComp, NULL);
 }
 
@@ -252,21 +267,14 @@ static void updateSom(float temp, float comp) {
 }
 
 static void updateRegression() {
-    // compute means
-    float mean[3] = {0, 0, 0};
-    for(int i = 0; i < SOM_NODE_CNT; i++) {
-        const volatile float *row = somNode[i];
-        mean[0] += row[0] * row[2];
-        mean[1] += row[1] * row[2];
-        mean[2] += row[2];
-    }
+    float mean[3];
+    float coef[4];
 
+    // compute initial linear fit
+    fitLinear((float *) somNode, SOM_NODE_CNT, coef + 1, mean);
     // wait for sufficient data
     if(mean[2] < SOM_FILL_OFF)
         return;
-    // normalize means
-    mean[0] /= mean[2];
-    mean[1] /= mean[2];
     // update means
     tcmpMean[0] = mean[0];
     tcmpMean[1] = mean[1];
@@ -276,68 +284,55 @@ static void updateRegression() {
     if(mean[2] < SOM_FILL_REG)
         return;
 
-    // scratch variables
-    float coeff[3];
-    float scratch[SOM_NODE_CNT][2];
-    float xx, xy;
-
-    // linear coefficient
-    xx = 0; xy = 0;
-    for(int i = 0; i < SOM_NODE_CNT; i++) {
-        const volatile float *row = somNode[i];
-        float x = scratch[i][0] = row[0] - mean[0];
-        float y = scratch[i][1] = row[1] - mean[1];
-        xx += x * x * row[2];
-        xy += x * y * row[2];
-    }
-    coeff[0] = xy / xx;
-
-    // quadratic coefficient
-    xx = 0; xy = 0;
-    for(int i = 0; i < SOM_NODE_CNT; i++) {
-        const volatile float *row = somNode[i];
-        float x = scratch[i][0];
-        float y = (scratch[i][1] -= x * coeff[0]);
-        x = x * x;
-        xx += x * x * row[2];
-        xy += x * y * row[2];
-    }
-    coeff[1] = xy / xx;
-
-    // cubic coefficient
-    xx = 0; xy = 0;
-    for(int i = 0; i < SOM_NODE_CNT; i++) {
-        const volatile float *row = somNode[i];
-        float x = scratch[i][0];
-        float y = (scratch[i][1] -= x * x * coeff[1]);
-        x = x * x * x;
-        xx += x * x * row[2];
-        xy += x * y * row[2];
-    }
-    coeff[2] = xy / xx;
-
-
-    // compute RMS error
+    // compute residual error
     float rmse = 0;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
-        const volatile float *row = somNode[i];
+        float x = somNode[i][0] - mean[0];
+        float y = somNode[i][1] - mean[1];
+        y -= x * coef[1];
+        rmse += y * y * somNode[i][2];
+    }
+    rmse /= mean[2];
+    rmse *= 4;
 
-        float x = row[0] - mean[0];
-        float y = mean[1];
-        y += x * coeff[0];
-        y += x * x * coeff[1];
-        y += x * x * x * coeff[2];
+    // prune outliers
+    float scratch[SOM_NODE_CNT][3];
+    for(int i = 0; i < SOM_NODE_CNT; i++) {
+        // copy X and Y values
+        scratch[i][0] = somNode[i][0];
+        scratch[i][1] = somNode[i][1];
 
-        float error = y - row[1];
-        rmse += error * error * row[2];
+        // determine if sample should be excluded
+        float x = somNode[i][0] - mean[0];
+        float y = somNode[i][1] - mean[1];
+        y -= x * coef[1];
+        y *= y;
+        scratch[i][2] = (y <= rmse) ? somNode[i][2] : 0;
+    }
+
+    // compute final linear fit
+    fitLinear((float *) scratch, SOM_NODE_CNT, coef + 1, mean);
+
+    // compute residual error
+    rmse = 0;
+    for(int i = 0; i < SOM_NODE_CNT; i++) {
+        float x = scratch[i][0] - mean[0];
+        float y = scratch[i][1] - mean[1];
+        y -= x * coef[1];
+        rmse += y * y * scratch[i][2];
     }
     tcmpRmse = sqrtf(rmse / mean[2]);
 
-    // update coefficients
+    // quality check fit
     if(tcmpRmse <= REG_MIN_RMSE) {
-        tcmpCoeff[0] = coeff[0];
-        tcmpCoeff[1] = coeff[1];
-        tcmpCoeff[2] = coeff[2];
+        // update means
+        tcmpMean[0] = mean[0];
+        tcmpMean[1] = mean[1];
+        tcmpMean[2] = mean[2];
+        // update coefficients
+        tcmpCoeff[0] = coef[1];
+        tcmpCoeff[1] = 0;
+        tcmpCoeff[2] = 0;
     }
 }
 
@@ -368,4 +363,31 @@ unsigned statusSom(char *buffer) {
     end = append(end, "};\n");
 
     return end - buffer;
+}
+
+__attribute__((optimize(3)))
+static void fitLinear(const float * const data, const int cnt, float *coef, float *mean) {
+    // compute means
+    mean[0] = 0;
+    mean[1] = 0;
+    mean[2] = 0;
+    for(int i = 0; i < cnt; i++) {
+        const float *row = data + (i * 3);
+        mean[0] += row[0] * row[2];
+        mean[1] += row[1] * row[2];
+        mean[2] += row[2];
+    }
+    mean[0] /= mean[2];
+    mean[1] /= mean[2];
+
+    float xx = 0, xy = 0;
+    for(int i = 0; i < cnt; i++) {
+        const float *row = data + (i * 3);
+        float x = row[0] - mean[0];
+        float y = row[1] - mean[1];
+
+        xx += x * x * row[2];
+        xy += x * y * row[2];
+    }
+    coef[0] = xy / xx;
 }
