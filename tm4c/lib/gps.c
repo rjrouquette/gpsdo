@@ -22,7 +22,6 @@
 #define GPS_RST_THR (60)
 
 #define INTV_HEALTH  (1u << (32 - 1))
-#define INTV_RX_PARS (1u << (32 - 5))
 
 #define ADV_RING(ptr) ((ptr) = ((ptr) + 1) & GPS_RING_MASK)
 
@@ -33,6 +32,8 @@ static volatile int rxHead, rxTail;
 static volatile int txHead, txTail;
 static volatile int lenNEMA, lenUBX;
 static volatile int endUBX;
+
+static void * volatile taskParse;
 
 static volatile uint32_t lastReset;
 static volatile int fixGood;
@@ -59,7 +60,7 @@ static void sendUBX(uint8_t _class, uint8_t _id, int len, const uint8_t *payload
 static void configureGPS();
 
 static void runHealth(void *ref);
-static void runParser(void *ref);
+static void runParse(void *ref);
 
 static void startTx();
 
@@ -123,7 +124,7 @@ void GPS_init() {
 
     // start threads
     runSleep(INTV_HEALTH, runHealth, NULL);
-    runSleep(INTV_RX_PARS, runParser, NULL);
+    taskParse = runSleep(1ull << 36, runParse, NULL);
 }
 
 static void runHealth(void *ref) {
@@ -162,6 +163,8 @@ void ISR_UART3() {
             ADV_RING(head);
         }
         rxHead = head;
+        // wake parser
+        runWake(taskParse);
     }
 
     // TX FIFO watermark
@@ -194,7 +197,7 @@ static void startTx() {
     UART3.IM.TX = 1;
 }
 
-static void runParser(void *ref) {
+static void runParse(void *ref) {
     const int head = rxHead;
     int tail = rxTail;
     while(tail != head) {

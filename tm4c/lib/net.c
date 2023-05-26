@@ -32,9 +32,6 @@
 #define TX_RING_SIZE (32)
 #define TX_BUFF_SIZE (1520)
 
-#define RX_POLL_INTV (1u << (32 - 16))
-#define TX_POLL_INTV (1u << (32 - 16))
-
 #define ADV_RING_RX(ptr) ((ptr) = ((ptr) + 1) & RX_RING_MASK)
 #define ADV_RING_TX(ptr) ((ptr) = ((ptr) + 1) & TX_RING_MASK)
 
@@ -43,15 +40,15 @@ static volatile int ptrTX = 0;
 static volatile int endTX = 0;
 static volatile int phyStatus = 0;
 
+static void * volatile taskRx;
 static EMAC_RX_DESC rxDesc[RX_RING_SIZE];
 static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 
-static volatile bool txRunning;
+static void * volatile taskTx;
 static struct { CallbackNetTX call; void *ref; } txCallback[TX_RING_SIZE];
 static EMAC_TX_DESC txDesc[TX_RING_SIZE];
 static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
-static const uint8_t arpMultiMac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 void PTP_process(uint8_t *frame, int flen);
 
@@ -179,8 +176,12 @@ static void initMAC() {
     EMAC0.TXDLADDR = (uint32_t) txDesc;
     EMAC0.DMAOPMODE.ST = 1;
     EMAC0.DMAOPMODE.SR = 1;
+    // enable RX/TX interrupts
+    EMAC0.DMAIM.RIE = 1;
+    EMAC0.DMAIM.TIE = 1;
+    EMAC0.DMAIM.NIE = 1;
 
-    // set frame filter moe
+    // set frame filter mode
     EMAC0.FRAMEFLTR.RA = 1;
     // verify all checksum
     EMAC0.CFG.IPC = 1;
@@ -217,6 +218,16 @@ void ISR_EthernetMAC(void) {
         uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYBMSR);
         if(temp & 4) phyStatus |= 1;
         return;
+    }
+
+    if(EMAC0.DMARIS.RI) {
+        EMAC0.DMARIS.RI = 1;
+        runWake(taskRx);
+    }
+
+    if(EMAC0.DMARIS.TI) {
+        EMAC0.DMARIS.TI = 1;
+        runWake(taskTx);
     }
 }
 
@@ -269,12 +280,6 @@ static void runTx(void *ref) {
         // advance pointer
         ADV_RING_TX(end);
     }
-
-    // shutdown thread if there is no more work
-    if(end == ptr) {
-        runCancel(runTx, NULL);
-        txRunning = false;
-    }
     endTX = end;
 }
 
@@ -290,8 +295,9 @@ void NET_init() {
     DHCP_init();
     DNS_init();
 
-    // schedule RX processing
-    runSleep(RX_POLL_INTV, runRx, NULL);
+    // schedule RX/TX processing
+    taskRx = runSleep(1ull << 36, runRx, NULL);
+    taskTx = runSleep(1ull << 36, runTx, NULL);
 }
 
 void NET_getMacAddress(char *strAddr) {
@@ -331,14 +337,10 @@ void NET_transmit(int desc, int len) {
     // set transmission size
     txDesc[desc].TDES1.TBS1 = len;
     // release descriptor
+    txDesc[desc].TDES0.IC = 1;
     txDesc[desc].TDES0.OWN = 1;
     // wake TX DMA
     EMAC0.TXPOLLD = 1;
-    // start thread
-    if(!txRunning) {
-        runSleep(TX_POLL_INTV, runTx, NULL);
-        txRunning = true;
-    }
 }
 
 /**

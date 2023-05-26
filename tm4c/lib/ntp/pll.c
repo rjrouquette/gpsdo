@@ -61,8 +61,8 @@ void PLL_updateOffset(int interval, int64_t offset) {
         offsetMean = fltOffset;
         offsetVar = fltOffset * fltOffset;
         offsetMS = offsetVar;
-        offsetRms = fltOffset;
-        offsetStdDev = fltOffset;
+        offsetRms = fabsf(fltOffset);
+        offsetStdDev = fabsf(fltOffset);
     } else {
         // update stats
         float diff = fltOffset - offsetMean;
