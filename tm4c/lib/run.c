@@ -17,7 +17,8 @@
 enum RunType {
     RunOnce,
     RunSleep,
-    RunPeriodic
+    RunPeriodic,
+    RunOnceExt
 };
 
 typedef struct Task {
@@ -37,12 +38,8 @@ typedef struct Task {
     uint32_t prevTicks;
 
     // extension fields
-    struct Extension {
-        SchedulerCallback runCall;
-        void *runRef;
-        uint32_t countDown;
-        uint32_t finalIntv;
-    } ext;
+    SchedulerCallback extCall;
+    uint32_t extCount;
 } Task;
 
 #define SLOT_CNT (32)
@@ -53,7 +50,8 @@ static volatile Task taskQueue;
 
 static Task * allocTask();
 
-static void doOnceExtended(void *ref);
+FAST_FUNC
+static void doNothing(void *ref) { }
 
 void initScheduler() {
     // initialize queue nodes
@@ -95,8 +93,26 @@ FAST_FUNC
 static void reschedule(Task *node) {
     __disable_irq();
     // set next run time
-    uint32_t nextRun = node->runIntv;
-    nextRun += (node->runType == RunPeriodic) ? node->runNext : CLK_MONO_RAW;
+    uint32_t nextRun;
+    if(node->runType == RunPeriodic) {
+        nextRun = node->runNext + node->runIntv;
+    }
+    else if(node->runType == RunSleep) {
+        nextRun = CLK_MONO_RAW + node->runIntv;
+    }
+    else if(node->runType == RunOnceExt) {
+        if(--node->extCount == 0) {
+            nextRun = node->runNext + node->runIntv;
+            node->runCall = node->extCall;
+            node->runType = RunOnce;
+        }
+        else {
+            nextRun = node->runNext + CLK_FREQ;
+        }
+    }
+    else {
+        nextRun = node->runNext;
+    }
     node->runNext = nextRun;
 
     // locate optimal insertion point
@@ -211,43 +227,23 @@ void * runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref) {
     return node;
 }
 
-FAST_FUNC
-static void doOnceExtended(void *ref) {
-    Task *this = (Task *) ref;
-
-    if(this->ext.countDown == 0) {
-        // run the task
-        (*(this->ext.runCall))(this->ext.runRef);
-        // flag for removal from queue
-        this->runType = RunOnce;
-    }
-    else if(--this->ext.countDown == 0) {
-        // set final interval once countdown is complete
-        this->runIntv = this->ext.finalIntv;
-    }
-}
-
 static void * runOnceExtended(uint64_t delay, SchedulerCallback callback, void *ref) {
     // allocate queue node
     Task *node = allocTask();
-    node->runType = RunPeriodic;
-    node->runCall = doOnceExtended;
-    node->runRef = node;
-    node->runIntv = CLK_FREQ;
-
-    // configure extension
-    node->ext.runCall = callback;
-    node->ext.runRef = ref;
+    node->runType = RunOnceExt;
+    node->runCall = doNothing;
+    node->runRef = ref;
+    node->extCall = callback;
 
     // convert fixed-point interval to raw monotonic domain
     union fixed_32_32 scratch;
     scratch.full = delay;
     // set countdown
-    node->ext.countDown = scratch.ipart - 1;
+    node->extCount = scratch.ipart - 1;
     // set final interval
     scratch.ipart = 1;
     scratch.full *= CLK_FREQ;
-    node->ext.finalIntv = scratch.ipart;
+    node->runIntv = scratch.ipart;
 
     // start countdown immediately
     node->runNext = CLK_MONO_RAW + CLK_FREQ;
@@ -285,8 +281,10 @@ void runWake(void *taskHandle) {
     // set next run time
     const uint32_t nextRun = CLK_MONO_RAW;
     // schedule task to run immediately
-    node->ext.countDown = 0;
     node->runNext = nextRun;
+    node->extCount = 0;
+    if(node->runType == RunOnceExt)
+        node->runCall = node->extCall;
 
     // locate optimal insertion point
     Task *ins = taskQueue.qNext;
@@ -317,9 +315,9 @@ void runCancel(SchedulerCallback callback, void *ref) {
             if((ref == NULL) || (node->runRef == ref))
                 runRemove(node);
         }
-        else if(node->runCall == doOnceExtended) {
+        else if(node->runCall == doNothing) {
             // additional check for extended tasks
-            if((node->ext.runCall == callback) && ((ref == NULL) || (node->ext.runRef == ref)))
+            if((node->extCall == callback) && ((ref == NULL) || (node->runRef == ref)))
                 runRemove(node);
         }
     }
@@ -340,7 +338,7 @@ void runRemove(void *taskHandle) {
 
 
 static volatile uint32_t prevQuery;
-static const char typeCode[3] = "OSP";
+static const char typeCode[4] = "OSPE";
 
 unsigned runStatus(char *buffer) {
     char *end = buffer;
@@ -382,19 +380,11 @@ unsigned runStatus(char *buffer) {
     for(int i = 0; i < cnt; i++) {
         Task *node = taskPool + topList[i];
 
-        if(node->runCall == doOnceExtended) {
-            *(end++) = 'E';
-            *(end++) = ' ';
-            end += toHex((uint32_t) node->ext.runCall, 5, '0', end);
-            *(end++) = ' ';
-            end += toHex((uint32_t) node->ext.runRef, 8, '0', end);
-        } else {
-            *(end++) = typeCode[node->runType];
-            *(end++) = ' ';
-            end += toHex((uint32_t) node->runCall, 5, '0', end);
-            *(end++) = ' ';
-            end += toHex((uint32_t) node->runRef, 8, '0', end);
-        }
+        *(end++) = typeCode[node->runType];
+        *(end++) = ' ';
+        end += toHex((uint32_t) node->runCall, 5, '0', end);
+        *(end++) = ' ';
+        end += toHex((uint32_t) node->runRef, 8, '0', end);
         *(end++) = ' ';
         end += fmtFloat(scale * (float) node->prevHits, 8, 0, end);
         *(end++) = ' ';
