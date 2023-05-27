@@ -339,7 +339,7 @@ void runRemove(void *taskHandle) {
 
 
 
-static volatile uint32_t prevQuery, idleHits, idleTicks;
+static volatile uint32_t prevQuery;
 static const char typeCode[3] = "OSP";
 
 unsigned runStatus(char *buffer) {
@@ -413,19 +413,19 @@ unsigned runStatus(char *buffer) {
     *(end++) = '\n';
 
     end += padCopy(17, ' ', end, "Idle ", 5);
-    end += fmtFloat(scale * (float) (taskQueue.runHits - idleHits), 8, 0, end);
+    end += fmtFloat(scale * (float) (taskQueue.runHits - taskQueue.prevHits), 8, 0, end);
     *(end++) = ' ';
-    end += fmtFloat(scale * 0.008f * (float) (taskQueue.runTicks - idleTicks), 8, 0, end);
+    end += fmtFloat(scale * 0.008f * (float) (taskQueue.runTicks - taskQueue.prevTicks), 8, 0, end);
     *(end++) = '\n';
 
-    idleHits = taskQueue.runHits;
-    idleTicks = taskQueue.runTicks;
-
+    // set prior state
     for(int i = 0; i < cnt; i++) {
         Task *node = taskPool + topList[i];
         node->prevHits = node->runHits;
         node->prevTicks = node->runTicks;
     }
+    taskQueue.prevHits = taskQueue.runHits;
+    taskQueue.prevTicks = taskQueue.runTicks;
 
     return end - buffer;
 }
