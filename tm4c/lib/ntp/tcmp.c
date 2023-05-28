@@ -12,9 +12,8 @@
 #include "../run.h"
 #include "tcmp.h"
 
-#define ADC_TO_32(x) ((x) << 20)
-#define TEMP_RATE (12)
-#define TEMP_SCALE (0x1p-20f)
+#define ADC_RATE_MEAN (0x1p-9f)
+#define ADC_RATE_VAR  (0x1p-10f)
 
 #define INTV_TEMP (1u << (32 - 10)) // 1024 Hz
 #define INTV_TCMP (1u << (32 - 4))  // 16 Hz
@@ -29,7 +28,8 @@
 
 #define REG_MIN_RMSE (250e-9f)
 
-static volatile uint32_t adcValue;
+static volatile float adcMean;
+static volatile float adcVar;
 static volatile float tempValue;
 
 static volatile uint32_t tcmpSaved;
@@ -57,20 +57,32 @@ static void fitLinear(const float *data, int cnt, float *coef, float *mean);
  */
 static float tcmpEstimate(float temp);
 
-static void runTemp(void *ref) {
-    uint32_t temp = adcValue;
-    while(!ADC0.SS0.FSTAT.EMPTY) {
-        int32_t delta = ADC0.SS0.FIFO.DATA;
-        delta = ADC_TO_32(delta) - temp;
-        temp += delta >> TEMP_RATE;
-    }
-    adcValue = temp;
+static void runAdc(void *ref) {
+    uint32_t acc;
+    // ADC FIFO will always contain eight samples
+    acc  = ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    // trigger next sample
     ADC0.PSSI.SS0 = 1;
+
+    // store result
+    float adcValue = 0x1p-3f * (float) acc;
+    float diff = adcValue - adcMean;
+    float var = diff * diff;
+    if(var <= 4 * adcVar)
+        adcMean += ADC_RATE_MEAN * diff;
+    adcVar += ADC_RATE_VAR * (var - adcVar);
 }
 
 static void runComp(void *ref) {
     // update temperature compensation
-    tempValue = 147.5f - (0.0604248047f * TEMP_SCALE * (float) adcValue);
+    tempValue = 147.5f - (0.0604248047f * adcMean);
     tcmpValue = tcmpEstimate(tempValue);
     CLK_COMP_setComp((int32_t) (0x1p32f * tcmpValue));
 }
@@ -108,11 +120,20 @@ void TCMP_init() {
     ADC0.PSSI.SS0 = 1;      // trigger temperature measurement
     while(!ADC0.RIS.INR0);  // wait for data
     ADC0.ISC.IN0 = 1;       // clear flag
-    // drain FIFO
-    uint32_t adc;
-    while(!ADC0.SS0.FSTAT.EMPTY)
-        adc = ADC0.SS0.FIFO.DATA;
-    adcValue = ADC_TO_32(adc);
+    uint32_t acc;
+    // ADC FIFO will always contain eight samples
+    acc  = ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    acc += ADC0.SS0.FIFO.DATA;
+    // trigger next sample
+    ADC0.PSSI.SS0 = 1;
+    // store result
+    adcMean = 0x1p-3f * (float) acc;
 
     loadSom();
     if(isfinite(somNode[0][0])) {
@@ -121,7 +142,7 @@ void TCMP_init() {
     }
 
     // schedule thread
-    runSleep(INTV_TEMP, runTemp, NULL);
+    runPeriodic(INTV_TEMP, runAdc, NULL);
     runPeriodic(INTV_TCMP, runComp, NULL);
 }
 
@@ -152,6 +173,11 @@ unsigned TCMP_status(char *buffer) {
 
     tmp[fmtFloat(tempValue, 12, 4, tmp)] = 0;
     end = append(end, "  - temp:    ");
+    end = append(end, tmp);
+    end = append(end, " C\n");
+
+    tmp[fmtFloat(0.0604248047f * sqrtf(adcVar), 12, 4, tmp)] = 0;
+    end = append(end, "  - noise:   ");
     end = append(end, tmp);
     end = append(end, " C\n");
 
