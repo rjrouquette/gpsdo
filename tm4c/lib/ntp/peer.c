@@ -241,15 +241,29 @@ static void NtpPeer_run(void *pObj) {
         scratch.full |= 1ull << (32 + this->source.poll);
         // schedule next poll
         runCancel(NtpPeer_run, this);
-        runOnce(scratch.full, NtpPeer_run, this);
+        this->pollWait = scratch.ipart;
+        this->pollTrim = scratch.fpart;
+        if(scratch.ipart) {
+            runPeriodic(1ull << 32, NtpPeer_run, this);
+        } else {
+            runOnce(scratch.fpart, NtpPeer_run, this);
+        }
         return;
     }
 
     // requires hardware time synchronization
-    // wait for valid MAC address
+    // requires valid MAC address
     if(clkMonoEth == 0 || checkMac(this)) {
         runCancel(NtpPeer_run, this);
         runOnce(IDLE_INTV, NtpPeer_run, this);
+        return;
+    }
+
+    if(this->pollWait) {
+        if(--this->pollWait == 0) {
+            runCancel(NtpPeer_run, this);
+            runOnce(this->pollTrim, NtpPeer_run, this);
+        }
         return;
     }
 

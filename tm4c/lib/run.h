@@ -61,12 +61,6 @@ void runWake(void *taskHandle);
 void runCancel(SchedulerCallback callback, void *ref);
 
 /**
- * Cancel execution of specific task and release its scheduling resources
- * @param taskHandle task to cancel
- */
-void runRemove(void *taskHandle);
-
-/**
  * Write current status of the scheduler to a buffer
  * @param buffer destination for status information
  * @return number of bytes written to buffer

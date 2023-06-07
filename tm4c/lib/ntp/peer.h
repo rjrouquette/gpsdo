@@ -26,6 +26,8 @@ struct NtpPeer {
 
     // state machine
     uint64_t pollStart;
+    uint32_t pollWait;
+    uint32_t pollTrim;
     uint32_t lastArp;
 
     bool pollActive;
