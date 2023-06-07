@@ -198,9 +198,8 @@ static void startTx() {
 }
 
 static void runParse(void *ref) {
-    const int head = rxHead;
     int tail = rxTail;
-    while(tail != head) {
+    while(tail != rxHead) {
         // get next byte
         uint8_t byte = rxBuff[tail];
         ADV_RING(tail);
