@@ -61,38 +61,38 @@ static Task * allocTask() {
     __disable_irq();
     if(taskFree == NULL)
         faultBlink(3, 1);
-    Task *node = taskFree;
-    taskFree = node->qNext;
+    Task *task = taskFree;
+    taskFree = task->qNext;
     __enable_irq();
-    memset(node, 0, sizeof(Task));
-    return node;
+    memset(task, 0, sizeof(Task));
+    return task;
 }
 
 FAST_FUNC
-static void freeTask(Task *node) {
+static void freeTask(Task *task) {
     // remove from queue
-    node->qPrev->qNext = node->qNext;
-    node->qNext->qPrev = node->qPrev;
+    task->qPrev->qNext = task->qNext;
+    task->qNext->qPrev = task->qPrev;
     // push onto free stack
-    node->qNext = taskFree;
-    taskFree = node;
+    task->qNext = taskFree;
+    taskFree = task;
 }
 
 FAST_FUNC
-static void reschedule(Task *node) {
+static void reschedule(Task *task) {
     // remove from queue
-    node->qPrev->qNext = node->qNext;
-    node->qNext->qPrev = node->qPrev;
+    task->qPrev->qNext = task->qNext;
+    task->qNext->qPrev = task->qPrev;
 
     // set next run time
     uint32_t nextRun;
-    if(node->runType == RunPeriodic)
-        nextRun = node->runNext + node->runIntv;
-    else if(node->runType == RunSleep)
-        nextRun = CLK_MONO_RAW + node->runIntv;
+    if(task->runType == RunPeriodic)
+        nextRun = task->runNext + task->runIntv;
+    else if(task->runType == RunSleep)
+        nextRun = CLK_MONO_RAW + task->runIntv;
     else
-        nextRun = node->runNext;
-    node->runNext = nextRun;
+        nextRun = task->runNext;
+    task->runNext = nextRun;
 
     // locate optimal insertion point
     Task *ins = queueHead;
@@ -103,10 +103,10 @@ static void reschedule(Task *node) {
     }
 
     // insert task into the scheduling queue
-    node->qNext = ins;
-    node->qPrev = ins->qPrev;
-    ins->qPrev = node;
-    node->qPrev->qNext = node;
+    task->qNext = ins;
+    task->qPrev = ins->qPrev;
+    ins->qPrev = task;
+    task->qPrev->qNext = task;
 }
 
 FAST_FUNC
@@ -135,10 +135,10 @@ void runScheduler() {
     }
 }
 
-static void schedule(Task *node) {
+static void schedule(Task *task) {
     __disable_irq();
     // locate optimal insertion point
-    const uint32_t runNext = node->runNext;
+    const uint32_t runNext = task->runNext;
     Task *ins = queueHead;
     while(ins != queueRoot) {
         if(((int32_t) (runNext - ins->runNext)) < 0)
@@ -147,57 +147,57 @@ static void schedule(Task *node) {
     }
 
     // insert task into the scheduling queue
-    node->qNext = ins;
-    node->qPrev = ins->qPrev;
-    ins->qPrev = node;
-    node->qPrev->qNext = node;
+    task->qNext = ins;
+    task->qPrev = ins->qPrev;
+    ins->qPrev = task;
+    task->qPrev->qNext = task;
     __enable_irq();
 }
 
 void * runSleep(uint64_t delay, RunCall callback, void *ref) {
-    Task *node = allocTask();
-    node->runType = RunSleep;
-    node->runCall = callback;
-    node->runRef = ref;
+    Task *task = allocTask();
+    task->runType = RunSleep;
+    task->runCall = callback;
+    task->runRef = ref;
 
     // convert fixed-point interval to raw monotonic domain
     union fixed_32_32 scratch;
     scratch.full = delay;
     scratch.full *= CLK_FREQ;
-    node->runIntv = scratch.ipart;
+    task->runIntv = scratch.ipart;
 
     // start immediately
-    node->runNext = CLK_MONO_RAW;
+    task->runNext = CLK_MONO_RAW;
     // add to schedule
-    schedule(node);
-    return node;
+    schedule(task);
+    return task;
 }
 
 void * runPeriodic(uint64_t interval, RunCall callback, void *ref) {
-    Task *node = allocTask();
-    node->runType = RunPeriodic;
-    node->runCall = callback;
-    node->runRef = ref;
+    Task *task = allocTask();
+    task->runType = RunPeriodic;
+    task->runCall = callback;
+    task->runRef = ref;
 
     // convert fixed-point interval to raw monotonic domain
     union fixed_32_32 scratch;
     scratch.full = interval;
     scratch.full *= CLK_FREQ;
-    node->runIntv = scratch.ipart;
+    task->runIntv = scratch.ipart;
 
     // start immediately
-    node->runNext = CLK_MONO_RAW;
+    task->runNext = CLK_MONO_RAW;
     // add to schedule
-    schedule(node);
-    return node;
+    schedule(task);
+    return task;
 }
 
 void * runOnce(uint64_t delay, RunCall callback, void *ref) {
-    Task *node = allocTask();
-    node->runType = RunOnce;
-    node->runCall = callback;
-    node->runRef = ref;
-    node->runIntv = 0;
+    Task *task = allocTask();
+    task->runType = RunOnce;
+    task->runCall = callback;
+    task->runRef = ref;
+    task->runIntv = 0;
 
     // convert fixed-point interval to raw monotonic domain
     union fixed_32_32 scratch;
@@ -205,22 +205,22 @@ void * runOnce(uint64_t delay, RunCall callback, void *ref) {
     scratch.full *= CLK_FREQ;
 
     // start after delay
-    node->runNext = CLK_MONO_RAW + scratch.ipart;
+    task->runNext = CLK_MONO_RAW + scratch.ipart;
     // add to schedule
-    schedule(node);
-    return node;
+    schedule(task);
+    return task;
 }
 
 void runWake(void *taskHandle) {
     __disable_irq();
-    Task *node = taskHandle;
+    Task *task = taskHandle;
     // remove from queue
-    node->qPrev->qNext = node->qNext;
-    node->qNext->qPrev = node->qPrev;
+    task->qPrev->qNext = task->qNext;
+    task->qNext->qPrev = task->qPrev;
 
     // set next run time
     const uint32_t nextRun = CLK_MONO_RAW;
-    node->runNext = nextRun;
+    task->runNext = nextRun;
 
     // locate optimal insertion point
     Task *ins = queueHead;
@@ -231,10 +231,10 @@ void runWake(void *taskHandle) {
     }
 
     // insert task into the scheduling queue
-    node->qNext = ins;
-    node->qPrev = ins->qPrev;
-    ins->qPrev = node;
-    node->qPrev->qNext = node;
+    task->qNext = ins;
+    task->qPrev = ins->qPrev;
+    ins->qPrev = task;
+    task->qPrev->qNext = task;
     __enable_irq();
 }
 
@@ -253,10 +253,10 @@ void runCancel(RunCall callback, void *ref) {
     // match by reference
     if(callback == NULL) {
         __disable_irq();
-        Task *next = queueHead;
-        while(next != queueRoot) {
-            Task *task = next;
-            next = next->qNext;
+        Task *iter = queueHead;
+        while(iter != queueRoot) {
+            Task *task = iter;
+            iter = iter->qNext;
 
             if (task->runRef == ref)
                 cancelTask(task);
@@ -268,10 +268,10 @@ void runCancel(RunCall callback, void *ref) {
     // match by callback
     if(ref == NULL) {
         __disable_irq();
-        Task *next = queueHead;
-        while (next != queueRoot) {
-            Task *task = next;
-            next = next->qNext;
+        Task *iter = queueHead;
+        while (iter != queueRoot) {
+            Task *task = iter;
+            iter = iter->qNext;
 
             if (task->runCall == callback)
                 cancelTask(task);
@@ -282,10 +282,10 @@ void runCancel(RunCall callback, void *ref) {
 
     // match both callback and reference
     __disable_irq();
-    Task *next = queueHead;
-    while (next != queueRoot) {
-        Task *task = next;
-        next = next->qNext;
+    Task *iter = queueHead;
+    while (iter != queueRoot) {
+        Task *task = iter;
+        iter = iter->qNext;
 
         if ((task->runCall == callback) && (task->runRef == ref))
             cancelTask(task);
@@ -303,10 +303,10 @@ unsigned runStatus(char *buffer) {
     Task *tasks[SLOT_CNT];
 
     __disable_irq();
-    Task *next = queueHead;
-    while(next != queueRoot) {
-        tasks[taskCount++] = next;
-        next = next->qNext;
+    Task *iter = queueHead;
+    while(iter != queueRoot) {
+        tasks[taskCount++] = iter;
+        iter = iter->qNext;
     }
     __enable_irq();
 
