@@ -7,7 +7,10 @@
 
 #include <stdint.h>
 
-typedef void (*SchedulerCallback)(void *ref);
+/**
+ * Callback function typedef
+ */
+typedef void (*RunCall)(void *ref);
 
 /**
  * Initialize scheduler
@@ -27,7 +30,7 @@ void runScheduler();
  * @param ref context pointer for task
  * @return task handle
  */
-void * runSleep(uint64_t delay, SchedulerCallback callback, void *ref);
+void * runSleep(uint64_t delay, RunCall callback, void *ref);
 
 /**
  * Schedule task to execute at a regular interval (exact execution rate)
@@ -36,7 +39,7 @@ void * runSleep(uint64_t delay, SchedulerCallback callback, void *ref);
  * @param ref context pointer for task
  * @return task handle
  */
-void * runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref);
+void * runPeriodic(uint64_t interval, RunCall callback, void *ref);
 
 /**
  * Schedule task to execute after a delay
@@ -45,7 +48,7 @@ void * runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref);
  * @param ref context pointer for task
  * @return task handle
  */
-void * runOnce(uint64_t delay, SchedulerCallback callback, void *ref);
+void * runOnce(uint64_t delay, RunCall callback, void *ref);
 
 /**
  * Wake a sleeping task
@@ -58,7 +61,7 @@ void runWake(void *taskHandle);
  * @param callback task entry point
  * @param ref context pointer for task (if NULL, all entries matching callback are removed)
  */
-void runCancel(SchedulerCallback callback, void *ref);
+void runCancel(RunCall callback, void *ref);
 
 /**
  * Write current status of the scheduler to a buffer

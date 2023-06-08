@@ -14,11 +14,11 @@
 
 #define FAST_FUNC __attribute__((optimize(3)))
 
-enum RunType {
+typedef enum RunType {
     RunOnce,
     RunSleep,
     RunPeriodic
-};
+} RunType;
 
 typedef struct Task {
     // queue pointers
@@ -26,8 +26,8 @@ typedef struct Task {
     struct Task *qPrev;
 
     // task fields
-    enum RunType runType;
-    SchedulerCallback runCall;
+    RunType runType;
+    RunCall runCall;
     void *runRef;
     uint32_t runNext;
     uint32_t runIntv;
@@ -153,7 +153,7 @@ static void schedule(Task *node) {
     __enable_irq();
 }
 
-void * runSleep(uint64_t delay, SchedulerCallback callback, void *ref) {
+void * runSleep(uint64_t delay, RunCall callback, void *ref) {
     Task *node = allocTask();
     node->runType = RunSleep;
     node->runCall = callback;
@@ -172,7 +172,7 @@ void * runSleep(uint64_t delay, SchedulerCallback callback, void *ref) {
     return node;
 }
 
-void * runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref) {
+void * runPeriodic(uint64_t interval, RunCall callback, void *ref) {
     Task *node = allocTask();
     node->runType = RunPeriodic;
     node->runCall = callback;
@@ -191,7 +191,7 @@ void * runPeriodic(uint64_t interval, SchedulerCallback callback, void *ref) {
     return node;
 }
 
-void * runOnce(uint64_t delay, SchedulerCallback callback, void *ref) {
+void * runOnce(uint64_t delay, RunCall callback, void *ref) {
     Task *node = allocTask();
     node->runType = RunOnce;
     node->runCall = callback;
@@ -237,7 +237,7 @@ void runWake(void *taskHandle) {
     __enable_irq();
 }
 
-void runCancel(SchedulerCallback callback, void *ref) {
+void runCancel(RunCall callback, void *ref) {
     __disable_irq();
     Task *next = taskQueue.qNext;
     while(next != queueRoot) {

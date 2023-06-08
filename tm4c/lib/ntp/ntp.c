@@ -346,7 +346,7 @@ static void ntpRemovePeer(NtpSource *peer) {
         selectedSource = NULL;
 
     // remove from task schedule
-    runCancel((SchedulerCallback) peer->run, peer);
+    runCancel(peer->run, peer);
     // deregister peer
     peer->id = 0;
     uint32_t slot = -1u;
