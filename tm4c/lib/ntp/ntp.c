@@ -102,7 +102,7 @@ void NTP_init() {
     NtpGPS_init(&srcGps);
     sources[cntSources++] = (void *) &srcGps;
     // 16 Hz polling rate for sources
-    runSleep(SRC_UPDT_INTV, srcGps.source.run, &srcGps);
+    runSleep(SRC_UPDT_INTV, NtpGPS_run, &srcGps);
 
     // update source selection at 16 Hz
     runSleep(SRC_UPDT_INTV, runSelect, NULL);
@@ -328,11 +328,11 @@ static NtpSource* ntpAllocPeer() {
         NtpPeer *slot = peerSlots + i;
         if(slot->source.id == 0) {
             // initialize peer record
-            (*(slot->source.init))(slot);
+            NtpPeer_init(slot);
             // append to source list
             sources[cntSources++] = (NtpSource *) slot;
             // start source updates
-            runOnce((1u << 31), slot->source.run, slot);
+            runOnce((1u << 31), NtpPeer_run, slot);
             // return instance
             return (NtpSource *) slot;
         }
@@ -346,7 +346,7 @@ static void ntpRemovePeer(NtpSource *peer) {
         selectedSource = NULL;
 
     // remove from task schedule
-    runCancel(peer->run, peer);
+    runCancel(NULL, peer);
     // deregister peer
     peer->id = 0;
     uint32_t slot = -1u;

@@ -223,7 +223,7 @@ static void finishPoll(NtpPeer *this) {
 }
 
 
-static void NtpPeer_run(void *pObj) {
+void NtpPeer_run(void *pObj) {
     // typecast "this" pointer
     NtpPeer *this = (NtpPeer *) pObj;
 
@@ -240,7 +240,7 @@ static void NtpPeer_run(void *pObj) {
         scratch.full >>= 36 - this->source.poll;
         scratch.full |= 1ull << (32 + this->source.poll);
         // schedule next poll
-        runCancel(NtpPeer_run, this);
+        runCancel(NULL, this);
         this->pollWait = scratch.ipart;
         this->pollTrim = scratch.fpart;
         if(scratch.ipart) {
@@ -254,14 +254,14 @@ static void NtpPeer_run(void *pObj) {
     // requires hardware time synchronization
     // requires valid MAC address
     if(clkMonoEth == 0 || checkMac(this)) {
-        runCancel(NtpPeer_run, this);
+        runCancel(NULL, this);
         runOnce(IDLE_INTV, NtpPeer_run, this);
         return;
     }
 
     if(this->pollWait) {
         if(--this->pollWait == 0) {
-            runCancel(NtpPeer_run, this);
+            runCancel(NULL, this);
             runOnce(this->pollTrim, NtpPeer_run, this);
         }
         return;
@@ -277,7 +277,7 @@ static void NtpPeer_run(void *pObj) {
     // send poll packet
     sendPoll(this);
     this->pktSent = true;
-    runCancel(NtpPeer_run, this);
+    runCancel(NULL, this);
     runSleep(ACTV_INTV, NtpPeer_run, this);
 }
 
@@ -287,9 +287,6 @@ void NtpPeer_init(void *pObj) {
 
     // typecast "this" pointer
     NtpPeer *this = (NtpPeer *) pObj;
-    // set virtual functions
-    this->source.init = NtpPeer_init;
-    this->source.run = NtpPeer_run;
     // set mode and state
     this->source.lost = true;
     this->source.mode = RPY_SD_MD_CLIENT;

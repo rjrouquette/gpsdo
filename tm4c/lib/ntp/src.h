@@ -21,9 +21,6 @@ struct NtpPollSample {
 typedef struct NtpPollSample NtpPollSample;
 
 struct NtpSource {
-    void (*init)(void *);
-    void (*run)(void *);
-
     // filter samples
     struct NtpPollSample pollSample[NTP_MAX_HISTORY];
     uint8_t samplePtr;

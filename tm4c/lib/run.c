@@ -37,6 +37,7 @@ typedef struct Task {
 static Task *taskFree;
 static Task taskPool[SLOT_CNT];
 static volatile Task taskQueue;
+#define queueHead (taskQueue.qNext)
 #define queueRoot ((Task *) &taskQueue)
 
 static Task * allocTask();
@@ -94,7 +95,7 @@ static void reschedule(Task *node) {
     node->runNext = nextRun;
 
     // locate optimal insertion point
-    Task *ins = taskQueue.qNext;
+    Task *ins = queueHead;
     while(ins != queueRoot) {
         if(((int32_t) (nextRun - ins->runNext)) < 0)
             break;
@@ -114,7 +115,7 @@ void runScheduler() {
     // infinite loop
     for (;;) {
         // check for scheduled tasks
-        Task *task = taskQueue.qNext;
+        Task *task = queueHead;
         if(((int32_t) (CLK_MONO_RAW - task->runNext)) < 0)
             continue;
 
@@ -138,7 +139,7 @@ static void schedule(Task *node) {
     __disable_irq();
     // locate optimal insertion point
     const uint32_t runNext = node->runNext;
-    Task *ins = taskQueue.qNext;
+    Task *ins = queueHead;
     while(ins != queueRoot) {
         if(((int32_t) (runNext - ins->runNext)) < 0)
             break;
@@ -222,7 +223,7 @@ void runWake(void *taskHandle) {
     node->runNext = nextRun;
 
     // locate optimal insertion point
-    Task *ins = taskQueue.qNext;
+    Task *ins = queueHead;
     while(ins != queueRoot) {
         if(((int32_t) (nextRun - ins->runNext)) < 0)
             break;
@@ -237,24 +238,57 @@ void runWake(void *taskHandle) {
     __enable_irq();
 }
 
+static void cancelTask(Task *task) {
+    // disable task
+    task->runCall = doNothing;
+    task->runRef = NULL;
+    task->runType = RunOnce;
+    // explicitly delete task if it is not currently running
+    if (task != queueHead) {
+        freeTask(task);
+    }
+}
+
 void runCancel(RunCall callback, void *ref) {
+    // match by reference
+    if(callback == NULL) {
+        __disable_irq();
+        Task *next = queueHead;
+        while(next != queueRoot) {
+            Task *task = next;
+            next = next->qNext;
+
+            if (task->runRef == ref)
+                cancelTask(task);
+        }
+        __enable_irq();
+        return;
+    }
+
+    // match by callback
+    if(ref == NULL) {
+        __disable_irq();
+        Task *next = queueHead;
+        while (next != queueRoot) {
+            Task *task = next;
+            next = next->qNext;
+
+            if (task->runCall == callback)
+                cancelTask(task);
+        }
+        __enable_irq();
+        return;
+    }
+
+    // match both callback and reference
     __disable_irq();
-    Task *next = taskQueue.qNext;
-    while(next != queueRoot) {
-        Task *node = next;
+    Task *next = queueHead;
+    while (next != queueRoot) {
+        Task *task = next;
         next = next->qNext;
 
-        if(node->runCall == callback) {
-            if((ref == NULL) || (node->runRef == ref)) {
-                // prevent task from running
-                node->runCall = doNothing;
-                node->runType = RunOnce;
-                // explicitly delete task if it is not currently running
-                if(node != taskQueue.qNext) {
-                    freeTask(node);
-                }
-            }
-        }
+        if ((task->runCall == callback) && (task->runRef == ref))
+            cancelTask(task);
     }
     __enable_irq();
 }
@@ -269,7 +303,7 @@ unsigned runStatus(char *buffer) {
     Task *tasks[SLOT_CNT];
 
     __disable_irq();
-    Task *next = taskQueue.qNext;
+    Task *next = queueHead;
     while(next != queueRoot) {
         tasks[taskCount++] = next;
         next = next->qNext;

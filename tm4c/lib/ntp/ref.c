@@ -21,7 +21,7 @@ static void NtpGPS_updateStatus(NtpGPS *this) {
         this->source.lost = false;
 }
 
-static void NtpGPS_run(void *pObj) {
+void NtpGPS_run(void *pObj) {
     NtpGPS *this = (struct NtpGPS *) pObj;
 
     // get pps timestamps
@@ -87,9 +87,6 @@ void NtpGPS_init(void *pObj) {
     memset((void *) pObj, 0, sizeof(struct NtpGPS));
 
     NtpGPS *this = (NtpGPS *) pObj;
-    // set virtual functions
-    this->source.init = NtpGPS_init;
-    this->source.run = NtpGPS_run;
     // set mode
     this->source.lost = true;
     this->source.mode = RPY_SD_MD_REF;

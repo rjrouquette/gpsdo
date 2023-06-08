@@ -21,4 +21,10 @@ typedef struct NtpGPS NtpGPS;
  */
 void NtpGPS_init(void *pObj);
 
+/**
+ * Run GPS tasks
+ * @param pObj pointer to GPS structure
+ */
+void NtpGPS_run(void *pObj);
+
 #endif //GPSDO_REF_H

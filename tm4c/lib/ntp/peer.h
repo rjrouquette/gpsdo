@@ -54,4 +54,10 @@ void NtpPeer_init(void *pObj);
  */
 void NtpPeer_recv(void *pObj, uint8_t *frame, int flen);
 
+/**
+ * Run peer tasks
+ * @param pObj pointer to peer structure
+ */
+void NtpPeer_run(void *pObj);
+
 #endif //GPSDO_PEER_H
