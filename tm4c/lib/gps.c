@@ -206,18 +206,10 @@ static void runParse(void *ref) {
 
         // process UBX message
         if(lenUBX) {
-            // determine end of UBX block
-            if(lenUBX == 6) {
-                // validate second sync byte
-                if(msgBuff[1] != 0x62) {
-                    lenUBX = 0;
-                    continue;
-                }
-                endUBX = 8 + *(uint16_t *) (msgBuff + 4);
-            }
             // append character to message buffer
             if(lenUBX < sizeof(msgBuff))
                 msgBuff[lenUBX] = byte;
+
             // end of message
             if(++lenUBX >= endUBX) {
                 if(lenUBX > sizeof(msgBuff))
@@ -225,7 +217,21 @@ static void runParse(void *ref) {
                 processUBX((uint8_t *) msgBuff, lenUBX);
                 lenUBX = 0;
                 endUBX = 0;
+                continue;
             }
+
+            // parse UBX message length
+            if(lenUBX == 6) {
+                endUBX = 8 + *(uint16_t *) (msgBuff + 4);
+                // resync if message length is bad
+                if(endUBX > sizeof(msgBuff))
+                    lenUBX = 0;
+                continue;
+            }
+
+            // validate second sync byte
+            if(lenUBX == 2 && msgBuff[1] != 0x62)
+                lenUBX = 0;
             continue;
         }
 
@@ -243,15 +249,19 @@ static void runParse(void *ref) {
             }
         }
 
-        // search for NEMA message start
+        // check for NEMA message start
         if(byte == '$') {
-            msgBuff[lenNEMA++] = byte;
+            msgBuff[0] = byte;
+            lenNEMA = 1;
             continue;
         }
-        // search for UBX message start
+
+        // check for UBX message start
         if(byte == 0xB5) {
+            lenNEMA = 0;
+            msgBuff[0] = byte;
+            lenUBX = 1;
             endUBX = 8;
-            msgBuff[lenUBX++] = byte;
             continue;
         }
     }
