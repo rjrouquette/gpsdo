@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-#define PLL_STATS_ALPHA (0x1p-3f)
+#define PLL_STATS_ALPHA (0x1p-4f)
 
 #define PLL_MAX_FREQ_TRIM (250e-6f) // 250 ppm
 
