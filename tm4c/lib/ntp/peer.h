@@ -30,6 +30,9 @@ struct NtpPeer {
     uint32_t pollTrim;
     uint32_t lastArp;
 
+    // task handle
+    void *taskHandle;
+
     bool pollActive;
     bool pollXleave;
     bool pktSent;

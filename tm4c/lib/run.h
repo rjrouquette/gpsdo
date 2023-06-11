@@ -42,13 +42,11 @@ void * runSleep(uint64_t delay, RunCall callback, void *ref);
 void * runPeriodic(uint64_t interval, RunCall callback, void *ref);
 
 /**
- * Schedule task to execute after a delay
- * @param delay delay in 32.32 fixed point format (16 second maximum, uses monotonic clock)
- * @param callback task entry point
- * @param ref context pointer for task
- * @return task handle
+ * Adjust the execution interval for a task
+ * @param taskHandle the task to adjust
+ * @param newInterval new interval in 32.32 fixed point format (16 second maximum, uses monotonic clock)
  */
-void * runOnce(uint64_t delay, RunCall callback, void *ref);
+void runAdjust(void *taskHandle, uint64_t newInterval);
 
 /**
  * Wake a sleeping task

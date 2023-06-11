@@ -94,10 +94,6 @@ void NTP_init() {
     // listen for crony status requests
     UDP_register(DEFAULT_CANDM_PORT, chronycRequest);
 
-    // initialize empty peer records
-    for(int i = 0; i < MAX_NTP_PEERS; i++)
-        NtpPeer_init(peerSlots + i);
-
     // initialize GPS reference and register it as a source
     NtpGPS_init(&srcGps);
     sources[cntSources++] = (void *) &srcGps;
@@ -331,8 +327,6 @@ static NtpSource* ntpAllocPeer() {
             NtpPeer_init(slot);
             // append to source list
             sources[cntSources++] = (NtpSource *) slot;
-            // start source updates
-            runOnce((1u << 31), NtpPeer_run, slot);
             // return instance
             return (NtpSource *) slot;
         }

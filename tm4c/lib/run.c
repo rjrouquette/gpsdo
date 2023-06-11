@@ -15,7 +15,7 @@
 #define FAST_FUNC __attribute__((optimize(3)))
 
 typedef enum RunType {
-    RunOnce,
+    RunCanceled,
     RunSleep,
     RunPeriodic
 } RunType;
@@ -84,20 +84,10 @@ static void reschedule(Task *task) {
     task->qPrev->qNext = task->qNext;
     task->qNext->qPrev = task->qPrev;
 
-    // set next run time
-    uint32_t nextRun;
-    if(task->runType == RunPeriodic)
-        nextRun = task->runNext + task->runIntv;
-    else if(task->runType == RunSleep)
-        nextRun = CLK_MONO_RAW + task->runIntv;
-    else
-        nextRun = task->runNext;
-    task->runNext = nextRun;
-
     // locate optimal insertion point
     Task *ins = queueHead;
     while(ins != queueRoot) {
-        if(((int32_t) (nextRun - ins->runNext)) < 0)
+        if(((int32_t) (task->runNext - ins->runNext)) < 0)
             break;
         ins = ins->qNext;
     }
@@ -124,11 +114,15 @@ void runScheduler() {
 
         // determine next state
         __disable_irq();
-        if(task->runType == RunOnce) {
+        if(task->runType == RunCanceled) {
             // task is complete
             freeTask(task);
         } else {
-            // schedule next run time
+            // set next run time
+            task->runNext = task->runIntv + (
+                    (task->runType == RunPeriodic) ? task->runNext : CLK_MONO_RAW
+            );
+            // reschedule next run
             reschedule(task);
         }
         __enable_irq();
@@ -166,8 +160,8 @@ void * runSleep(uint64_t delay, RunCall callback, void *ref) {
     scratch.full *= CLK_FREQ;
     task->runIntv = scratch.ipart;
 
-    // start immediately
-    task->runNext = CLK_MONO_RAW;
+    // start after delay
+    task->runNext = CLK_MONO_RAW + scratch.ipart;
     // add to schedule
     schedule(task);
     return task;
@@ -185,25 +179,6 @@ void * runPeriodic(uint64_t interval, RunCall callback, void *ref) {
     scratch.full *= CLK_FREQ;
     task->runIntv = scratch.ipart;
 
-    // start immediately
-    task->runNext = CLK_MONO_RAW;
-    // add to schedule
-    schedule(task);
-    return task;
-}
-
-void * runOnce(uint64_t delay, RunCall callback, void *ref) {
-    Task *task = allocTask();
-    task->runType = RunOnce;
-    task->runCall = callback;
-    task->runRef = ref;
-    task->runIntv = 0;
-
-    // convert fixed-point interval to raw monotonic domain
-    union fixed_32_32 scratch;
-    scratch.full = delay;
-    scratch.full *= CLK_FREQ;
-
     // start after delay
     task->runNext = CLK_MONO_RAW + scratch.ipart;
     // add to schedule
@@ -211,38 +186,32 @@ void * runOnce(uint64_t delay, RunCall callback, void *ref) {
     return task;
 }
 
+void runAdjust(void *taskHandle, uint64_t newInterval) {
+    Task *task = taskHandle;
+
+    // convert fixed-point interval to raw monotonic domain
+    union fixed_32_32 scratch;
+    scratch.full = newInterval;
+    scratch.full *= CLK_FREQ;
+    task->runIntv = scratch.ipart;
+}
+
 void runWake(void *taskHandle) {
     __disable_irq();
     Task *task = taskHandle;
-    // remove from queue
-    task->qPrev->qNext = task->qNext;
-    task->qNext->qPrev = task->qPrev;
 
     // set next run time
-    const uint32_t nextRun = CLK_MONO_RAW;
-    task->runNext = nextRun;
-
-    // locate optimal insertion point
-    Task *ins = queueHead;
-    while(ins != queueRoot) {
-        if(((int32_t) (nextRun - ins->runNext)) < 0)
-            break;
-        ins = ins->qNext;
-    }
-
-    // insert task into the scheduling queue
-    task->qNext = ins;
-    task->qPrev = ins->qPrev;
-    ins->qPrev = task;
-    task->qPrev->qNext = task;
+    task->runNext = CLK_MONO_RAW;
+    // reschedule next run
+    reschedule(task);
     __enable_irq();
 }
 
 static void cancelTask(Task *task) {
-    // disable task
+    // cancel task
     task->runCall = doNothing;
     task->runRef = NULL;
-    task->runType = RunOnce;
+    task->runType = RunCanceled;
     // explicitly delete task if it is not currently running
     if (task != queueHead) {
         freeTask(task);
@@ -293,7 +262,7 @@ void runCancel(RunCall callback, void *ref) {
     __enable_irq();
 }
 
-static const char typeCode[3] = "OSP";
+static const char typeCode[3] = "CSP";
 
 unsigned runStatus(char *buffer) {
     char *end = buffer;

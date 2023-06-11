@@ -239,31 +239,23 @@ void NtpPeer_run(void *pObj) {
         scratch.ipart = RAND_next();
         scratch.full >>= 36 - this->source.poll;
         scratch.full |= 1ull << (32 + this->source.poll);
-        // schedule next poll
-        runCancel(NULL, this);
+        // schedule next update
         this->pollWait = scratch.ipart;
         this->pollTrim = scratch.fpart;
-        if(scratch.ipart) {
-            runPeriodic(1ull << 32, NtpPeer_run, this);
-        } else {
-            runOnce(scratch.fpart, NtpPeer_run, this);
-        }
+        runAdjust(this->taskHandle, scratch.ipart ? (1ull << 32) : scratch.fpart);
         return;
     }
 
     // requires hardware time synchronization
     // requires valid MAC address
     if(clkMonoEth == 0 || checkMac(this)) {
-        runCancel(NULL, this);
-        runOnce(IDLE_INTV, NtpPeer_run, this);
+        runAdjust(this->taskHandle, IDLE_INTV);
         return;
     }
 
     if(this->pollWait) {
-        if(--this->pollWait == 0) {
-            runCancel(NULL, this);
-            runOnce(this->pollTrim, NtpPeer_run, this);
-        }
+        if(--this->pollWait == 0)
+            runAdjust(this->taskHandle, this->pollTrim);
         return;
     }
 
@@ -277,8 +269,7 @@ void NtpPeer_run(void *pObj) {
     // send poll packet
     sendPoll(this);
     this->pktSent = true;
-    runCancel(NULL, this);
-    runSleep(ACTV_INTV, NtpPeer_run, this);
+    runAdjust(this->taskHandle, ACTV_INTV);
 }
 
 void NtpPeer_init(void *pObj) {
@@ -295,6 +286,8 @@ void NtpPeer_init(void *pObj) {
     this->source.maxPoll = PEER_MAX_POLL;
     this->source.minPoll = PEER_MIN_POLL;
     this->source.poll = PEER_MIN_POLL;
+    // start source updates
+    this->taskHandle = runSleep(IDLE_INTV, NtpPeer_run, this);
 }
 
 void NtpPeer_recv(void *pObj, uint8_t *frame, int flen) {
