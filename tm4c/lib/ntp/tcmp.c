@@ -12,8 +12,8 @@
 #include "../run.h"
 #include "tcmp.h"
 
-#define ADC_RATE_MEAN (0x1p-9f)
-#define ADC_RATE_VAR  (0x1p-10f)
+#define ADC_RATE_MEAN (0x1p-10f)
+#define ADC_RATE_VAR  (0x1p-11f)
 
 #define INTV_TEMP (1u << (32 - 10)) // 1024 Hz
 #define INTV_TCMP (1u << (32 - 4))  // 16 Hz
