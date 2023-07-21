@@ -285,7 +285,12 @@ static void runTx(void *ref) {
 
 extern volatile uint16_t ipID;
 void NET_init() {
+    // initialize ring buffers
     initDescriptors();
+    // create RX/TX threads
+    taskRx = runSleep(1ull << 36, runRx, NULL);
+    taskTx = runSleep(1ull << 36, runTx, NULL);
+    // initialize MAC and PHY
     initMAC();
 
     // unique IP identifier seed
@@ -294,10 +299,6 @@ void NET_init() {
     ARP_init();
     DHCP_init();
     DNS_init();
-
-    // schedule RX/TX processing
-    taskRx = runSleep(1ull << 36, runRx, NULL);
-    taskTx = runSleep(1ull << 36, runTx, NULL);
 }
 
 void NET_getMacAddress(char *strAddr) {

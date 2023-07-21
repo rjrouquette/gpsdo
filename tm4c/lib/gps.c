@@ -107,24 +107,22 @@ void GPS_init() {
     UART3.LCRH.WLEN = 3;
     // enable FIFO
     UART3.LCRH.FEN = 1;
-    // enable interrupt
-    UART3.IM.RT = 1;
-    UART3.IM.RX = 1;
     // enable UART
     UART3.CTL.RXE = 1;
     UART3.CTL.TXE = 1;
     UART3.CTL.UARTEN = 1;
+    // start parser thread
+    taskParse = runSleep(1ull << 36, runParse, NULL);
     // reduce interrupt priority
     ISR_priority(ISR_UART3, 7);
+    // enable interrupts
+    UART3.IM.RT = 1;
+    UART3.IM.RX = 1;
 
-    // reset GPS
+    // reset GPS module
     GPS_RST_PORT.DATA[GPS_RST_PIN] = 0;
-    delay_ms(125);
-    GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
-
-    // start threads
+    // start health check thread
     runSleep(INTV_HEALTH, runHealth, NULL);
-    taskParse = runSleep(1ull << 36, runParse, NULL);
 }
 
 static void runHealth(void *ref) {
