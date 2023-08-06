@@ -31,8 +31,8 @@
 #define NTP_POOL_FQDN ("pool.ntp.org")
 #define NTP_MAX_SKEW (50e-6f) // 50 ppm
 
-#define DNS_UPDT_INTV (1ull << (32 + 4))    // every 16 seconds
-#define SRC_UPDT_INTV (1ull << (32 - 4))    // 16 Hz
+#define DNS_UPDT_INTV (RUN_SEC << 4)    // every 16 seconds
+#define SRC_UPDT_INTV (RUN_SEC >> 4)    // 16 Hz
 
 static NtpGPS srcGps;
 static NtpPeer peerSlots[MAX_NTP_PEERS];

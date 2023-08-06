@@ -33,8 +33,8 @@ void PTP_init() {
     getMAC(ptpClockId + 2);
 
     // schedule periodic message transmission
-    runSleep(1ull << (32 + PTP2_ANNC_LOG_INTV), sendAnnounce, NULL);
-    runSleep(1ull << (32 + PTP2_SYNC_LOG_INTV), sendSync, NULL);
+    runSleep(RUN_SEC >> -PTP2_ANNC_LOG_INTV, sendAnnounce, NULL);
+    runSleep(RUN_SEC >> -PTP2_SYNC_LOG_INTV, sendSync, NULL);
 }
 
 /**

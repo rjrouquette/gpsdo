@@ -15,8 +15,8 @@
 #define ADC_RATE_MEAN (0x1p-11f)
 #define ADC_RATE_VAR  (0x1p-12f)
 
-#define INTV_TEMP (1u << (32 - 10)) // 1024 Hz
-#define INTV_TCMP (1u << (32 - 4))  // 16 Hz
+#define INTV_TEMP (1u << (24 - 10)) // 1024 Hz
+#define INTV_TCMP (1u << (24 - 4))  // 16 Hz
 
 #define TCMP_SAVE_INTV (3600) // save state every hour
 

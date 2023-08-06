@@ -119,7 +119,7 @@ void DHCP_init() {
     // register DHCP client port
     UDP_register(DHCP_PORT_CLI, processFrame);
     // wake every 0.5 seconds
-    runSleep(1u << (32 - 1), dhcpRun, NULL);
+    runSleep(RUN_SEC >> 1, dhcpRun, NULL);
 }
 
 void DHCP_renew() {

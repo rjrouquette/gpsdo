@@ -117,7 +117,7 @@ static void arpRun() {
 
 void ARP_init() {
     // wake every 0.5 seconds
-    runSleep(1u << (32 - 1), arpRun, NULL);
+    runSleep(RUN_SEC >> 1, arpRun, NULL);
 }
 
 void ARP_process(uint8_t *frame, int flen) {

@@ -17,8 +17,8 @@
 #include "peer.h"
 
 
-#define IDLE_INTV (1u << (32 - 1))
-#define ACTV_INTV (1u << (32 - 4))
+#define IDLE_INTV (RUN_SEC >> 1)
+#define ACTV_INTV (RUN_SEC >> 4)
 
 
 // average two 64-bit numbers
@@ -241,8 +241,8 @@ void NtpPeer_run(void *pObj) {
         scratch.full |= 1ull << (32 + this->source.poll);
         // schedule next update
         this->pollWait = scratch.ipart;
-        this->pollTrim = scratch.fpart;
-        runAdjust(this->taskHandle, scratch.ipart ? (1ull << 32) : scratch.fpart);
+        this->pollTrim = scratch.fpart >> 8;
+        runAdjust(this->taskHandle, scratch.ipart ? RUN_SEC : (scratch.fpart >> 8));
         return;
     }
 

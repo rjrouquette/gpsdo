@@ -21,7 +21,7 @@
 #define GPS_RST_INTV (300)
 #define GPS_RST_THR (60)
 
-#define INTV_HEALTH  (1u << (32 - 1))
+#define INTV_HEALTH (RUN_SEC >> 1)
 
 #define ADV_RING(ptr) ((ptr) = ((ptr) + 1) & GPS_RING_MASK)
 
@@ -112,7 +112,7 @@ void GPS_init() {
     UART3.CTL.TXE = 1;
     UART3.CTL.UARTEN = 1;
     // start parser thread
-    taskParse = runSleep(1ull << 36, runParse, NULL);
+    taskParse = runSleep(RUN_MAX, runParse, NULL);
     // reduce interrupt priority
     ISR_priority(ISR_UART3, 7);
     // enable interrupts

@@ -3,7 +3,6 @@
 //
 
 #include <stddef.h>
-#include <stdbool.h>
 #include "../hw/crc.h"
 #include "../hw/emac.h"
 #include "../hw/interrupts.h"
@@ -288,8 +287,8 @@ void NET_init() {
     // initialize ring buffers
     initDescriptors();
     // create RX/TX threads
-    taskRx = runSleep(1ull << 36, runRx, NULL);
-    taskTx = runSleep(1ull << 36, runTx, NULL);
+    taskRx = runSleep(RUN_MAX, runRx, NULL);
+    taskTx = runSleep(RUN_MAX, runTx, NULL);
     // initialize MAC and PHY
     initMAC();
 

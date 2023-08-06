@@ -148,7 +148,7 @@ static void schedule(Task *task) {
     __enable_irq();
 }
 
-void * runSleep(uint64_t delay, RunCall callback, void *ref) {
+void * runSleep(uint32_t delay, RunCall callback, void *ref) {
     Task *task = allocTask();
     task->runType = RunSleep;
     task->runCall = callback;
@@ -157,6 +157,7 @@ void * runSleep(uint64_t delay, RunCall callback, void *ref) {
     // convert fixed-point interval to raw monotonic domain
     union fixed_32_32 scratch;
     scratch.full = delay;
+    scratch.full <<= 8;
     scratch.full *= CLK_FREQ;
     task->runIntv = scratch.ipart;
 
@@ -167,7 +168,7 @@ void * runSleep(uint64_t delay, RunCall callback, void *ref) {
     return task;
 }
 
-void * runPeriodic(uint64_t interval, RunCall callback, void *ref) {
+void * runPeriodic(uint32_t interval, RunCall callback, void *ref) {
     Task *task = allocTask();
     task->runType = RunPeriodic;
     task->runCall = callback;
@@ -176,6 +177,7 @@ void * runPeriodic(uint64_t interval, RunCall callback, void *ref) {
     // convert fixed-point interval to raw monotonic domain
     union fixed_32_32 scratch;
     scratch.full = interval;
+    scratch.full <<= 8;
     scratch.full *= CLK_FREQ;
     task->runIntv = scratch.ipart;
 
@@ -186,12 +188,13 @@ void * runPeriodic(uint64_t interval, RunCall callback, void *ref) {
     return task;
 }
 
-void runAdjust(void *taskHandle, uint64_t newInterval) {
+void runAdjust(void *taskHandle, uint32_t newInterval) {
     Task *task = taskHandle;
 
     // convert fixed-point interval to raw monotonic domain
     union fixed_32_32 scratch;
     scratch.full = newInterval;
+    scratch.full <<= 8;
     scratch.full *= CLK_FREQ;
     task->runIntv = scratch.ipart;
 }
