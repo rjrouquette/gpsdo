@@ -79,15 +79,12 @@ static void freeTask(Task *task) {
 }
 
 FAST_FUNC
-static void reschedule(Task *task) {
-    // remove from queue
-    task->qPrev->qNext = task->qNext;
-    task->qNext->qPrev = task->qPrev;
-
+static void schedule(Task *task) {
     // locate optimal insertion point
+    const uint32_t runNext = task->runNext;
     Task *ins = queueHead;
     while(ins != queueRoot) {
-        if(((int32_t) (task->runNext - ins->runNext)) < 0)
+        if(((int32_t) (runNext - ins->runNext)) < 0)
             break;
         ins = ins->qNext;
     }
@@ -118,34 +115,18 @@ void runScheduler() {
             // task is complete
             freeTask(task);
         } else {
+            // remove from queue
+            task->qPrev->qNext = task->qNext;
+            task->qNext->qPrev = task->qPrev;
             // set next run time
             task->runNext = task->runIntv + (
                     (task->runType == RunPeriodic) ? task->runNext : CLK_MONO_RAW
             );
-            // reschedule next run
-            reschedule(task);
+            // schedule next run
+            schedule(task);
         }
         __enable_irq();
     }
-}
-
-static void schedule(Task *task) {
-    __disable_irq();
-    // locate optimal insertion point
-    const uint32_t runNext = task->runNext;
-    Task *ins = queueHead;
-    while(ins != queueRoot) {
-        if(((int32_t) (runNext - ins->runNext)) < 0)
-            break;
-        ins = ins->qNext;
-    }
-
-    // insert task into the scheduling queue
-    task->qNext = ins;
-    task->qPrev = ins->qPrev;
-    ins->qPrev = task;
-    task->qPrev->qNext = task;
-    __enable_irq();
 }
 
 void * runSleep(uint32_t delay, RunCall callback, void *ref) {
@@ -164,7 +145,9 @@ void * runSleep(uint32_t delay, RunCall callback, void *ref) {
     // start after delay
     task->runNext = CLK_MONO_RAW + scratch.ipart;
     // add to schedule
+    __disable_irq();
     schedule(task);
+    __enable_irq();
     return task;
 }
 
@@ -184,7 +167,9 @@ void * runPeriodic(uint32_t interval, RunCall callback, void *ref) {
     // start after delay
     task->runNext = CLK_MONO_RAW + scratch.ipart;
     // add to schedule
+    __disable_irq();
     schedule(task);
+    __enable_irq();
     return task;
 }
 
@@ -202,11 +187,13 @@ void runAdjust(void *taskHandle, uint32_t newInterval) {
 void runWake(void *taskHandle) {
     __disable_irq();
     Task *task = taskHandle;
-
+    // remove from queue
+    task->qPrev->qNext = task->qNext;
+    task->qNext->qPrev = task->qPrev;
     // set next run time
     task->runNext = CLK_MONO_RAW;
-    // reschedule next run
-    reschedule(task);
+    // schedule next run
+    schedule(task);
     __enable_irq();
 }
 
