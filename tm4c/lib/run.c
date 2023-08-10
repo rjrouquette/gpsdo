@@ -174,14 +174,13 @@ void * runPeriodic(uint32_t interval, RunCall callback, void *ref) {
 }
 
 void runAdjust(void *taskHandle, uint32_t newInterval) {
-    Task *task = taskHandle;
-
     // convert fixed-point interval to raw monotonic domain
     union fixed_32_32 scratch;
     scratch.full = newInterval;
     scratch.full <<= 8;
     scratch.full *= CLK_FREQ;
-    task->runIntv = scratch.ipart;
+    // set new run interval
+    ((Task *) taskHandle)->runIntv = scratch.ipart;
 }
 
 void runWake(void *taskHandle) {
