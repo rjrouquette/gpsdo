@@ -17,10 +17,10 @@
 #define FRQ_PIN (1<<2)
 #define FRQ_INTV (CLK_FREQ / 2000) // 1 kHz
 
-static volatile uint32_t clkCompRem = 0;
 volatile uint64_t clkCompOffset = 0;
 volatile uint64_t clkCompRef = 0;
 volatile int32_t clkCompRate = 0;
+static volatile uint32_t clkCompRem = 0;
 
 static uint64_t frqInc;
 static uint32_t frqRem;

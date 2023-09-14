@@ -21,10 +21,10 @@
 
 volatile uint64_t clkTaiUtcOffset = 0;
 
-static volatile uint32_t clkTaiRem = 0;
 volatile uint64_t clkTaiOffset = 0;
 volatile uint64_t clkTaiRef = 0;
 volatile int32_t clkTaiRate = 0;
+static volatile uint32_t clkTaiRem = 0;
 
 static volatile uint32_t clkPpsLow = CLK_FREQ - PPS_INTV_HI - 1;
 
@@ -65,7 +65,8 @@ static void runPpsTai(void *ref) {
     scratch.full = CLK_MONO();
     scratch.full += clkCompOffset;
     scratch.full += clkTaiOffset;
-    if(scratch.fpart >= (7u << 29)) {
+    // wait for end-of-second
+    if(scratch.fpart >= 0xE0000000u) {
         // compute next TAI second boundary
         scratch.fpart = 0;
         ++scratch.ipart;
