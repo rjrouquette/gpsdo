@@ -40,7 +40,7 @@ void ISR_Timer1A() {
 void runClkComp(void *ref) {
     // prepare update values
     const uint64_t now = CLK_MONO();
-    const int32_t offset = corrFrac(clkCompRate, now - clkCompRef, &clkCompRem);
+    const int32_t offset = corrFracRem64(clkCompRate, now - clkCompRef, &clkCompRem);
 
     // apply update
     __disable_irq();
@@ -89,12 +89,11 @@ void initClkComp() {
 
 uint64_t CLK_COMP() {
     // get monotonic time
-    uint64_t scratch = CLK_MONO();
-    uint32_t rem = 0;
+    const uint64_t clkMono = CLK_MONO();
     // translate to compensated domain
-    scratch += corrFrac(clkCompRate, scratch - clkCompRef, &rem);
-    scratch += clkCompOffset;
-    return scratch;
+    int64_t scratch = (int32_t) (clkMono - clkCompRef);
+    scratch *= clkCompRate;
+    return clkMono + clkCompOffset + (int32_t) (scratch >> 32);
 }
 
 uint64_t CLK_COMP_fromMono(uint64_t ts) {
@@ -106,7 +105,7 @@ uint64_t CLK_COMP_fromMono(uint64_t ts) {
 void CLK_COMP_setComp(int32_t comp) {
     // prepare update values
     const uint64_t now = CLK_MONO();
-    const int32_t offset = corrFrac(clkCompRate, now - clkCompRef, &clkCompRem);
+    const int32_t offset = corrFracRem64(clkCompRate, now - clkCompRef, &clkCompRem);
 
     // apply update
     __disable_irq();

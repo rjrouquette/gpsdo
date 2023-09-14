@@ -85,8 +85,8 @@ void CLK_PPS(uint64_t *tsResult) {
     // convert snapshot to timestamps
     uint32_t rem = 0;
     ppsStamp[0] = fromClkMono(ppsEvent.timer, ppsEvent.offset, ppsEvent.integer);
-    ppsStamp[1] = ppsStamp[0] + corrFrac(ppsEvent.compRate, ppsStamp[0] - ppsEvent.compRef, &rem) + ppsEvent.compOff;
-    ppsStamp[2] = ppsStamp[1] + corrFrac(ppsEvent.taiRate, ppsStamp[1] - ppsEvent.taiRef, &rem) + ppsEvent.taiOff;
+    ppsStamp[1] = ppsStamp[0] + corrFracRem64(ppsEvent.compRate, ppsStamp[0] - ppsEvent.compRef, &rem) + ppsEvent.compOff;
+    ppsStamp[2] = ppsStamp[1] + corrFracRem64(ppsEvent.taiRate, ppsStamp[1] - ppsEvent.taiRef, &rem) + ppsEvent.taiOff;
 
     // return result
     tsResult[0] = ppsStamp[0];

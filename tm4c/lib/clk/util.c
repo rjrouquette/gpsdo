@@ -2,7 +2,6 @@
 // Created by robert on 4/26/23.
 //
 
-#include <math.h>
 #include "mono.h"
 #include "util.h"
 
@@ -58,14 +57,14 @@ int64_t corrValue(int32_t rate, int64_t delta) {
 }
 
 __attribute__((optimize(3)))
-int32_t corrFrac(int32_t rate, uint32_t delta, volatile uint32_t *rem) {
+int32_t corrFracRem(int32_t rate, int32_t delta, volatile uint32_t *rem) {
     // compute rate-based delta adjustment
-    uint64_t scratch = delta;
+    int64_t scratch = delta;
     scratch *= rate;
     // add prior remainder
     scratch += *rem;
     // update remainder
-    *rem = scratch;
+    *rem = (uint32_t) scratch;
     // return rate-based delta adjustment
     return (int32_t) (scratch >> 32);
 }

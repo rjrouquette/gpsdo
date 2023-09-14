@@ -49,7 +49,9 @@ int64_t corrValue(int32_t rate, int64_t delta);
  * @param rem offset remainder from prior adjustment (unsigned 0.32)
  * @return offset adjustment (signed 0.31)
  */
-int32_t corrFrac(int32_t rate, uint32_t delta, volatile uint32_t *rem);
+int32_t corrFracRem(int32_t rate, int32_t delta, volatile uint32_t *rem);
+
+#define corrFracRem64(rate, delta, rem) corrFracRem((rate), (int32_t) (uint32_t) (delta), (rem))
 
 /**
  * Convert 64-bit fixed-point timestamp (32.32) to float
