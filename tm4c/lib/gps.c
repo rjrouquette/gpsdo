@@ -129,11 +129,10 @@ static void runHealth(void *ref) {
     // check GPS message configuration
     configureGPS();
 
-    // release reset pin if it is held down
-    if(!GPS_RST_PORT.DATA[GPS_RST_PIN])
-        GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
+    // release reset pin
+    GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
 
-    // reset GPS if PPS has stopped
+    // reset GPS if PPS has ceased
     uint32_t now = CLK_MONO_INT();
     if((now - lastReset) > GPS_RST_INTV) {
         union fixed_32_32 age;
