@@ -110,8 +110,7 @@ void STATUS_process(uint8_t *frame, int flen) {
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
     // transmit response
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     memcpy(NET_getTxBuff(txDesc), frame, flen);
     NET_transmit(txDesc, flen);
 }

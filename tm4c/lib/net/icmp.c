@@ -52,8 +52,7 @@ static void sendPingResponse(uint8_t *frame, int flen) {
     copyMAC(headerEth->macDst, headerEth->macSrc);
 
     // get TX descriptor
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     // transmit response
     memcpy(NET_getTxBuff(txDesc), frame, flen);
     NET_transmit(txDesc, flen);

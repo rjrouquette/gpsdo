@@ -79,8 +79,7 @@ static void txCallback(void *ref, uint8_t *frame, int flen) {
 }
 
 static void sendPoll(NtpPeer *this) {
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     // allocate and clear frame buffer
     uint8_t *frame = NET_getTxBuff(txDesc);
     memset(frame, 0, NTP4_SIZE);

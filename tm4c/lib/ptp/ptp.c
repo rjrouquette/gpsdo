@@ -68,8 +68,7 @@ static void processDelayRequest(uint8_t *frame, int flen) {
     if(flen < (PTP2_MIN_SIZE + sizeof(PTP2_TIMESTAMP)))
         return;
 
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     // allocate and copy frame buffer
     uint8_t *txFrame = NET_getTxBuff(txDesc);
     memcpy(txFrame, frame, flen);
@@ -102,8 +101,7 @@ static void processDelayRequest(uint8_t *frame, int flen) {
 }
 
 static void peerDelayRespFollowup(void *ref, uint8_t *txFrame, int flen) {
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     uint8_t *followup = NET_getTxBuff(txDesc);
     memcpy(followup, txFrame, flen);
     flen = PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_FOLLOW_UP);
@@ -131,8 +129,7 @@ static void processPDelayRequest(uint8_t *frame, int flen) {
     if(flen < (PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_REQ)))
         return;
 
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     // allocate and copy frame buffer
     uint8_t *txFrame = NET_getTxBuff(txDesc);
     memcpy(txFrame, frame, flen);
@@ -166,8 +163,7 @@ static void processPDelayRequest(uint8_t *frame, int flen) {
 }
 
 static void sendAnnounce(void *ref) {
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     // allocate and clear frame buffer
     const int flen = PTP2_MIN_SIZE + sizeof(PTP2_ANNOUNCE);
     uint8_t *frame = NET_getTxBuff(txDesc);
@@ -210,8 +206,7 @@ static void sendAnnounce(void *ref) {
 }
 
 static void syncFollowup(void *ref, uint8_t *txFrame, int flen) {
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     uint8_t *followup = NET_getTxBuff(txDesc);
     memcpy(followup, txFrame, flen);
 
@@ -233,8 +228,7 @@ static void syncFollowup(void *ref, uint8_t *txFrame, int flen) {
 }
 
 static void sendSync(void *ref) {
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     // allocate and clear frame buffer
     const int flen = PTP2_MIN_SIZE + sizeof(PTP2_TIMESTAMP);
     uint8_t *frame = NET_getTxBuff(txDesc);

@@ -136,16 +136,14 @@ void ARP_process(uint8_t *frame, int flen) {
         // send response
         if(ipAddress) {
             if (ipAddress == payload->TPA) {
-                int txDesc = NET_getTxDesc();
-                if(txDesc >= 0) {
-                    uint8_t *packetTX = NET_getTxBuff(txDesc);
-                    makeArpIp4(
-                            packetTX, ARP_OP_REPLY,
-                            payload->SHA, payload->SPA
-                    );
-                    copyMAC(((HEADER_ETH *)packetTX)->macDst, header->macSrc);
-                    NET_transmit(txDesc, ARP_FRAME_LEN);
-                }
+                const int txDesc = NET_getTxDesc();
+                uint8_t *packetTX = NET_getTxBuff(txDesc);
+                makeArpIp4(
+                        packetTX, ARP_OP_REPLY,
+                        payload->SHA, payload->SPA
+                );
+                copyMAC(((HEADER_ETH *)packetTX)->macDst, header->macSrc);
+                NET_transmit(txDesc, ARP_FRAME_LEN);
             }
         }
     }
@@ -171,8 +169,7 @@ int ARP_request(uint32_t remoteAddress, CallbackARP callback, void *ref) {
         if(requests[i].remoteAddress != 0)
             continue;
         // get TX descriptor
-        int txDesc = NET_getTxDesc();
-        if(txDesc < 0) return -1;
+        const int txDesc = NET_getTxDesc();
         // create request frame
         uint8_t wildCard[6] = { 0, 0, 0, 0, 0, 0 };
         uint8_t *packetTX = NET_getTxBuff(txDesc);

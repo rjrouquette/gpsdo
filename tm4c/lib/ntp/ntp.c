@@ -63,7 +63,7 @@ static volatile struct TsXleave {
 
 // hash function for interleaved timestamp table
 static inline int hashXleave(uint32_t addr) {
-    return (int) (((addr * 0xDE9DB139u) >> (32 - XLEAVE_SIZE)) & ((1u << XLEAVE_SIZE) - 1));
+    return (int) ((addr * 0xDE9DB139u) >> (32 - XLEAVE_SIZE));
 }
 
 
@@ -155,7 +155,6 @@ static void ntpRequest(uint8_t *frame, int flen) {
 
     // get TX descriptor
     const int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
     // set callback for precise TX timestamp
     NET_setTxCallback(txDesc, ntpTxCallback, NULL);
     // duplicate packet for sending
@@ -481,8 +480,7 @@ static void chronycRequest(uint8_t *frame, int flen) {
             return;
     }
 
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     // allocate and clear frame buffer
     uint8_t *resp = NET_getTxBuff(txDesc);
     memset(resp, 0, UDP_DATA_OFFSET + sizeof(CMD_Reply));

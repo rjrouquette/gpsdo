@@ -232,8 +232,7 @@ void sendResults(uint8_t *frame, uint8_t *data, int dlen) {
     headerUDP->portDst = headerUDP->portSrc;
     headerUDP->portSrc = __builtin_bswap16(SNMP_PORT);
 
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     uint8_t *txFrame = NET_getTxBuff(txDesc);
     memcpy(txFrame, frame, UDP_DATA_OFFSET);
 

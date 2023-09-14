@@ -127,9 +127,7 @@ void DHCP_renew() {
     dhcpXID = dhcpUUID + CLK_MONO_INT();
 
     // get TX descriptor
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
-
+    const int txDesc = NET_getTxDesc();
     // initialize frame
     uint8_t *frame = NET_getTxBuff(txDesc);
     initPacket(frame);
@@ -335,8 +333,7 @@ static void processFrame(uint8_t *frame, int flen) {
 
 static void sendReply(HEADER_DHCP *response) {
     // get TX descriptor
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     // initialize frame
     uint8_t *frame = NET_getTxBuff(txDesc);
     initPacket(frame);

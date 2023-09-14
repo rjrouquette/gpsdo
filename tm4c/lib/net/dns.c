@@ -195,8 +195,7 @@ static void processFrame(uint8_t *frame, int flen) {
 }
 
 static void sendRequest(const char *hostname, uint16_t requestId) {
-    int txDesc = NET_getTxDesc();
-    if(txDesc < 0) return;
+    const int txDesc = NET_getTxDesc();
     uint8_t *frame = NET_getTxBuff(txDesc);
 
     // clear frame buffer

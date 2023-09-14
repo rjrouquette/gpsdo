@@ -6,7 +6,6 @@
 #include <stddef.h>
 #include "../hw/interrupts.h"
 #include "clk/mono.h"
-#include "clk/util.h"
 #include "format.h"
 #include "led.h"
 #include "run.h"
@@ -44,6 +43,13 @@ static Task * allocTask();
 
 FAST_FUNC
 static void doNothing(void *ref) { }
+
+__attribute__((always_inline))
+static inline uint32_t toMonoRaw(const uint32_t fixed_8_24) {
+    uint64_t scratch = fixed_8_24;
+    scratch *= CLK_FREQ;
+    return scratch >> 24;
+}
 
 void initScheduler() {
     // initialize queue nodes
@@ -136,14 +142,9 @@ void * runSleep(uint32_t delay, RunCall callback, void *ref) {
     task->runRef = ref;
 
     // convert fixed-point interval to raw monotonic domain
-    union fixed_32_32 scratch;
-    scratch.full = delay;
-    scratch.full <<= 8;
-    scratch.full *= CLK_FREQ;
-    task->runIntv = scratch.ipart;
-
+    task->runIntv = toMonoRaw(delay);
     // start after delay
-    task->runNext = CLK_MONO_RAW + scratch.ipart;
+    task->runNext = CLK_MONO_RAW + task->runIntv;
     // add to schedule
     __disable_irq();
     schedule(task);
@@ -158,14 +159,9 @@ void * runPeriodic(uint32_t interval, RunCall callback, void *ref) {
     task->runRef = ref;
 
     // convert fixed-point interval to raw monotonic domain
-    union fixed_32_32 scratch;
-    scratch.full = interval;
-    scratch.full <<= 8;
-    scratch.full *= CLK_FREQ;
-    task->runIntv = scratch.ipart;
-
+    task->runIntv = toMonoRaw(interval);
     // start after delay
-    task->runNext = CLK_MONO_RAW + scratch.ipart;
+    task->runNext = CLK_MONO_RAW + task->runIntv;
     // add to schedule
     __disable_irq();
     schedule(task);
@@ -174,13 +170,8 @@ void * runPeriodic(uint32_t interval, RunCall callback, void *ref) {
 }
 
 void runAdjust(void *taskHandle, uint32_t newInterval) {
-    // convert fixed-point interval to raw monotonic domain
-    union fixed_32_32 scratch;
-    scratch.full = newInterval;
-    scratch.full <<= 8;
-    scratch.full *= CLK_FREQ;
     // set new run interval
-    ((Task *) taskHandle)->runIntv = scratch.ipart;
+    ((Task *) taskHandle)->runIntv = toMonoRaw(newInterval);
 }
 
 void runWake(void *taskHandle) {
