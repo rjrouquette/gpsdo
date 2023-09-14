@@ -312,7 +312,7 @@ int NET_getPhyStatus() {
 
 int NET_getTxDesc() {
     if(txDesc[ptrTX].TDES0.OWN)
-        faultBlink(4, 4);
+        faultBlink(4, 1);
 
     int temp = ptrTX;
     ADV_RING_TX(ptrTX);
@@ -333,7 +333,7 @@ void NET_transmit(int desc, int len) {
     desc &= TX_RING_MASK;
     // restrict transmission length
     if(len < 60) len = 60;
-    if(len > TX_BUFF_SIZE) faultBlink(4, 3);
+    if(len > TX_BUFF_SIZE) faultBlink(4, 2);
     // set transmission size
     txDesc[desc].TDES1.TBS1 = len;
     // release descriptor
@@ -351,9 +351,9 @@ void NET_transmit(int desc, int len) {
 static inline void toStamps(uint32_t timer, volatile uint64_t *stamps) {
     // snapshot clock state
     __disable_irq();
-    uint32_t monoEth = clkMonoEth;
-    uint32_t offset = clkMonoOff;
-    uint32_t integer = clkMonoInt;
+    const uint32_t monoEth = clkMonoEth;
+    const uint32_t offset = clkMonoOff;
+    const uint32_t integer = clkMonoInt;
     __enable_irq();
     // adjust timer offset
     timer += monoEth;
@@ -366,25 +366,14 @@ static inline void toStamps(uint32_t timer, volatile uint64_t *stamps) {
 void NET_getRxTime(const uint8_t *rxFrame, volatile uint64_t *stamps) {
     // compute descriptor offset
     const int i = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
-    if(i >= RX_RING_SIZE) faultBlink(4, 1);
-    // retrieve timestamp
-    uint32_t timer;
-    timer  = rxDesc[i].RTSH * CLK_FREQ;
-    timer += rxDesc[i].RTSL >> 3;
     // assemble timestamps
-    toStamps(timer, stamps);
+    toStamps((rxDesc[i].RTSH * CLK_FREQ) + (rxDesc[i].RTSL >> 3), stamps);
 }
 
 void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps) {
     // compute descriptor offset
     const int i = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
-    if(i >= TX_RING_SIZE) faultBlink(4, 2);
-    // retrieve timestamp
-    uint32_t timer;
-    timer  = txDesc[i].TTSH * CLK_FREQ;
-    timer += txDesc[i].TTSL >> 3;
-    // assemble timestamps
-    toStamps(timer, stamps);
+    toStamps((txDesc[i].TTSH * CLK_FREQ) + (txDesc[i].TTSL >> 3), stamps);
 }
 
 

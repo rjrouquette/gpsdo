@@ -97,7 +97,8 @@ uint64_t CLK_COMP() {
 }
 
 uint64_t CLK_COMP_fromMono(uint64_t ts) {
-    ts += corrValue(clkCompRate, (int64_t) (ts - clkCompRef));
+    ts -= clkCompRef;
+    ts += corrValue(clkCompRate, (int64_t) ts);
     ts += clkCompOffset;
     return ts;
 }
