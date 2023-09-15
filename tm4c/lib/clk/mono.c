@@ -13,8 +13,6 @@
 #include "comp.h"
 #include "util.h"
 
-#define INPUT_DELAY (2)
-
 volatile uint32_t clkMonoInt = 0;
 volatile uint32_t clkMonoOff = 0;
 volatile uint32_t clkMonoEth = 0;
@@ -190,7 +188,7 @@ void ISR_Timer4A() {
     // clear capture interrupt flag
     GPTM4.ICR = GPTM_ICR_CAE;
     // compute pps output time
-    timer -= ((timer + INPUT_DELAY) - event) & 0xFFFF;
+    timer -= (timer - event) & 0xFFFF;
     clkMonoPps = timer;
 }
 
@@ -208,7 +206,7 @@ void ISR_Timer5A() {
     // clear capture interrupt flag
     GPTM5.ICR = GPTM_ICR_CAE;
     // compute ethernet clock offset
-    timer -= ((timer + INPUT_DELAY) - event) & 0xFFFF;
+    timer -= (timer - event) & 0xFFFF;
     timer -= EMAC0.TIMSEC * CLK_FREQ;
     clkMonoEth = timer;
 }
@@ -221,7 +219,7 @@ void ISR_Timer5B() {
     // clear capture interrupt flag
     GPTM5.ICR = GPTM_ICR_CBE;
     // update pps edge state
-    timer -= ((timer + INPUT_DELAY) - event) & 0xFFFF;
+    timer -= (timer - event) & 0xFFFF;
     // monotonic clock state
     clkMonoPpsEvent.timer = timer;
     clkMonoPpsEvent.offset = clkMonoOff;
