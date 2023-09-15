@@ -29,12 +29,12 @@ static uint32_t frqRem;
 // frequency output timer
 void ISR_Timer1A() {
     // update interval adjustment
-    uint64_t scratch = frqInc + frqRem;
+    const uint64_t scratch = frqInc + frqRem;
     frqRem = scratch;
     // set next second boundary
     FRQ_TIMER.TAILR = scratch >> 32;
-    // clear interrupt flag
-    FRQ_TIMER.ICR.TATO = 1;
+    // clear timeout interrupt flag
+    FRQ_TIMER.ICR.raw = 1u << 0;
 }
 
 void runClkComp(void *ref) {
@@ -104,27 +104,19 @@ uint64_t CLK_COMP_fromMono(uint64_t ts) {
 }
 
 void CLK_COMP_setComp(int32_t comp) {
-    // prepare update values
+    // prepare compensation update
     const uint64_t now = CLK_MONO();
-    const int32_t offset = corrFracRem64(clkCompRate, now - clkCompRef, &clkCompRem);
+    const uint64_t offset = clkCompOffset + corrFracRem64(clkCompRate, now - clkCompRef, &clkCompRem);
+
+    // prepare frequency output update
+    const uint64_t incr = (((int64_t) comp) * -FRQ_INTV) + (((uint64_t) (FRQ_INTV - 1)) << 32);
 
     // apply update
     __disable_irq();
-    clkCompRef = now;
     clkCompRate = comp;
-    clkCompOffset += offset;
-    __enable_irq();
-
-    // prepare update value
-    union fixed_32_32 incr;
-    incr.ipart = 0;
-    incr.fpart = FRQ_INTV;
-    incr.full *= -comp;
-    incr.ipart += FRQ_INTV - 1;
-
-    // apply update
-    __disable_irq();
-    frqInc = incr.full;
+    clkCompRef = now;
+    clkCompOffset = offset;
+    frqInc = incr;
     __enable_irq();
 }
 
