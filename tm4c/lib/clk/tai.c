@@ -31,19 +31,12 @@ static volatile uint32_t clkPpsLow = CLK_FREQ - PPS_INTV_HI - 1;
 
 // PPS output timer
 void ISR_Timer2A() {
-    // set next second boundary
-    if(PPS_TIMER.TAMR.TCACT == 0x3) {
-        // output is now high, schedule transition to low
-        PPS_TIMER.TAMR.TCACT = 0x2;
-        PPS_TIMER.TAILR = PPS_INTV_HI - 1;
-    }
-    else {
-        // output is now low, schedule transition to high
-        PPS_TIMER.TAMR.TCACT = 0x3;
-        PPS_TIMER.TAILR = clkPpsLow;
-    }
-    // clear interrupt flag
-    PPS_TIMER.ICR.TATO = 1;
+    // clear timeout interrupt flag
+    PPS_TIMER.ICR.raw = 1u << 0;
+    // schedule next output transition
+    int isHi = (PPS_TIMER.TAMR.TCACT == 0x3);
+    PPS_TIMER.TAMR.TCACT = isHi ? 0x2 : 0x3;
+    PPS_TIMER.TAILR = isHi ? (PPS_INTV_HI - 1) : clkPpsLow;
 }
 
 static void runClkTai(void *ref) {
@@ -81,8 +74,8 @@ static void runPpsTai(void *ref) {
         scratch.full *= CLK_FREQ;
         // compute PPS output interval
         int32_t delta = (int32_t) (scratch.ipart - clkMonoPps);
-        while(delta < CLK_FREQ / 2) delta += CLK_FREQ;
-        while(delta > CLK_FREQ * 2) delta -= CLK_FREQ;
+        while(delta <= CLK_FREQ / 2) delta += CLK_FREQ;
+        while(delta >= CLK_FREQ * 2) delta -= CLK_FREQ;
         clkPpsLow = delta - PPS_INTV_HI - 1;
         // update PPS output interval
         __disable_irq();
