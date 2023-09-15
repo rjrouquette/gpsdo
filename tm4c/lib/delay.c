@@ -7,7 +7,7 @@
 
 #define CLK_KHZ (125000)    // 125 MHz
 #define CLK_MHZ (125)       // 125 MHz
-#define DELAY_MAX (1<<14)   // 16384 ms
+#define DELAY_MAX (16384)   // 16384 ms
 
 void delay_us(uint16_t delay) {
     // get current time

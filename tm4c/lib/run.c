@@ -54,9 +54,8 @@ static inline uint32_t toMonoRaw(const uint32_t fixed_8_24) {
 void initScheduler() {
     // initialize queue nodes
     taskFree = taskPool;
-    for(int i = 0; i < SLOT_CNT - 1; i++) {
-        taskPool[i].qNext = taskPool + i + 1;
-    }
+    for(int i = 1; i < SLOT_CNT; i++)
+        taskPool[i - 1].qNext = taskPool + i;
 
     // initialize queue pointers
     taskQueue.qNext = queueRoot;

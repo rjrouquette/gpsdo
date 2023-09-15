@@ -11,8 +11,8 @@ static void getMeanVar(int cnt, const float *v, float *mean, float *var);
 
 void NtpSource_incr(NtpSource *this) {
     this->samplePtr = (this->samplePtr + 1) & (NTP_MAX_HISTORY - 1);
-    if(++this->sampleCount > NTP_MAX_HISTORY)
-        this->sampleCount = NTP_MAX_HISTORY;
+    if(this->sampleCount < NTP_MAX_HISTORY)
+        ++(this->sampleCount);
 }
 
 void NtpSource_update(NtpSource *this) {
