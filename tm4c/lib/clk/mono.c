@@ -161,7 +161,7 @@ void ISR_Timer0A() {
     // set next second boundary
     TIMER_MONO.TAMATCHR = clkMonoOff + CLK_FREQ;
     // clear interrupt flag
-    TIMER_MONO.ICR.TAM = 1;
+    TIMER_MONO.ICR = GPTM_ICR_TAM;
 }
 
 // return integer part of current time
@@ -187,8 +187,8 @@ void ISR_Timer4A() {
     // snapshot edge time
     uint32_t timer = CLK_MONO_RAW;
     uint32_t event = GPTM4.TAR.raw;
-    // clear interrupt flag
-    GPTM4.ICR.CAE = 1;
+    // clear capture interrupt flag
+    GPTM4.ICR = GPTM_ICR_CAE;
     // compute pps output time
     timer -= ((timer + INPUT_DELAY) - event) & 0xFFFF;
     clkMonoPps = timer;
@@ -196,8 +196,8 @@ void ISR_Timer4A() {
 
 // currently unused, but included for safety
 void ISR_Timer4B() {
-    // clear interrupt flag
-    GPTM4.ICR.CBE = 1;
+    // clear capture interrupt flag
+    GPTM4.ICR = GPTM_ICR_CBE;
 }
 
 // capture rising edge of ethernet PPS for offset measurement
@@ -205,8 +205,8 @@ void ISR_Timer5A() {
     // snapshot edge time
     uint32_t timer = CLK_MONO_RAW;
     uint32_t event = GPTM5.TAR.raw;
-    // clear interrupt flag
-    GPTM5.ICR.CAE = 1;
+    // clear capture interrupt flag
+    GPTM5.ICR = GPTM_ICR_CAE;
     // compute ethernet clock offset
     timer -= ((timer + INPUT_DELAY) - event) & 0xFFFF;
     timer -= EMAC0.TIMSEC * CLK_FREQ;
@@ -218,8 +218,8 @@ void ISR_Timer5B() {
     // snapshot edge time
     uint32_t timer = CLK_MONO_RAW;
     uint32_t event = GPTM5.TBR.raw;
-    // clear interrupt flag
-    GPTM5.ICR.CBE = 1;
+    // clear capture interrupt flag
+    GPTM5.ICR = GPTM_ICR_CBE;
     // update pps edge state
     timer -= ((timer + INPUT_DELAY) - event) & 0xFFFF;
     // monotonic clock state

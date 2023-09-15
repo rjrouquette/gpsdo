@@ -34,7 +34,7 @@ void ISR_Timer1A() {
     // set next second boundary
     FRQ_TIMER.TAILR = scratch >> 32;
     // clear timeout interrupt flag
-    FRQ_TIMER.ICR.raw = 1u << 0;
+    FRQ_TIMER.ICR = GPTM_ICR_TATO;
 }
 
 void runClkComp(void *ref) {

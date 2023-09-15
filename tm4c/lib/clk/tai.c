@@ -32,7 +32,7 @@ static volatile uint32_t clkPpsLow = CLK_FREQ - PPS_INTV_HI - 1;
 // PPS output timer
 void ISR_Timer2A() {
     // clear timeout interrupt flag
-    PPS_TIMER.ICR.raw = 1u << 0;
+    PPS_TIMER.ICR = GPTM_ICR_TATO;
     // schedule next output transition
     int isHi = (PPS_TIMER.TAMR.TCACT == 0x3);
     PPS_TIMER.TAMR.TCACT = isHi ? 0x2 : 0x3;
