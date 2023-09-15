@@ -85,6 +85,7 @@ static void freeTask(Task *task) {
 }
 
 FAST_FUNC
+__attribute__((noinline))
 static void schedule(Task *task) {
     // locate optimal insertion point
     const uint32_t runNext = task->runNext;
@@ -103,6 +104,26 @@ static void schedule(Task *task) {
 }
 
 FAST_FUNC
+__attribute__((noinline))
+static void reschedule(Task *task) {
+    if(task->runType == RunCanceled) {
+        // delete task it is canceled
+        freeTask(task);
+        return;
+    }
+
+    // remove from queue
+    task->qPrev->qNext = task->qNext;
+    task->qNext->qPrev = task->qPrev;
+    // set next run time
+    task->runNext = task->runIntv + (
+            (task->runType == RunPeriodic) ? task->runNext : CLK_MONO_RAW
+    );
+    // schedule next run
+    schedule(task);
+}
+
+FAST_FUNC
 _Noreturn
 void runScheduler() {
     // infinite loop
@@ -117,20 +138,7 @@ void runScheduler() {
 
         // determine next state
         __disable_irq();
-        if(task->runType == RunCanceled) {
-            // task is complete
-            freeTask(task);
-        } else {
-            // remove from queue
-            task->qPrev->qNext = task->qNext;
-            task->qNext->qPrev = task->qPrev;
-            // set next run time
-            task->runNext = task->runIntv + (
-                    (task->runType == RunPeriodic) ? task->runNext : CLK_MONO_RAW
-            );
-            // schedule next run
-            schedule(task);
-        }
+        reschedule(task);
         __enable_irq();
     }
 }
@@ -187,6 +195,7 @@ void runWake(void *taskHandle) {
     __enable_irq();
 }
 
+FAST_FUNC
 static void cancelTask(Task *task) {
     // cancel task
     task->runCall = doNothing;
@@ -198,10 +207,11 @@ static void cancelTask(Task *task) {
     }
 }
 
-void runCancel(RunCall callback, void *ref) {
+FAST_FUNC
+__attribute__((noinline))
+static void runCancel_(RunCall callback, void *ref) {
     // match by reference
     if(callback == NULL) {
-        __disable_irq();
         Task *iter = queueHead;
         while(iter != queueRoot) {
             Task *task = iter;
@@ -210,13 +220,11 @@ void runCancel(RunCall callback, void *ref) {
             if (task->runRef == ref)
                 cancelTask(task);
         }
-        __enable_irq();
         return;
     }
 
     // match by callback
     if(ref == NULL) {
-        __disable_irq();
         Task *iter = queueHead;
         while (iter != queueRoot) {
             Task *task = iter;
@@ -225,12 +233,10 @@ void runCancel(RunCall callback, void *ref) {
             if (task->runCall == callback)
                 cancelTask(task);
         }
-        __enable_irq();
         return;
     }
 
     // match both callback and reference
-    __disable_irq();
     Task *iter = queueHead;
     while (iter != queueRoot) {
         Task *task = iter;
@@ -239,6 +245,11 @@ void runCancel(RunCall callback, void *ref) {
         if ((task->runCall == callback) && (task->runRef == ref))
             cancelTask(task);
     }
+}
+
+void runCancel(RunCall callback, void *ref) {
+    __disable_irq();
+    runCancel_(callback, ref);
     __enable_irq();
 }
 
@@ -247,23 +258,11 @@ static const char typeCode[3] = "CSP";
 unsigned runStatus(char *buffer) {
     char *end = buffer;
 
-    // gather tasks
-    int taskCount = 0;
-    Task *tasks[SLOT_CNT];
-
-    __disable_irq();
-    Task *iter = queueHead;
-    while(iter != queueRoot) {
-        tasks[taskCount++] = iter;
-        iter = iter->qNext;
-    }
-    __enable_irq();
-
     // header row
     end = append(end, "  Call  Context\n");
 
-    for(int i = 0; i < taskCount; i++) {
-        Task *task = tasks[i];
+    for(int i = 0; i < SLOT_CNT; i++) {
+        Task *task = taskPool + i;
 
         *(end++) = typeCode[task->runType];
         *(end++) = ' ';
