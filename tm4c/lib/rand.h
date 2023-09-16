@@ -1,8 +1,3 @@
-/**
- * Stripped down version of TinyMT
- * https://github.com/MersenneTwister-Lab/TinyMT
- */
-
 #ifndef GPSDO_RAND_H
 #define GPSDO_RAND_H
 

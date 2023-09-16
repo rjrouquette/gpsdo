@@ -117,19 +117,14 @@ static void initCaptureTimer(volatile struct GPTM_MAP *timer) {
 }
 
 void initClkSync() {
-    // Enable Timer 4
-    RCGCTIMER.EN_GPTM4 = 1;
+    // enable capture timers
+    RCGCTIMER.raw |= 0x31;
     delay_cycles_4();
     initCaptureTimer(&GPTM4);
-    // disable timer B interrupt
-    GPTM4.IMR.CBE = 0;
-
-    // Enable Timer 5
-    RCGCTIMER.EN_GPTM5 = 1;
-    delay_cycles_4();
     initCaptureTimer(&GPTM5);
-
-    // synchronize timers with monotonic clock
+    // disable timer 4B interrupt
+    GPTM4.IMR.CBE = 0;
+    // synchronize capture timers with monotonic clock
     TIMER_MONO.SYNC = 0x0F03;
 
     // configure capture pins
@@ -192,7 +187,7 @@ void ISR_Timer4A() {
     clkMonoPps = timer;
 }
 
-// currently unused, but included for safety
+// currently unused, but included for completeness
 void ISR_Timer4B() {
     // clear capture interrupt flag
     GPTM4.ICR = GPTM_ICR_CBE;
