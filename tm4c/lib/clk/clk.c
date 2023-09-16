@@ -24,20 +24,22 @@ static void initClkSys() {
     PLLFREQ1.Q = 0;
     PLLFREQ0.MINT = 15;
     PLLFREQ0.MFRAC = 0;
-    PLLFREQ0.PLLPWR = 1;
+    RSCLKCFG.PSYSDIV = 2;
     RSCLKCFG.NEWFREQ = 1;
-    while(!PLLSTAT.LOCK);
-    // Update Memory Timing
+    PLLFREQ0.PLLPWR = 1;
+
+    // Adjust Memory Timing
     MEMTIM0.EWS = 5;
     MEMTIM0.EBCE = 0;
     MEMTIM0.EBCHT = 6;
     MEMTIM0.FWS = 5;
     MEMTIM0.FBCE = 0;
     MEMTIM0.FBCHT = 6;
-    // Apply Changes
+    // Apply Timing Adjustments
     RSCLKCFG.MEMTIMU = 1;
+
     // Switch to PLL
-    RSCLKCFG.PSYSDIV = 2;
+    while(!PLLSTAT.LOCK);
     RSCLKCFG.USEPLL = 1;
 }
 
