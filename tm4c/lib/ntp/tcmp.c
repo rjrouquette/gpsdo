@@ -52,7 +52,7 @@ static void saveSom();
 static void seedSom(float temp, float comp);
 static void updateSom(float temp, float comp);
 static void runRegression(void *ref);
-static void fitQuadratic(const float *data, int cnt, float *coef, float *mean);
+static void fitQuadratic(const float *data);
 
 /**
  * Estimate temperature correction using 3rd order taylor series
@@ -309,7 +309,7 @@ float scratch[SOM_NODE_CNT][3];
 
 static int step0() {
     // compute initial fit
-    fitQuadratic((float *) somNode, SOM_NODE_CNT, coef, mean);
+    fitQuadratic((float *) somNode);
     // wait for sufficient data
     if(mean[2] < SOM_FILL_OFF)
         return 1;
@@ -342,7 +342,7 @@ static int step1() {
 }
 
 static int step2() {
-    // trim outliers
+    // reweigh outliers
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         // copy X and Y values
         scratch[i][0] = somNode[i][0];
@@ -362,7 +362,7 @@ static int step2() {
 
 static int step3() {
     // compute final fit
-    fitQuadratic((float *) scratch, SOM_NODE_CNT, coef + 1, mean);
+    fitQuadratic((float *) scratch);
     return 0;
 }
 
@@ -440,12 +440,12 @@ unsigned statusSom(char *buffer) {
 }
 
 __attribute__((optimize(3)))
-static void fitQuadratic(const float * const data, const int cnt, float *coef, float *mean) {
+static void fitQuadratic(const float * const data) {
     // compute means
     mean[0] = 0;
     mean[1] = 0;
     mean[2] = 0;
-    for(int i = 0; i < cnt; i++) {
+    for(int i = 0; i < SOM_NODE_CNT; i++) {
         const float *row = data + (i * 3);
         mean[0] += row[0] * row[2];
         mean[1] += row[1] * row[2];
@@ -456,7 +456,7 @@ static void fitQuadratic(const float * const data, const int cnt, float *coef, f
 
     // compute equation matrix
     float xx[3][4] = {0};
-    for (int i = 0; i < cnt; i++) {
+    for (int i = 0; i < SOM_NODE_CNT; i++) {
         const float *row = data + (i * 3);
         const float w = row[2];
         const float x = row[0] - mean[0];
