@@ -319,7 +319,6 @@ static void updateRegression() {
         rmse += y * y * somNode[i][2];
     }
     rmse /= mean[2];
-    rmse *= 4;
 
     // prune outliers
     float scratch[SOM_NODE_CNT][3];
@@ -328,12 +327,12 @@ static void updateRegression() {
         scratch[i][0] = somNode[i][0];
         scratch[i][1] = somNode[i][1];
 
-        // determine if sample should be excluded
+        // re-weight samples
         float x = somNode[i][0] - mean[0];
         float y = somNode[i][1] - mean[1];
         y -= x * coef[1];
         y *= y;
-        scratch[i][2] = (y <= rmse) ? somNode[i][2] : 0;
+        scratch[i][2] *= expf(-0.25f * y / rmse);
     }
 
     // compute final linear fit
