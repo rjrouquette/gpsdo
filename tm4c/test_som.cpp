@@ -27,221 +27,125 @@ float som[16][3] = {
         45.9950176, -169.162288, 0.999999232
 };
 
-void fitGradient(const float * const data, const int cnt, const int dim, float alpha, float *coef) {
-    float delta[dim+1];
-    for(int j = 0; j <= dim; j++)
-        delta[j] = 0;
-
-    for(int i = 0; i < cnt; i++) {
+void fitQuadratic(const float * const data, const int cnt, float *coef) {
+    // compute equation matrix
+    float xx[3][4] = {0};
+    for (int i = 0; i < cnt; i++) {
         auto row = data + (i * 3);
-        float error = row[1];
-        float x = 1;
-        for(int j = 0; j <= dim; j++) {
-            error -= x * coef[j];
-            x *= row[0];
-        }
+        const float w = row[2];
+        const float x = row[0];
+        const float y = row[1];
 
-        error *= row[2];
-        x = 1;
-        for(int j = 0; j <= dim; j++) {
-            delta[j] += error * x;
-            x *= row[0];
-        }
+        // constant terms
+        xx[2][2] += w;
+        xx[2][3] += w * y;
+
+        // linear terms
+        float z = x;
+        xx[1][2] += w * z;
+        xx[1][3] += w * z * y;
+
+        // quadratic terms
+        z *= x;
+        xx[0][2] += w * z;
+        xx[0][3] += w * z * y;
+
+        // cubic terms
+        z *= x;
+        xx[0][1] += w * z;
+
+        // quartic terms
+        z *= x;
+        xx[0][0] += w * z;
+    }
+    // employ matrix symmetry
+    xx[1][0] = xx[0][1];
+    xx[1][1] = xx[0][2];
+    xx[2][0] = xx[0][2];
+    xx[2][1] = xx[1][2];
+
+    // row-echelon reduction
+    if(xx[1][0] != 0) {
+        const float f = xx[1][0] / xx[0][0];
+        xx[1][1] -= f * xx[0][1];
+        xx[1][2] -= f * xx[0][2];
+        xx[1][3] -= f * xx[0][3];
     }
 
-    alpha /= cnt;
-    for(int j = 0; j <= dim; j++)
-        coef[j] += alpha * delta[j];
-}
-
-void fitLinear(const float * const data, const int cnt, float *coef) {
-    float xx = 0, xy = 0;
-    for(int i = 0; i < cnt; i++) {
-        auto row = data + (i * 3);
-        float x = row[0];
-        float y = row[1];
-
-        xx += x * x * row[2];
-        xy += x * y * row[2];
-    }
-    coef[0] = xy / xx;
-}
-
-void fitLinear(const float * const data, const int cnt, float *coef, float *mean) {
-    // compute means
-    mean[0] = 0;
-    mean[1] = 0;
-    mean[2] = 0;
-    for(int i = 0; i < cnt; i++) {
-        auto row = data + (i * 3);
-        mean[0] += row[0] * row[2];
-        mean[1] += row[1] * row[2];
-        mean[2] += row[2];
-    }
-    mean[0] /= mean[2];
-    mean[1] /= mean[2];
-
-    float xx = 0, xy = 0;
-    for(int i = 0; i < cnt; i++) {
-        auto row = data + (i * 3);
-        float x = row[0] - mean[0];
-        float y = row[1] - mean[1];
-
-        xx += x * x * row[2];
-        xy += x * y * row[2];
-    }
-    coef[0] = xy / xx;
-}
-
-void fitTaylor(const int order, float * const data, const int cnt, float *coef, float *mean) {
-    fitLinear(data, cnt, coef + 1, mean);
-
-    // re-center data
-    for(int i = 0; i < cnt; i++) {
-        auto row = data + (i * 3);
-        row[0] -= mean[0];
-        row[1] -= mean[1];
+    // row-echelon reduction
+    {
+        const float f = xx[2][0] / xx[0][0];
+        xx[2][1] -= f * xx[0][1];
+        xx[2][2] -= f * xx[0][2];
+        xx[2][3] -= f * xx[0][3];
     }
 
-    const float rate = 0x1p-64f / mean[2];
-    float x[order + 1];
-    for(int pass = 0; pass < 256; pass++) {
-        for(int i = 0; i < cnt; i++) {
-            auto row = data + (i * 3);
-
-            // compute x and error terms
-            float error = row[1] - coef[0];
-            x[0] = 1;
-            for(int j = 1; j <= order; j++) {
-                x[j] = x[j - 1] * row[0];
-                error -= coef[j] * x[j];
-            }
-
-            error *= rate * row[2];
-            for(int j = 0; j <= order; j++)
-                coef[j] += error * x[j];
-        }
+    // row-echelon reduction
+    if(xx[2][1] != 0) {
+        const float f = xx[2][1] / xx[1][1];
+        xx[2][2] -= f * xx[1][2];
+        xx[2][3] -= f * xx[1][3];
     }
+
+    // compute coefficients
+    coef[0] = xx[2][3] / xx[2][2];
+    coef[1] = (xx[1][3] - xx[1][2] * coef[0]) / xx[1][1];
+    coef[2] = (xx[0][3] - xx[0][2] * coef[0] - xx[0][1] * coef[1]) / xx[0][0];
 }
 
 int main(int argc, char **argv) {
     float scratch[sizeof(som) / sizeof(float)];
     memcpy(scratch, som, sizeof(som));
 
-    // re-center data
-    float mean[3];
-    bzero(mean, sizeof(mean));
-
-    // compute means
-    for(int i = 0; i < 16; i++) {
-        auto row = scratch + (i * 3);
-        mean[0] += row[0] * row[2];
-        mean[1] += row[1] * row[2];
-        mean[2] += row[2];
-    }
-    mean[0] /= mean[2];
-    mean[1] /= mean[2];
-
-    // re-center data
-    for(int i = 0; i < 16; i++) {
-        auto row = scratch + (i * 3);
-        row[0] -= mean[0];
-        row[1] -= mean[1];
-    }
-
-    float coef[4];
-    bzero(coef, sizeof(coef));
-    fitLinear(scratch, 16, coef + 1);
-    for (int i = 0; i < 1<<16; i++)
-        fitGradient(scratch, 16, 2, 0x1p-12f, coef);
-
-    for (auto c : coef)
-        fprintf(stdout, "%f\n", c);
-
-    fprintf(stdout, "plot:\n");
-    fprintf(stdout, "temp,som,linear,quadratic,cubic,error\n");
-    float rmse = 0;
-    for(auto &row : som) {
-        fprintf(stdout, "%f,%f", row[0], row[1]);
-        float x = row[0] - mean[0];
-        float y = coef[0] + mean[1];
-        y += x * coef[1];
-        fprintf(stdout, ",%f", y);
-        y += x * x * coef[2];
-        fprintf(stdout, ",%f", y);
-        y += x * x * x * coef[3];
-        fprintf(stdout, ",%f", y);
-        y -= row[1];
-        fprintf(stdout, ",%f\n", y);
-        rmse += y * y * row[2];
-    }
-    fflush(stdout);
-
-    rmse = sqrtf(rmse / mean[2]);
-    fprintf(stdout, "\nrmse: %f\n", rmse);
-    fflush(stdout);
-
-    return 0;
-}
-
-/*
-int main(int argc, char **argv) {
-    float scratch[sizeof(som) / sizeof(float)];
-    memcpy(scratch, som, sizeof(som));
-
-    float mean[3];
-    float coef[4];
-    bzero(coef, sizeof(coef));
-    fitLinear(scratch, 16, coef + 1, mean);
+    float coef[3];
+    fitQuadratic(scratch, 16, coef);
     float rmse = 0, norm = 0;
     for(auto &row : som) {
-        float x = row[0] - mean[0];
-        float y = coef[0] + mean[1];
+        float x = row[0];
+        float y = coef[0];
         y += x * coef[1];
+        y += x * x * coef[2];
         y -= row[1];
         rmse += y * y * row[2];
+        norm += row[2];
     }
-    rmse /= mean[2];
+    rmse /= norm;
 
     for(auto &row : som) {
-        float x = row[0] - mean[0];
-        float y = coef[0] + mean[1];
+        float x = row[0];
+        float y = coef[0];
         y += x * coef[1];
+        y += x * x * coef[2];
         y -= row[1];
         row[2] *= expf(-0.25 * (y * y) / rmse);
     }
 
     memcpy(scratch, som, sizeof(som));
-//    bzero(coef, sizeof(coef));
-//    fitTaylor(3, scratch, 16, coef, mean);
-    fitLinear(scratch, 16, coef + 1, mean);
-    fprintf(stdout, "%f\n", mean[2]);
-    for(int i = 0; i < 4; i++)
+    fitQuadratic(scratch, 16, coef);
+    for(int i = 0; i < 3; i++)
         fprintf(stdout, "%f\n", coef[i]);
     fflush(stdout);
 
     fprintf(stdout, "plot:\n");
-    fprintf(stdout, "temp,som,linear,quadratic,cubic\n");
+    fprintf(stdout, "temp,som,linear,quadratic\n");
     rmse = 0, norm = 0;
     for(auto &row : som) {
         fprintf(stdout, "%f,%f", row[0], row[1]);
-        float x = row[0] - mean[0];
-        float y = coef[0] + mean[1];
+        float x = row[0];
+        float y = coef[0];
         y += x * coef[1];
         fprintf(stdout, ",%f", y);
         y += x * x * coef[2];
-        fprintf(stdout, ",%f", y);
-        y += x * x * x * coef[3];
         fprintf(stdout, ",%f\n", y);
         y -= row[1];
         rmse += y * y * row[2];
+        norm += row[2];
     }
     fflush(stdout);
 
-    rmse = sqrtf(rmse / mean[2]);
+    rmse = sqrtf(rmse / norm);
     fprintf(stdout, "\nrmse: %f\n", rmse);
     fflush(stdout);
 
     return 0;
 }
-*/

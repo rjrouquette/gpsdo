@@ -15,6 +15,7 @@
 #define ADC_RATE_MEAN (0x1p-11f)
 #define ADC_RATE_VAR  (0x1p-12f)
 
+#define INTV_REGR (1u << (24 - 14)) // 16384 Hz
 #define INTV_TEMP (1u << (24 - 10)) // 1024 Hz
 #define INTV_TCMP (1u << (24 - 4))  // 16 Hz
 
@@ -43,12 +44,15 @@ static volatile float tcmpRmse;
 static volatile float somNode[SOM_NODE_CNT][3];
 static volatile float somNW[SOM_NODE_CNT];
 
+// regression step counter
+static int regressionStep = 0;
+
 static void loadSom();
 static void saveSom();
 static void seedSom(float temp, float comp);
 static void updateSom(float temp, float comp);
-static void updateRegression();
-static void fitLinear(const float *data, int cnt, float *coef, float *mean);
+static void runRegression(void *ref);
+static void fitQuadratic(const float *data, int cnt, float *coef, float *mean);
 
 /**
  * Estimate temperature correction using 3rd order taylor series
@@ -136,10 +140,8 @@ void TCMP_init() {
     adcMean = 0x1p-3f * (float) acc;
 
     loadSom();
-    if(isfinite(somNode[0][0])) {
-        updateRegression();
-        runComp(NULL);
-    }
+    if(isfinite(somNode[0][0]))
+        runSleep(INTV_REGR, runRegression, NULL);
 
     // schedule thread
     runPeriodic(INTV_TEMP, runAdc, NULL);
@@ -156,12 +158,19 @@ float TCMP_get() {
 
 void TCMP_update(const float target) {
     updateSom(tempValue, target);
-    updateRegression();
 
     const uint32_t now = CLK_MONO_INT();
     if(now - tcmpSaved > TCMP_SAVE_INTV) {
         tcmpSaved = now;
         saveSom();
+    }
+
+    if (regressionStep == 0) {
+        // start regression computation
+        runSleep(INTV_REGR, runRegression, NULL);
+    } else {
+        // re-start regression computation
+        regressionStep = 0;
     }
 }
 
@@ -204,17 +213,17 @@ unsigned TCMP_status(char *buffer) {
     tmp[fmtFloat(tcmpCoeff[0] * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - coef[0]: ");
     end = append(end, tmp);
-    end = append(end, " ppm/C\n");
+    end = append(end, " ppm\n");
 
     tmp[fmtFloat(tcmpCoeff[1] * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - coef[1]: ");
     end = append(end, tmp);
-    end = append(end, " ppm/C^2\n");
+    end = append(end, " ppm/C\n");
 
     tmp[fmtFloat(tcmpCoeff[2] * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - coef[2]: ");
     end = append(end, tmp);
-    end = append(end, " ppm/C^3\n");
+    end = append(end, " ppm/C^2\n");
 
     tmp[fmtFloat(tcmpValue * 1e6f, 12, 4, tmp)] = 0;
     end = append(end, "  - curr:    ");
@@ -292,15 +301,19 @@ static void updateSom(float temp, float comp) {
     }
 }
 
-static void updateRegression() {
-    float mean[3];
-    float coef[4];
+// regression scratch variables
+static float rmse;
+static float mean[3];
+static float coef[3];
+float scratch[SOM_NODE_CNT][3];
 
-    // compute initial linear fit
-    fitLinear((float *) somNode, SOM_NODE_CNT, coef + 1, mean);
+static int step0() {
+    // compute initial fit
+    fitQuadratic((float *) somNode, SOM_NODE_CNT, coef, mean);
     // wait for sufficient data
     if(mean[2] < SOM_FILL_OFF)
-        return;
+        return 1;
+
     // update means
     tcmpMean[0] = mean[0];
     tcmpMean[1] = mean[1];
@@ -308,20 +321,28 @@ static void updateRegression() {
 
     // wait for sufficient data
     if(mean[2] < SOM_FILL_REG)
-        return;
+        return 2;
 
+    return 0;
+}
+
+static int step1() {
     // compute residual error
-    float rmse = 0;
+    rmse = 0;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         float x = somNode[i][0] - mean[0];
         float y = somNode[i][1] - mean[1];
+        y -= coef[0];
         y -= x * coef[1];
+        y -= x * x * coef[2];
         rmse += y * y * somNode[i][2];
     }
     rmse /= mean[2];
+    return 0;
+}
 
-    // prune outliers
-    float scratch[SOM_NODE_CNT][3];
+static int step2() {
+    // trim outliers
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         // copy X and Y values
         scratch[i][0] = somNode[i][0];
@@ -330,20 +351,30 @@ static void updateRegression() {
         // re-weight samples
         float x = somNode[i][0] - mean[0];
         float y = somNode[i][1] - mean[1];
+        y -= coef[0];
         y -= x * coef[1];
+        y -= x * x * coef[2];
         y *= y;
         scratch[i][2] *= expf(-0.25f * y / rmse);
     }
+    return 0;
+}
 
-    // compute final linear fit
-    fitLinear((float *) scratch, SOM_NODE_CNT, coef + 1, mean);
+static int step3() {
+    // compute final fit
+    fitQuadratic((float *) scratch, SOM_NODE_CNT, coef + 1, mean);
+    return 0;
+}
 
+static int step4() {
     // compute residual error
     rmse = 0;
     for(int i = 0; i < SOM_NODE_CNT; i++) {
         float x = scratch[i][0] - mean[0];
         float y = scratch[i][1] - mean[1];
+        y -= coef[0];
         y -= x * coef[1];
+        y -= x * x * coef[2];
         rmse += y * y * scratch[i][2];
     }
     tcmpRmse = sqrtf(rmse / mean[2]);
@@ -355,19 +386,37 @@ static void updateRegression() {
         tcmpMean[1] = mean[1];
         tcmpMean[2] = mean[2];
         // update coefficients
-        tcmpCoeff[0] = coef[1];
-        tcmpCoeff[1] = 0;
-        tcmpCoeff[2] = 0;
+        tcmpCoeff[0] = coef[0];
+        tcmpCoeff[1] = coef[1];
+        tcmpCoeff[2] = coef[2];
+    }
+    return 0;
+}
+
+typedef int (*RegressionStep)(void);
+static RegressionStep steps[] = {
+        step0,
+        step1,
+        step2,
+        step3,
+        step4,
+        NULL
+};
+
+static void runRegression(void *ref) {
+    RegressionStep step = steps[regressionStep++];
+    if(step == NULL || (*step)() != 0) {
+        runCancel(runRegression, NULL);
+        regressionStep = 0;
     }
 }
 
 static float tcmpEstimate(const float temp) {
     float x = temp - tcmpMean[0];
-    float y = tcmpMean[1];
-    y += x * tcmpCoeff[0];
-    y += x * x * tcmpCoeff[1];
-    y += x * x * x * tcmpCoeff[2];
-    return y;
+    float y = tcmpCoeff[0];
+    y += x * tcmpCoeff[1];
+    y += x * x * tcmpCoeff[2];
+    return y + tcmpMean[1];
 }
 
 unsigned statusSom(char *buffer) {
@@ -391,7 +440,7 @@ unsigned statusSom(char *buffer) {
 }
 
 __attribute__((optimize(3)))
-static void fitLinear(const float * const data, const int cnt, float *coef, float *mean) {
+static void fitQuadratic(const float * const data, const int cnt, float *coef, float *mean) {
     // compute means
     mean[0] = 0;
     mean[1] = 0;
@@ -405,14 +454,67 @@ static void fitLinear(const float * const data, const int cnt, float *coef, floa
     mean[0] /= mean[2];
     mean[1] /= mean[2];
 
-    float xx = 0, xy = 0;
-    for(int i = 0; i < cnt; i++) {
+    // compute equation matrix
+    float xx[3][4] = {0};
+    for (int i = 0; i < cnt; i++) {
         const float *row = data + (i * 3);
-        float x = row[0] - mean[0];
-        float y = row[1] - mean[1];
+        const float w = row[2];
+        const float x = row[0] - mean[0];
+        const float y = row[1] - mean[1];
 
-        xx += x * x * row[2];
-        xy += x * y * row[2];
+        // constant terms
+        xx[2][2] += w;
+        xx[2][3] += w * y;
+
+        // linear terms
+        float z = x;
+        xx[1][2] += w * z;
+        xx[1][3] += w * z * y;
+
+        // quadratic terms
+        z *= x;
+        xx[0][2] += w * z;
+        xx[0][3] += w * z * y;
+
+        // cubic terms
+        z *= x;
+        xx[0][1] += w * z;
+
+        // quartic terms
+        z *= x;
+        xx[0][0] += w * z;
     }
-    coef[0] = xy / xx;
+    // employ matrix symmetry
+    xx[1][0] = xx[0][1];
+    xx[1][1] = xx[0][2];
+    xx[2][0] = xx[0][2];
+    xx[2][1] = xx[1][2];
+
+    // row-echelon reduction
+    if(xx[1][0] != 0) {
+        const float f = xx[1][0] / xx[0][0];
+        xx[1][1] -= f * xx[0][1];
+        xx[1][2] -= f * xx[0][2];
+        xx[1][3] -= f * xx[0][3];
+    }
+
+    // row-echelon reduction
+    {
+        const float f = xx[2][0] / xx[0][0];
+        xx[2][1] -= f * xx[0][1];
+        xx[2][2] -= f * xx[0][2];
+        xx[2][3] -= f * xx[0][3];
+    }
+
+    // row-echelon reduction
+    if(xx[2][1] != 0) {
+        const float f = xx[2][1] / xx[1][1];
+        xx[2][2] -= f * xx[1][2];
+        xx[2][3] -= f * xx[1][3];
+    }
+
+    // compute coefficients
+    coef[0] = xx[2][3] / xx[2][2];
+    coef[1] = (xx[1][3] - xx[1][2] * coef[0]) / xx[1][1];
+    coef[2] = (xx[0][3] - xx[0][2] * coef[0] - xx[0][1] * coef[1]) / xx[0][0];
 }
