@@ -55,7 +55,7 @@ static void seedSom(float temp, float comp);
 static void updateSom(float temp, float comp);
 static void runRegression(void *ref);
 
-static void computeMean(const float * const data);
+static void computeMean(const float *data);
 static void fitQuadratic(const float *data);
 static void computeMSE(const float *data);
 
