@@ -44,7 +44,7 @@ static volatile float tcmpRmse;
 
 // SOM filter for compensation samples
 static float somNode[SOM_NODE_CNT][SOM_NODE_DIM];
-static const float somNW[SOM_NODE_CNT];
+static float somNW[SOM_NODE_CNT];
 
 // regression step counter
 static int regressionStep = 0;
