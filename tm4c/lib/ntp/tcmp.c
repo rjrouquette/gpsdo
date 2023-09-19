@@ -47,7 +47,7 @@ static float somNode[SOM_NODE_CNT][SOM_NODE_DIM];
 static float somNW[SOM_NODE_CNT];
 
 // regression step counter
-static int regressionStep = 0;
+static uint32_t regressionStep = 0;
 
 static void loadSom();
 static void saveSom();
@@ -396,8 +396,9 @@ static int step8() {
     return 0;
 }
 
+#define STEP_CNT (9)
 typedef int (*RegressionStep)(void);
-static const RegressionStep steps[] = {
+static const RegressionStep steps[STEP_CNT] = {
         step0,
         step1,
         step2,
@@ -406,15 +407,18 @@ static const RegressionStep steps[] = {
         step5,
         step6,
         step7,
-        step8,
-        NULL
+        step8
 };
 
 static void runRegression(void *ref) {
-    RegressionStep step = steps[regressionStep++];
-    if(step == NULL || (*step)() != 0) {
+    if(
+            regressionStep >= STEP_CNT ||
+            (*(steps[regressionStep]))() != 0
+    ) {
         runCancel(runRegression, NULL);
         regressionStep = 0;
+    } else {
+        ++regressionStep;
     }
 }
 
@@ -447,32 +451,30 @@ unsigned statusSom(char *buffer) {
 }
 
 __attribute__((optimize(3)))
-static void computeMean(const float * const data) {
-    const float * const end = data + (SOM_NODE_DIM * SOM_NODE_CNT);
-
+static void computeMean(const float *data) {
     // compute means
     mean[0] = 0;
     mean[1] = 0;
     mean[2] = 0;
-    for(const float *row = data; row < end; row += SOM_NODE_DIM) {
-        mean[0] += row[0] * row[2];
-        mean[1] += row[1] * row[2];
-        mean[2] += row[2];
+    for(int i = 0; i < SOM_NODE_CNT; i++) {
+        mean[0] += data[0] * data[2];
+        mean[1] += data[1] * data[2];
+        mean[2] += data[2];
+        data += SOM_NODE_DIM;
     }
     mean[0] /= mean[2];
     mean[1] /= mean[2];
 }
 
 __attribute__((optimize(3)))
-static void fitQuadratic(const float * const data) {
-    const float * const end = data + (SOM_NODE_DIM * SOM_NODE_CNT);
-
+static void fitQuadratic(const float *data) {
     // compute equation matrix
     float xx[REG_DIM_COEF][REG_DIM_COEF + 1] = {0};
-    for(const float *row = data; row < end; row += SOM_NODE_DIM) {
-        const float w = row[2];
-        const float x = row[0] - mean[0];
-        const float y = row[1] - mean[1];
+    for(int i = 0; i < SOM_NODE_CNT; i++) {
+        const float w = data[2];
+        const float x = data[0] - mean[0];
+        const float y = data[1] - mean[1];
+        data += SOM_NODE_DIM;
 
         // constant terms
         xx[2][2] += w;
@@ -532,17 +534,16 @@ static void fitQuadratic(const float * const data) {
 }
 
 __attribute__((optimize(3)))
-static void computeMSE(const float * const data) {
-    const float * const end = data + (SOM_NODE_DIM * SOM_NODE_CNT);
-
+static void computeMSE(const float *data) {
     float acc = 0;
-    for(const float *row = data; row < end; row += SOM_NODE_DIM) {
-        float x = row[0] - mean[0];
-        float y = row[1] - mean[1];
+    for(int i = 0; i < SOM_NODE_CNT; i++) {
+        float x = data[0] - mean[0];
+        float y = data[1] - mean[1];
         y -= coef[0];
         y -= x * coef[1];
         y -= x * x * coef[2];
-        acc += y * y * row[2];
+        acc += y * y * data[2];
+        data += SOM_NODE_DIM;
     }
     mse = acc / mean[2];
 }
