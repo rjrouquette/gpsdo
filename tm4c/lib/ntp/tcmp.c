@@ -25,7 +25,7 @@
 #define SOM_NODE_CNT (16)
 #define SOM_FILL_OFF (2.0f)
 #define SOM_FILL_REG (8.0f)
-#define SOM_RATE_MAX (0.25f)
+#define SOM_RATE_MAX (0x1p-4f)
 
 #define REG_MIN_RMSE (250e-9f)
 
@@ -355,7 +355,7 @@ static int step2() {
         y -= x * coef[1];
         y -= x * x * coef[2];
         y *= y;
-        scratch[i][2] *= expf(-0.25f * y / rmse);
+        scratch[i][2] = somNode[i][2] * expf(-0.25f * y / rmse);
     }
     return 0;
 }
