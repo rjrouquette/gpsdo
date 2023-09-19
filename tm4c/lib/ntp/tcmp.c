@@ -22,11 +22,13 @@
 #define TCMP_SAVE_INTV (3600) // save state every hour
 
 #define SOM_EEPROM_BASE (0x0020)
+#define SOM_NODE_DIM (3)
 #define SOM_NODE_CNT (16)
 #define SOM_FILL_OFF (2.0f)
 #define SOM_FILL_REG (8.0f)
 #define SOM_RATE_MAX (0x1p-4f)
 
+#define REG_DIM_COEF (3)
 #define REG_MIN_RMSE (250e-9f)
 
 static volatile float adcMean;
@@ -36,13 +38,13 @@ static volatile float tempValue;
 static volatile uint32_t tcmpSaved;
 static volatile float tcmpValue;
 
-static volatile float tcmpMean[3];
-static volatile float tcmpCoeff[3];
+static volatile float tcmpMean[SOM_NODE_DIM];
+static volatile float tcmpCoeff[REG_DIM_COEF];
 static volatile float tcmpRmse;
 
-// SOM for filtering compensation samples
-static volatile float somNode[SOM_NODE_CNT][3];
-static volatile float somNW[SOM_NODE_CNT];
+// SOM filter for compensation samples
+static float somNode[SOM_NODE_CNT][SOM_NODE_DIM];
+static const float somNW[SOM_NODE_CNT];
 
 // regression step counter
 static int regressionStep = 0;
@@ -52,7 +54,10 @@ static void saveSom();
 static void seedSom(float temp, float comp);
 static void updateSom(float temp, float comp);
 static void runRegression(void *ref);
+
+static void computeMean(const float * const data);
 static void fitQuadratic(const float *data);
+static void computeMSE(const float *data);
 
 /**
  * Estimate temperature correction using 3rd order taylor series
@@ -236,7 +241,7 @@ unsigned TCMP_status(char *buffer) {
 static void loadSom() {
     // initialize neighbor weights
     for(int i = 0; i < SOM_NODE_CNT; i++)
-        somNW[i] = expf(-2.0f * (float) (i * i));
+        ((float *) somNW)[i] = expf(-2.0f * (float) (i * i));
 
     uint32_t *ptr = (uint32_t *) somNode;
     uint32_t *end = ptr + (sizeof(somNode) / sizeof(uint32_t));
@@ -302,15 +307,25 @@ static void updateSom(float temp, float comp) {
 }
 
 // regression scratch variables
-static float rmse;
-static float mean[3];
-static float coef[3];
-float scratch[SOM_NODE_CNT][3];
+static float mse;
+static float mean[SOM_NODE_DIM];
+static float coef[REG_DIM_COEF];
+float scratch[SOM_NODE_CNT][SOM_NODE_DIM];
 
 static int step0() {
+    // compute initial mean
+    computeMean(somNode[0]);
+    return 0;
+}
+
+static int step1() {
     // compute initial fit
-    fitQuadratic((float *) somNode);
-    // wait for sufficient data
+    fitQuadratic(somNode[0]);
+    return 0;
+}
+
+static int step2() {
+    // require sufficient data
     if(mean[2] < SOM_FILL_OFF)
         return 1;
 
@@ -319,65 +334,53 @@ static int step0() {
     tcmpMean[1] = mean[1];
     tcmpMean[2] = mean[2];
 
-    // wait for sufficient data
+    // require sufficient data
     if(mean[2] < SOM_FILL_REG)
         return 2;
 
     return 0;
 }
 
-static int step1() {
-    // compute residual error
-    rmse = 0;
-    for(int i = 0; i < SOM_NODE_CNT; i++) {
-        float x = somNode[i][0] - mean[0];
-        float y = somNode[i][1] - mean[1];
-        y -= coef[0];
-        y -= x * coef[1];
-        y -= x * x * coef[2];
-        rmse += y * y * somNode[i][2];
-    }
-    rmse /= mean[2];
-    return 0;
-}
-
-static int step2() {
-    // reweigh outliers
-    for(int i = 0; i < SOM_NODE_CNT; i++) {
-        // copy X and Y values
-        scratch[i][0] = somNode[i][0];
-        scratch[i][1] = somNode[i][1];
-
-        // re-weight samples
-        float x = somNode[i][0] - mean[0];
-        float y = somNode[i][1] - mean[1];
-        y -= coef[0];
-        y -= x * coef[1];
-        y -= x * x * coef[2];
-        y *= y;
-        scratch[i][2] = somNode[i][2] * expf(-0.25f * y / rmse);
-    }
-    return 0;
-}
-
 static int step3() {
-    // compute final fit
-    fitQuadratic((float *) scratch);
+    // compute residual error
+    computeMSE(somNode[0]);
     return 0;
 }
 
 static int step4() {
-    // compute residual error
-    rmse = 0;
+    // reweigh outliers
     for(int i = 0; i < SOM_NODE_CNT; i++) {
-        float x = scratch[i][0] - mean[0];
-        float y = scratch[i][1] - mean[1];
+        float x = (scratch[i][0] = somNode[i][0]) - mean[0];
+        float y = (scratch[i][1] = somNode[i][1]) - mean[1];
         y -= coef[0];
         y -= x * coef[1];
         y -= x * x * coef[2];
-        rmse += y * y * scratch[i][2];
+        scratch[i][2] = somNode[i][2] * expf(-0.25f * y * y / mse);
     }
-    tcmpRmse = sqrtf(rmse / mean[2]);
+    return 0;
+}
+
+static int step5() {
+    // compute final mean
+    computeMean(scratch[0]);
+    return 0;
+}
+
+static int step6() {
+    // compute final fit
+    fitQuadratic(scratch[0]);
+    return 0;
+}
+
+static int step7() {
+    // compute residual error
+    computeMSE(scratch[0]);
+    return 0;
+}
+
+static int step8() {
+    // update residual error
+    tcmpRmse = sqrtf(mse);
 
     // quality check fit
     if(tcmpRmse <= REG_MIN_RMSE) {
@@ -394,12 +397,16 @@ static int step4() {
 }
 
 typedef int (*RegressionStep)(void);
-static RegressionStep steps[] = {
+static const RegressionStep steps[] = {
         step0,
         step1,
         step2,
         step3,
         step4,
+        step5,
+        step6,
+        step7,
+        step8,
         NULL
 };
 
@@ -440,24 +447,29 @@ unsigned statusSom(char *buffer) {
 }
 
 __attribute__((optimize(3)))
-static void fitQuadratic(const float * const data) {
+static void computeMean(const float * const data) {
+    const float * const end = data + (SOM_NODE_DIM * SOM_NODE_CNT);
+
     // compute means
     mean[0] = 0;
     mean[1] = 0;
     mean[2] = 0;
-    for(int i = 0; i < SOM_NODE_CNT; i++) {
-        const float *row = data + (i * 3);
+    for(const float *row = data; row < end; row += SOM_NODE_DIM) {
         mean[0] += row[0] * row[2];
         mean[1] += row[1] * row[2];
         mean[2] += row[2];
     }
     mean[0] /= mean[2];
     mean[1] /= mean[2];
+}
+
+__attribute__((optimize(3)))
+static void fitQuadratic(const float * const data) {
+    const float * const end = data + (SOM_NODE_DIM * SOM_NODE_CNT);
 
     // compute equation matrix
-    float xx[3][4] = {0};
-    for (int i = 0; i < SOM_NODE_CNT; i++) {
-        const float *row = data + (i * 3);
+    float xx[REG_DIM_COEF][REG_DIM_COEF + 1] = {0};
+    for(const float *row = data; row < end; row += SOM_NODE_DIM) {
         const float w = row[2];
         const float x = row[0] - mean[0];
         const float y = row[1] - mean[1];
@@ -517,4 +529,20 @@ static void fitQuadratic(const float * const data) {
     coef[0] = xx[2][3] / xx[2][2];
     coef[1] = (xx[1][3] - xx[1][2] * coef[0]) / xx[1][1];
     coef[2] = (xx[0][3] - xx[0][2] * coef[0] - xx[0][1] * coef[1]) / xx[0][0];
+}
+
+__attribute__((optimize(3)))
+static void computeMSE(const float * const data) {
+    const float * const end = data + (SOM_NODE_DIM * SOM_NODE_CNT);
+
+    float acc = 0;
+    for(const float *row = data; row < end; row += SOM_NODE_DIM) {
+        float x = row[0] - mean[0];
+        float y = row[1] - mean[1];
+        y -= coef[0];
+        y -= x * coef[1];
+        y -= x * x * coef[2];
+        acc += y * y * row[2];
+    }
+    mse = acc / mean[2];
 }
