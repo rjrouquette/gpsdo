@@ -530,11 +530,12 @@ static void processUbxPVT(const uint8_t *payload) {
     uint32_t offset = *(uint16_t*) (payload + 4);
     offset -= 1900;
     // determine leap-year status
-    int isLeap = ((offset & 3) == 0);
+    int isLeap = ((offset & 3) == 0) ? 1 : 0;
     if(offset % 100 == 0) isLeap = 0;
     // correct for leap-years
     uint32_t leap = offset >> 2;
     leap -= leap / 25;
+    leap -= isLeap;
     // rescale
     offset *= 365;
     offset += leap;
