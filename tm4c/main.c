@@ -19,7 +19,7 @@
 #include "lib/ntp/ntp.h"
 #include "lib/ptp/ptp.h"
 
-#define EEPROM_FORMAT (0x00000003)
+#define EEPROM_FORMAT (0x00000004)
 
 static void EEPROM_init();
 
