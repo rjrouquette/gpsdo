@@ -41,8 +41,8 @@ static NtpSource* ntpAllocPeer();
 // deallocate peer
 static void ntpRemovePeer(NtpSource *peer);
 
-static NtpSource * sources[MAX_NTP_SRCS];
-static NtpSource * selectedSource = NULL;
+static NtpSource *sources[MAX_NTP_SRCS];
+static NtpSource *selectedSource = NULL;
 static volatile uint32_t cntSources = 0;
 static volatile uint64_t lastUpdate = 0;
 
@@ -56,6 +56,7 @@ static volatile uint32_t rootDispersion;
 
 // hash table for interleaved timestamps
 #define XLEAVE_SIZE (10)
+
 static volatile struct TsXleave {
     uint64_t rxTime;
     uint64_t txTime;
@@ -79,9 +80,10 @@ static void runDnsFill(void *ref);
 
 // called by PLL for hard TAI adjustments
 void ntpApplyOffset(int64_t offset) {
-    for(int i = 0; i < cntSources; i++) {
+    for (int i = 0; i < cntSources; i++) {
         NtpSource *source = sources[i];
-        if(source == NULL) continue;
+        if (source == NULL)
+            continue;
         NtpSource_applyOffset(source, offset);
     }
 }
@@ -96,7 +98,7 @@ void NTP_init() {
 
     // initialize GPS reference and register it as a source
     NtpGPS_init(&srcGps);
-    sources[cntSources++] = (void *) &srcGps;
+    sources[cntSources++] = (void*) &srcGps;
     // 16 Hz polling rate for sources
     runSleep(SRC_UPDT_INTV, NtpGPS_run, &srcGps);
 
@@ -112,10 +114,10 @@ uint32_t NTP_refId() {
 
 static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
     // map headers
-    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
-    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
-    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
-    HEADER_NTP *headerNTP = (HEADER_NTP *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH*) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4*) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP*) (headerIP4 + 1);
+    HEADER_NTP *headerNTP = (HEADER_NTP*) (headerUDP + 1);
 
     // retrieve hardware transmit time
     uint64_t stamps[3];
@@ -131,19 +133,23 @@ static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
 // process client request
 static void ntpRequest(uint8_t *frame, int flen) {
     // discard malformed packets
-    if(flen < NTP4_SIZE) return;
+    if (flen < NTP4_SIZE)
+        return;
     // map headers
-    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
-    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
-    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
-    HEADER_NTP *headerNTP = (HEADER_NTP *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH*) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4*) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP*) (headerIP4 + 1);
+    HEADER_NTP *headerNTP = (HEADER_NTP*) (headerUDP + 1);
 
     // verify destination
-    if(headerIP4->dst != ipAddress) return;
+    if (headerIP4->dst != ipAddress)
+        return;
     // prevent loopback
-    if(headerIP4->src == ipAddress) return;
+    if (headerIP4->src == ipAddress)
+        return;
     // filter non-client frames
-    if(headerNTP->mode != NTP_MODE_CLI) return;
+    if (headerNTP->mode != NTP_MODE_CLI)
+        return;
     // indicate time-server activity
     LED_act0();
 
@@ -166,21 +172,21 @@ static void ntpRequest(uint8_t *frame, int flen) {
     UDP_returnToSender(frame, ipAddress, NTP_PORT_SRV);
 
     // remap headers
-    headerEth = (HEADER_ETH *) frame;
-    headerIP4 = (HEADER_IP4 *) (headerEth + 1);
-    headerUDP = (HEADER_UDP *) (headerIP4 + 1);
-    headerNTP = (HEADER_NTP *) (headerUDP + 1);
+    headerEth = (HEADER_ETH*) frame;
+    headerIP4 = (HEADER_IP4*) (headerEth + 1);
+    headerUDP = (HEADER_UDP*) (headerIP4 + 1);
+    headerNTP = (HEADER_NTP*) (headerUDP + 1);
 
     // check for interleaved request
     int xleave = -1;
     const uint64_t orgTime = headerNTP->origTime;
-    if(
-            orgTime != 0 &&
-            headerNTP->rxTime != headerNTP->txTime
-            ) {
+    if (
+        orgTime != 0 &&
+        headerNTP->rxTime != headerNTP->txTime
+    ) {
         // load TX timestamp if available
         int cell = hashXleave(headerIP4->dst);
-        if(orgTime == tsXleave[cell].rxTime)
+        if (orgTime == tsXleave[cell].rxTime)
             xleave = cell;
     }
 
@@ -199,10 +205,11 @@ static void ntpRequest(uint8_t *frame, int flen) {
     // set reference timestamp
     headerNTP->refTime = __builtin_bswap64(CLK_TAI_fromMono(lastUpdate) + NTP_UTC_OFFSET - clkTaiUtcOffset);
     // set origin and TX timestamps
-    if(xleave < 0) {
+    if (xleave < 0) {
         headerNTP->origTime = headerNTP->txTime;
         headerNTP->txTime = __builtin_bswap64(CLK_TAI() + NTP_UTC_OFFSET - clkTaiUtcOffset);
-    } else {
+    }
+    else {
         headerNTP->origTime = headerNTP->rxTime;
         headerNTP->txTime = tsXleave[xleave].txTime;
     }
@@ -219,32 +226,41 @@ static void ntpRequest(uint8_t *frame, int flen) {
 // process peer response
 static void ntpResponse(uint8_t *frame, int flen) {
     // discard malformed packets
-    if(flen < NTP4_SIZE) return;
+    if (flen < NTP4_SIZE)
+        return;
     // map headers
-    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
-    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
-    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
-    HEADER_NTP *headerNTP = (HEADER_NTP *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH*) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4*) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP*) (headerIP4 + 1);
+    HEADER_NTP *headerNTP = (HEADER_NTP*) (headerUDP + 1);
 
     // verify destination
-    if(isMyMAC(headerEth->macDst)) return;
-    if(headerIP4->dst != ipAddress) return;
+    if (isMyMAC(headerEth->macDst))
+        return;
+    if (headerIP4->dst != ipAddress)
+        return;
     // prevent loopback
-    if(headerIP4->src == ipAddress) return;
+    if (headerIP4->src == ipAddress)
+        return;
     // filter non-server frames
-    if(headerNTP->mode != NTP_MODE_SRV) return;
+    if (headerNTP->mode != NTP_MODE_SRV)
+        return;
     // filter invalid frames
-    if(headerNTP->origTime == 0) return;
+    if (headerNTP->origTime == 0)
+        return;
 
     // locate recipient
     uint32_t srcAddr = headerIP4->src;
-    for(uint32_t i = 0; i < cntSources; i++) {
+    for (uint32_t i = 0; i < cntSources; i++) {
         NtpSource *source = sources[i];
 
         // check for matching peer
-        if(source == NULL) return;
-        if(source->mode != RPY_SD_MD_CLIENT) continue;
-        if(source->id != srcAddr) continue;
+        if (source == NULL)
+            return;
+        if (source->mode != RPY_SD_MD_CLIENT)
+            continue;
+        if (source->id != srcAddr)
+            continue;
 
         // handoff frame to peer
         NtpPeer_recv(source, frame, flen);
@@ -254,11 +270,11 @@ static void ntpResponse(uint8_t *frame, int flen) {
 
 static void runSelect(void *ref) {
     // prune defunct sources
-    for(int i = 0; i < cntSources; i++) {
+    for (int i = 0; i < cntSources; i++) {
         // reference sources are excluded
-        if(sources[i]->mode == RPY_SD_MD_REF)
+        if (sources[i]->mode == RPY_SD_MD_REF)
             continue;
-        if(sources[i]->prune) {
+        if (sources[i]->prune) {
             ntpRemovePeer(sources[i]);
             break;
         }
@@ -266,31 +282,31 @@ static void runSelect(void *ref) {
 
     // select best clock
     selectedSource = NULL;
-    for(int i = 0; i < cntSources; i++) {
-        if(sources[i]->lost) {
+    for (int i = 0; i < cntSources; i++) {
+        if (sources[i]->lost) {
             sources[i]->state = RPY_SD_ST_UNSELECTED;
             continue;
         }
-        if(sources[i]->usedOffset < 8 || sources[i]->usedDrift < 4) {
+        if (sources[i]->usedOffset < 8 || sources[i]->usedDrift < 4) {
             sources[i]->state = RPY_SD_ST_FALSETICKER;
             continue;
         }
-        if(sources[i]->freqSkew > NTP_MAX_SKEW) {
+        if (sources[i]->freqSkew > NTP_MAX_SKEW) {
             sources[i]->state = RPY_SD_ST_JITTERY;
             continue;
         }
         sources[i]->state = RPY_SD_ST_SELECTABLE;
-        if(selectedSource == NULL) {
+        if (selectedSource == NULL) {
             selectedSource = sources[i];
             continue;
         }
-        if(sources[i]->score < selectedSource->score) {
+        if (sources[i]->score < selectedSource->score) {
             selectedSource = sources[i];
         }
     }
 
     // indicate complete loss of tracking
-    if(selectedSource == NULL) {
+    if (selectedSource == NULL) {
         refId = 0;
         clockStratum = 16;
         leapIndicator = 3;
@@ -302,7 +318,8 @@ static void runSelect(void *ref) {
     // sanity check source and check for update
     NtpSource *source = selectedSource;
     source->state = RPY_SD_ST_SELECTED;
-    if(source->lastUpdate == lastUpdate) return;
+    if (source->lastUpdate == lastUpdate)
+        return;
     lastUpdate = source->lastUpdate;
 
     // set status
@@ -319,15 +336,15 @@ static void runSelect(void *ref) {
 }
 
 static NtpSource* ntpAllocPeer() {
-    for(int i = 0; i < MAX_NTP_PEERS; i++) {
+    for (int i = 0; i < MAX_NTP_PEERS; i++) {
         NtpPeer *slot = peerSlots + i;
-        if(slot->source.id == 0) {
+        if (slot->source.id == 0) {
             // initialize peer record
             NtpPeer_init(slot);
             // append to source list
-            sources[cntSources++] = (NtpSource *) slot;
+            sources[cntSources++] = (NtpSource*) slot;
             // return instance
-            return (NtpSource *) slot;
+            return (NtpSource*) slot;
         }
     }
     return NULL;
@@ -335,7 +352,7 @@ static NtpSource* ntpAllocPeer() {
 
 static void ntpRemovePeer(NtpSource *peer) {
     // deselect source if selected
-    if(peer == selectedSource)
+    if (peer == selectedSource)
         selectedSource = NULL;
 
     // remove from task schedule
@@ -343,15 +360,17 @@ static void ntpRemovePeer(NtpSource *peer) {
     // deregister peer
     peer->id = 0;
     uint32_t slot = -1u;
-    for(uint32_t i = 0; i < cntSources; i++) {
-        if(sources[i] == peer) slot = i;
+    for (uint32_t i = 0; i < cntSources; i++) {
+        if (sources[i] == peer)
+            slot = i;
     }
-    if(slot > cntSources) return;
+    if (slot > cntSources)
+        return;
     // compact source list
-    while(++slot < cntSources)
-        sources[slot-1] = sources[slot];
+    while (++slot < cntSources)
+        sources[slot - 1] = sources[slot];
     // clear unused slots
-    while(slot < MAX_NTP_SRCS)
+    while (slot < MAX_NTP_SRCS)
         sources[slot++] = NULL;
     // reduce source count
     --cntSources;
@@ -359,21 +378,23 @@ static void ntpRemovePeer(NtpSource *peer) {
 
 static void ntpDnsCallback(void *ref, uint32_t addr) {
     // ignore if slots are full
-    if(cntSources >= MAX_NTP_SRCS) return;
+    if (cntSources >= MAX_NTP_SRCS)
+        return;
     // ignore own address
-    if(addr == ipAddress) return;
+    if (addr == ipAddress)
+        return;
     // verify address is not currently in use
-    for(uint32_t i = 0; i < cntSources; i++) {
-        if(sources[i]->mode != RPY_SD_MD_CLIENT)
+    for (uint32_t i = 0; i < cntSources; i++) {
+        if (sources[i]->mode != RPY_SD_MD_CLIENT)
             continue;
-        if(sources[i]->id == addr)
+        if (sources[i]->id == addr)
             return;
     }
     // attempt to add as new source
     NtpSource *newSource = ntpAllocPeer();
-    if(newSource != NULL) {
+    if (newSource != NULL) {
         newSource->id = addr;
-        if(!IPv4_testSubnet(ipSubnet, ipAddress, addr)) {
+        if (!IPv4_testSubnet(ipSubnet, ipAddress, addr)) {
             // faster initial burst for local timeservers
             newSource->poll = 1;
             newSource->minPoll = 2;
@@ -383,7 +404,7 @@ static void ntpDnsCallback(void *ref, uint32_t addr) {
 }
 
 static void runDnsFill(void *ref) {
-    if(cntSources < MAX_NTP_SRCS) {
+    if (cntSources < MAX_NTP_SRCS) {
         // fill with DHCP provided addresses
         uint32_t *addr;
         int cnt;
@@ -412,11 +433,15 @@ static void runDnsFill(void *ref) {
 
 // replicate htons() function
 __attribute__((always_inline))
-static inline uint16_t htons(uint16_t value) { return __builtin_bswap16(value); }
+static inline uint16_t htons(uint16_t value) {
+    return __builtin_bswap16(value);
+}
 
 // replicate htonl() function
 __attribute__((always_inline))
-static inline uint32_t htonl(uint32_t value) { return __builtin_bswap32(value); }
+static inline uint32_t htonl(uint32_t value) {
+    return __builtin_bswap32(value);
+}
 
 // replicate chronyc float format
 static int32_t htonf(float value);
@@ -446,37 +471,45 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
 static uint16_t chronycNtpData(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
 
 #define CHRONYC_HANDLER_CNT (5)
+
 static const struct {
-    uint16_t (*call) (CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
+    uint16_t (*call)(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
     int len;
     uint16_t cmd;
 } handlers[CHRONYC_HANDLER_CNT] = {
-        { chronycNSources, REP_LEN_NSOURCES, REQ_N_SOURCES },
-        { chronycSourceData, REP_LEN_SOURCEDATA, REQ_SOURCE_DATA },
-        { chronycSourceStats, REP_LEN_SOURCESTATS, REQ_SOURCESTATS },
-        { chronycTracking, REP_LEN_TRACKING, REQ_TRACKING },
-        { chronycNtpData, REP_LEN_NTP_DATA, REQ_NTP_DATA }
+    {chronycNSources, REP_LEN_NSOURCES, REQ_N_SOURCES},
+    {chronycSourceData, REP_LEN_SOURCEDATA, REQ_SOURCE_DATA},
+    {chronycSourceStats, REP_LEN_SOURCESTATS, REQ_SOURCESTATS},
+    {chronycTracking, REP_LEN_TRACKING, REQ_TRACKING},
+    {chronycNtpData, REP_LEN_NTP_DATA, REQ_NTP_DATA}
 };
 
 static void chronycRequest(uint8_t *frame, int flen) {
     // drop invalid packets
-    if(flen < (UDP_DATA_OFFSET + REQ_MIN_LEN)) return;
-    if(flen > (UDP_DATA_OFFSET + REQ_MAX_LEN)) return;
+    if (flen < (UDP_DATA_OFFSET + REQ_MIN_LEN)
+
+    )
+    return;
+    if (flen > (UDP_DATA_OFFSET + REQ_MAX_LEN))
+        return;
 
     // map headers
-    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
-    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
-    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
-    CMD_Request *cmdRequest = (CMD_Request *) (headerUDP + 1);
+    HEADER_ETH *headerEth = (HEADER_ETH*) frame;
+    HEADER_IP4 *headerIP4 = (HEADER_IP4*) (headerEth + 1);
+    HEADER_UDP *headerUDP = (HEADER_UDP*) (headerIP4 + 1);
+    CMD_Request *cmdRequest = (CMD_Request*) (headerUDP + 1);
 
     // drop invalid packets
-    if(cmdRequest->pkt_type != PKT_TYPE_CMD_REQUEST) return;
-    if(cmdRequest->pad1 != 0) return;
-    if(cmdRequest->pad2 != 0) return;
+    if (cmdRequest->pkt_type != PKT_TYPE_CMD_REQUEST)
+        return;
+    if (cmdRequest->pad1 != 0)
+        return;
+    if (cmdRequest->pad2 != 0)
+        return;
 
     // drop packet if nack is not possible
-    if(cmdRequest->version != PROTO_VERSION_NUMBER) {
-        if(cmdRequest->version < PROTO_VERSION_MISMATCH_COMPAT_SERVER)
+    if (cmdRequest->version != PROTO_VERSION_NUMBER) {
+        if (cmdRequest->version < PROTO_VERSION_MISMATCH_COMPAT_SERVER)
             return;
     }
 
@@ -489,24 +522,25 @@ static void chronycRequest(uint8_t *frame, int flen) {
     UDP_returnToSender(resp, ipAddress, DEFAULT_CANDM_PORT);
 
     // remap headers
-    headerEth = (HEADER_ETH *) resp;
-    headerIP4 = (HEADER_IP4 *) (headerEth + 1);
-    headerUDP = (HEADER_UDP *) (headerIP4 + 1);
-    CMD_Reply *cmdReply = (CMD_Reply *) (headerUDP + 1);
+    headerEth = (HEADER_ETH*) resp;
+    headerIP4 = (HEADER_IP4*) (headerEth + 1);
+    headerUDP = (HEADER_UDP*) (headerIP4 + 1);
+    CMD_Reply *cmdReply = (CMD_Reply*) (headerUDP + 1);
 
     // begin response
     chronycReply(cmdReply, cmdRequest);
 
     // nack bad protocol version
-    if(cmdRequest->version != PROTO_VERSION_NUMBER) {
+    if (cmdRequest->version != PROTO_VERSION_NUMBER) {
         cmdReply->status = htons(STT_BADPKTVERSION);
-    } else {
+    }
+    else {
         cmdReply->status = htons(STT_INVALID);
         const uint16_t cmd = htons(cmdRequest->command);
         const int len = flen - UDP_DATA_OFFSET;
-        for(int i = 0; i < CHRONYC_HANDLER_CNT; i++) {
-            if(handlers[i].cmd == cmd) {
-                if(handlers[i].len == len)
+        for (int i = 0; i < CHRONYC_HANDLER_CNT; i++) {
+            if (handlers[i].cmd == cmd) {
+                if (handlers[i].len == len)
                     cmdReply->status = (*(handlers[i].call))(cmdReply, cmdRequest);
                 else
                     cmdReply->status = htons(STT_BADPKTLENGTH);
@@ -541,10 +575,12 @@ static uint16_t chronycSourceData(CMD_Reply *cmdReply, const CMD_Request *cmdReq
     cmdReply->reply = htons(RPY_SOURCE_DATA);
     // locate source
     const uint32_t i = htonl(cmdRequest->data.source_data.index);
-    if(i >= cntSources) return htons(STT_NOSUCHSOURCE);
+    if (i >= cntSources)
+        return htons(STT_NOSUCHSOURCE);
     // sanity check
     NtpSource *source = sources[i];
-    if(source == NULL) return htons(STT_NOSUCHSOURCE);
+    if (source == NULL)
+        return htons(STT_NOSUCHSOURCE);
 
     // set source id
     cmdReply->data.source_data.mode = htons(source->mode);
@@ -566,13 +602,15 @@ static uint16_t chronycSourceStats(CMD_Reply *cmdReply, const CMD_Request *cmdRe
     cmdReply->reply = htons(RPY_SOURCESTATS);
 
     const uint32_t i = htonl(cmdRequest->data.sourcestats.index);
-    if(i >= cntSources) return htons(STT_NOSUCHSOURCE);
+    if (i >= cntSources)
+        return htons(STT_NOSUCHSOURCE);
     // sanity check
     NtpSource *source = sources[i];
-    if(source == NULL) return htons(STT_NOSUCHSOURCE);
+    if (source == NULL)
+        return htons(STT_NOSUCHSOURCE);
 
     // set source id
-    if(source->mode == RPY_SD_MD_REF) {
+    if (source->mode == RPY_SD_MD_REF) {
         cmdReply->data.sourcestats.ref_id = source->id;
         cmdReply->data.sourcestats.ip_addr.family = htons(IPADDR_UNSPEC);
         cmdReply->data.sourcestats.ip_addr.addr.in4 = source->id;
@@ -598,10 +636,11 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
     cmdReply->data.tracking.ref_id = refId;
     cmdReply->data.tracking.stratum = htons(clockStratum);
     cmdReply->data.tracking.leap_status = htons(leapIndicator);
-    if(refId == srcGps.source.id) {
+    if (refId == srcGps.source.id) {
         cmdReply->data.tracking.ip_addr.family = htons(IPADDR_UNSPEC);
         cmdReply->data.tracking.ip_addr.addr.in4 = refId;
-    } else {
+    }
+    else {
         cmdReply->data.tracking.ip_addr.family = htons(IPADDR_INET4);
         cmdReply->data.tracking.ip_addr.addr.in4 = refId;
     }
@@ -621,7 +660,8 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
     cmdReply->data.tracking.root_delay.f = htonf(0x1p-16f * (float) rootDelay);
     cmdReply->data.tracking.root_dispersion.f = htonf(0x1p-16f * (float) rootDispersion);
 
-    cmdReply->data.tracking.last_update_interval.f = htonf(source ? (0x1p-16f * (float) (1u << (16 + source->poll))) : 0);
+    cmdReply->data.tracking.last_update_interval.f = htonf(
+        source ? (0x1p-16f * (float) (1u << (16 + source->poll))) : 0);
     return htons(STT_SUCCESS);
 }
 
@@ -629,21 +669,21 @@ static uint16_t chronycNtpData(CMD_Reply *cmdReply, const CMD_Request *cmdReques
     cmdReply->reply = htons(RPY_NTP_DATA);
 
     // must be an IPv4 address
-    if(cmdRequest->data.ntp_data.ip_addr.family != htons(IPADDR_INET4))
+    if (cmdRequest->data.ntp_data.ip_addr.family != htons(IPADDR_INET4))
         return htons(STT_NOSUCHSOURCE);
 
     // locate server
     uint32_t addr = cmdRequest->data.ntp_data.ip_addr.addr.in4;
     NtpSource *source = NULL;
-    for(int i = 0; i < cntSources; i++) {
-        if(sources[i]->mode != RPY_SD_MD_CLIENT)
+    for (int i = 0; i < cntSources; i++) {
+        if (sources[i]->mode != RPY_SD_MD_CLIENT)
             continue;
-        if(sources[i]->id == addr) {
+        if (sources[i]->id == addr) {
             source = sources[i];
             break;
         }
     }
-    if(source == NULL)
+    if (source == NULL)
         return htons(STT_NOSUCHSOURCE);
 
     cmdReply->data.ntp_data.local_addr.family = htons(IPADDR_INET4);
@@ -673,7 +713,7 @@ static uint16_t chronycNtpData(CMD_Reply *cmdReply, const CMD_Request *cmdReques
     cmdReply->data.ntp_data.total_rx_count = htonl(source->rxCount);
     cmdReply->data.ntp_data.total_tx_count = htonl(source->txCount);
     cmdReply->data.ntp_data.total_valid_count = htonl(source->rxValid);
-    if(source->xleave)
+    if (source->xleave)
         cmdReply->data.ntp_data.flags |= htons(RPY_NTP_FLAG_INTERLEAVED);
 
     return htons(STT_SUCCESS);
@@ -684,24 +724,26 @@ static uint16_t chronycNtpData(CMD_Reply *cmdReply, const CMD_Request *cmdReques
  * @param value IEEE 754 single-precision float
  * @return candm float format
  */
-static int32_t htonf(float value) {
+static int32_t htonf(const float value) {
     // decompose IEEE 754 single-precision float
-    uint32_t raw = *(uint32_t*) &value;
+    const int32_t raw;
+    memcpy((uint32_t*) &raw, &value, sizeof(uint32_t));
     uint32_t coef = raw & ((1 << 23) - 1);
-    int32_t exp = ((int32_t) (raw >> 23 & 0xFF)) - 127;
-    uint32_t sign = (raw >> 31) & 1;
+    const int32_t exp = ((raw >> 23) & 0xFF) - 127;
 
     // small values and NaNs
-    if(exp < -65 || (exp == 128 && coef != 0))
+    if (exp < -65 || (exp == 128 && coef != 0))
         return 0;
 
     // large values
-    if(exp > 61)
-        return (int32_t) (sign ? 0x0000007Fu : 0xFFFFFF7Eu);
+    if (exp > 61)
+        return (raw < 0) ? 0x8000003Fu : 0x7FFFFFBFu;
 
     // normal values
     coef |= 1 << 23;
-    if(sign) coef = -coef;
+    if (raw < 0)
+        coef = -coef;
     coef &= (1 << 25) - 1;
-    return (int32_t) htonl(coef | ((exp + 2) << 25));
+    coef |= (exp + 2) << 25;
+    return htonl(coef);
 }

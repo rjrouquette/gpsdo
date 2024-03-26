@@ -15,6 +15,7 @@ union fixed_32_32 {
         uint32_t fpart;
         uint32_t ipart;
     };
+
     uint64_t full;
 };
 

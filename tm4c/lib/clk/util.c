@@ -19,30 +19,31 @@ uint32_t nanosToFrac(uint32_t nanos) {
     return nanos;
 }
 
-uint64_t fromClkMono(uint32_t timer, uint32_t offset, uint32_t integer) {
+uint64_t fromClkMono(const uint32_t timer, const uint32_t offset, uint32_t integer) {
     int32_t ticks = (int32_t) (timer - offset);
     // adjust for underflow
-    while(ticks < 0) {
+    while (ticks < 0) {
         ticks += CLK_FREQ;
         --integer;
     }
     // adjust for overflow
-    while(ticks >= CLK_FREQ) {
+    while (ticks >= CLK_FREQ) {
         ticks -= CLK_FREQ;
         ++integer;
     }
 
     // assemble result
     union fixed_32_32 scratch;
-    scratch.fpart = nanosToFrac(ticks << 3);
+    scratch.fpart = nanosToFrac(ticks * CLK_NANO);
     scratch.ipart = integer;
     return scratch.full;
 }
 
 __attribute__((optimize(3)))
-int64_t corrValue(int32_t rate, int64_t delta) {
-    int neg = delta < 0;
-    if(neg) delta = -delta;
+int64_t corrValue(const int32_t rate, int64_t delta) {
+    const int neg = delta < 0;
+    if (neg)
+        delta = -delta;
 
     // compute integral correction
     uint64_t scratch = (uint32_t) (delta >> 32);
@@ -57,7 +58,7 @@ int64_t corrValue(int32_t rate, int64_t delta) {
 }
 
 __attribute__((optimize(3)))
-int32_t corrFracRem(int32_t rate, int32_t delta, volatile uint32_t *rem) {
+int32_t corrFracRem(const int32_t rate, const int32_t delta, volatile uint32_t *rem) {
     // compute rate-based delta adjustment
     int64_t scratch = delta;
     scratch *= rate;
@@ -70,10 +71,10 @@ int32_t corrFracRem(int32_t rate, int32_t delta, volatile uint32_t *rem) {
 }
 
 __attribute__((optimize(3)))
-float toFloatU(uint64_t value) {
+float toFloatU(const uint64_t value) {
     return ((float) (uint32_t) (value >> 32)) + (0x1p-32f * (float) (uint32_t) value);
 }
 
-float toFloat(int64_t value) {
+float toFloat(const int64_t value) {
     return (value < 0) ? -toFloatU(-value) : toFloatU(value);
 }

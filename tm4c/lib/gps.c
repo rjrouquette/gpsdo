@@ -11,6 +11,9 @@
 #include "clk/util.h"
 #include "delay.h"
 #include "gps.h"
+
+#include <math.h>
+
 #include "run.h"
 
 #define GPS_RING_SIZE (256)
@@ -100,9 +103,12 @@ void GPS_init() {
 
     // configure UART 3
     UART3.CTL.UARTEN = 0;
-    // baud divisor = 813.80208 = (125 MHz / (16 * 9600 baud))
-    UART3.IBRD.DIVINT = 813;
-    UART3.FBRD.DIVFRAC = 51;
+    // baud divisor
+    const float divisor = CLK_FREQ / (16.0f * 9600.0f);
+    const int divisorInt = (int) divisor;
+    const int divisorFrac = (int) ((divisor - divisorInt) *  64.0f);
+    UART3.IBRD.DIVINT = divisorInt;
+    UART3.FBRD.DIVFRAC = divisorFrac;
     // 8-bit data
     UART3.LCRH.WLEN = 3;
     // enable FIFO
@@ -303,30 +309,19 @@ static uint8_t fromHex(char c) {
     return c - 'a' + 10;
 }
 
-static void processNEMA(char *msg, int len) {
+static void processNEMA(char *ptr, const int len) {
     uint8_t csum = 0;
-    char *chksum = NULL;
-    char *parts[64];
-    int cnt = 0;
+    const char *chksum = NULL;
 
-    char *end = msg + len;
-    char *ptr = msg;
-    parts[cnt++] = ptr++;
-    while(ptr < end) {
-        char c = *ptr;
+    const char *const end = ptr + len;
+    while(++ptr < end) {
+        const char c = *ptr;
         csum ^= c;
-        if(c == ',') {
-            *(ptr++) = 0;
-            parts[cnt++] = ptr;
-            continue;
-        }
         if(c == '*') {
             csum ^= c;
-            *(ptr++) = 0;
-            chksum = ptr;
+            chksum = ++ptr;
             break;
         }
-        ++ptr;
     }
 
     // verify checksum if present

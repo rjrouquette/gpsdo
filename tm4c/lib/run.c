@@ -2,13 +2,15 @@
 // Created by robert on 5/15/23.
 //
 
-#include <memory.h>
-#include <stddef.h>
-#include "../hw/interrupts.h"
-#include "clk/mono.h"
+#include "run.h"
+
 #include "format.h"
 #include "led.h"
-#include "run.h"
+#include "../hw/interrupts.h"
+#include "clk/mono.h"
+
+#include <memory.h>
+#include <stddef.h>
 
 
 #define FAST_FUNC __attribute__((optimize(3)))
@@ -45,7 +47,7 @@ FAST_FUNC
 static void doNothing(void *ref) { }
 
 __attribute__((always_inline))
-static inline uint32_t toMonoRaw(const uint32_t fixed_8_24) {
+inline uint32_t toMonoRaw(const uint32_t fixed_8_24) {
     uint64_t scratch = fixed_8_24;
     scratch *= CLK_FREQ;
     return scratch >> 24;
@@ -208,7 +210,7 @@ static void cancelTask(Task *task) {
 
 FAST_FUNC
 __attribute__((noinline))
-static void runCancel_(RunCall callback, void *ref) {
+static void runCancel_(const RunCall callback, const void * const ref) {
     // match by reference
     if(callback == NULL) {
         Task *iter = queueHead;
@@ -241,7 +243,7 @@ static void runCancel_(RunCall callback, void *ref) {
         Task *task = iter;
         iter = iter->qNext;
 
-        if ((task->runCall == callback) && (task->runRef == ref))
+        if (task->runCall == callback && task->runRef == ref)
             cancelTask(task);
     }
 }
@@ -261,14 +263,14 @@ unsigned runStatus(char *buffer) {
     end = append(end, "  Call  Context\n");
 
     for(int i = 0; i < SLOT_CNT; i++) {
-        Task *task = taskPool + i;
+        const Task *task = taskPool + i;
 
-        *(end++) = typeCode[task->runType];
-        *(end++) = ' ';
+        *end++ = typeCode[task->runType];
+        *end++ = ' ';
         end += toHex((uint32_t) task->runCall, 5, '0', end);
-        *(end++) = ' ';
+        *end++ = ' ';
         end += toHex((uint32_t) task->runRef, 8, '0', end);
-        *(end++) = '\n';
+        *end++ = '\n';
     }
     return end - buffer;
 }

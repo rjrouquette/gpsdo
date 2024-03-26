@@ -8,7 +8,8 @@
 #include <stdint.h>
 #include "../hw/timer.h"
 
-#define CLK_FREQ (125000000)
+#define CLK_FREQ (100000000)
+#define CLK_NANO (1000000000 / CLK_FREQ)
 #define TIMER_MONO (GPTM0)
 
 /**

@@ -4,21 +4,20 @@
  * @date 2022-04-13
  */
 
+#include "gitversion.h"
+#include "snmp.h"
+#include "status.h"
 #include "hw/eeprom.h"
 #include "hw/sys.h"
-#include "lib/clk/clk.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
 #include "lib/led.h"
 #include "lib/net.h"
-#include "lib/ntp/ntp.h"
-#include "lib/ptp/ptp.h"
 #include "lib/rand.h"
 #include "lib/run.h"
-
-#include "gitversion.h"
-#include "snmp.h"
-#include "status.h"
+#include "lib/clk/clk.h"
+#include "lib/ntp/ntp.h"
+#include "lib/ptp/ptp.h"
 
 #define EEPROM_FORMAT (0x00000003)
 
@@ -78,8 +77,8 @@ static void EEPROM_init() {
 
     // verify eeprom format
     EEPROM_seek(0);
-    uint32_t format = EEPROM_read();
-    if(format != EEPROM_FORMAT) {
+    const uint32_t format = EEPROM_read();
+    if (format != EEPROM_FORMAT) {
         // reformat EEPROM
         EEPROM_mass_erase();
         EEPROM_seek(0);

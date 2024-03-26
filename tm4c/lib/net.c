@@ -2,7 +2,6 @@
 // Created by robert on 4/26/22.
 //
 
-#include <stddef.h>
 #include "../hw/crc.h"
 #include "../hw/emac.h"
 #include "../hw/interrupts.h"
@@ -39,12 +38,17 @@ static volatile int ptrTX = 0;
 static volatile int endTX = 0;
 static volatile int phyStatus = 0;
 
-static void * volatile taskRx;
+static void *volatile taskRx;
 static EMAC_RX_DESC rxDesc[RX_RING_SIZE];
 static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 
-static void * volatile taskTx;
-static struct { CallbackNetTX call; void *ref; } txCallback[TX_RING_SIZE];
+static void *volatile taskTx;
+
+static struct {
+    CallbackNetTX call;
+    void *ref;
+} txCallback[TX_RING_SIZE];
+
 static EMAC_TX_DESC txDesc[TX_RING_SIZE];
 static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
@@ -53,7 +57,7 @@ void PTP_process(uint8_t *frame, int flen);
 
 static void initDescriptors() {
     // init receive descriptors
-    for(int i = 0; i < RX_RING_SIZE; i++) {
+    for (int i = 0; i < RX_RING_SIZE; i++) {
         rxDesc[i].BUFF1 = (uint32_t) rxBuffer[i];
         rxDesc[i].BUFF2 = 0;
         rxDesc[i].RDES1.RBS1 = RX_BUFF_SIZE;
@@ -61,10 +65,10 @@ static void initDescriptors() {
         rxDesc[i].RDES1.RER = 0;
         rxDesc[i].RDES0.OWN = 1;
     }
-    rxDesc[RX_RING_SIZE-1].RDES1.RER = 1;
+    rxDesc[RX_RING_SIZE - 1].RDES1.RER = 1;
 
     // init transmit descriptors
-    for(int i = 0; i < TX_RING_SIZE; i++) {
+    for (int i = 0; i < TX_RING_SIZE; i++) {
         txDesc[i].BUFF1 = (uint32_t) txBuffer[i];
         txDesc[i].BUFF2 = 0;
         txDesc[i].TDES1.TBS1 = 0;
@@ -83,7 +87,7 @@ static void initDescriptors() {
         // clear callback
         txCallback[i].call = 0;
     }
-    txDesc[TX_RING_SIZE-1].TDES0.TER = 1;
+    txDesc[TX_RING_SIZE - 1].TDES0.TER = 1;
 }
 
 static void initPHY() {
@@ -110,11 +114,11 @@ static void initPHY() {
     // enable clock
     RCGCEPHY.EN0 = 1;
     delay_cycles_4();
-    while(!PREPHY.RDY0);
+    while (!PREPHY.RDY0) {}
     // enable power
     PCEPHY.EN0 = 1;
     delay_cycles_4();
-    while(!PREPHY.RDY0);
+    while (!PREPHY.RDY0) {}
 
     // enable PHY interrupt for relevant link changes
     uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYMISR1);
@@ -134,7 +138,7 @@ static void initHwAddr() {
     // enable CRC module
     RCGCCCM.EN = 1;
     delay_cycles_4();
-    while(!PRCCM.RDY);
+    while (!PRCCM.RDY) {}
     // compute MAC address
     CRC.CTRL.TYPE = CRC_TYPE_04C11DB7;
     CRC.CTRL.INIT = CRC_INIT_ZERO;
@@ -143,12 +147,12 @@ static void initHwAddr() {
     CRC.DIN = UNIQUEID.WORD[2];
     CRC.DIN = UNIQUEID.WORD[3];
     // set MAC address
-    uint8_t macAddr[6] = {
-            // "TUX" prefix borrowed from tuxgraphics.org
-            0x54, 0x55, 0x58,
-            (CRC.SEED >> 16) & 0xFF,
-            (CRC.SEED >> 8) & 0xFF,
-            (CRC.SEED >> 0) & 0xFF
+    const uint8_t macAddr[6] = {
+        // "TUX" prefix borrowed from tuxgraphics.org
+        0x54, 0x55, 0x58,
+        (CRC.SEED >> 16) & 0xFF,
+        (CRC.SEED >> 8) & 0xFF,
+        (CRC.SEED >> 0) & 0xFF
     };
     EMAC_setMac(&(EMAC0.ADDR0), macAddr);
     // disable CRC module
@@ -161,11 +165,11 @@ static void initMAC() {
     // enable clock
     RCGCEMAC.EN0 = 1;
     delay_cycles_4();
-    while(!PREMAC.RDY0);
+    while (!PREMAC.RDY0) {}
     // initialize PHY
     initPHY();
     // wait for DMA reset to complete
-    while(EMAC0.DMABUSMOD.SWR);
+    while (EMAC0.DMABUSMOD.SWR) {}
 
     initHwAddr();
 
@@ -202,7 +206,7 @@ static void initMAC() {
 
 void ISR_EthernetMAC(void) {
     // process link status changes
-    if(EMAC0.PHY.MIS.INT) {
+    if (EMAC0.PHY.MIS.INT) {
         // clear interrupt
         EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYMISR1);
         EMAC0.PHY.MIS.INT = 1;
@@ -214,17 +218,18 @@ void ISR_EthernetMAC(void) {
         // set duplex
         EMAC0.CFG.DUPM = (phyStatus >> 2u) & 1u;
         // link status bit in EPHYSTS is buggy, but EPHYBMSR works
-        uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYBMSR);
-        if(temp & 4) phyStatus |= 1;
+        const uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYBMSR);
+        if (temp & 4)
+            phyStatus |= 1;
         return;
     }
 
-    if(EMAC0.DMARIS.RI) {
+    if (EMAC0.DMARIS.RI) {
         EMAC0.DMARIS.RI = 1;
         runWake(taskRx);
     }
 
-    if(EMAC0.DMARIS.TI) {
+    if (EMAC0.DMARIS.TI) {
         EMAC0.DMARIS.TI = 1;
         runWake(taskTx);
     }
@@ -233,18 +238,19 @@ void ISR_EthernetMAC(void) {
 __attribute__((optimize(3)))
 static void runRx(void *ref) {
     // check for completed receptions
-    for(;;) {
+    for (;;) {
         EMAC_RX_DESC *pRxDesc = rxDesc + ptrRX;
         // test for ownership
-        if (pRxDesc->RDES0.OWN) break;
+        if (pRxDesc->RDES0.OWN)
+            break;
         // process frame if there was no error
         if (!pRxDesc->RDES0.ES) {
             // extract ether type
-            uint8_t *frame = (uint8_t *) pRxDesc->BUFF1;
-            HEADER_ETH *headerEth = (HEADER_ETH *) frame;
+            uint8_t *frame = (uint8_t*) pRxDesc->BUFF1;
+            const HEADER_ETH *headerEth = (HEADER_ETH*) frame;
             // only process the frame if the source MAC is not a broadcast address
             // (prevents packet amplification attacks)
-            if(!(headerEth->macSrc[0] & 1)) {
+            if (!(headerEth->macSrc[0] & 1)) {
                 const uint16_t ethType = headerEth->ethType;
                 // dispatch frame processor
                 if (ethType == ETHTYPE_ARP)
@@ -269,10 +275,10 @@ static void runTx(void *ref) {
     int end = endTX;
     while ((end != ptr) && !txDesc[end].TDES0.OWN) {
         // check for callback
-        CallbackNetTX pCall = txCallback[end].call;
-        if(pCall) {
+        const CallbackNetTX pCall = txCallback[end].call;
+        if (pCall) {
             // invoke callback
-            (*pCall) (txCallback[end].ref, (uint8_t *) txBuffer[end], txDesc[end].TDES1.TBS1);
+            (*pCall)(txCallback[end].ref, (uint8_t*) txBuffer[end], txDesc[end].TDES1.TBS1);
             // clear callback
             txCallback[end].call = NULL;
         }
@@ -283,6 +289,7 @@ static void runTx(void *ref) {
 }
 
 extern volatile uint16_t ipID;
+
 void NET_init() {
     // initialize ring buffers
     initDescriptors();
@@ -311,29 +318,31 @@ int NET_getPhyStatus() {
 }
 
 int NET_getTxDesc() {
-    if(txDesc[ptrTX].TDES0.OWN)
+    if (txDesc[ptrTX].TDES0.OWN)
         faultBlink(4, 1);
 
-    int temp = ptrTX;
+    const int temp = ptrTX;
     ADV_RING_TX(ptrTX);
     return temp;
 }
 
-uint8_t * NET_getTxBuff(int desc) {
-    return (uint8_t *) txDesc[desc & TX_RING_MASK].BUFF1;
+uint8_t* NET_getTxBuff(int desc) {
+    return (uint8_t*) txDesc[desc & TX_RING_MASK].BUFF1;
 }
 
 void NET_setTxCallback(int desc, CallbackNetTX callback, volatile void *ref) {
     desc &= TX_RING_MASK;
     txCallback[desc].call = callback;
-    txCallback[desc].ref = (void *) ref;
+    txCallback[desc].ref = (void*) ref;
 }
 
 void NET_transmit(int desc, int len) {
     desc &= TX_RING_MASK;
     // restrict transmission length
-    if(len < 60) len = 60;
-    if(len > TX_BUFF_SIZE) faultBlink(4, 2);
+    if (len < 60)
+        len = 60;
+    if (len > TX_BUFF_SIZE)
+        faultBlink(4, 2);
     // set transmission size
     txDesc[desc].TDES1.TBS1 = len;
     // release descriptor
@@ -348,7 +357,7 @@ void NET_transmit(int desc, int len) {
  * @param timer raw counter value (125 MHz)
  * @param stamps array of 3 64-bit timestamps [ monotonic, compensated, tai ]
  */
-static inline void toStamps(uint32_t timer, volatile uint64_t *stamps) {
+static void toStamps(uint32_t timer, volatile uint64_t *stamps) {
     // snapshot clock state
     __disable_irq();
     const uint32_t monoEth = clkMonoEth;
@@ -367,13 +376,13 @@ void NET_getRxTime(const uint8_t *rxFrame, volatile uint64_t *stamps) {
     // compute descriptor offset
     const int i = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
     // assemble timestamps
-    toStamps((rxDesc[i].RTSH * CLK_FREQ) + (rxDesc[i].RTSL >> 3), stamps);
+    toStamps((rxDesc[i].RTSH * CLK_FREQ) + (rxDesc[i].RTSL / CLK_NANO), stamps);
 }
 
 void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps) {
     // compute descriptor offset
     const int i = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
-    toStamps((txDesc[i].TTSH * CLK_FREQ) + (txDesc[i].TTSL >> 3), stamps);
+    toStamps((txDesc[i].TTSH * CLK_FREQ) + (txDesc[i].TTSL / CLK_NANO), stamps);
 }
 
 
