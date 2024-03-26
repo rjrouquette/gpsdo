@@ -37,40 +37,102 @@ add_executable(
 
         main.c
         snmp.c
+        snmp.h
         status.c
+        status.h
+
+        # hardware target files
+        hw/adc.h
+        hw/crc.h
         hw/eeprom.c
+        hw/eeprom.h
         hw/emac.c
+        hw/emac.h
+        hw/gpio.h
+        hw/i2c.h
         hw/interrupts.c
+        hw/interrupts.h
+        hw/register.h
+        hw/ssi.h
         hw/sys.c
+        hw/sys.h
+        hw/timer.h
+        hw/uart.h
+
+        # chrony header files
+        lib/chrony/addressing.h
+        lib/chrony/candm.h
+
+        # timekeeping
         lib/clk/clk.c
+        lib/clk/clk.h
         lib/clk/comp.c
+        lib/clk/comp.h
         lib/clk/mono.c
+        lib/clk/mono.h
         lib/clk/tai.c
+        lib/clk/tai.h
         lib/clk/util.c
+        lib/clk/util.h
+
         lib/delay.c
+        lib/delay.h
         lib/format.c
+        lib/format.h
         lib/gps.c
+        lib/gps.h
         lib/led.c
+        lib/led.h
+
+        # networking
         lib/net.c
+        lib/net.h
         lib/net/arp.c
+        lib/net/arp.h
         lib/net/dhcp.c
+        lib/net/dhcp.h
         lib/net/dns.c
+        lib/net/dns.h
+        lib/net/eth.h
         lib/net/icmp.c
+        lib/net/icmp.h
         lib/net/ip.c
+        lib/net/ip.h
         lib/net/udp.c
+        lib/net/udp.h
         lib/net/util.c
+        lib/net/util.h
+
+        # NTP server
+        lib/ntp/common.h
         lib/ntp/ntp.c
+        lib/ntp/ntp.h
         lib/ntp/peer.c
+        lib/ntp/peer.h
         lib/ntp/pll.c
+        lib/ntp/pll.h
         lib/ntp/ref.c
+        lib/ntp/ref.h
         lib/ntp/src.c
+        lib/ntp/src.h
         lib/ntp/tcmp.c
+        lib/ntp/tcmp.h
+
+        # PTP server
         lib/ptp/common.c
+        lib/ptp/common.h
         lib/ptp/ptp.c
+        lib/ptp/ptp.h
+
         lib/rand.c
+        lib/rand.h
         lib/run.c
+        lib/run.h
+
         lib/snmp/sensors.c
+        lib/snmp/sensors.h
         lib/snmp/util.c
+        lib/snmp/util.h
 )
 
 target_link_libraries(

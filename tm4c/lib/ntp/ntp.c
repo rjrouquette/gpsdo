@@ -3,7 +3,6 @@
 //
 
 #include <memory.h>
-#include <math.h>
 
 #include "../chrony/candm.h"
 #include "../clk/tai.h"
@@ -18,7 +17,6 @@
 #include "../run.h"
 
 #include "common.h"
-#include "gitversion.h"
 #include "ntp.h"
 #include "peer.h"
 #include "ref.h"
@@ -433,13 +431,13 @@ static void runDnsFill(void *ref) {
 
 // replicate htons() function
 __attribute__((always_inline))
-static inline uint16_t htons(uint16_t value) {
+inline uint16_t htons(uint16_t value) {
     return __builtin_bswap16(value);
 }
 
 // replicate htonl() function
 __attribute__((always_inline))
-static inline uint32_t htonl(uint32_t value) {
+inline uint32_t htonl(uint32_t value) {
     return __builtin_bswap32(value);
 }
 
@@ -447,11 +445,11 @@ static inline uint32_t htonl(uint32_t value) {
 static int32_t htonf(float value);
 
 // convert 64-bit fixed point timestamp to chrony TimeSpec
-static void toTimespec(uint64_t timestamp, volatile Timespec *ts) {
+static void toTimespec(const uint64_t timestamp, volatile Timespec *ts) {
     union fixed_32_32 scratch;
     scratch.full = timestamp;
     // rough reduction from fraction to nanoseconds
-    uint32_t temp = scratch.fpart;
+    const uint32_t temp = scratch.fpart;
     scratch.fpart -= temp >> 4;
     scratch.fpart -= temp >> 7;
     ts->tv_nsec = htonl(scratch.fpart >> 2);
@@ -486,10 +484,8 @@ static const struct {
 
 static void chronycRequest(uint8_t *frame, int flen) {
     // drop invalid packets
-    if (flen < (UDP_DATA_OFFSET + REQ_MIN_LEN)
-
-    )
-    return;
+    if (flen < (UDP_DATA_OFFSET + REQ_MIN_LEN))
+        return;
     if (flen > (UDP_DATA_OFFSET + REQ_MAX_LEN))
         return;
 
