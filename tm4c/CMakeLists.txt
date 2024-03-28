@@ -121,9 +121,9 @@ add_executable(
         lib/chrony/util.hpp
 
         # PTP server
-        lib/ptp/common.c
-        lib/ptp/common.h
-        lib/ptp/ptp.c
+        lib/ptp/common.cpp
+        lib/ptp/common.hpp
+        lib/ptp/ptp.cpp
         lib/ptp/ptp.h
 
         lib/rand.c

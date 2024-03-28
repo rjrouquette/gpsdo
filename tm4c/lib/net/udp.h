@@ -68,6 +68,42 @@ int UDP_deregister(uint16_t port);
 
 #ifdef __cplusplus
 }
+
+#include "eth.h"
+#include "ip.h"
+
+#include <cstddef>
+
+template<typename T>
+struct [[gnu::packed]] PacketUDP {
+    static constexpr int DATA_OFFSET = sizeof(HEADER_ETH) + sizeof(HEADER_IP4) + sizeof(HEADER_UDP);
+
+    HEADER_ETH eth;
+    HEADER_IP4 ip4;
+    HEADER_UDP udp;
+    T data;
+
+    static auto& from(void *frame) {
+        return *static_cast<PacketUDP<T>*>(frame);
+    }
+
+    static auto& from(const void *frame) {
+        return *static_cast<const PacketUDP<T>*>(frame);
+    }
+
+    [[nodiscard]]
+    auto ptr() const {
+        return reinterpret_cast<const T*>(reinterpret_cast<const char*>(this) + DATA_OFFSET);
+    }
+
+    [[nodiscard]]
+    auto ptr() {
+        return reinterpret_cast<T*>(reinterpret_cast<char*>(this) + DATA_OFFSET);
+    }
+};
+
+static_assert(offsetof(PacketUDP<uint64_t>, data) == PacketUDP<uint64_t>::DATA_OFFSET, "PacketUDP.data is misaligned");
+
 #endif
 
 #endif //GPSDO_UDP_H

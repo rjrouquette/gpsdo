@@ -13,17 +13,14 @@
 #include "../net.h"
 #include "../run.h"
 #include "../chrony/candm.h"
+#include "../chrony/util.hpp"
 #include "../clk/comp.h"
 #include "../clk/tai.h"
 #include "../net/dhcp.h"
 #include "../net/dns.h"
-#include "../net/eth.h"
 #include "../net/util.h"
 
 #include <memory>
-
-#include "../chrony/util.hpp"
-
 
 #define MAX_NTP_PEERS (8)
 #define MAX_NTP_SRCS (9)
@@ -38,9 +35,9 @@ static char rawGps[sizeof(ntp::GPS)] alignas(ntp::GPS);
 // static allocation for Peers
 static char rawPeers[sizeof(ntp::Peer) * MAX_NTP_PEERS] alignas(ntp::Peer);
 // allocate new peer
-static ntp::Source* ntpAllocPeer(uint32_t ipAddr);
+static ntp::Source* newPeer(uint32_t ipAddr);
 // deallocate peer
-static void ntpRemovePeer(ntp::Source *peer);
+static void deletePeer(ntp::Source *peer);
 
 static ntp::Source *sources[MAX_NTP_SRCS];
 static ntp::Source *selectedSource = nullptr;
@@ -111,10 +108,7 @@ uint32_t NTP_refId() {
 
 static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
-    const auto headerNTP = reinterpret_cast<HEADER_NTP*>(headerUDP + 1);
+    auto &packet = PacketUDP<HEADER_NTP>::from(frame);
 
     // retrieve hardware transmit time
     uint64_t stamps[3];
@@ -122,8 +116,8 @@ static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
     const uint64_t txTime = (stamps[2] - clkTaiUtcOffset) + NTP_UTC_OFFSET;
 
     // record hardware transmit time
-    const uint32_t cell = hashXleave(headerIP4->dst);
-    tsXleave[cell].rxTime = headerNTP->rxTime;
+    const uint32_t cell = hashXleave(packet.ip4.dst);
+    tsXleave[cell].rxTime = packet.data.rxTime;
     tsXleave[cell].txTime = htonll(txTime);
 }
 
@@ -133,19 +127,16 @@ static void ntpRequest(uint8_t *frame, const int flen) {
     if (flen < NTP4_SIZE)
         return;
     // map headers
-    auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
-    auto headerNTP = reinterpret_cast<HEADER_NTP*>(headerUDP + 1);
+    const auto &request = PacketUDP<HEADER_NTP>::from(frame);
 
     // verify destination
-    if (headerIP4->dst != ipAddress)
+    if (request.ip4.dst != ipAddress)
         return;
     // prevent loopback
-    if (headerIP4->src == ipAddress)
+    if (request.ip4.src == ipAddress)
         return;
     // filter non-client frames
-    if (headerNTP->mode != NTP_MODE_CLI)
+    if (request.data.mode != NTP_MODE_CLI)
         return;
     // indicate time-server activity
     LED_act0();
@@ -168,50 +159,47 @@ static void ntpRequest(uint8_t *frame, const int flen) {
     // return the response directly to the sender
     UDP_returnToSender(frame, ipAddress, NTP_PORT_SRV);
 
-    // remap headers
-    headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
-    headerNTP = reinterpret_cast<HEADER_NTP*>(headerUDP + 1);
+    // map headers
+    auto &response = PacketUDP<HEADER_NTP>::from(frame);
 
     // check for interleaved request
     int xleave = -1;
-    const uint64_t orgTime = headerNTP->origTime;
+    const uint64_t orgTime = response.data.origTime;
     if (
         orgTime != 0 &&
-        headerNTP->rxTime != headerNTP->txTime
+        response.data.rxTime != response.data.txTime
     ) {
         // load TX timestamp if available
-        const int cell = hashXleave(headerIP4->dst);
+        const int cell = hashXleave(response.ip4.dst);
         if (orgTime == tsXleave[cell].rxTime)
             xleave = cell;
     }
 
     // set type to server response
-    headerNTP->mode = NTP_MODE_SRV;
-    headerNTP->status = leapIndicator;
+    response.data.mode = NTP_MODE_SRV;
+    response.data.status = leapIndicator;
     // set stratum and precision
-    headerNTP->stratum = clockStratum;
-    headerNTP->precision = NTP_CLK_PREC;
+    response.data.stratum = clockStratum;
+    response.data.precision = NTP_CLK_PREC;
     // set root delay
-    headerNTP->rootDelay = htonl(rootDelay);
+    response.data.rootDelay = htonl(rootDelay);
     // set root dispersion
-    headerNTP->rootDispersion = htonl(rootDispersion);
+    response.data.rootDispersion = htonl(rootDispersion);
     // set reference ID
-    headerNTP->refID = refId;
+    response.data.refID = refId;
     // set reference timestamp
-    headerNTP->refTime = htonll(CLK_TAI_fromMono(lastUpdate) + NTP_UTC_OFFSET - clkTaiUtcOffset);
+    response.data.refTime = htonll(CLK_TAI_fromMono(lastUpdate) + NTP_UTC_OFFSET - clkTaiUtcOffset);
     // set origin and TX timestamps
     if (xleave < 0) {
-        headerNTP->origTime = headerNTP->txTime;
-        headerNTP->txTime = htonll(CLK_TAI() + NTP_UTC_OFFSET - clkTaiUtcOffset);
+        response.data.origTime = response.data.txTime;
+        response.data.txTime = htonll(CLK_TAI() + NTP_UTC_OFFSET - clkTaiUtcOffset);
     }
     else {
-        headerNTP->origTime = headerNTP->rxTime;
-        headerNTP->txTime = tsXleave[xleave].txTime;
+        response.data.origTime = response.data.rxTime;
+        response.data.txTime = tsXleave[xleave].txTime;
     }
     // set RX timestamp
-    headerNTP->rxTime = htonll(rxTime);
+    response.data.rxTime = htonll(rxTime);
 
     // finalize packet
     UDP_finalize(frame, flen);
@@ -226,28 +214,25 @@ static void ntpResponse(uint8_t *frame, const int flen) {
     if (flen < NTP4_SIZE)
         return;
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
-    const auto headerNTP = reinterpret_cast<HEADER_NTP*>(headerUDP + 1);
+    auto &response = PacketUDP<HEADER_NTP>::from(frame);
 
     // verify destination
-    if (isMyMAC(headerEth->macDst))
+    if (isMyMAC(response.eth.macDst))
         return;
-    if (headerIP4->dst != ipAddress)
+    if (response.ip4.dst != ipAddress)
         return;
     // prevent loopback
-    if (headerIP4->src == ipAddress)
+    if (response.ip4.src == ipAddress)
         return;
     // filter non-server frames
-    if (headerNTP->mode != NTP_MODE_SRV)
+    if (response.data.mode != NTP_MODE_SRV)
         return;
     // filter invalid frames
-    if (headerNTP->origTime == 0)
+    if (response.data.origTime == 0)
         return;
 
     // locate recipient
-    const uint32_t srcAddr = headerIP4->src;
+    const uint32_t srcAddr = response.ip4.src;
     for (uint32_t i = 0; i < cntSources; i++) {
         const auto source = sources[i];
 
@@ -267,7 +252,7 @@ static void runSelect(void *ref) {
     // prune defunct sources
     for (uint32_t i = 0; i < cntSources; i++) {
         if (sources[i]->isPruneable()) {
-            ntpRemovePeer(sources[i]);
+            deletePeer(sources[i]);
             break;
         }
     }
@@ -316,7 +301,7 @@ static void runSelect(void *ref) {
     PLL_updateDrift(source->getPollingInterval(), source->getFrequencyDrift());
 }
 
-static ntp::Source* ntpAllocPeer(const uint32_t ipAddr) {
+static ntp::Source* newPeer(const uint32_t ipAddr) {
     const auto peerSlots = reinterpret_cast<ntp::Peer*>(rawPeers);
     for (int i = 0; i < MAX_NTP_PEERS; i++) {
         const auto slot = peerSlots + i;
@@ -330,7 +315,7 @@ static ntp::Source* ntpAllocPeer(const uint32_t ipAddr) {
     return nullptr;
 }
 
-static void ntpRemovePeer(ntp::Source *peer) {
+static void deletePeer(ntp::Source *peer) {
     // deselect source if selected
     if (peer == selectedSource)
         selectedSource = nullptr;
@@ -368,7 +353,7 @@ static void ntpDnsCallback(void *ref, const uint32_t addr) {
             return;
     }
     // allocate new source
-    ntpAllocPeer(addr);
+    newPeer(addr);
 }
 
 static void runDnsFill(void *ref) {
@@ -390,14 +375,14 @@ static void runDnsFill(void *ref) {
 // support for chronyc status queries ------------------------------------------
 // -----------------------------------------------------------------------------
 
-#define REQ_MIN_LEN (offsetof(CMD_Request, data.null.EOR))
-#define REQ_MAX_LEN (sizeof(CMD_Request))
+static constexpr int REQ_MIN_LEN = offsetof(CMD_Request, data.null.EOR);
+static constexpr int REQ_MAX_LEN = sizeof(CMD_Request);
 
-#define REP_LEN_NSOURCES (offsetof(CMD_Reply, data.n_sources.EOR))
-#define REP_LEN_SOURCEDATA (offsetof(CMD_Reply, data.source_data.EOR))
-#define REP_LEN_SOURCESTATS (offsetof(CMD_Reply, data.sourcestats.EOR))
-#define REP_LEN_TRACKING (offsetof(CMD_Reply, data.tracking.EOR))
-#define REP_LEN_NTP_DATA (offsetof(CMD_Reply, data.ntp_data.EOR))
+static constexpr int REP_LEN_NSOURCES = offsetof(CMD_Reply, data.n_sources.EOR);
+static constexpr int REP_LEN_SOURCEDATA = offsetof(CMD_Reply, data.source_data.EOR);
+static constexpr int REP_LEN_SOURCESTATS = offsetof(CMD_Reply, data.sourcestats.EOR);
+static constexpr int REP_LEN_TRACKING = offsetof(CMD_Reply, data.tracking.EOR);
+static constexpr int REP_LEN_NTP_DATA = offsetof(CMD_Reply, data.ntp_data.EOR);
 
 // begin chronyc reply
 static void chronycReply(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
@@ -413,6 +398,10 @@ static const struct {
     uint16_t (*call)(CMD_Reply *cmdReply, const CMD_Request *cmdRequest);
     int len;
     uint16_t cmd;
+
+    auto operator()(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) const {
+        return (*call)(cmdReply, cmdRequest);
+    }
 } handlers[] = {
     {chronycNSources, REP_LEN_NSOURCES, REQ_N_SOURCES},
     {chronycSourceData, REP_LEN_SOURCEDATA, REQ_SOURCE_DATA},
@@ -421,30 +410,27 @@ static const struct {
     {chronycNtpData, REP_LEN_NTP_DATA, REQ_NTP_DATA}
 };
 
-static void chronycRequest(uint8_t *frame, int flen) {
+static void chronycRequest(uint8_t *frame, const int flen) {
     // drop invalid packets
-    if (flen < static_cast<int>(UDP_DATA_OFFSET + REQ_MIN_LEN))
+    if (flen < UDP_DATA_OFFSET + REQ_MIN_LEN)
         return;
-    if (flen > static_cast<int>(UDP_DATA_OFFSET + REQ_MAX_LEN))
+    if (flen > UDP_DATA_OFFSET + REQ_MAX_LEN)
         return;
 
     // map headers
-    auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
-    auto cmdRequest = reinterpret_cast<CMD_Request*>(headerUDP + 1);
+    const auto &request = PacketUDP<CMD_Request>::from(frame);
 
     // drop invalid packets
-    if (cmdRequest->pkt_type != PKT_TYPE_CMD_REQUEST)
+    if (request.data.pkt_type != PKT_TYPE_CMD_REQUEST)
         return;
-    if (cmdRequest->pad1 != 0)
+    if (request.data.pad1 != 0)
         return;
-    if (cmdRequest->pad2 != 0)
+    if (request.data.pad2 != 0)
         return;
 
     // drop packet if nack is not possible
-    if (cmdRequest->version != PROTO_VERSION_NUMBER) {
-        if (cmdRequest->version < PROTO_VERSION_MISMATCH_COMPAT_SERVER)
+    if (request.data.version != PROTO_VERSION_NUMBER) {
+        if (request.data.version < PROTO_VERSION_MISMATCH_COMPAT_SERVER)
             return;
     }
 
@@ -457,28 +443,25 @@ static void chronycRequest(uint8_t *frame, int flen) {
     UDP_returnToSender(resp, ipAddress, DEFAULT_CANDM_PORT);
 
     // remap headers
-    headerEth = reinterpret_cast<HEADER_ETH*>(resp);
-    headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
-    auto cmdReply = reinterpret_cast<CMD_Reply*>(headerUDP + 1);
+    auto &response = PacketUDP<CMD_Reply>::from(resp);
 
     // begin response
-    chronycReply(cmdReply, cmdRequest);
+    chronycReply(response.ptr(), request.ptr());
 
     // nack bad protocol version
-    if (cmdRequest->version != PROTO_VERSION_NUMBER) {
-        cmdReply->status = htons(STT_BADPKTVERSION);
+    if (response.data.version != PROTO_VERSION_NUMBER) {
+        response.data.status = htons(STT_BADPKTVERSION);
     }
     else {
-        cmdReply->status = htons(STT_INVALID);
-        const uint16_t cmd = htons(cmdRequest->command);
+        response.data.status = htons(STT_INVALID);
+        const uint16_t cmd = htons(response.data.command);
         const int len = flen - UDP_DATA_OFFSET;
         for (const auto &handler : handlers) {
             if (handler.cmd == cmd) {
                 if (handler.len == len)
-                    cmdReply->status = (*(handler.call))(cmdReply, cmdRequest);
+                    response.data.status = handler(response.ptr(), request.ptr());
                 else
-                    cmdReply->status = htons(STT_BADPKTLENGTH);
+                    response.data.status = htons(STT_BADPKTLENGTH);
                 break;
             }
         }

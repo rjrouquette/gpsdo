@@ -2,8 +2,9 @@
 // Created by robert on 5/20/23.
 //
 
+#include "common.hpp"
 #include "../clk/util.h"
-#include "common.h"
+#include "../net/util.h"
 
 // lut for PTP clock accuracy codes
 const float lutClkAccuracy[17] = {
@@ -19,21 +20,20 @@ const uint8_t gPtpMac[6] = { 0x01, 0x80, 0xC2, 0x00, 0x00, 0x0E };
 
 
 void toPtpTimestamp(uint64_t ts, PTP2_TIMESTAMP *tsPtp) {
-    union fixed_32_32 scratch;
-    scratch.full = ts;
+    auto &scratch = reinterpret_cast<fixed_32_32&>(ts);
     // set seconds
     tsPtp->secondsHi = 0;
-    tsPtp->secondsLo = __builtin_bswap32(scratch.ipart);
+    tsPtp->secondsLo = htonl(scratch.ipart);
     // convert fraction to nanoseconds
     scratch.ipart = 0;
     scratch.full *= 1000000000u;
-    tsPtp->nanoseconds = __builtin_bswap32(scratch.ipart);
+    tsPtp->nanoseconds = htonl(scratch.ipart);
 }
 
 uint64_t fromPtpTimestamp(PTP2_TIMESTAMP *tsPtp) {
-    union fixed_32_32 scratch;
-    scratch.fpart = nanosToFrac(__builtin_bswap32(tsPtp->nanoseconds));
-    scratch.ipart = __builtin_bswap32(tsPtp->secondsLo);
+    fixed_32_32 scratch;
+    scratch.fpart = nanosToFrac(htonl(tsPtp->nanoseconds));
+    scratch.ipart = htonl(tsPtp->secondsLo);
     return scratch.full;
 }
 

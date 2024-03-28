@@ -7,8 +7,9 @@
 
 #ifdef __cplusplus
 extern "C" {
+    #define _Noreturn [[noreturn]]
 #else
-#define static_assert _Static_assert
+    #define static_assert _Static_assert
 #endif
 
 void LED_init();
