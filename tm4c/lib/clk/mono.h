@@ -5,6 +5,12 @@
 #ifndef GPSDO_CLK_MONO_H
 #define GPSDO_CLK_MONO_H
 
+#ifdef __cplusplus
+extern "C" {
+#else
+#define static_assert _Static_assert
+#endif
+
 #include <stdint.h>
 #include "../hw/timer.h"
 
@@ -56,6 +62,10 @@ uint64_t CLK_MONO();
  * Returns the raw value of the system clock timer
  */
 #define CLK_MONO_RAW (TIMER_MONO.TAV.raw)
+
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif //GPSDO_CLK_MONO_H

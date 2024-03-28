@@ -29,7 +29,7 @@ static uint32_t nextAnnounce = 0;
 static uint32_t lastRouterPoll = 0;
 
 
-static void arpRouter(void *ref, uint32_t remoteAddress, uint8_t *macAddress) {
+static void arpRouter(void *ref, uint32_t remoteAddress, const uint8_t *macAddress) {
     // retry if request timed-out
     if(isNullMAC(macAddress))
         ARP_refreshRouter();

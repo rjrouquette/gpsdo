@@ -5,6 +5,12 @@
 #ifndef GPSDO_CLK_UTIL_H
 #define GPSDO_CLK_UTIL_H
 
+#ifdef __cplusplus
+extern "C" {
+#else
+#define static_assert _Static_assert
+#endif
+
 #include <stdint.h>
 
 /**
@@ -67,5 +73,9 @@ float toFloatU(uint64_t value);
  * @return single-precision floating point value
  */
 float toFloat(int64_t value);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_CLK_UTIL_H

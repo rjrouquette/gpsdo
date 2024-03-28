@@ -5,6 +5,12 @@
 #ifndef GPSDO_UDP_H
 #define GPSDO_UDP_H
 
+#ifdef __cplusplus
+extern "C" {
+#else
+#define static_assert _Static_assert
+#endif
+
 #include <stdint.h>
 
 #ifndef PACKED
@@ -17,7 +23,7 @@ typedef struct PACKED HEADER_UDP {
     uint16_t length;
     uint16_t chksum;
 } HEADER_UDP;
-_Static_assert(sizeof(struct HEADER_UDP) == 8, "HEADER_UDP must be 8 bytes");
+static_assert(sizeof(struct HEADER_UDP) == 8, "HEADER_UDP must be 8 bytes");
 
 #define UDP_DATA_OFFSET (14+20+8)
 
@@ -59,5 +65,9 @@ int UDP_register(uint16_t port, CallbackUDP callback);
  * @return 0 on success, -1 if port was not registered
  */
 int UDP_deregister(uint16_t port);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_UDP_H

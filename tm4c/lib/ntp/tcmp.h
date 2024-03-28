@@ -5,8 +5,6 @@
 #ifndef GPSDO_TCMP_H
 #define GPSDO_TCMP_H
 
-#include <stdint.h>
-
 /**
  * Initialize the temperature compensation module
  */
@@ -27,8 +25,9 @@ float TCMP_get();
 /**
  * Update the temperature compensation with a new sample
  * @param target new compensation value for current temperature
+ * @param weight relative confidence in target accuracy
  */
-void TCMP_update(float target);
+void TCMP_update(float target, float weight);
 
 /**
  * Write current status of the temperature compensation to a buffer

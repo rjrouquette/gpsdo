@@ -62,7 +62,7 @@ void DNS_init() {
     UDP_register(DNS_CLIENT_PORT, processFrame);
 }
 
-static void callbackARP(void *ref, uint32_t remoteAddress, uint8_t *macAddress) {
+static void callbackARP(void *ref, uint32_t remoteAddress, const uint8_t *macAddress) {
     if(remoteAddress == ipDNS) {
         // retry if request timed-out
         if (isNullMAC(macAddress))

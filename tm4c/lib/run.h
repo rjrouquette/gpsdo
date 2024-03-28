@@ -5,6 +5,10 @@
 #ifndef GPSDO_LIB_RUN_H
 #define GPSDO_LIB_RUN_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 #define RUN_MAX (1u << 28)
@@ -22,8 +26,12 @@ void initScheduler();
 
 /**
  * Run scheduler (infinite loop)
- */
+*/
+#ifdef __cplusplus
+[[noreturn]]
+#else
 _Noreturn
+#endif
 void runScheduler();
 
 /**
@@ -70,5 +78,9 @@ void runCancel(RunCall callback, void *ref);
  * @return number of bytes written to buffer
  */
 unsigned runStatus(char *buffer);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_LIB_RUN_H

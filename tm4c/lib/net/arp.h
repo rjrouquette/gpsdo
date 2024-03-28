@@ -5,6 +5,12 @@
 #ifndef GPSDO_ARP_H
 #define GPSDO_ARP_H
 
+#ifdef __cplusplus
+extern "C" {
+#else
+#define static_assert _Static_assert
+#endif
+
 #include <stdint.h>
 
 #ifndef PACKED
@@ -27,11 +33,11 @@ typedef struct PACKED ARP_IP4 {
         uint8_t THA[6];
         uint32_t TPA;
 } ARP_IP4;
-_Static_assert(sizeof(struct ARP_IP4) == 28, "ARP_IP4 must be 28 bytes");
+static_assert(sizeof(struct ARP_IP4) == 28, "ARP_IP4 must be 28 bytes");
 
 #define ARP_FRAME_LEN (60)
 
-typedef void (*CallbackARP)(void *ref, uint32_t remoteAddress, uint8_t *macAddress);
+typedef void (*CallbackARP)(void *ref, uint32_t remoteAddress, const uint8_t *macAddress);
 
 extern uint8_t macRouter[6];
 
@@ -40,5 +46,9 @@ void ARP_init();
 void ARP_process(uint8_t *frame, int flen);
 int ARP_request(uint32_t remoteAddress, CallbackARP callback, void *ref);
 void ARP_refreshRouter();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_ARP_H

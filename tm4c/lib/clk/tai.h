@@ -5,6 +5,12 @@
 #ifndef GPSDO_TAI_H
 #define GPSDO_TAI_H
 
+#ifdef __cplusplus
+extern "C" {
+#else
+#define static_assert _Static_assert
+#endif
+
 #include <stdint.h>
 
 extern volatile uint64_t clkTaiUtcOffset;
@@ -43,5 +49,9 @@ void CLK_TAI_setTrim(int32_t trim);
  * @return current trim rate (0.31 fixed-point)
  */
 int32_t CLK_TAI_getTrim();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_TAI_H

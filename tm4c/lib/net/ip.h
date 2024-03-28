@@ -5,6 +5,12 @@
 #ifndef GPSDO_IP_H
 #define GPSDO_IP_H
 
+#ifdef __cplusplus
+extern "C" {
+#else
+#define static_assert _Static_assert
+#endif
+
 #include <stdint.h>
 
 #ifndef PACKED
@@ -35,7 +41,7 @@ typedef struct PACKED HEADER_IP4 {
     uint32_t src;
     uint32_t dst;
 } HEADER_IP4;
-_Static_assert(sizeof(struct HEADER_IP4) == 20, "HEADER_IP4 must be 20 bytes");
+static_assert(sizeof(struct HEADER_IP4) == 20, "HEADER_IP4 must be 20 bytes");
 
 extern volatile uint32_t ipBroadcast;
 extern volatile uint32_t ipAddress;
@@ -68,5 +74,9 @@ void IPv4_setMulticast(uint8_t *frame, uint32_t groupAddress);
 void IPv4_macMulticast(uint8_t *mac, uint32_t groupAddress);
 
 uint16_t RFC1071_checksum(volatile const void *buffer, int len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_IP_H

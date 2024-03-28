@@ -5,6 +5,12 @@
 #ifndef GPSDO_NET_H
 #define GPSDO_NET_H
 
+#ifdef __cplusplus
+extern "C" {
+#else
+#define static_assert _Static_assert
+#endif
+
 #include <stdint.h>
 
 #define PHY_STATUS_DUPLEX (4)
@@ -25,5 +31,9 @@ void NET_transmit(int desc, int len);
 void NET_getRxTime(const uint8_t *rxFrame, volatile uint64_t *stamps);
 
 void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_NET_H

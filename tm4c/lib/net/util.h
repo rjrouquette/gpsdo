@@ -5,6 +5,12 @@
 #ifndef GPSDO_UTIL_H
 #define GPSDO_UTIL_H
 
+#ifdef __cplusplus
+extern "C" {
+#else
+#define static_assert _Static_assert
+#endif
+
 #include <memory.h>
 #include <stdint.h>
 
@@ -64,5 +70,27 @@ char* addrToStr(uint32_t addr, char *str);
  * @return pointer to end of MAC string
  */
 char* macToStr(const void *mac, char *str);
+
+// replicate htons() function
+__attribute__((always_inline))
+inline uint16_t htons(uint16_t value) {
+    return __builtin_bswap16(value);
+}
+
+// replicate htonl() function
+__attribute__((always_inline))
+inline uint32_t htonl(uint32_t value) {
+    return __builtin_bswap32(value);
+}
+
+// replicate htonll() function
+__attribute__((always_inline))
+inline uint64_t htonll(uint64_t value) {
+    return __builtin_bswap64(value);
+}
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_UTIL_H

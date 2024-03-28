@@ -93,19 +93,19 @@ void PLL_updateOffset(int interval, int64_t offset) {
     CLK_TAI_setTrim((int32_t) (0x1p32f * trim));
 }
 
-void PLL_updateDrift(int interval, float drift) {
-    // update temperature compensation
-    driftFreq = drift + (0x1p-32f * (float) CLK_COMP_getComp());
-    TCMP_update(driftFreq);
-
+void PLL_updateDrift(int interval, const float drift) {
     // update stats
     driftLast = drift;
-    float diff = drift - driftMean;
+    const float diff = drift - driftMean;
     driftVar += ((diff * diff) - driftVar) * PLL_STATS_ALPHA;
     driftMS += ((drift * drift) - driftMS) * PLL_STATS_ALPHA;
     driftMean += diff * PLL_STATS_ALPHA;
     driftStdDev = sqrtf(driftVar);
     driftRms = sqrtf(driftMS);
+
+    // update temperature compensation
+    driftFreq = drift + (0x1p-32f * (float) CLK_COMP_getComp());
+    TCMP_update(driftFreq, 100e-9f / (100e-9f + driftStdDev + fabsf(diff)));
 }
 
 unsigned PLL_status(char *buffer) {

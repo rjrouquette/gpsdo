@@ -5,6 +5,12 @@
 #ifndef GPSDO_CLK_H
 #define GPSDO_CLK_H
 
+#ifdef __cplusplus
+extern "C" {
+#else
+#define static_assert _Static_assert
+#endif
+
 #include <stdint.h>
 
 void CLK_initSys();
@@ -19,5 +25,9 @@ void CLK_init();
  *                 2 - TAI clock
  */
 void CLK_PPS(uint64_t *tsResult);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_CLK_H

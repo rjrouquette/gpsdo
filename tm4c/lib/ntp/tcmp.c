@@ -26,9 +26,9 @@
 #define SOM_EEPROM_BASE (0x0020)
 #define SOM_NODE_DIM (3)
 #define SOM_NODE_CNT (16)
-#define SOM_FILL_OFF (2.0f)
-#define SOM_FILL_REG (8.0f)
-#define SOM_RATE_MAX (0x1p-4f)
+#define SOM_FILL_OFF (0.2f)
+#define SOM_FILL_REG (4.0f)
+#define SOM_RATE (0x1p-10f)
 
 #define REG_DIM_COEF (3)
 #define REG_MIN_RMSE (250e-9f)
@@ -54,7 +54,7 @@ static uint32_t regressionStep = 0;
 static void loadSom();
 static void saveSom();
 static void seedSom(float temp, float comp);
-static void updateSom(float temp, float comp);
+static void updateSom(float temp, float comp, float alpha);
 static void runRegression(void *ref);
 
 static void computeMean(const float *data);
@@ -69,9 +69,8 @@ static void computeMSE(const float *data);
 static float tcmpEstimate(float temp);
 
 static void runAdc(void *ref) {
-    uint32_t acc;
     // ADC FIFO will always contain eight samples
-    acc = ADC0.SS0.FIFO.DATA;
+    uint32_t acc = ADC0.SS0.FIFO.DATA;
     acc += ADC0.SS0.FIFO.DATA;
     acc += ADC0.SS0.FIFO.DATA;
     acc += ADC0.SS0.FIFO.DATA;
@@ -83,9 +82,9 @@ static void runAdc(void *ref) {
     ADC0.PSSI.SS0 = 1;
 
     // store result
-    float adcValue = 0x1p-3f * (float) acc;
-    float diff = adcValue - adcMean;
-    float var = diff * diff;
+    const float adcValue = 0x1p-3f * (float) acc;
+    const float diff = adcValue - adcMean;
+    const float var = diff * diff;
     if (var <= 4 * adcVar)
         adcMean += ADC_RATE_MEAN * diff;
     adcVar += ADC_RATE_VAR * (var - adcVar);
@@ -162,8 +161,8 @@ float TCMP_get() {
     return tcmpValue;
 }
 
-void TCMP_update(const float target) {
-    updateSom(tempValue, target);
+void TCMP_update(const float target, const float weight) {
+    updateSom(tempValue, target, weight);
 
     const uint32_t now = CLK_MONO_INT();
     if (now - tcmpSaved > TCMP_SAVE_INTV) {
@@ -274,19 +273,19 @@ static void seedSom(float temp, float comp) {
     }
 }
 
-static void updateSom(float temp, float comp) {
+static void updateSom(const float temp, const float comp, float alpha) {
     // initialize som nodes if necessary
     if (!isfinite(somNode[0][0])) {
-        seedSom(temp, comp);
+        if (alpha >= 0.5f)
+            seedSom(temp, comp);
+        return;
     }
 
     // locate nearest node and measure learning progress
-    float alpha = 0;
     int best = 0;
     float dist = fabsf(temp - somNode[0][0]);
     for (int i = 1; i < SOM_NODE_CNT; i++) {
-        alpha += somNode[i][2];
-        float diff = fabsf(temp - somNode[i][0]);
+        const float diff = fabsf(temp - somNode[i][0]);
         if (diff < dist) {
             dist = diff;
             best = i;
@@ -294,7 +293,7 @@ static void updateSom(float temp, float comp) {
     }
 
     // update nodes using dynamic learning rate
-    alpha = SOM_RATE_MAX / (1.0f + (alpha * alpha));
+    alpha *= SOM_RATE;
     for (int i = 0; i < SOM_NODE_CNT; i++) {
         // compute neighbor distance
         int ndist = i - best;

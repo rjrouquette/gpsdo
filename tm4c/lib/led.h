@@ -5,6 +5,12 @@
 #ifndef GPSDO_LED_H
 #define GPSDO_LED_H
 
+#ifdef __cplusplus
+extern "C" {
+#else
+#define static_assert _Static_assert
+#endif
+
 void LED_init();
 
 void LED0_ON();
@@ -20,5 +26,9 @@ void LED_act1();
 
 _Noreturn
 void faultBlink(int a, int b);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_LED_H

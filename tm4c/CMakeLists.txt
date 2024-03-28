@@ -17,17 +17,17 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c17")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
 # ARM options
-add_compile_options(-mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fno-exceptions)
+add_compile_options(-mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fno-exceptions -specs=nano.specs -specs=nosys.specs)
 # warnings
 add_compile_options(-Wall -Wreturn-type)
 # debug options
 add_compile_options(-ggdb -Os)
 
-set(CMAKE_LINKER arm-none-eabi-ld)
-set(LINKER_FLAGS "-T ${CMAKE_SOURCE_DIR}/hw/linker/tm4c1249ncpdt.ld --entry ISR_Reset --gc-sections")
-set(LINKER_FLAGS "${LINKER_FLAGS} -L/usr/lib/arm-none-eabi/lib/thumb/v7e-m+fp/hard")
-set(CMAKE_C_LINK_EXECUTABLE "<CMAKE_LINKER> ${LINKER_FLAGS} <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
-set(CMAKE_CXX_LINK_EXECUTABLE "<CMAKE_LINKER> ${LINKER_FLAGS} <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
+# linker options
+add_link_options(-mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fno-exceptions -specs=nano.specs -specs=nosys.specs)
+add_link_options(-Wl,-T${CMAKE_SOURCE_DIR}/hw/linker/tm4c1249ncpdt.ld)
+add_link_options(-Wl,--entry,ISR_Reset)
+add_link_options(-Wl,--gc-sections)
 
 # Include generated headers.
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -104,19 +104,21 @@ add_executable(
         lib/net/util.h
 
         # NTP server
-        lib/ntp/common.h
-        lib/ntp/ntp.c
+        lib/ntp/common.hpp
+        lib/ntp/gps.cpp
+        lib/ntp/gps.hpp
+        lib/ntp/ntp.cpp
         lib/ntp/ntp.h
-        lib/ntp/peer.c
-        lib/ntp/peer.h
+        lib/ntp/peer.cpp
+        lib/ntp/peer.hpp
         lib/ntp/pll.c
         lib/ntp/pll.h
-        lib/ntp/ref.c
-        lib/ntp/ref.h
-        lib/ntp/src.c
-        lib/ntp/src.h
+        lib/ntp/source.cpp
+        lib/ntp/source.hpp
         lib/ntp/tcmp.c
         lib/ntp/tcmp.h
+        lib/chrony/util.cpp
+        lib/chrony/util.hpp
 
         # PTP server
         lib/ptp/common.c
@@ -138,8 +140,6 @@ add_executable(
 target_link_libraries(
         gpsdo
         -static
-        -lm
-        -lc
 )
 
 # a custom target that is always built
