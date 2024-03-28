@@ -166,7 +166,7 @@ void toPtpTimestamp(uint64_t ts, PTP2_TIMESTAMP *tsPtp);
  * @param tsPtp PTP timestamp
  * @return fixed-point 64-bit timestamp
  */
-uint64_t fromPtpTimestamp(PTP2_TIMESTAMP *tsPtp);
+uint64_t fromPtpTimestamp(const PTP2_TIMESTAMP *tsPtp);
 
 /**
  * Translate clock RMS error into PTP accuracy code

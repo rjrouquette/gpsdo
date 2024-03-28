@@ -30,14 +30,14 @@ void toPtpTimestamp(uint64_t ts, PTP2_TIMESTAMP *tsPtp) {
     tsPtp->nanoseconds = htonl(scratch.ipart);
 }
 
-uint64_t fromPtpTimestamp(PTP2_TIMESTAMP *tsPtp) {
-    fixed_32_32 scratch;
+uint64_t fromPtpTimestamp(const PTP2_TIMESTAMP *tsPtp) {
+    fixed_32_32 scratch = {};
     scratch.fpart = nanosToFrac(htonl(tsPtp->nanoseconds));
     scratch.ipart = htonl(tsPtp->secondsLo);
     return scratch.full;
 }
 
-uint32_t toPtpClkAccuracy(float rmsError) {
+uint32_t toPtpClkAccuracy(const float rmsError) {
     // check accuracy thresholds
     for(int i = 0; i < 17; i++) {
         if(rmsError <= lutClkAccuracy[i])
