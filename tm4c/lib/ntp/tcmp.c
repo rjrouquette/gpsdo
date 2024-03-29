@@ -474,41 +474,41 @@ static void fitQuadratic(const float *data) {
     // compute equation matrix
     float xx[REG_DIM_COEF][REG_DIM_COEF + 1] = {0};
     for (int i = 0; i < SOM_NODE_CNT; i++) {
-        const float w = data[2];
         const float x = data[0] - mean[0];
         const float y = data[1] - mean[1];
+        float z = data[2];
         data += SOM_NODE_DIM;
 
         // constant terms
-        xx[2][2] += w;
-        xx[2][3] += w * y;
+        xx[2][2] += z;
+        xx[2][3] += z * y;
 
         // linear terms
-        float z = x;
-        xx[1][2] += w * z;
-        xx[1][3] += w * z * y;
+        z *= x;
+        xx[1][2] += z;
+        xx[1][3] += z * y;
 
         // quadratic terms
         z *= x;
-        xx[0][2] += w * z;
-        xx[0][3] += w * z * y;
+        xx[0][2] += z;
+        xx[0][3] += z * y;
 
         // cubic terms
         z *= x;
-        xx[0][1] += w * z;
+        xx[0][1] += z;
 
         // quartic terms
         z *= x;
-        xx[0][0] += w * z;
+        xx[0][0] += z;
     }
-    // employ matrix symmetry
+    // fill remaining cells using matrix symmetry
     xx[1][0] = xx[0][1];
     xx[1][1] = xx[0][2];
     xx[2][0] = xx[0][2];
     xx[2][1] = xx[1][2];
 
     // row-echelon reduction
-    if (xx[1][0] != 0) {
+    {
         const float f = xx[1][0] / xx[0][0];
         xx[1][1] -= f * xx[0][1];
         xx[1][2] -= f * xx[0][2];
@@ -524,7 +524,7 @@ static void fitQuadratic(const float *data) {
     }
 
     // row-echelon reduction
-    if (xx[2][1] != 0) {
+    {
         const float f = xx[2][1] / xx[1][1];
         xx[2][2] -= f * xx[1][2];
         xx[2][3] -= f * xx[1][3];
