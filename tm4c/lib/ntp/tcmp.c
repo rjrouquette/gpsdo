@@ -281,7 +281,7 @@ static void updateSom(const float temp, const float comp, float alpha) {
         return;
     }
 
-    // locate nearest node and measure learning progress
+    // locate nearest node
     int best = 0;
     float dist = fabsf(temp - somNode[0][0]);
     for (int i = 1; i < SOM_NODE_CNT; i++) {
