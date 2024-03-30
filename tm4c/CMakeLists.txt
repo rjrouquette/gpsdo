@@ -115,7 +115,7 @@ add_executable(
         lib/ntp/pll.h
         lib/ntp/source.cpp
         lib/ntp/source.hpp
-        lib/ntp/tcmp.c
+        lib/ntp/tcmp.cpp
         lib/ntp/tcmp.h
         lib/chrony/util.cpp
         lib/chrony/util.hpp

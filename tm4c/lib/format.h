@@ -5,6 +5,10 @@
 #ifndef GPSDO_FORMAT_H
 #define GPSDO_FORMAT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 char* append(char *dst, const char *src);
@@ -24,5 +28,9 @@ int toHMS(uint32_t value, char *origin);
 int fmtFloat(float value, int width, int places, char *origin);
 
 uint32_t fromHex(const char *str, int len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_FORMAT_H

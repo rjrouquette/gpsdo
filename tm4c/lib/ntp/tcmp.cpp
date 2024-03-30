@@ -12,10 +12,11 @@
 #include "../clk/comp.h"
 #include "../clk/mono.h"
 
-#include <math.h>
+#include <cmath>
 
 #define ADC_RATE_MEAN (0x1p-11f)
-#define ADC_RATE_VAR  (0x1p-12f)
+#define ADC_RATE_VAR (0x1p-12f)
+#define ADC_SCALE (0.0604248047f)
 
 #define INTV_REGR (1u << (24 - 14)) // 16384 Hz
 #define INTV_TEMP (1u << (24 - 10)) // 1024 Hz
@@ -28,7 +29,7 @@
 #define SOM_NODE_CNT (16)
 #define SOM_FILL_OFF (0.2f)
 #define SOM_FILL_REG (4.0f)
-#define SOM_RATE (0x1p-10f)
+#define SOM_RATE (0x1p-12f)
 
 #define REG_DIM_COEF (3)
 #define REG_MIN_RMSE (250e-9f)
@@ -62,13 +63,17 @@ static void fitQuadratic(const float *data);
 static void computeMSE(const float *data);
 
 /**
- * Estimate temperature correction using 3rd order taylor series
+ * Estimate temperature correction using quadratic regressor
  * @param temp current temperature in Celsius
  * @return estimated correction value
  */
 static float tcmpEstimate(float temp);
 
-static void runAdc(void *ref) {
+/**
+ * Retrieve ADC samples and update moving average.
+ * @param ref unused context argument
+ */
+static void runAdc([[maybe_unused]] void *ref) {
     // ADC FIFO will always contain eight samples
     uint32_t acc = ADC0.SS0.FIFO.DATA;
     acc += ADC0.SS0.FIFO.DATA;
@@ -82,7 +87,7 @@ static void runAdc(void *ref) {
     ADC0.PSSI.SS0 = 1;
 
     // store result
-    const float adcValue = 0x1p-3f * (float) acc;
+    const float adcValue = 0x1p-3f * static_cast<float>(acc);
     const float diff = adcValue - adcMean;
     const float var = diff * diff;
     if (var <= 4 * adcVar)
@@ -90,11 +95,15 @@ static void runAdc(void *ref) {
     adcVar += ADC_RATE_VAR * (var - adcVar);
 }
 
+/**
+ * Update the current temperature compensation value.
+ * @param ref unused context argument
+ */
 static void runComp(void *ref) {
     // update temperature compensation
-    tempValue = 147.5f - (0.0604248047f * adcMean);
+    tempValue = 147.5f - ADC_SCALE * adcMean;
     tcmpValue = tcmpEstimate(tempValue);
-    CLK_COMP_setComp((int32_t) (0x1p32f * tcmpValue));
+    CLK_COMP_setComp(static_cast<int32_t>(0x1p32f * tcmpValue));
 }
 
 void TCMP_init() {
@@ -142,15 +151,15 @@ void TCMP_init() {
     // trigger next sample
     ADC0.PSSI.SS0 = 1;
     // store result
-    adcMean = 0x1p-3f * (float) acc;
+    adcMean = 0x1p-3f * static_cast<float>(acc);
 
     loadSom();
-    if (isfinite(somNode[0][0]))
-        runSleep(INTV_REGR, runRegression, NULL);
+    if (std::isfinite(somNode[0][0]))
+        runSleep(INTV_REGR, runRegression, nullptr);
 
     // schedule thread
-    runPeriodic(INTV_TEMP, runAdc, NULL);
-    runPeriodic(INTV_TCMP, runComp, NULL);
+    runPeriodic(INTV_TEMP, runAdc, nullptr);
+    runPeriodic(INTV_TCMP, runComp, nullptr);
 }
 
 float TCMP_temp() {
@@ -172,7 +181,7 @@ void TCMP_update(const float target, const float weight) {
 
     if (regressionStep == 0) {
         // start regression computation
-        runSleep(INTV_REGR, runRegression, NULL);
+        runSleep(INTV_REGR, runRegression, nullptr);
     }
     else {
         // re-start regression computation
@@ -191,7 +200,7 @@ unsigned TCMP_status(char *buffer) {
     end = append(end, tmp);
     end = append(end, " C\n");
 
-    tmp[fmtFloat(0.0604248047f * sqrtf(adcVar), 12, 4, tmp)] = 0;
+    tmp[fmtFloat(ADC_SCALE * std::sqrt(adcVar), 12, 4, tmp)] = 0;
     end = append(end, "  - noise:   ");
     end = append(end, tmp);
     end = append(end, " C\n");
@@ -242,20 +251,20 @@ unsigned TCMP_status(char *buffer) {
 static void loadSom() {
     // initialize neighbor weights
     for (int i = 0; i < SOM_NODE_CNT; i++)
-        ((float*) somNW)[i] = expf(-2.0f * (float) (i * i));
+        somNW[i] = std::exp(-2.0f * static_cast<float>(i * i));
 
-    uint32_t *ptr = (uint32_t*) somNode;
-    uint32_t *end = ptr + (sizeof(somNode) / sizeof(uint32_t));
+    auto ptr = reinterpret_cast<uint32_t*>(somNode);
+    const auto end = ptr + (sizeof(somNode) / sizeof(uint32_t));
 
     // load SOM data
     EEPROM_seek(SOM_EEPROM_BASE);
     while (ptr < end)
-        *(ptr++) = EEPROM_read();
+        *ptr++ = EEPROM_read();
 }
 
 static void saveSom() {
-    uint32_t *ptr = (uint32_t*) somNode;
-    uint32_t *end = ptr + (sizeof(somNode) / sizeof(uint32_t));
+    auto ptr = reinterpret_cast<uint32_t*>(somNode);
+    const auto end = ptr + (sizeof(somNode) / sizeof(uint32_t));
 
     // load SOM data
     EEPROM_seek(SOM_EEPROM_BASE);
@@ -263,11 +272,10 @@ static void saveSom() {
         EEPROM_write(*(ptr++));
 }
 
-static void seedSom(float temp, float comp) {
-    float norm = 0.01f / (float) SOM_NODE_CNT;
-    int mid = SOM_NODE_CNT / 2;
+static void seedSom(const float temp, const float comp) {
+    constexpr int mid = SOM_NODE_CNT / 2;
     for (int i = 0; i < SOM_NODE_CNT; i++) {
-        somNode[i][0] = temp + (norm * (float) (i - mid));
+        somNode[i][0] = temp + 0.1f * static_cast<float>(i - mid);
         somNode[i][1] = comp;
         somNode[i][2] = 0;
     }
@@ -275,7 +283,7 @@ static void seedSom(float temp, float comp) {
 
 static void updateSom(const float temp, const float comp, float alpha) {
     // initialize som nodes if necessary
-    if (!isfinite(somNode[0][0])) {
+    if (!std::isfinite(somNode[0][0])) {
         if (alpha >= 0.5f)
             seedSom(temp, comp);
         return;
@@ -283,9 +291,9 @@ static void updateSom(const float temp, const float comp, float alpha) {
 
     // locate nearest node
     int best = 0;
-    float dist = fabsf(temp - somNode[0][0]);
+    float dist = std::abs(temp - somNode[0][0]);
     for (int i = 1; i < SOM_NODE_CNT; i++) {
-        const float diff = fabsf(temp - somNode[i][0]);
+        const float diff = std::abs(temp - somNode[i][0]);
         if (diff < dist) {
             dist = diff;
             best = i;
@@ -295,12 +303,8 @@ static void updateSom(const float temp, const float comp, float alpha) {
     // update nodes using dynamic learning rate
     alpha *= SOM_RATE;
     for (int i = 0; i < SOM_NODE_CNT; i++) {
-        // compute neighbor distance
-        int ndist = i - best;
-        if (ndist < 0)
-            ndist = -ndist;
         // compute node alpha
-        const float w = alpha * somNW[ndist];
+        const float w = alpha * somNW[std::abs(i - best)];
         // update node weights
         somNode[i][0] += (temp - somNode[i][0]) * w;
         somNode[i][1] += (comp - somNode[i][1]) * w;
@@ -352,12 +356,12 @@ static int step3() {
 static int step4() {
     // reweigh outliers
     for (int i = 0; i < SOM_NODE_CNT; i++) {
-        float x = (scratch[i][0] = somNode[i][0]) - mean[0];
+        const float x = (scratch[i][0] = somNode[i][0]) - mean[0];
         float y = (scratch[i][1] = somNode[i][1]) - mean[1];
         y -= coef[0];
         y -= x * coef[1];
         y -= x * x * coef[2];
-        scratch[i][2] = somNode[i][2] * expf(-0.25f * y * y / mse);
+        scratch[i][2] = somNode[i][2] * std::exp(-0.25f * y * y / mse);
     }
     return 0;
 }
@@ -382,7 +386,7 @@ static int step7() {
 
 static int step8() {
     // update residual error
-    tcmpRmse = sqrtf(mse);
+    tcmpRmse = std::sqrt(mse);
 
     // quality check fit
     if (tcmpRmse <= REG_MIN_RMSE) {
@@ -399,8 +403,8 @@ static int step8() {
 }
 
 #define STEP_CNT (9)
-typedef int (*RegressionStep)(void);
-static const RegressionStep steps[STEP_CNT] = {
+typedef int (*RegressionStep)();
+static constexpr RegressionStep steps[STEP_CNT] = {
     step0,
     step1,
     step2,
@@ -417,7 +421,7 @@ static void runRegression(void *ref) {
         regressionStep >= STEP_CNT ||
         (*(steps[regressionStep]))() != 0
     ) {
-        runCancel(runRegression, NULL);
+        runCancel(runRegression, nullptr);
         regressionStep = 0;
     }
     else {
@@ -426,13 +430,14 @@ static void runRegression(void *ref) {
 }
 
 static float tcmpEstimate(const float temp) {
-    float x = temp - tcmpMean[0];
+    const float x = temp - tcmpMean[0];
     float y = tcmpCoeff[0];
     y += x * tcmpCoeff[1];
     y += x * x * tcmpCoeff[2];
     return y + tcmpMean[1];
 }
 
+extern "C"
 unsigned statusSom(char *buffer) {
     char *end = buffer;
 
