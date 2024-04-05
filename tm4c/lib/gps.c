@@ -469,7 +469,7 @@ static const uint8_t payloadNavConfig[] = {
     0x02, // stationary mode
     0x02, // 3D fix mode
     0x00, 0x00, 0x00, 0x00, // fixed altitude (not set)
-    0x00, 0x00, 0x00, 0x00, // fixed altitude variance (not set)
+    0x00, 0x00, 0x01, 0x00, // fixed altitude variance (not set)
     0x00, // minimum satellite elevation degrees (not set)
     0x00, // reserved (drLimit)
     0x00, 0x00, // position DOP (not set)
