@@ -128,7 +128,7 @@ add_executable(
 
         lib/rand.c
         lib/rand.h
-        lib/run.c
+        lib/run.cpp
         lib/run.h
 
         lib/snmp/sensors.c
