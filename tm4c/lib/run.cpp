@@ -19,14 +19,14 @@ inline uint32_t toMonoRaw(const uint32_t fixed_8_24) {
     return scratch >> 24;
 }
 
-enum RunType {
-    RunCanceled,
-    RunSleep,
-    RunPeriodic
-};
-
 class Task {
     static constexpr char typeCode[] = "CSP";
+
+    enum RunType {
+        RunCanceled,
+        RunSleep,
+        RunPeriodic
+    };
 
     // queue pointers
     Task *qNext;
