@@ -17,16 +17,23 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c17")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
 # ARM options
-add_compile_options(-mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fno-exceptions -specs=nano.specs -specs=nosys.specs)
+add_compile_options(-mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard)
+# no operating system
+add_compile_options(-fno-exceptions -specs=nano.specs -specs=nosys.specs)
 # warnings
 add_compile_options(-Wall -Wreturn-type)
 # debug options
 add_compile_options(-ggdb -Os)
 
-# linker options
-add_link_options(-mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fno-exceptions -specs=nano.specs -specs=nosys.specs)
+# ARM options
+add_link_options(-mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard)
+# no operating system
+add_link_options(-fno-exceptions -specs=nano.specs -specs=nosys.specs)
+# target linker definitions
 add_link_options(-Wl,-T${CMAKE_SOURCE_DIR}/hw/linker/tm4c1249ncpdt.ld)
+# entry on reset interrupt vector
 add_link_options(-Wl,--entry,ISR_Reset)
+# prune unused code blocks
 add_link_options(-Wl,--gc-sections)
 
 # Include generated headers.
