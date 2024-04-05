@@ -41,7 +41,7 @@ void runScheduler();
  * @param ref context pointer for task
  * @return task handle
  */
-void * runSleep(uint32_t delay, RunCall callback, void *ref);
+void* runSleep(uint32_t delay, RunCall callback, void *ref);
 
 /**
  * Schedule task to execute at a regular interval (exact execution rate)
@@ -50,14 +50,14 @@ void * runSleep(uint32_t delay, RunCall callback, void *ref);
  * @param ref context pointer for task
  * @return task handle
  */
-void * runPeriodic(uint32_t interval, RunCall callback, void *ref);
+void* runPeriodic(uint32_t interval, RunCall callback, void *ref);
 
 /**
  * Adjust the execution interval for a task
  * @param taskHandle the task to adjust
- * @param newInterval new interval in 8.24 fixed point format (16 second maximum, uses monotonic clock)
+ * @param interval new interval in 8.24 fixed point format (16 second maximum, uses monotonic clock)
  */
-void runAdjust(void *taskHandle, uint32_t newInterval);
+void runAdjust(void *taskHandle, uint32_t interval);
 
 /**
  * Wake a sleeping task

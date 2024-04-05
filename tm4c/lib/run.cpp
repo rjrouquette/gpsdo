@@ -9,7 +9,6 @@
 #include "../hw/interrupts.h"
 #include "clk/mono.h"
 
-#include <cstddef>
 #include <memory>
 
 
@@ -20,34 +19,77 @@ inline uint32_t toMonoRaw(const uint32_t fixed_8_24) {
 }
 
 class Task {
-    static constexpr char typeCode[] = "CSP";
-
-    enum RunType {
-        RunCanceled,
-        RunSleep,
-        RunPeriodic
+    /**
+     * Scheduling type
+     */
+    enum Schedule {
+        Canceled,
+        Sleep,
+        Periodic
     };
 
-    // queue pointers
+    /**
+     * Status type codes
+     */
+    static constexpr char typeCode[] = "CSP";
+
+    /**
+     * pointer to next task in the queue
+     */
     Task *qNext;
+
+    /**
+     * pointer to previous task in the queue
+     */
     Task *qPrev;
 
-    // task fields
-    RunType runType;
-    RunCall runCall;
-    void *runRef;
+    /**
+     * scheduling type
+     */
+    Schedule schedule;
+
+    /**
+     * the task callback
+     */
+    RunCall callback;
+
+    /**
+     * reference pointer for the task callback
+     */
+    void *reference;
+
+    /**
+     * The next scheduled run time.
+     */
     uint32_t runNext;
-    uint32_t runIntv;
+
+    /**
+     * The run or sleep interval.
+     */
+    uint32_t runInterval;
 
 public:
     Task();
 
+    /**
+     * Allocate a new task.
+     * @return the new task
+     */
     static Task* alloc();
 
+    /**
+     * Deallocate the task.
+     */
     void free();
 
+    /**
+     * Cancel the task.
+     */
     void cancel();
 
+    /**
+     * Wake the task if it is sleeping.
+     */
     void wake();
 
     /**
@@ -69,11 +111,19 @@ public:
         qPrev = nullptr;
     }
 
+    /**
+     * Get the next task in the queue.
+     * @return the next task in the queue
+     */
     [[nodiscard]]
     Task* next() const volatile {
         return qNext;
     }
 
+    /**
+     * Get the next task in the queue.
+     * @return the next task in the queue
+     */
     [[nodiscard]]
     Task* next() const {
         return qNext;
@@ -83,15 +133,25 @@ public:
      * Run the task.
      */
     void run() const {
-        (*runCall)(runRef);
+        (*callback)(reference);
     }
 
-    void reschedule();
+    /**
+     * Requeue the task.
+     */
+    void requeue();
 
+    /**
+     * Insert the task into the queue.
+     */
     void insert();
 
+    /**
+     * Set the run or sleep interval.
+     * @param interval the new run or sleep interval
+     */
     void setInterval(const uint32_t interval) {
-        runIntv = toMonoRaw(interval);
+        runInterval = toMonoRaw(interval);
     }
 
     /**
@@ -114,15 +174,20 @@ public:
 
     [[nodiscard]]
     RunCall getCallback() const {
-        return runCall;
+        return callback;
     }
 
     [[nodiscard]]
     void* getReference() const {
-        return runRef;
+        return reference;
     }
 
-    void print(char *&ptr) const;
+    /**
+     * Write task status to string buffer.
+     * @param str string buffer
+     * @return pointer to immediately after last character written
+     */
+    char* print(char *str) const;
 
     friend void initScheduler();
 };
@@ -151,12 +216,12 @@ Task::Task() {
     qNext = nullptr;
     qPrev = nullptr;
 
-    runType = RunCanceled;
-    runCall = doNothing;
-    runRef = nullptr;
+    schedule = Canceled;
+    callback = doNothing;
+    reference = nullptr;
 
     runNext = 0;
-    runIntv = 0;
+    runInterval = 0;
 }
 
 Task* Task::alloc() {
@@ -176,9 +241,9 @@ void Task::free() {
 
 void Task::cancel() {
     // cancel task
-    runCall = doNothing;
-    runRef = nullptr;
-    runType = RunCanceled;
+    callback = doNothing;
+    reference = nullptr;
+    schedule = Canceled;
     // explicitly delete task if it is not currently running
     if (this != queueHead)
         free();
@@ -195,7 +260,7 @@ void Task::wake() {
 
 void Task::insert() {
     // locate optimal insertion point
-    Task *ins = queueHead;
+    auto ins = queueHead;
     while (ins != queueRoot) {
         if (static_cast<int32_t>(runNext - ins->runNext) < 0)
             break;
@@ -209,8 +274,8 @@ void Task::insert() {
     qPrev->qNext = this;
 }
 
-void Task::reschedule() {
-    if (runType == RunCanceled) {
+void Task::requeue() {
+    if (schedule == Canceled) {
         // delete task it is canceled
         free();
         return;
@@ -219,43 +284,44 @@ void Task::reschedule() {
     // remove from queue
     pop();
     // set next run time
-    runNext = runIntv + ((runType == RunPeriodic) ? runNext : CLK_MONO_RAW);
+    runNext = runInterval + ((schedule == Periodic) ? runNext : CLK_MONO_RAW);
     // schedule next run
     insert();
 }
 
-void Task::setPeriodic(uint32_t interval, RunCall callback, void *ref) {
-    runType = RunPeriodic;
-    runCall = callback;
-    runRef = ref;
+void Task::setPeriodic(const uint32_t interval, const RunCall callback, void *ref) {
+    schedule = Periodic;
+    this->callback = callback;
+    reference = ref;
 
     // convert fixed-point interval to raw monotonic domain
-    runIntv = toMonoRaw(interval);
+    runInterval = toMonoRaw(interval);
     // start after delay
-    runNext = CLK_MONO_RAW + runIntv;
+    runNext = CLK_MONO_RAW + runInterval;
     // add to schedule
     insert();
 }
 
-void Task::setSleep(uint32_t delay, RunCall callback, void *ref) {
-    runType = RunSleep;
-    runCall = callback;
-    runRef = ref;
+void Task::setSleep(const uint32_t delay, const RunCall callback, void *ref) {
+    schedule = Sleep;
+    this->callback = callback;
+    reference = ref;
 
     // convert fixed-point interval to raw monotonic domain
-    runIntv = toMonoRaw(delay);
+    runInterval = toMonoRaw(delay);
     // start after delay
-    runNext = CLK_MONO_RAW + runIntv;
+    runNext = CLK_MONO_RAW + runInterval;
     // add to schedule
     insert();
 }
 
-void Task::print(char *&ptr) const {
-    *ptr++ = typeCode[runType];
-    *ptr++ = ' ';
-    ptr += toHex(reinterpret_cast<uint32_t>(runCall), 5, '0', ptr);
-    *ptr++ = ' ';
-    ptr += toHex(reinterpret_cast<uint32_t>(runRef), 8, '0', ptr);
+char* Task::print(char *str) const {
+    *str++ = typeCode[schedule];
+    *str++ = ' ';
+    str += toHex(reinterpret_cast<uint32_t>(callback), 5, '0', str);
+    *str++ = ' ';
+    str += toHex(reinterpret_cast<uint32_t>(reference), 8, '0', str);
+    return str;
 }
 
 
@@ -273,14 +339,14 @@ void runScheduler() {
 
         // determine next state
         __disable_irq();
-        task->reschedule();
+        task->requeue();
         __enable_irq();
     }
 }
 
 void* runSleep(uint32_t delay, RunCall callback, void *ref) {
     __disable_irq();
-    Task *task = Task::alloc();
+    const auto task = Task::alloc();
     task->setSleep(delay, callback, ref);
     __enable_irq();
     return task;
@@ -288,15 +354,14 @@ void* runSleep(uint32_t delay, RunCall callback, void *ref) {
 
 void* runPeriodic(uint32_t interval, RunCall callback, void *ref) {
     __disable_irq();
-    Task *task = Task::alloc();
+    const auto task = Task::alloc();
     task->setPeriodic(interval, callback, ref);
     __enable_irq();
     return task;
 }
 
-void runAdjust(void *taskHandle, uint32_t newInterval) {
-    // set new run interval
-    static_cast<Task*>(taskHandle)->setInterval(newInterval);
+void runAdjust(void *taskHandle, const uint32_t interval) {
+    static_cast<Task*>(taskHandle)->setInterval(interval);
 }
 
 void runWake(void *taskHandle) {
@@ -308,9 +373,9 @@ void runWake(void *taskHandle) {
 static void runCancel_(const RunCall callback, const void *const ref) {
     // match by reference
     if (callback == nullptr) {
-        Task *iter = queueHead;
+        auto iter = queueHead;
         while (iter != queueRoot) {
-            Task *task = iter;
+            const auto task = iter;
             iter = iter->next();
 
             if (task->getReference() == ref)
@@ -321,9 +386,9 @@ static void runCancel_(const RunCall callback, const void *const ref) {
 
     // match by callback
     if (ref == nullptr) {
-        Task *iter = queueHead;
+        auto iter = queueHead;
         while (iter != queueRoot) {
-            Task *task = iter;
+            const auto task = iter;
             iter = iter->next();
 
             if (task->getCallback() == callback)
@@ -333,9 +398,9 @@ static void runCancel_(const RunCall callback, const void *const ref) {
     }
 
     // match both callback and reference
-    Task *iter = queueHead;
+    auto iter = queueHead;
     while (iter != queueRoot) {
-        Task *task = iter;
+        const auto task = iter;
         iter = iter->next();
 
         if (task->getCallback() == callback && task->getReference() == ref)
@@ -356,7 +421,7 @@ unsigned runStatus(char *buffer) {
     end = append(end, "  Call  Context\n");
 
     for (const auto &task : taskPool) {
-        task.print(end);
+        end = task.print(end);
         *end++ = '\n';
     }
     return end - buffer;
