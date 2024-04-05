@@ -46,7 +46,7 @@ static volatile uint64_t taiEpochUpdate;
 static volatile uint32_t taiEpoch;
 static volatile int taiOffset = 37; // as of 2016-12-31
 
-static volatile bool hasNema, hasPvt, hasGpsTime, hasClock;
+static volatile bool hasNema, hasPvt, hasGpsTime, hasClock, wasReset;
 
 __attribute__((noinline))
 static void processNEMA(char *msg, int len);
@@ -128,6 +128,7 @@ void GPS_init() {
     // reset GPS module
     GPS_RST_PORT.DATA[GPS_RST_PIN] = 0;
     // start health check thread
+    wasReset = true;
     runSleep(INTV_HEALTH, runHealth, NULL);
 }
 
@@ -136,7 +137,10 @@ static void runHealth(void *ref) {
     configureGPS();
 
     // release reset pin
-    GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
+    if(GPS_RST_PORT.DATA[GPS_RST_PIN]) {
+        GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
+        wasReset = true;
+    }
 
     // reset GPS if PPS has ceased
     uint32_t now = CLK_MONO_INT();
@@ -334,7 +338,7 @@ static void processNEMA(char *ptr, const int len) {
     }
 
     // no NMEA messages are expected, tell configuration check to disable them
-    hasNema = 1;
+    hasNema = true;
 }
 
 static void processUBX(uint8_t *msg, const int len) {
@@ -460,6 +464,29 @@ static const uint8_t payloadEnableClock[] = {
 };
 _Static_assert(sizeof(payloadEnableClock) == 3, "payloadEnableClock must be 3 bytes");
 
+static const uint8_t payloadNavConfig[] = {
+    0x01, 0x02, // mask (dynamic model, UTC reference)
+    0x02, // stationary mode
+    0x03, // auto fix mode
+    0x00, 0x00, 0x00, 0x00, // fixed altitude (not set)
+    0x00, 0x00, 0x00, 0x00, // fixed altitude variance (not set)
+    0x00, // minimum satellite elevation degrees (not set)
+    0x00, // reserved (drLimit)
+    0x00, 0x00, // position DOP (not set)
+    0x00, 0x00, // time DOP (not set)
+    0x00, 0x00, // position accuracy (not set)
+    0x00, 0x00, // time accuracy (not set)
+    0x00, // static hold threshold (not set)
+    0x00, // DGNSS timeout (not set)
+    0x00, // cnoThreshNumSVs timeout (not set)
+    0x00, // cnoThresh (not set)
+    0x00, 0x00, // reserved
+    0x00, 0x00, // static hold maximum distance (not set)
+    0x03, // UTC USNO
+    0x00, 0x00, 0x00, 0x00, 0x00 // reserved
+};
+_Static_assert(sizeof(payloadNavConfig) == 36, "payloadNavConfig must be 3 bytes");
+
 static void configureGPS() {
     // transmit configuration stanzas
     if(hasNema)
@@ -470,16 +497,19 @@ static void configureGPS() {
         sendUBX(0x06, 0x01, sizeof(payloadEnableGpsTime), payloadEnableGpsTime);
     if(!hasPvt)
         sendUBX(0x06, 0x01, sizeof(payloadEnablePVT), payloadEnablePVT);
+    if(wasReset)
+        sendUBX(0x06, 0x24, sizeof(payloadDisableNMEA), payloadDisableNMEA);
 
-    hasNema = 0;
-    hasClock = 0;
-    hasGpsTime = 0;
-    hasPvt = 0;
+    hasNema = false;
+    hasClock = false;
+    hasGpsTime = false;
+    hasPvt = false;
+    wasReset = false;
 }
 
 static void processUbxClock(const uint8_t *payload) {
     // clock status message received, no conf update needed
-    hasClock = 1;
+    hasClock = true;
     // update GPS receiver clock stats
     clkBias = *(int32_t *)(payload + 4);
     clkDrift = *(int32_t *)(payload + 8);
@@ -489,7 +519,7 @@ static void processUbxClock(const uint8_t *payload) {
 
 static void processUbxGpsTime(const uint8_t *payload) {
     // gps time received, no conf update needed
-    hasGpsTime = 1;
+    hasGpsTime = true;
 
     // data must be valid
     if((payload[11] & 3) != 3)
@@ -509,7 +539,7 @@ static const int lutDays366[16] = {
 
 static void processUbxPVT(const uint8_t *payload) {
     // PVT message received, no conf update needed
-    hasPvt = 1;
+    hasPvt = true;
     // fix status
     fixGood = payload[21] & 1;
     // location data
