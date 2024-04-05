@@ -498,7 +498,7 @@ static void configureGPS() {
     if(!hasPvt)
         sendUBX(0x06, 0x01, sizeof(payloadEnablePVT), payloadEnablePVT);
     if(wasReset)
-        sendUBX(0x06, 0x24, sizeof(payloadDisableNMEA), payloadDisableNMEA);
+        sendUBX(0x06, 0x24, sizeof(payloadNavConfig), payloadNavConfig);
 
     hasNema = false;
     hasClock = false;
