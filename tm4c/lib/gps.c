@@ -485,7 +485,7 @@ static const uint8_t payloadNavConfig[] = {
     0x03, // UTC USNO
     0x00, 0x00, 0x00, 0x00, 0x00 // reserved
 };
-_Static_assert(sizeof(payloadNavConfig) == 36, "payloadNavConfig must be 3 bytes");
+_Static_assert(sizeof(payloadNavConfig) == 36, "payloadNavConfig must be 36 bytes");
 
 static void configureGPS() {
     // transmit configuration stanzas
