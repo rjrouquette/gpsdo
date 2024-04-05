@@ -467,7 +467,7 @@ _Static_assert(sizeof(payloadEnableClock) == 3, "payloadEnableClock must be 3 by
 static const uint8_t payloadNavConfig[] = {
     0x01, 0x02, // mask (dynamic model, UTC reference)
     0x02, // stationary mode
-    0x03, // auto fix mode
+    0x02, // 3D fix mode
     0x00, 0x00, 0x00, 0x00, // fixed altitude (not set)
     0x00, 0x00, 0x00, 0x00, // fixed altitude variance (not set)
     0x00, // minimum satellite elevation degrees (not set)
