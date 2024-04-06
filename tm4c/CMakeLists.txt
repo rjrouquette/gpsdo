@@ -92,7 +92,7 @@ add_executable(
         lib/led.h
 
         # networking
-        lib/net.c
+        lib/net.cpp
         lib/net.h
         lib/net/arp.c
         lib/net/arp.h

@@ -9,8 +9,8 @@ const char lutBase[16] = "0123456789ABCDEF";
 
 char* append(char *dst, const char *src) {
     for(;;) {
-        (*dst) = (*src);
-        if((*src) == 0) break;
+        *dst = *src;
+        if(*src == 0) break;
         ++dst; ++src;
     }
     return dst;

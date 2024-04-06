@@ -66,6 +66,15 @@ void STATUS_process(uint8_t *frame, int flen) {
     // status activity
     LED_act1();
 
+    // get TX buffer
+    const int txDesc = NET_getTxDesc();
+    uint8_t *temp = NET_getTxBuff(txDesc);
+    memcpy(temp, frame, flen);
+    frame = temp;
+    headerEth = (HEADER_ETH *) frame;
+    headerIP4 = (HEADER_IP4 *) (headerEth + 1);
+    headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+
     // modify ethernet frame header
     copyMAC(headerEth->macDst, headerEth->macSrc);
     // modify IP header
@@ -110,8 +119,6 @@ void STATUS_process(uint8_t *frame, int flen) {
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
     // transmit response
-    const int txDesc = NET_getTxDesc();
-    memcpy(NET_getTxBuff(txDesc), frame, flen);
     NET_transmit(txDesc, flen);
 }
 

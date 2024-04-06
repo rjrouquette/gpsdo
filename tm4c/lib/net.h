@@ -7,8 +7,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-#else
-#define static_assert _Static_assert
 #endif
 
 #include <stdint.h>
@@ -28,7 +26,7 @@ uint8_t * NET_getTxBuff(int desc);
 void NET_setTxCallback(int desc, CallbackNetTX callback, volatile void *ref);
 void NET_transmit(int desc, int len);
 
-void NET_getRxTime(const uint8_t *rxFrame, volatile uint64_t *stamps);
+void NET_getRxTime(volatile uint64_t *stamps);
 
 void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps);
 

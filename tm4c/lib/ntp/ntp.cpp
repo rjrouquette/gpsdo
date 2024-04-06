@@ -141,39 +141,38 @@ static void ntpRequest(uint8_t *frame, const int flen) {
     // indicate time-server activity
     LED_act0();
 
+    // check for interleaved request
+    int xleave = -1;
+    if (
+        const uint64_t orgTime = request.data.origTime;
+        orgTime != 0 &&
+        request.data.rxTime != request.data.txTime
+    ) {
+        // load TX timestamp if available
+        const int cell = hashXleave(request.ip4.src);
+        if (orgTime == tsXleave[cell].rxTime)
+            xleave = cell;
+    }
+
     // retrieve rx time
     uint64_t stamps[3];
-    NET_getRxTime(frame, stamps);
+    NET_getRxTime(stamps);
     // translate TAI timestamp into NTP domain
-    const uint64_t rxTime = (stamps[2] - clkTaiUtcOffset) + NTP_UTC_OFFSET;
+    const uint64_t rxTime = stamps[2] - clkTaiUtcOffset + NTP_UTC_OFFSET;
 
     // get TX descriptor
     const int txDesc = NET_getTxDesc();
     // set callback for precise TX timestamp
     NET_setTxCallback(txDesc, ntpTxCallback, nullptr);
     // duplicate packet for sending
-    uint8_t *temp = NET_getTxBuff(txDesc);
-    memcpy(temp, frame, flen);
-    frame = temp;
+    const auto txFrame = NET_getTxBuff(txDesc);
+    memcpy(txFrame, frame, flen);
 
     // return the response directly to the sender
-    UDP_returnToSender(frame, ipAddress, NTP_PORT_SRV);
+    UDP_returnToSender(txFrame, ipAddress, NTP_PORT_SRV);
 
     // map headers
-    auto &response = PacketUDP<HEADER_NTP>::from(frame);
-
-    // check for interleaved request
-    int xleave = -1;
-    const uint64_t orgTime = response.data.origTime;
-    if (
-        orgTime != 0 &&
-        response.data.rxTime != response.data.txTime
-    ) {
-        // load TX timestamp if available
-        const int cell = hashXleave(response.ip4.dst);
-        if (orgTime == tsXleave[cell].rxTime)
-            xleave = cell;
-    }
+    auto &response = PacketUDP<HEADER_NTP>::from(txFrame);
 
     // set type to server response
     response.data.mode = NTP_MODE_SRV;
@@ -188,22 +187,22 @@ static void ntpRequest(uint8_t *frame, const int flen) {
     // set reference ID
     response.data.refID = refId;
     // set reference timestamp
-    response.data.refTime = htonll(CLK_TAI_fromMono(lastUpdate) + NTP_UTC_OFFSET - clkTaiUtcOffset);
+    response.data.refTime = htonll(CLK_TAI_fromMono(lastUpdate) - clkTaiUtcOffset + NTP_UTC_OFFSET);
     // set origin and TX timestamps
     if (xleave < 0) {
-        response.data.origTime = response.data.txTime;
-        response.data.txTime = htonll(CLK_TAI() + NTP_UTC_OFFSET - clkTaiUtcOffset);
+        response.data.origTime = request.data.txTime;
+        response.data.txTime = htonll(CLK_TAI() - clkTaiUtcOffset + NTP_UTC_OFFSET);
     }
     else {
-        response.data.origTime = response.data.rxTime;
+        response.data.origTime = request.data.rxTime;
         response.data.txTime = tsXleave[xleave].txTime;
     }
     // set RX timestamp
     response.data.rxTime = htonll(rxTime);
 
     // finalize packet
-    UDP_finalize(frame, flen);
-    IPv4_finalize(frame, flen);
+    UDP_finalize(txFrame, flen);
+    IPv4_finalize(txFrame, flen);
     // transmit packet
     NET_transmit(txDesc, flen);
 }

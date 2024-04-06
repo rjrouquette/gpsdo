@@ -458,7 +458,6 @@ unsigned statusSom(char *buffer) {
     return end - buffer;
 }
 
-__attribute__((optimize(3)))
 static void computeMean(const float *data) {
     // compute means
     mean[0] = 0;
@@ -474,7 +473,6 @@ static void computeMean(const float *data) {
     mean[1] /= mean[2];
 }
 
-__attribute__((optimize(3)))
 static void fitQuadratic(const float *data) {
     // compute equation matrix
     float xx[REG_DIM_COEF][REG_DIM_COEF + 1] = {0};
@@ -541,7 +539,6 @@ static void fitQuadratic(const float *data) {
     coef[2] = (xx[0][3] - xx[0][2] * coef[0] - xx[0][1] * coef[1]) / xx[0][0];
 }
 
-__attribute__((optimize(3)))
 static void computeMSE(const float *data) {
     float acc = 0;
     for (int i = 0; i < SOM_NODE_CNT; i++) {

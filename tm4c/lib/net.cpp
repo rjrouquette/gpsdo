@@ -2,36 +2,42 @@
 // Created by robert on 4/26/22.
 //
 
+#include "net.h"
+
+#include "delay.h"
+#include "led.h"
+#include "run.h"
 #include "../hw/crc.h"
 #include "../hw/emac.h"
-#include "../hw/interrupts.h"
 #include "../hw/gpio.h"
+#include "../hw/interrupts.h"
 #include "../hw/sys.h"
 #include "clk/comp.h"
 #include "clk/mono.h"
 #include "clk/tai.h"
 #include "clk/util.h"
-#include "delay.h"
-#include "led.h"
-#include "net.h"
 #include "net/arp.h"
 #include "net/dhcp.h"
+#include "net/dns.h"
 #include "net/eth.h"
 #include "net/ip.h"
 #include "net/util.h"
-#include "net/dns.h"
-#include "run.h"
 
-#define RX_RING_MASK (31)
-#define RX_RING_SIZE (32)
-#define RX_BUFF_SIZE (1520)
+static constexpr int RX_RING_SIZE = 64;
+static constexpr int RX_RING_MASK = RX_RING_SIZE - 1;
+static constexpr int RX_BUFF_SIZE = 256;
 
-#define TX_RING_MASK (31)
-#define TX_RING_SIZE (32)
-#define TX_BUFF_SIZE (1520)
+static constexpr int TX_RING_SIZE = 32;
+static constexpr int TX_RING_MASK = TX_RING_SIZE - 1;
+static constexpr int TX_BUFF_SIZE = 1520;
 
-#define ADV_RING_RX(ptr) ((ptr) = ((ptr) + 1) & RX_RING_MASK)
-#define ADV_RING_TX(ptr) ((ptr) = ((ptr) + 1) & TX_RING_MASK)
+inline void incrRx(int &ptr) {
+    ptr = (ptr + 1) & RX_RING_MASK;
+}
+
+inline void incrTx(int &ptr) {
+    ptr = (ptr + 1) & TX_RING_MASK;
+}
 
 static volatile int ptrRX = 0;
 static volatile int ptrTX = 0;
@@ -42,13 +48,17 @@ static void *volatile taskRx;
 static EMAC_RX_DESC rxDesc[RX_RING_SIZE];
 static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 
-static void *volatile taskTx;
+static volatile struct {
+    uint32_t lo;
+    uint32_t hi;
+} rxTimestamp;
 
 static struct {
     CallbackNetTX call;
     void *ref;
 } txCallback[TX_RING_SIZE];
 
+static void *volatile taskTx;
 static EMAC_TX_DESC txDesc[TX_RING_SIZE];
 static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
@@ -58,18 +68,19 @@ void PTP_process(uint8_t *frame, int flen);
 static void initDescriptors() {
     // init receive descriptors
     for (int i = 0; i < RX_RING_SIZE; i++) {
-        rxDesc[i].BUFF1 = (uint32_t) rxBuffer[i];
+        rxDesc[i].BUFF1 = reinterpret_cast<uint32_t>(rxBuffer[i]);
         rxDesc[i].BUFF2 = 0;
         rxDesc[i].RDES1.RBS1 = RX_BUFF_SIZE;
         rxDesc[i].RDES1.RBS2 = 0;
         rxDesc[i].RDES1.RER = 0;
+        rxDesc[i].RDES1.RCH = 0;
         rxDesc[i].RDES0.OWN = 1;
     }
-    rxDesc[RX_RING_SIZE - 1].RDES1.RER = 1;
+    rxDesc[RX_RING_MASK].RDES1.RER = 1;
 
     // init transmit descriptors
     for (int i = 0; i < TX_RING_SIZE; i++) {
-        txDesc[i].BUFF1 = (uint32_t) txBuffer[i];
+        txDesc[i].BUFF1 = reinterpret_cast<uint32_t>(txBuffer[i]);
         txDesc[i].BUFF2 = 0;
         txDesc[i].TDES1.TBS1 = 0;
         txDesc[i].TDES1.TBS2 = 0;
@@ -85,9 +96,9 @@ static void initDescriptors() {
         // capture timestamp
         txDesc[i].TDES0.TTSE = 1;
         // clear callback
-        txCallback[i].call = 0;
+        txCallback[i].call = nullptr;
     }
-    txDesc[TX_RING_SIZE - 1].TDES0.TER = 1;
+    txDesc[TX_RING_MASK].TDES0.TER = 1;
 }
 
 static void initPHY() {
@@ -150,9 +161,9 @@ static void initHwAddr() {
     const uint8_t macAddr[6] = {
         // "TUX" prefix borrowed from tuxgraphics.org
         0x54, 0x55, 0x58,
-        (CRC.SEED >> 16) & 0xFF,
-        (CRC.SEED >> 8) & 0xFF,
-        (CRC.SEED >> 0) & 0xFF
+        static_cast<uint8_t>(CRC.SEED >> 16),
+        static_cast<uint8_t>(CRC.SEED >> 8),
+        static_cast<uint8_t>(CRC.SEED >> 0)
     };
     EMAC_setMac(&(EMAC0.ADDR0), macAddr);
     // disable CRC module
@@ -175,8 +186,8 @@ static void initMAC() {
 
     // configure DMA
     EMAC0.DMABUSMOD.ATDS = 1;
-    EMAC0.RXDLADDR = (uint32_t) rxDesc;
-    EMAC0.TXDLADDR = (uint32_t) txDesc;
+    EMAC0.RXDLADDR = reinterpret_cast<uint32_t>(rxDesc);
+    EMAC0.TXDLADDR = reinterpret_cast<uint32_t>(txDesc);
     EMAC0.DMAOPMODE.ST = 1;
     EMAC0.DMAOPMODE.SR = 1;
     // enable RX/TX interrupts
@@ -204,7 +215,7 @@ static void initMAC() {
     FLASHCONF.FPFOFF = 0;
 }
 
-void ISR_EthernetMAC(void) {
+void ISR_EthernetMAC() {
     // process link status changes
     if (EMAC0.PHY.MIS.INT) {
         // clear interrupt
@@ -235,40 +246,79 @@ void ISR_EthernetMAC(void) {
     }
 }
 
-__attribute__((optimize(3)))
-static void runRx(void *ref) {
-    // check for completed receptions
+static bool processFrame() {
+    auto ptr = ptrRX;
     for (;;) {
-        EMAC_RX_DESC *pRxDesc = rxDesc + ptrRX;
-        // test for ownership
-        if (pRxDesc->RDES0.OWN)
+        const auto &desc = rxDesc[ptr];
+        // check DMA ownership
+        if (desc.RDES0.OWN)
+            return false;
+        // check for last segment flag
+        if (desc.RDES0.LS)
             break;
-        // process frame if there was no error
-        if (!pRxDesc->RDES0.ES) {
-            // extract ether type
-            uint8_t *frame = (uint8_t*) pRxDesc->BUFF1;
-            const HEADER_ETH *headerEth = (HEADER_ETH*) frame;
-            // only process the frame if the source MAC is not a broadcast address
-            // (prevents packet amplification attacks)
-            if (!(headerEth->macSrc[0] & 1)) {
-                const uint16_t ethType = headerEth->ethType;
-                // dispatch frame processor
-                if (ethType == ETHTYPE_ARP)
-                    ARP_process(frame, pRxDesc->RDES0.FL);
-                else if (ethType == ETHTYPE_IP4)
-                    IPv4_process(frame, pRxDesc->RDES0.FL);
-                else if (ethType == ETHTYPE_PTP)
-                    PTP_process(frame, pRxDesc->RDES0.FL);
-            }
-        }
-        // restore ownership to DMA
-        pRxDesc->RDES0.OWN = 1;
-        // advance pointer
-        ADV_RING_RX(ptrRX);
+        incrRx(ptr);
     }
+
+    // load last descriptor
+    const auto &last = rxDesc[ptr];
+    incrRx(ptr);
+    const auto end = ptr;
+
+    // discard frames with errors
+    if (last.RDES0.ES) {
+        ptr = ptrRX;
+        while (ptr != end) {
+            // restore DMA ownership
+            rxDesc[ptr].RDES0.OWN = 1;
+            // advance ring pointer
+            incrRx(ptr);
+        }
+        ptrRX = ptr;
+        return true;
+    }
+
+    // assemble full frame
+    uint8_t buffer[last.RDES0.FL];
+    rxTimestamp.lo = last.RTSL;
+    rxTimestamp.hi = last.RTSH;
+    int length = 0;
+    ptr = ptrRX;
+    while (ptr != end) {
+        auto &desc = rxDesc[ptr];
+        // copy segment contents
+        const auto accLength = static_cast<int>(desc.RDES0.FL);
+        memcpy(buffer + length, rxBuffer[ptr], accLength - length);
+        length = accLength;
+        // restore DMA ownership
+        desc.RDES0.OWN = 1;
+        // advance ring pointer
+        incrRx(ptr);
+    }
+    ptrRX = ptr;
+
+    // only process the frame if the source MAC is not a broadcast address
+    // (prevents packet amplification attacks)
+    if (
+        const auto headerEth = reinterpret_cast<HEADER_ETH*>(buffer);
+        !(headerEth->macSrc[0] & 1)
+    ) {
+        const auto ethType = headerEth->ethType;
+        // dispatch frame processor
+        if (ethType == ETHTYPE_ARP)
+            ARP_process(buffer, length);
+        else if (ethType == ETHTYPE_IP4)
+            IPv4_process(buffer, length);
+        else if (ethType == ETHTYPE_PTP)
+            PTP_process(buffer, length);
+    }
+    return true;
 }
 
-__attribute__((optimize(3)))
+static void runRx(void *ref) {
+    // check for completed receptions
+    while (processFrame()) {}
+}
+
 static void runTx(void *ref) {
     // check for completed transmissions
     const int ptr = ptrTX;
@@ -278,12 +328,12 @@ static void runTx(void *ref) {
         const CallbackNetTX pCall = txCallback[end].call;
         if (pCall) {
             // invoke callback
-            (*pCall)(txCallback[end].ref, (uint8_t*) txBuffer[end], txDesc[end].TDES1.TBS1);
+            (*pCall)(txCallback[end].ref, txBuffer[end], txDesc[end].TDES1.TBS1);
             // clear callback
-            txCallback[end].call = NULL;
+            txCallback[end].call = nullptr;
         }
         // advance pointer
-        ADV_RING_TX(end);
+        incrTx(end);
     }
     endTX = end;
 }
@@ -294,8 +344,8 @@ void NET_init() {
     // initialize ring buffers
     initDescriptors();
     // create RX/TX threads
-    taskRx = runSleep(RUN_MAX, runRx, NULL);
-    taskTx = runSleep(RUN_MAX, runTx, NULL);
+    taskRx = runSleep(RUN_MAX, runRx, nullptr);
+    taskTx = runSleep(RUN_MAX, runTx, nullptr);
     // initialize MAC and PHY
     initMAC();
 
@@ -318,22 +368,24 @@ int NET_getPhyStatus() {
 }
 
 int NET_getTxDesc() {
-    if (txDesc[ptrTX].TDES0.OWN)
+    const int ptr = ptrTX;
+    if (txDesc[ptr].TDES0.OWN)
         faultBlink(4, 1);
 
-    const int temp = ptrTX;
-    ADV_RING_TX(ptrTX);
-    return temp;
+    int temp = ptr;
+    incrTx(temp);
+    ptrTX = temp;
+    return ptr;
 }
 
-uint8_t* NET_getTxBuff(int desc) {
-    return (uint8_t*) txDesc[desc & TX_RING_MASK].BUFF1;
+uint8_t* NET_getTxBuff(const int desc) {
+    return txBuffer[desc & TX_RING_MASK];
 }
 
 void NET_setTxCallback(int desc, CallbackNetTX callback, volatile void *ref) {
     desc &= TX_RING_MASK;
     txCallback[desc].call = callback;
-    txCallback[desc].ref = (void*) ref;
+    txCallback[desc].ref = const_cast<void*>(ref);
 }
 
 void NET_transmit(int desc, int len) {
@@ -368,15 +420,13 @@ static void toStamps(uint32_t timer, volatile uint64_t *stamps) {
     timer += monoEth;
     // assemble timestamps
     stamps[0] = fromClkMono(timer, offset, integer);
-    stamps[1] = stamps[0] + corrValue(clkCompRate, (int64_t) (stamps[0] - clkCompRef)) + clkCompOffset;
-    stamps[2] = stamps[1] + corrValue(clkTaiRate, (int64_t) (stamps[1] - clkTaiRef)) + clkTaiOffset;
+    stamps[1] = stamps[0] + corrValue(clkCompRate, static_cast<int64_t>(stamps[0] - clkCompRef)) + clkCompOffset;
+    stamps[2] = stamps[1] + corrValue(clkTaiRate, static_cast<int64_t>(stamps[1] - clkTaiRef)) + clkTaiOffset;
 }
 
-void NET_getRxTime(const uint8_t *rxFrame, volatile uint64_t *stamps) {
-    // compute descriptor offset
-    const int i = (rxFrame - rxBuffer[0]) / RX_BUFF_SIZE;
+void NET_getRxTime(volatile uint64_t *stamps) {
     // assemble timestamps
-    toStamps((rxDesc[i].RTSH * CLK_FREQ) + (rxDesc[i].RTSL / CLK_NANO), stamps);
+    toStamps((rxTimestamp.hi * CLK_FREQ) + (rxTimestamp.lo / CLK_NANO), stamps);
 }
 
 void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps) {

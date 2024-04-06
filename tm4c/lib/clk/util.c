@@ -6,7 +6,6 @@
 #include "util.h"
 
 
-__attribute__((optimize(3)))
 uint32_t nanosToFrac(uint32_t nanos) {
     // multiply by the integer portion of 4.294967296
     nanos <<= 2;
@@ -39,7 +38,6 @@ uint64_t fromClkMono(const uint32_t timer, const uint32_t offset, uint32_t integ
     return scratch.full;
 }
 
-__attribute__((optimize(3)))
 int64_t corrValue(const int32_t rate, int64_t delta) {
     const int neg = delta < 0;
     if (neg)
@@ -57,7 +55,6 @@ int64_t corrValue(const int32_t rate, int64_t delta) {
     return (int64_t) (neg ? -scratch : scratch);
 }
 
-__attribute__((optimize(3)))
 int32_t corrFracRem(const int32_t rate, const int32_t delta, volatile uint32_t *rem) {
     // compute rate-based delta adjustment
     int64_t scratch = delta;
@@ -70,7 +67,6 @@ int32_t corrFracRem(const int32_t rate, const int32_t delta, volatile uint32_t *
     return (int32_t) (scratch >> 32);
 }
 
-__attribute__((optimize(3)))
 float toFloatU(const uint64_t value) {
     return ((float) (uint32_t) (value >> 32)) + (0x1p-32f * (float) (uint32_t) value);
 }

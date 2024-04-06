@@ -372,7 +372,7 @@ void ntp::Peer::receive(uint8_t *frame, int flen) {
     // packet received
     pktRecv = true;
     // set hardware timestamp
-    NET_getRxTime(frame, local_rx_hw);
+    NET_getRxTime(local_rx_hw);
 
     // set stratum
     stratum = headerNTP->stratum;

@@ -130,24 +130,20 @@ uint64_t CLK_TAI() {
     // get monotonic time
     uint64_t ts = CLK_MONO();
     // translate to compensated domain
-    ts -= clkCompRef;
-    ts += corrFracRem64(clkCompRate, ts, &rem);
+    ts += corrFracRem64(clkCompRate, ts - clkCompRef, &rem);
     ts += clkCompOffset;
     // translate to TAI domain
-    ts -= clkTaiRef;
-    ts += corrFracRem64(clkTaiRate, ts, &rem);
+    ts += corrFracRem64(clkTaiRate, ts - clkTaiRef, &rem);
     ts += clkTaiOffset;
     return ts;
 }
 
 uint64_t CLK_TAI_fromMono(uint64_t ts) {
     // translate to compensated domain
-    ts -= clkCompRef;
-    ts += corrValue(clkCompRate, (int64_t) ts);
+    ts += corrValue(clkCompRate, (int64_t) (ts - clkCompRef));
     ts += clkCompOffset;
     // translate to TAI domain
-    ts -= clkTaiRef;
-    ts += corrValue(clkTaiRate, (int64_t) ts);
+    ts += corrValue(clkTaiRate, (int64_t) (ts - clkTaiRef));
     ts += clkTaiOffset;
     return ts;
 }
