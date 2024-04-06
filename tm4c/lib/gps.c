@@ -137,7 +137,7 @@ static void runHealth(void *ref) {
     configureGPS();
 
     // release reset pin
-    if(GPS_RST_PORT.DATA[GPS_RST_PIN]) {
+    if(!GPS_RST_PORT.DATA[GPS_RST_PIN]) {
         GPS_RST_PORT.DATA[GPS_RST_PIN] = GPS_RST_PIN;
         wasReset = true;
     }
