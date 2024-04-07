@@ -5,12 +5,11 @@
 #ifndef GPSDO_GPS_H
 #define GPSDO_GPS_H
 
-
 #ifdef __cplusplus
 extern "C" {
-#else
-#define static_assert _Static_assert
 #endif
+
+#include <stdint.h>
 
 void GPS_init();
 

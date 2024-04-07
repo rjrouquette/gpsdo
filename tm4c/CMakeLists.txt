@@ -86,7 +86,7 @@ add_executable(
         lib/delay.h
         lib/format.c
         lib/format.h
-        lib/gps.c
+        lib/gps.cpp
         lib/gps.h
         lib/led.c
         lib/led.h
