@@ -78,10 +78,10 @@ static void status::process(uint8_t *frame, int flen) {
     uint8_t *txFrame = NET_getTxBuff(txDesc);
     memcpy(txFrame, frame, flen);
     UDP_returnToSender(txFrame, ipAddress, STATUS_PORT);
-    auto &response = PacketUDP<char>::from(frame);
+    auto &response = PacketUDP<char>::from(txFrame);
 
     // get packet body
-    char *body = &response.data;
+    char *body = response.ptr();
     // force null termination
     body[size] = 0;
     if (strncmp(body, "clock", 5) == 0 && hasTerminus(body, 8)) {
