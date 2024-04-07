@@ -6,7 +6,6 @@
 
 #include "format.h"
 #include "led.h"
-#include "../hw/interrupts.h"
 #include "clk/mono.h"
 
 #include <memory>
@@ -23,15 +22,18 @@ class Task {
      * Scheduling type
      */
     enum Schedule {
+        Free,
         Canceled,
         Sleep,
-        Periodic
+        Periodic,
+        Wait,
+        Wake
     };
 
     /**
      * Status type codes
      */
-    static constexpr char typeCode[] = "CSP";
+    static constexpr char typeCode[] = "-CSPWQ";
 
     /**
      * pointer to next task in the queue
@@ -68,6 +70,8 @@ class Task {
      */
     uint32_t runInterval;
 
+    static void doNothing(void *ref) {}
+
 public:
     Task();
 
@@ -85,12 +89,23 @@ public:
     /**
      * Cancel the task.
      */
-    void cancel();
+    void cancel() {
+        callback = doNothing;
+        reference = nullptr;
+        schedule = Canceled;
+    }
 
     /**
-     * Wake the task if it is sleeping.
+     * Mark task as awoken.
      */
-    void wake();
+    void wake() {
+        schedule = Wake;
+    }
+
+    /**
+     * Wake the task.
+     */
+    void doWake();
 
     /**
      * Determine if the task is ready to run.
@@ -102,13 +117,38 @@ public:
     }
 
     /**
+     * Determine if the task has been freed.
+     * @return true if the task has been freed
+     */
+    [[nodiscard]]
+    bool isFree() const {
+        return schedule == Free;
+    }
+
+    /**
+     * Determine if the task has been canceled.
+     * @return true if the task has been canceled
+     */
+    [[nodiscard]]
+    bool isCanceled() const {
+        return callback == doNothing;
+    }
+
+    /**
+     * Determine if the task has been awoken.
+     * @return true if the task has been awoken
+     */
+    [[nodiscard]]
+    bool isAwake() const {
+        return schedule == Wake;
+    }
+
+    /**
      * Remove the task from the queue.
      */
-    void pop() {
+    void pop() const {
         qPrev->qNext = qNext;
         qNext->qPrev = qPrev;
-        qNext = nullptr;
-        qPrev = nullptr;
     }
 
     /**
@@ -132,7 +172,13 @@ public:
     /**
      * Run the task.
      */
-    void run() const {
+    void run() {
+        if (schedule == Wait)
+            return;
+        // if thread was awoken, set it back to waiting
+        if (schedule == Wake)
+            schedule = Wait;
+        // perform task
         (*callback)(reference);
     }
 
@@ -172,6 +218,14 @@ public:
      */
     void setSleep(uint32_t delay, RunCall callback, void *ref);
 
+    /**
+     * Schedule task to wait for calls to runWake().
+     * @param callback task entry point
+     * @param ref context pointer for task
+     * @return task handle
+     */
+    void setWait(RunCall callback, void *ref);
+
     [[nodiscard]]
     RunCall getCallback() const {
         return callback;
@@ -196,10 +250,9 @@ public:
 static Task *taskFree;
 static Task taskPool[SLOT_CNT];
 static volatile Task taskQueue;
+static volatile bool taskUpdate;
 #define queueHead (taskQueue.next())
 #define queueRoot ((Task *) &taskQueue)
-
-static void doNothing(void *ref) {}
 
 void initScheduler() {
     // initialize queue nodes
@@ -235,21 +288,14 @@ Task* Task::alloc() {
 void Task::free() {
     pop();
     // push onto free stack
+    callback = nullptr;
+    schedule = Free;
+    qPrev = nullptr;
     qNext = taskFree;
     taskFree = this;
 }
 
-void Task::cancel() {
-    // cancel task
-    callback = doNothing;
-    reference = nullptr;
-    schedule = Canceled;
-    // explicitly delete task if it is not currently running
-    if (this != queueHead)
-        free();
-}
-
-void Task::wake() {
+void Task::doWake() {
     // remove from queue
     pop();
     // set to run immediately
@@ -275,11 +321,8 @@ void Task::insert() {
 }
 
 void Task::requeue() {
-    if (schedule == Canceled) {
-        // delete task it is canceled
-        free();
+    if (schedule == Canceled)
         return;
-    }
 
     // remove from queue
     pop();
@@ -315,6 +358,19 @@ void Task::setSleep(const uint32_t delay, const RunCall callback, void *ref) {
     insert();
 }
 
+void Task::setWait(const RunCall callback, void *ref) {
+    schedule = Sleep;
+    this->callback = callback;
+    reference = ref;
+
+    // set run interval to a reasonably long value (without wrapping)
+    runInterval = 1u << 30;
+    // start after delay
+    runNext = CLK_MONO_RAW + runInterval;
+    // add to schedule
+    insert();
+}
+
 char* Task::print(char *str) const {
     *str++ = typeCode[schedule];
     *str++ = ' ';
@@ -324,11 +380,21 @@ char* Task::print(char *str) const {
     return str;
 }
 
-
 [[noreturn]]
 void runScheduler() {
     // infinite loop
     for (;;) {
+        // check for out-of-band updates
+        if (taskUpdate) {
+            taskUpdate = false;
+            for (auto &task : taskPool) {
+                if (task.isCanceled())
+                    task.free();
+                if (task.isAwake())
+                    task.doWake();
+            }
+        }
+
         // check for scheduled tasks
         const auto task = queueHead;
         if (!task->isReady())
@@ -336,27 +402,26 @@ void runScheduler() {
 
         // run the task
         task->run();
-
-        // determine next state
-        __disable_irq();
+        // requeue the task
         task->requeue();
-        __enable_irq();
     }
 }
 
+void* runWait(RunCall callback, void *ref) {
+    const auto task = Task::alloc();
+    task->setWait(callback, ref);
+    return task;
+}
+
 void* runSleep(uint32_t delay, RunCall callback, void *ref) {
-    __disable_irq();
     const auto task = Task::alloc();
     task->setSleep(delay, callback, ref);
-    __enable_irq();
     return task;
 }
 
 void* runPeriodic(uint32_t interval, RunCall callback, void *ref) {
-    __disable_irq();
     const auto task = Task::alloc();
     task->setPeriodic(interval, callback, ref);
-    __enable_irq();
     return task;
 }
 
@@ -365,12 +430,19 @@ void runAdjust(void *taskHandle, const uint32_t interval) {
 }
 
 void runWake(void *taskHandle) {
-    __disable_irq();
-    static_cast<Task*>(taskHandle)->wake();
-    __enable_irq();
+    const auto task = static_cast<Task*>(taskHandle);
+    if(task->isFree() || task->isCanceled())
+        return;
+    task->wake();
+    taskUpdate = true;
 }
 
-static void runCancel_(const RunCall callback, const void *const ref) {
+static void runCancel(void *taskHandle) {
+    static_cast<Task*>(taskHandle)->cancel();
+    taskUpdate = true;
+}
+
+void runCancel(const RunCall callback, const void *ref) {
     // match by reference
     if (callback == nullptr) {
         auto iter = queueHead;
@@ -379,7 +451,7 @@ static void runCancel_(const RunCall callback, const void *const ref) {
             iter = iter->next();
 
             if (task->getReference() == ref)
-                task->cancel();
+                runCancel(task);
         }
         return;
     }
@@ -392,7 +464,7 @@ static void runCancel_(const RunCall callback, const void *const ref) {
             iter = iter->next();
 
             if (task->getCallback() == callback)
-                task->cancel();
+                runCancel(task);
         }
         return;
     }
@@ -404,14 +476,8 @@ static void runCancel_(const RunCall callback, const void *const ref) {
         iter = iter->next();
 
         if (task->getCallback() == callback && task->getReference() == ref)
-            task->cancel();
+            runCancel(task);
     }
-}
-
-void runCancel(RunCall callback, void *ref) {
-    __disable_irq();
-    runCancel_(callback, ref);
-    __enable_irq();
 }
 
 unsigned runStatus(char *buffer) {

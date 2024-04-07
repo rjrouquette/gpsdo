@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "source.hpp"
 
 namespace ntp {

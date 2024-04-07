@@ -2,8 +2,7 @@
 // Created by robert on 4/27/23.
 //
 
-#ifndef GPSDO_NTP_H
-#define GPSDO_NTP_H
+#pragma once
 
 #include <cstdint>
 
@@ -14,5 +13,3 @@ namespace ntp {
 
     uint32_t refId();
 }
-
-#endif //GPSDO_NTP_H

@@ -35,6 +35,14 @@ _Noreturn
 void runScheduler();
 
 /**
+ * Schedule task to wait for calls to runWake().
+ * @param callback task entry point
+ * @param ref context pointer for task
+ * @return task handle
+ */
+void* runWait(RunCall callback, void *ref);
+
+/**
  * Schedule task to sleep for a fixed delay between executions
  * @param delay interval in 8.24 fixed point format (16 second maximum, uses monotonic clock)
  * @param callback task entry point
@@ -60,8 +68,8 @@ void* runPeriodic(uint32_t interval, RunCall callback, void *ref);
 void runAdjust(void *taskHandle, uint32_t interval);
 
 /**
- * Wake a sleeping task
- * @param taskHandle the sleeping task to wake
+ * Wake a waiting task
+ * @param taskHandle the waiting task to wake
  */
 void runWake(void *taskHandle);
 
@@ -70,7 +78,7 @@ void runWake(void *taskHandle);
  * @param callback task entry point
  * @param ref context pointer for task (if NULL, all entries matching callback are removed)
  */
-void runCancel(RunCall callback, void *ref);
+void runCancel(RunCall callback, const void *ref);
 
 /**
  * Write current status of the scheduler to a buffer

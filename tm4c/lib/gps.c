@@ -11,9 +11,6 @@
 #include "clk/util.h"
 #include "delay.h"
 #include "gps.h"
-
-#include <math.h>
-
 #include "run.h"
 
 #define GPS_RING_SIZE (256)
@@ -118,7 +115,7 @@ void GPS_init() {
     UART3.CTL.TXE = 1;
     UART3.CTL.UARTEN = 1;
     // start parser thread
-    taskParse = runSleep(RUN_MAX, runParse, NULL);
+    taskParse = runWait(runParse, NULL);
     // reduce interrupt priority
     ISR_priority(ISR_UART3, 7);
     // enable interrupts

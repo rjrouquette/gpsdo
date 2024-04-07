@@ -325,8 +325,10 @@ static void runTx(void *ref) {
     int end = endTX;
     while ((end != ptr) && !txDesc[end].TDES0.OWN) {
         // check for callback
-        const CallbackNetTX pCall = txCallback[end].call;
-        if (pCall) {
+        if (
+            const auto pCall = txCallback[end].call;
+            pCall != nullptr
+        ) {
             // invoke callback
             (*pCall)(txCallback[end].ref, txBuffer[end], txDesc[end].TDES1.TBS1);
             // clear callback
@@ -344,8 +346,8 @@ void NET_init() {
     // initialize ring buffers
     initDescriptors();
     // create RX/TX threads
-    taskRx = runSleep(RUN_MAX, runRx, nullptr);
-    taskTx = runSleep(RUN_MAX, runTx, nullptr);
+    taskRx = runWait(runRx, nullptr);
+    taskTx = runWait(runTx, nullptr);
     // initialize MAC and PHY
     initMAC();
 
