@@ -115,7 +115,7 @@ add_executable(
         lib/ntp/gps.cpp
         lib/ntp/gps.hpp
         lib/ntp/ntp.cpp
-        lib/ntp/ntp.h
+        lib/ntp/ntp.hpp
         lib/ntp/peer.cpp
         lib/ntp/peer.hpp
         lib/ntp/pll.c
@@ -131,7 +131,7 @@ add_executable(
         lib/ptp/common.cpp
         lib/ptp/common.hpp
         lib/ptp/ptp.cpp
-        lib/ptp/ptp.h
+        lib/ptp/ptp.hpp
 
         lib/rand.c
         lib/rand.h

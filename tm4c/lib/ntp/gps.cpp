@@ -6,7 +6,7 @@
 #include "../gps.h"
 
 #include "common.hpp"
-#include "ntp.h"
+#include "ntp.hpp"
 #include "../run.h"
 #include "../clk/clk.h"
 #include "../clk/mono.h"

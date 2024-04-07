@@ -2,7 +2,7 @@
 // Created by robert on 3/31/23.
 //
 
-#include "ptp.h"
+#include "ptp.hpp"
 
 #include "common.hpp"
 #include "../led.h"
@@ -10,7 +10,7 @@
 #include "../run.h"
 #include "../clk/tai.h"
 #include "../net/util.h"
-#include "../ntp/ntp.h"
+#include "../ntp/ntp.hpp"
 #include "../ntp/pll.h"
 
 
@@ -178,13 +178,14 @@ static void sendAnnounce(void *ref) {
     announce.ptp.sequenceId = htons(seqId++);
 
     // PTP Announce
-    announce.data.timeSource = (NTP_refId() == NTP_REF_GPS) ? PTP2_TSRC_GPS : PTP2_TSRC_NTP;
+    const auto refId = ntp::refId();
+    announce.data.timeSource = (refId== NTP_REF_GPS) ? PTP2_TSRC_GPS : PTP2_TSRC_NTP;
     announce.data.currentUtcOffset = (clkTaiUtcOffset >> 32);
     memcpy(announce.data.grandMasterIdentity, ptpClockId, sizeof(ptpClockId));
     announce.data.grandMasterPriority = 0;
     announce.data.grandMasterPriority2 = 0;
     announce.data.stepsRemoved = 0;
-    if(NTP_refId())
+    if(refId != 0)
         announce.data.grandMasterClockQuality = toPtpClkAccuracy(PLL_offsetRms());
     else
         announce.data.grandMasterClockQuality = 0x31;

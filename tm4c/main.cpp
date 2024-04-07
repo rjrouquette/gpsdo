@@ -16,8 +16,8 @@
 #include "lib/rand.h"
 #include "lib/run.h"
 #include "lib/clk/clk.h"
-#include "lib/ntp/ntp.h"
-#include "lib/ptp/ptp.h"
+#include "lib/ntp/ntp.hpp"
+#include "lib/ptp/ptp.hpp"
 #include "lib/snmp/snmp.h"
 
 #define EEPROM_FORMAT (0x00000006)
@@ -46,7 +46,7 @@ int main() {
     GPS_init();
     // initialize networking
     NET_init();
-    NTP_init();
+    ntp::init();
     PTP_init();
     SNMP_init();
     status::init();

@@ -2,7 +2,7 @@
 // Created by robert on 4/27/23.
 //
 
-#include "ntp.h"
+#include "ntp.hpp"
 
 #include "common.hpp"
 #include "gps.hpp"
@@ -84,7 +84,7 @@ extern "C" void ntpApplyOffset(const int64_t offset) {
     }
 }
 
-void NTP_init() {
+void ntp::init() {
     PLL_init();
 
     UDP_register(NTP_PORT_SRV, ntpRequest);
@@ -102,8 +102,8 @@ void NTP_init() {
     runSleep(DNS_UPDT_INTV, runDnsFill, nullptr);
 }
 
-uint32_t NTP_refId() {
-    return refId;
+uint32_t ntp::refId() {
+    return ::refId;
 }
 
 static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
