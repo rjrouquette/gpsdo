@@ -19,9 +19,59 @@ static void getMeanVar(int cnt, const float *v, float *mean, float *var);
 
 ntp::Source::Source(const uint32_t id_, const uint16_t mode_) :
     ringSamples{}, id(id_), mode(mode_) {
+    // sample ring buffer
     ringPtr = 0;;
     sampleCount = 0;
+
+    // samples used in calculations
+    usedOffset = 0;
+    usedDrift = 0;
+    // time span
+    span = 0;
+
+    // polling state variable
+    lastUpdate = 0;
+    refTime = 0;
+    refId = 0;
+    rootDelay = 0;
+    rootDispersion = 0;
+    rxCount = 0;
+    rxValid = 0;
+    txCount = 0;
+    responseTime = 0;
+    state = 0;
+    reach = 0;
+    stratum = 0;
+    poll = 0;
     pollCounter = 0;
+    minPoll = 0;
+    maxPoll = 0;
+    precision = 0;
+    leap = 0;
+    version = 0;
+    ntpMode = 0;
+
+    // last sample offset
+    lastOffset = 0;
+    lastOffsetOrig = 0;
+    lastDelay = 0;
+    // offset stats
+    offsetMean = 0;
+    offsetStdDev = 0;
+    // delay stats
+    delayMean = 0;
+    delayStdDev = 0;
+    // frequency stats
+    freqDrift = 0;
+    freqSkew = 0;
+    // overall score
+    score = 0;
+
+    // status flags
+    xleave = false;
+    prune = false;
+    lost = false;
+    unstable = false;
 
     // set initial state
     lost = true;
@@ -184,7 +234,7 @@ void ntp::Source::getNtpData(RPY_NTPData &rpyNtpData) const {
     rpyNtpData.poll = static_cast<int8_t>(poll);
 
     rpyNtpData.ref_id = refId;
-    chrony::toTimespec(__builtin_bswap64(refTime) - NTP_UTC_OFFSET, &(rpyNtpData.ref_time));
+    chrony::toTimespec(htonll(refTime) - NTP_UTC_OFFSET, &(rpyNtpData.ref_time));
 
     rpyNtpData.offset.f = chrony::htonf(lastOffset);
     rpyNtpData.root_delay.f = chrony::htonf(0x1p-16f * static_cast<float>(rootDelay));
