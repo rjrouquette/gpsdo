@@ -5,9 +5,9 @@
  */
 
 #include "gitversion.h"
-#include "snmp.h"
-#include "status.h"
+#include "status.hpp"
 #include "hw/eeprom.h"
+#include "hw/interrupts.h"
 #include "hw/sys.h"
 #include "lib/delay.h"
 #include "lib/gps.h"
@@ -18,12 +18,14 @@
 #include "lib/clk/clk.h"
 #include "lib/ntp/ntp.h"
 #include "lib/ptp/ptp.h"
+#include "lib/snmp/snmp.h"
 
 #define EEPROM_FORMAT (0x00000006)
 
 static void EEPROM_init();
 
-int main(void) {
+extern "C"
+int main() {
     // enable FPU
     CPAC.CP10 = 3;
     CPAC.CP11 = 3;
@@ -47,7 +49,7 @@ int main(void) {
     NTP_init();
     PTP_init();
     SNMP_init();
-    STATUS_init();
+    status::init();
 
     // run task scheduler
     runScheduler();

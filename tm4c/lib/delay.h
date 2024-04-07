@@ -5,6 +5,10 @@
 #ifndef GPSDO_DELAY_H
 #define GPSDO_DELAY_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 /**
@@ -44,5 +48,9 @@ void delay_us(uint16_t delay);
  * @param delay in milliseconds
  */
 void delay_ms(uint16_t delay);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GPSDO_DELAY_H

@@ -42,11 +42,11 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 add_executable(
         gpsdo
 
-        main.c
-        snmp.c
-        snmp.h
-        status.c
-        status.h
+        main.cpp
+        lib/snmp/snmp.c
+        lib/snmp/snmp.h
+        status.cpp
+        status.hpp
 
         # hardware target files
         hw/adc.h

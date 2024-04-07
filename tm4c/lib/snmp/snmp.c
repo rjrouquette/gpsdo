@@ -4,14 +4,14 @@
 
 #include <memory.h>
 
-#include "lib/led.h"
-#include "lib/net.h"
-#include "lib/net/eth.h"
-#include "lib/net/ip.h"
-#include "lib/net/udp.h"
-#include "lib/net/util.h"
-#include "lib/snmp/sensors.h"
-#include "lib/snmp/util.h"
+#include "../led.h"
+#include "../net.h"
+#include "../net/eth.h"
+#include "../net/ip.h"
+#include "../net/udp.h"
+#include "../net/util.h"
+#include "sensors.h"
+#include "util.h"
 #include "snmp.h"
 
 #include "gitversion.h"

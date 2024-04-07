@@ -5,6 +5,8 @@
 #ifndef GPSDO_STATUS_H
 #define GPSDO_STATUS_H
 
-void STATUS_init();
+namespace status {
+    void init();
+}
 
 #endif //GPSDO_STATUS_H

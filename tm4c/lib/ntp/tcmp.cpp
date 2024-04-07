@@ -437,7 +437,6 @@ static float tcmpEstimate(const float temp) {
     return y + tcmpMean[1];
 }
 
-extern "C"
 unsigned statusSom(char *buffer) {
     char *end = buffer;
 

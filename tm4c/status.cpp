@@ -2,19 +2,21 @@
 // Created by robert on 12/2/22.
 //
 
-#include <string.h>
+#include "status.hpp"
 
+#include "gitversion.h"
 #include "hw/eeprom.h"
 #include "hw/emac.h"
 #include "hw/sys.h"
-#include "lib/clk/clk.h"
-#include "lib/clk/mono.h"
-#include "lib/clk/tai.h"
-#include "lib/clk/comp.h"
 #include "lib/format.h"
 #include "lib/gps.h"
 #include "lib/led.h"
 #include "lib/net.h"
+#include "lib/run.h"
+#include "lib/clk/clk.h"
+#include "lib/clk/comp.h"
+#include "lib/clk/mono.h"
+#include "lib/clk/tai.h"
 #include "lib/net/arp.h"
 #include "lib/net/dhcp.h"
 #include "lib/net/eth.h"
@@ -23,19 +25,19 @@
 #include "lib/net/util.h"
 #include "lib/ntp/pll.h"
 
-#include "gitversion.h"
-#include "status.h"
-#include "lib/run.h"
+#include <cstring>
 
 #define STATUS_PORT (23) // telnet port
 
-void STATUS_process(uint8_t *frame, int flen);
+namespace status {
+    static void process(uint8_t *frame, int flen);
+}
 
-unsigned statusClock(char *body);
-unsigned statusEEPROM(int block, char *body);
-unsigned statusETH(char *body);
-unsigned statusGPS(char *body);
-unsigned statusSystem(char *body);
+static unsigned statusClock(char *body);
+static unsigned statusEEPROM(int block, char *body);
+static unsigned statusETH(char *body);
+static unsigned statusGPS(char *body);
+static unsigned statusSystem(char *body);
 
 unsigned statusSom(char *buffer);
 
@@ -46,52 +48,39 @@ int hasTerminus(const char *str, int offset) {
     return 0;
 }
 
-void STATUS_init() {
-    UDP_register(STATUS_PORT, STATUS_process);
+void status::init() {
+    UDP_register(STATUS_PORT, process);
 }
 
-void STATUS_process(uint8_t *frame, int flen) {
+static void status::process(uint8_t *frame, int flen) {
     // restrict length
     if(flen > 128) return;
     // map headers
-    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
-    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
-    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
+    const auto &request = PacketUDP<char>::from(frame);
     // verify destination
-    if(isMyMAC(headerEth->macDst)) return;
-    if(headerIP4->dst != ipAddress) return;
+    if(isMyMAC(request.eth.macDst)) return;
+    if(request.ip4.dst != ipAddress) return;
     // restrict length
-    unsigned size = __builtin_bswap16(headerUDP->length) - sizeof(HEADER_UDP);
+    unsigned size = htons(request.udp.length) - sizeof(HEADER_UDP);
     if(size > 31) return;
     // status activity
     LED_act1();
 
     // get TX buffer
     const int txDesc = NET_getTxDesc();
-    uint8_t *temp = NET_getTxBuff(txDesc);
-    memcpy(temp, frame, flen);
-    frame = temp;
-    headerEth = (HEADER_ETH *) frame;
-    headerIP4 = (HEADER_IP4 *) (headerEth + 1);
-    headerUDP = (HEADER_UDP *) (headerIP4 + 1);
-
-    // modify ethernet frame header
-    copyMAC(headerEth->macDst, headerEth->macSrc);
-    // modify IP header
-    headerIP4->dst = headerIP4->src;
-    headerIP4->src = ipAddress;
-    // modify UDP header
-    headerUDP->portDst = headerUDP->portSrc;
-    headerUDP->portSrc = __builtin_bswap16(STATUS_PORT);
+    uint8_t *txFrame = NET_getTxBuff(txDesc);
+    memcpy(txFrame, frame, flen);
+    UDP_returnToSender(txFrame, ipAddress, STATUS_PORT);
+    auto &response = PacketUDP<char>::from(frame);
 
     // get packet body
-    char *body = (char *) (headerUDP + 1);
+    char *body = &response.data;
     // force null termination
     body[size] = 0;
     if(strncmp(body, "clock", 5) == 0 && hasTerminus(body, 8)) {
         size = statusClock(body);
     } else if(strncmp(body, "eeprom", 6) == 0 && hasTerminus(body, 8)) {
-        size = statusEEPROM((int) fromHex(body + 6, 2), body);
+        size = statusEEPROM(static_cast<int>(fromHex(body + 6, 2)), body);
     } else if(strncmp(body, "ethernet", 8) == 0 && hasTerminus(body, 8)) {
         size = statusETH(body);
     } else if(strncmp(body, "gps", 3) == 0 && hasTerminus(body, 3)) {
@@ -116,13 +105,13 @@ void STATUS_process(uint8_t *frame, int flen) {
 
     // finalize response
     flen = UDP_DATA_OFFSET + size;
-    UDP_finalize(frame, flen);
-    IPv4_finalize(frame, flen);
+    UDP_finalize(txFrame, flen);
+    IPv4_finalize(txFrame, flen);
     // transmit response
     NET_transmit(txDesc, flen);
 }
 
-unsigned statusClock(char *body) {
+static unsigned statusClock(char *body) {
     char tmp[32];
     char *end = body;
 
@@ -267,7 +256,7 @@ unsigned statusClock(char *body) {
     return end - body;
 }
 
-unsigned statusETH(char *body) {
+static unsigned statusETH(char *body) {
     char tmp[32];
     char *end = body;
 
@@ -342,7 +331,7 @@ unsigned statusETH(char *body) {
     return end - body;
 }
 
-unsigned statusGPS(char *body) {
+static unsigned statusGPS(char *body) {
     char tmp[32];
     char *end = body;
 
@@ -370,13 +359,13 @@ unsigned statusGPS(char *body) {
     end = append(end, " m\n");
 
     // clock bias
-    tmp[fmtFloat((float) GPS_clkBias(), 0, 0, tmp)] = 0;
+    tmp[fmtFloat(static_cast<float>(GPS_clkBias()), 0, 0, tmp)] = 0;
     end = append(end, "clock bias: ");
     end = append(end, tmp);
     end = append(end, " ns\n");
 
     // clock drift
-    tmp[fmtFloat((float) GPS_clkDrift(), 0, 0, tmp)] = 0;
+    tmp[fmtFloat(static_cast<float>(GPS_clkDrift()), 0, 0, tmp)] = 0;
     end = append(end, "clock drift: ");
     end = append(end, tmp);
     end = append(end, " ns/s\n");
@@ -396,7 +385,7 @@ unsigned statusGPS(char *body) {
     return end - body;
 }
 
-unsigned statusSystem(char *body) {
+static unsigned statusSystem(char *body) {
     char tmp[32];
     char *end = body;
 
@@ -468,7 +457,7 @@ unsigned statusSystem(char *body) {
     return end - body;
 }
 
-unsigned statusEEPROM(int block, char *body) {
+static unsigned statusEEPROM(int block, char *body) {
     char tmp[32];
     char *end = body;
 
@@ -482,7 +471,7 @@ unsigned statusEEPROM(int block, char *body) {
     for(int i = 0; i < 16; i++) {
         uint32_t word = EEPROM_read();
         end = append(end, "  ");
-        end = toHexBytes(end, (uint8_t *) &word, sizeof(word));
+        end = toHexBytes(end, reinterpret_cast<uint8_t*>(&word), sizeof(word));
         end = append(end, "\n");
     }
 
