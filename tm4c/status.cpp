@@ -41,11 +41,14 @@ static unsigned statusSystem(char *body);
 
 unsigned statusSom(char *buffer);
 
-int hasTerminus(const char *str, int offset) {
-    if(str[offset] == 0) return 1;
-    if(str[offset] == '\n') return 1;
-    if(str[offset] == '\r') return 1;
-    return 0;
+bool hasTerminus(const char *str, int offset) {
+    if (str[offset] == 0)
+        return true;
+    if (str[offset] == '\n')
+        return true;
+    if (str[offset] == '\r')
+        return true;
+    return false;
 }
 
 void status::init() {
@@ -54,15 +57,19 @@ void status::init() {
 
 static void status::process(uint8_t *frame, int flen) {
     // restrict length
-    if(flen > 128) return;
+    if (flen > 128)
+        return;
     // map headers
     const auto &request = PacketUDP<char>::from(frame);
     // verify destination
-    if(isMyMAC(request.eth.macDst)) return;
-    if(request.ip4.dst != ipAddress) return;
+    if (isMyMAC(request.eth.macDst))
+        return;
+    if (request.ip4.dst != ipAddress)
+        return;
     // restrict length
     unsigned size = htons(request.udp.length) - sizeof(HEADER_UDP);
-    if(size > 31) return;
+    if (size > 31)
+        return;
     // status activity
     LED_act1();
 
@@ -77,23 +84,31 @@ static void status::process(uint8_t *frame, int flen) {
     char *body = &response.data;
     // force null termination
     body[size] = 0;
-    if(strncmp(body, "clock", 5) == 0 && hasTerminus(body, 8)) {
+    if (strncmp(body, "clock", 5) == 0 && hasTerminus(body, 8)) {
         size = statusClock(body);
-    } else if(strncmp(body, "eeprom", 6) == 0 && hasTerminus(body, 8)) {
+    }
+    else if (strncmp(body, "eeprom", 6) == 0 && hasTerminus(body, 8)) {
         size = statusEEPROM(static_cast<int>(fromHex(body + 6, 2)), body);
-    } else if(strncmp(body, "ethernet", 8) == 0 && hasTerminus(body, 8)) {
+    }
+    else if (strncmp(body, "ethernet", 8) == 0 && hasTerminus(body, 8)) {
         size = statusETH(body);
-    } else if(strncmp(body, "gps", 3) == 0 && hasTerminus(body, 3)) {
+    }
+    else if (strncmp(body, "gps", 3) == 0 && hasTerminus(body, 3)) {
         size = statusGPS(body);
-    } else if(strncmp(body, "pll", 3) == 0 && hasTerminus(body, 3)) {
+    }
+    else if (strncmp(body, "pll", 3) == 0 && hasTerminus(body, 3)) {
         size = PLL_status(body);
-    } else if(strncmp(body, "system", 6) == 0 && hasTerminus(body, 6)) {
+    }
+    else if (strncmp(body, "system", 6) == 0 && hasTerminus(body, 6)) {
         size = statusSystem(body);
-    } else if(strncmp(body, "run", 3) == 0 && hasTerminus(body, 3)) {
+    }
+    else if (strncmp(body, "run", 3) == 0 && hasTerminus(body, 3)) {
         size = runStatus(body);
-    }  else if(strncmp(body, "som", 3) == 0 && hasTerminus(body, 3)) {
+    }
+    else if (strncmp(body, "som", 3) == 0 && hasTerminus(body, 3)) {
         size = statusSom(body);
-    } else {
+    }
+    else {
         char tmp[32];
         strncpy(tmp, body, size);
         char *end = body;
@@ -118,9 +133,9 @@ static unsigned statusClock(char *body) {
     // current time
     uint64_t mono = CLK_MONO();
     strcpy(tmp, "0x");
-    toHex(mono>>32, 8, '0', tmp+2);
+    toHex(mono >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
-    toHex(mono, 8, '0', tmp+11);
+    toHex(mono, 8, '0', tmp + 11);
     tmp[19] = 0;
     end = append(end, "clk mono:  ");
     end = append(end, tmp);
@@ -129,9 +144,9 @@ static unsigned statusClock(char *body) {
     // current time
     uint64_t comp = CLK_COMP();
     strcpy(tmp, "0x");
-    toHex(comp>>32, 8, '0', tmp+2);
+    toHex(comp >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
-    toHex(comp, 8, '0', tmp+11);
+    toHex(comp, 8, '0', tmp + 11);
     tmp[19] = 0;
     end = append(end, "clk comp:  ");
     end = append(end, tmp);
@@ -140,9 +155,9 @@ static unsigned statusClock(char *body) {
     // TAI time
     uint64_t tai = CLK_TAI();
     strcpy(tmp, "0x");
-    toHex(tai>>32, 8, '0', tmp+2);
+    toHex(tai >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
-    toHex(tai, 8, '0', tmp+11);
+    toHex(tai, 8, '0', tmp + 11);
     tmp[19] = 0;
     end = append(end, "clk tai:   ");
     end = append(end, tmp);
@@ -208,27 +223,27 @@ static unsigned statusClock(char *body) {
     uint64_t pps[3];
     CLK_PPS(pps);
     strcpy(tmp, "0x");
-    toHex(pps[0]>>32, 8, '0', tmp+2);
+    toHex(pps[0] >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
-    toHex(pps[0], 8, '0', tmp+11);
+    toHex(pps[0], 8, '0', tmp + 11);
     tmp[19] = 0;
     end = append(end, "pps mono:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
     strcpy(tmp, "0x");
-    toHex(pps[1]>>32, 8, '0', tmp+2);
+    toHex(pps[1] >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
-    toHex(pps[1], 8, '0', tmp+11);
+    toHex(pps[1], 8, '0', tmp + 11);
     tmp[19] = 0;
     end = append(end, "pps comp:  ");
     end = append(end, tmp);
     end = append(end, "\n");
 
     strcpy(tmp, "0x");
-    toHex(pps[2]>>32, 8, '0', tmp+2);
+    toHex(pps[2] >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
-    toHex(pps[2], 8, '0', tmp+11);
+    toHex(pps[2], 8, '0', tmp + 11);
     tmp[19] = 0;
     end = append(end, "pps tai:   ");
     end = append(end, tmp);
@@ -398,19 +413,19 @@ static unsigned statusSystem(char *body) {
 
     // mcu device id
     strcpy(tmp, " 0x");
-    toHex(DID0.raw, 8, '0', tmp+3);
+    toHex(DID0.raw, 8, '0', tmp + 3);
     tmp[11] = 0;
     end = append(end, "device id:");
     end = append(end, tmp);
-    toHex(DID1.raw, 8, '0', tmp+3);
+    toHex(DID1.raw, 8, '0', tmp + 3);
     tmp[11] = 0;
     end = append(end, tmp);
     end = append(end, "\n");
 
     // mcu unique id
     end = append(end, "unique id:");
-    for(int i = 0; i < 4; i++) {
-        toHex(UNIQUEID.WORD[i], 8, '0', tmp+3);
+    for (int i = 0; i < 4; i++) {
+        toHex(UNIQUEID.WORD[i], 8, '0', tmp + 3);
         tmp[11] = 0;
         end = append(end, tmp);
     }
@@ -462,13 +477,13 @@ static unsigned statusEEPROM(int block, char *body) {
     char *end = body;
 
     strcpy(tmp, "block 0x");
-    toHex(block, 2, '0', tmp+8);
+    toHex(block, 2, '0', tmp + 8);
     tmp[10] = '\n';
     tmp[11] = 0;
     end = append(end, tmp);
 
     EEPROM_seek(block << 4);
-    for(int i = 0; i < 16; i++) {
+    for (int i = 0; i < 16; i++) {
         uint32_t word = EEPROM_read();
         end = append(end, "  ");
         end = toHexBytes(end, reinterpret_cast<uint8_t*>(&word), sizeof(word));
