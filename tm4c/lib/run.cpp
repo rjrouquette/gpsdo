@@ -82,11 +82,6 @@ public:
     static Task* alloc();
 
     /**
-     * Deallocate the task.
-     */
-    void free();
-
-    /**
      * Cancel the task.
      */
     void cancel() {
@@ -101,11 +96,6 @@ public:
     void wake() {
         schedule = Wake;
     }
-
-    /**
-     * Wake the task.
-     */
-    void doWake();
 
     /**
      * Determine if the task is ready to run.
@@ -132,15 +122,6 @@ public:
     [[nodiscard]]
     bool isCanceled() const {
         return callback == doNothing;
-    }
-
-    /**
-     * Determine if the task has been awoken.
-     * @return true if the task has been awoken
-     */
-    [[nodiscard]]
-    bool isAwake() const {
-        return schedule == Wake;
     }
 
     /**
@@ -181,6 +162,11 @@ public:
         // perform task
         (*callback)(reference);
     }
+
+    /**
+     * Process out-of-band updates.
+     */
+    void update();
 
     /**
      * Requeue the task.
@@ -285,23 +271,28 @@ Task* Task::alloc() {
     return new(task) Task();
 }
 
-void Task::free() {
-    pop();
-    // push onto free stack
-    callback = nullptr;
-    schedule = Free;
-    qPrev = nullptr;
-    qNext = taskFree;
-    taskFree = this;
-}
+void Task::update() {
+    // free task if it has been canceled
+    if (callback == doNothing) {
+        pop();
+        // push onto free stack
+        callback = nullptr;
+        schedule = Free;
+        qPrev = nullptr;
+        qNext = taskFree;
+        taskFree = this;
+        return;
+    }
 
-void Task::doWake() {
-    // remove from queue
-    pop();
-    // set to run immediately
-    runNext = CLK_MONO_RAW;
-    // update schedule queue
-    insert();
+    // wake task
+    if (schedule == Wake) {
+        // remove from queue
+        pop();
+        // set to run immediately
+        runNext = CLK_MONO_RAW;
+        // update schedule queue
+        insert();
+    }
 }
 
 void Task::insert() {
@@ -387,12 +378,8 @@ void runScheduler() {
         // check for out-of-band updates
         if (taskUpdate) {
             taskUpdate = false;
-            for (auto &task : taskPool) {
-                if (task.isCanceled())
-                    task.free();
-                if (task.isAwake())
-                    task.doWake();
-            }
+            for (auto &task : taskPool)
+                task.update();
         }
 
         // check for scheduled tasks
@@ -431,7 +418,7 @@ void runAdjust(void *taskHandle, const uint32_t interval) {
 
 void runWake(void *taskHandle) {
     const auto task = static_cast<Task*>(taskHandle);
-    if(task->isFree() || task->isCanceled())
+    if (task->isFree() || task->isCanceled())
         return;
     task->wake();
     taskUpdate = true;
