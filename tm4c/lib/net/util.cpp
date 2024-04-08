@@ -2,45 +2,58 @@
 // Created by robert on 5/19/22.
 //
 
-#include "../../hw/emac.h"
-#include "../format.hpp"
 #include "util.h"
+
+#include "../format.hpp"
+#include "../../hw/emac.h"
 
 
 void getMAC(void *mac) {
-    EMAC_getMac(&(EMAC0.ADDR0), (uint8_t *) mac);
+    EMAC_getMac(&EMAC0.ADDR0, static_cast<uint8_t*>(mac));
 }
 
-void broadcastMAC(void *_mac) {
-    uint8_t *mac = (uint8_t *)_mac;
-    mac[0] = 0xFF;
-    mac[1] = 0xFF;
-    mac[2] = 0xFF;
-    mac[3] = 0xFF;
-    mac[4] = 0xFF;
-    mac[5] = 0xFF;
+void broadcastMAC(void *mac) {
+    const auto _mac = static_cast<uint8_t*>(mac);
+    _mac[0] = 0xFF;
+    _mac[1] = 0xFF;
+    _mac[2] = 0xFF;
+    _mac[3] = 0xFF;
+    _mac[4] = 0xFF;
+    _mac[5] = 0xFF;
 }
 
 int cmpMac(const void *macA, const void *macB) {
-    const int8_t *a = (int8_t *) macA;
-    const int8_t *b = (int8_t *) macB;
-    if(a[0] != b[0]) return a[0] - b[0];
-    if(a[1] != b[1]) return a[1] - b[1];
-    if(a[2] != b[2]) return a[2] - b[2];
-    if(a[3] != b[3]) return a[3] - b[3];
-    if(a[4] != b[4]) return a[4] - b[4];
-    if(a[5] != b[5]) return a[5] - b[5];
+    const auto a = static_cast<const int8_t*>(macA);
+    const auto b = static_cast<const int8_t*>(macB);
+    if (a[0] != b[0])
+        return a[0] - b[0];
+    if (a[1] != b[1])
+        return a[1] - b[1];
+    if (a[2] != b[2])
+        return a[2] - b[2];
+    if (a[3] != b[3])
+        return a[3] - b[3];
+    if (a[4] != b[4])
+        return a[4] - b[4];
+    if (a[5] != b[5])
+        return a[5] - b[5];
     return 0;
 }
 
-int isNullMAC(const void *_mac) {
-    const uint8_t *mac = (uint8_t *)_mac;
-    if(mac[0] != 0) return 0;
-    if(mac[1] != 0) return 0;
-    if(mac[2] != 0) return 0;
-    if(mac[3] != 0) return 0;
-    if(mac[4] != 0) return 0;
-    if(mac[5] != 0) return 0;
+int isNullMAC(const void *mac) {
+    const auto _mac = static_cast<const uint8_t*>(mac);
+    if (_mac[0] != 0)
+        return 0;
+    if (_mac[1] != 0)
+        return 0;
+    if (_mac[2] != 0)
+        return 0;
+    if (_mac[3] != 0)
+        return 0;
+    if (_mac[4] != 0)
+        return 0;
+    if (_mac[5] != 0)
+        return 0;
     return 1;
 }
 
@@ -50,35 +63,35 @@ int isMyMAC(const void *mac) {
     return cmpMac(mac, myMac);
 }
 
-void copyMAC(void *_dst, const void *_src) {
-    uint8_t *dst = (uint8_t *)_dst;
-    const uint8_t *src = (uint8_t *)_src;
-    dst[0] = src[0];
-    dst[1] = src[1];
-    dst[2] = src[2];
-    dst[3] = src[3];
-    dst[4] = src[4];
-    dst[5] = src[5];
+void copyMAC(void *dst, const void *src) {
+    const auto _dst = static_cast<uint8_t*>(dst);
+    const auto _src = static_cast<const uint8_t*>(src);
+    _dst[0] = _src[0];
+    _dst[1] = _src[1];
+    _dst[2] = _src[2];
+    _dst[3] = _src[3];
+    _dst[4] = _src[4];
+    _dst[5] = _src[5];
 }
 
-char* addrToStr(uint32_t addr, char *str) {
+char* addrToStr(const uint32_t addr, char *str) {
     str += toBase((addr >> 0u) & 0xFFu, 10, str);
-    *(str++) = '.';
+    *str++ = '.';
     str += toBase((addr >> 8u) & 0xFFu, 10, str);
-    *(str++) = '.';
+    *str++ = '.';
     str += toBase((addr >> 16u) & 0xFFu, 10, str);
-    *(str++) = '.';
+    *str++ = '.';
     str += toBase((addr >> 24u) & 0xFFu, 10, str);
     *str = 0;
     return str;
 }
 
-char* macToStr(const void *_mac, char *str) {
-    const uint8_t *mac = (uint8_t *) _mac;
-    for(int i = 0; i < 6; i++) {
-        str += toHex(mac[i], 2, '0', (char *) str);
-        *(str++) = ':';
+char* macToStr(const void *mac, char *str) {
+    const auto _mac = static_cast<const uint8_t*>(mac);
+    for (int i = 0; i < 6; i++) {
+        str += toHex(_mac[i], 2, '0', str);
+        *str++ = ':';
     }
-    str[-1] = 0;
-    return (char *) (str - 1);
+    *--str = 0;
+    return str;
 }
