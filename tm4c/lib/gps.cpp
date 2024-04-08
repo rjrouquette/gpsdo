@@ -8,9 +8,9 @@
 #include "run.h"
 #include "../hw/interrupts.h"
 #include "../hw/uart.h"
-#include "clk/clk.h"
+#include "clk/clk.hpp"
 #include "clk/mono.h"
-#include "clk/util.h"
+#include "clk/util.hpp"
 
 #include <memory>
 

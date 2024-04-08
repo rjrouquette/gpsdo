@@ -3,7 +3,7 @@
 //
 
 #include "util.hpp"
-#include "../clk/util.h"
+#include "../clk/util.hpp"
 #include "../net/util.h"
 
 #include <memory.h>

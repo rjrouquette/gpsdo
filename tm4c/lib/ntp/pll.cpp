@@ -6,8 +6,8 @@
 
 #include "tcmp.hpp"
 #include "../format.hpp"
-#include "../clk/comp.h"
-#include "../clk/tai.h"
+#include "../clk/comp.hpp"
+#include "../clk/tai.hpp"
 
 #include <cmath>
 

@@ -15,7 +15,7 @@
 #include "lib/net.h"
 #include "lib/rand.h"
 #include "lib/run.h"
-#include "lib/clk/clk.h"
+#include "lib/clk/clk.hpp"
 #include "lib/ntp/ntp.hpp"
 #include "lib/ptp/ptp.hpp"
 #include "lib/snmp/snmp.hpp"

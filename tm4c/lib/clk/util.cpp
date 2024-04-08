@@ -2,8 +2,9 @@
 // Created by robert on 4/26/23.
 //
 
+#include "util.hpp"
+
 #include "mono.h"
-#include "util.h"
 
 
 uint32_t nanosToFrac(uint32_t nanos) {
@@ -13,13 +14,13 @@ uint32_t nanosToFrac(uint32_t nanos) {
     uint64_t correction = nanos;
     correction *= 0x12E0BE82;
     // assemble final result (round-to-nearest to minimize average error)
-    nanos += ((uint32_t) correction) >> 31;
+    nanos += static_cast<uint32_t>(correction) >> 31;
     nanos += correction >> 32;
     return nanos;
 }
 
 uint64_t fromClkMono(const uint32_t timer, const uint32_t offset, uint32_t integer) {
-    int32_t ticks = (int32_t) (timer - offset);
+    auto ticks = static_cast<int32_t>(timer - offset);
     // adjust for underflow
     while (ticks < 0) {
         ticks += CLK_FREQ;
@@ -32,43 +33,44 @@ uint64_t fromClkMono(const uint32_t timer, const uint32_t offset, uint32_t integ
     }
 
     // assemble result
-    union fixed_32_32 scratch;
+    fixed_32_32 scratch = {};
     scratch.fpart = nanosToFrac(ticks * CLK_NANO);
     scratch.ipart = integer;
     return scratch.full;
 }
 
 int64_t corrValue(const int32_t rate, int64_t delta) {
-    const int neg = delta < 0;
+    const bool neg = delta < 0;
     if (neg)
         delta = -delta;
 
     // compute integral correction
-    uint64_t scratch = (uint32_t) (delta >> 32);
+    uint64_t scratch = static_cast<uint32_t>(delta >> 32);
     scratch *= rate;
 
     // compute fractional correction
-    uint64_t frac = (uint32_t) delta;
+    uint64_t frac = static_cast<uint32_t>(delta);
     frac *= rate;
 
-    scratch += (int32_t) (frac >> 32);
-    return (int64_t) (neg ? -scratch : scratch);
+    scratch += static_cast<int32_t>(frac >> 32);
+    return static_cast<int64_t>(neg ? -scratch : scratch);
 }
 
-int32_t corrFracRem(const int32_t rate, const int32_t delta, volatile uint32_t *rem) {
+int32_t corrFracRem(const int32_t rate, const int32_t delta, volatile uint32_t &rem) {
     // compute rate-based delta adjustment
     int64_t scratch = delta;
     scratch *= rate;
     // add prior remainder
-    scratch += *rem;
+    scratch += rem;
     // update remainder
-    *rem = (uint32_t) scratch;
+    rem = static_cast<uint32_t>(scratch);
     // return rate-based delta adjustment
-    return (int32_t) (scratch >> 32);
+    return static_cast<int32_t>(scratch >> 32);
 }
 
 float toFloatU(const uint64_t value) {
-    return ((float) (uint32_t) (value >> 32)) + (0x1p-32f * (float) (uint32_t) value);
+    return static_cast<float>(static_cast<uint32_t>(value >> 32)) +
+           0x1p-32f * static_cast<float>(static_cast<uint32_t>(value));
 }
 
 float toFloat(const int64_t value) {

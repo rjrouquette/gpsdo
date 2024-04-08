@@ -2,16 +2,9 @@
 // Created by robert on 4/26/23.
 //
 
-#ifndef GPSDO_CLK_UTIL_H
-#define GPSDO_CLK_UTIL_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#else
-#define static_assert _Static_assert
-#endif
-
-#include <stdint.h>
+#include <cstdint>
 
 /**
  * fixed-point 32.32 timestamp structure
@@ -52,13 +45,44 @@ int64_t corrValue(int32_t rate, int64_t delta);
 /**
  * Compute offset correction for frequency trimming
  * @param rate frequency trim rate (signed 0.31)
+ * @param delta elapsed time since prior offset adjustment (signed 0.31)
+ * @param rem offset remainder from prior adjustment (unsigned 0.32)
+ * @return offset adjustment (signed 0.31)
+ */
+int32_t corrFracRem(int32_t rate, int32_t delta, volatile uint32_t &rem);
+
+/**
+ * Compute offset correction for frequency trimming
+ * @param rate frequency trim rate (signed 0.31)
  * @param delta elapsed time since prior offset adjustment (unsigned 0.32)
  * @param rem offset remainder from prior adjustment (unsigned 0.32)
  * @return offset adjustment (signed 0.31)
  */
-int32_t corrFracRem(int32_t rate, int32_t delta, volatile uint32_t *rem);
+inline int32_t corrFracRem(const int32_t rate, const uint32_t delta, volatile uint32_t &rem) {
+    return corrFracRem(rate, static_cast<int32_t>(delta), rem);
+}
 
-#define corrFracRem64(rate, delta, rem) corrFracRem((rate), (int32_t) (uint32_t) (delta), (rem))
+/**
+ * Compute offset correction for frequency trimming
+ * @param rate frequency trim rate (signed 0.31)
+ * @param delta elapsed time since prior offset adjustment (signed 31.32)
+ * @param rem offset remainder from prior adjustment (unsigned 0.32)
+ * @return offset adjustment (signed 0.31)
+ */
+inline int32_t corrFracRem(const int32_t rate, const int64_t delta, volatile uint32_t &rem) {
+    return corrFracRem(rate, static_cast<int32_t>(delta), rem);
+}
+
+/**
+ * Compute offset correction for frequency trimming
+ * @param rate frequency trim rate (signed 0.31)
+ * @param delta elapsed time since prior offset adjustment (unsigned 32.32)
+ * @param rem offset remainder from prior adjustment (unsigned 0.32)
+ * @return offset adjustment (signed 0.31)
+ */
+inline int32_t corrFracRem(const int32_t rate, const uint64_t delta, volatile uint32_t &rem) {
+    return corrFracRem(rate, static_cast<uint32_t>(delta), rem);
+}
 
 /**
  * Convert 64-bit fixed-point timestamp (32.32) to float
@@ -73,9 +97,3 @@ float toFloatU(uint64_t value);
  * @return single-precision floating point value
  */
 float toFloat(int64_t value);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_CLK_UTIL_H

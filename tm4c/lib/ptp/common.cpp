@@ -3,7 +3,7 @@
 //
 
 #include "common.hpp"
-#include "../clk/util.h"
+#include "../clk/util.hpp"
 #include "../net/util.h"
 
 // lut for PTP clock accuracy codes

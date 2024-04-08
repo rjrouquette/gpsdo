@@ -2,10 +2,10 @@
 // Created by robert on 4/27/23.
 //
 
-#include "clk.h"
+#include "clk.hpp"
 
 #include "mono.h"
-#include "util.h"
+#include "util.hpp"
 #include "../hw/interrupts.h"
 #include "../hw/sys.h"
 
@@ -69,7 +69,7 @@ void CLK_init() {
 
 
 // internal state for CLK_PPS (reduces overhead)
-static volatile struct ClockEvent ppsEvent;
+static volatile ClockEvent ppsEvent;
 static volatile uint64_t ppsStamp[3];
 
 void CLK_PPS(uint64_t *tsResult) {
@@ -84,7 +84,7 @@ void CLK_PPS(uint64_t *tsResult) {
     }
 
     __disable_irq();
-    ppsEvent = clkMonoPpsEvent;
+    const_cast<ClockEvent&>(ppsEvent) = const_cast<ClockEvent&>(clkMonoPpsEvent);
     __enable_irq();
 
     // convert snapshot to timestamps
@@ -93,11 +93,11 @@ void CLK_PPS(uint64_t *tsResult) {
     ppsStamp[0] = fromClkMono(ppsEvent.timer, ppsEvent.offset, ppsEvent.integer);
     // frequency compensated clock
     ppsStamp[1] = ppsStamp[0] +
-                  corrFracRem64(ppsEvent.compRate, ppsStamp[0] - ppsEvent.compRef, &rem) +
+                  corrFracRem(ppsEvent.compRate, ppsStamp[0] - ppsEvent.compRef, rem) +
                   ppsEvent.compOff;
     // TAI disciplined clock
     ppsStamp[2] = ppsStamp[1] +
-                  corrFracRem64(ppsEvent.taiRate, ppsStamp[1] - ppsEvent.taiRef, &rem) +
+                  corrFracRem(ppsEvent.taiRate, ppsStamp[1] - ppsEvent.taiRef, rem) +
                   ppsEvent.taiOff;
 
     // return result

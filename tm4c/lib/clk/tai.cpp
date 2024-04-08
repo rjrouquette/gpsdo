@@ -2,17 +2,17 @@
 // Created by robert on 4/27/23.
 //
 
-#include <stddef.h>
-#include "../../hw/gpio.h"
-#include "../../hw/interrupts.h"
-#include "../../hw/timer.h"
+#include "tai.hpp"
+
+#include "comp.hpp"
+#include "mono.h"
+#include "util.hpp"
 #include "../delay.h"
 #include "../gps.h"
 #include "../run.h"
-#include "mono.h"
-#include "tai.h"
-#include "comp.h"
-#include "util.h"
+#include "../../hw/gpio.h"
+#include "../../hw/interrupts.h"
+#include "../../hw/timer.h"
 
 #define PPS_TIMER GPTM2
 #define PPS_PORT PORTA
@@ -34,7 +34,7 @@ void ISR_Timer2A() {
     // clear timeout interrupt flag
     PPS_TIMER.ICR = GPTM_ICR_TATO;
     // schedule next output transition
-    int isHi = (PPS_TIMER.TAMR.TCACT == 0x3);
+    const int isHi = (PPS_TIMER.TAMR.TCACT == 0x3);
     PPS_TIMER.TAMR.TCACT = isHi ? 0x2 : 0x3;
     PPS_TIMER.TAILR = isHi ? (PPS_INTV_HI - 1) : clkPpsLow;
 }
@@ -42,7 +42,7 @@ void ISR_Timer2A() {
 static void runClkTai(void *ref) {
     // prepare update values
     const uint64_t now = CLK_COMP();
-    const int32_t offset = corrFracRem64(clkTaiRate, now - clkTaiRef, &clkTaiRem);
+    const int32_t offset = corrFracRem(clkTaiRate, now - clkTaiRef, clkTaiRem);
 
     // apply update
     __disable_irq();
@@ -53,33 +53,35 @@ static void runClkTai(void *ref) {
 
 static void runPpsTai(void *ref) {
     // update PPS output alignment
-    union fixed_32_32 scratch;
+    fixed_32_32 scratch = {};
     // use imprecise TAI calculation to reduce overhead
     scratch.full = CLK_MONO();
     scratch.full += clkCompOffset;
     scratch.full += clkTaiOffset;
     // wait for end-of-second
-    if(scratch.fpart >= 0xE0000000u) {
+    if (scratch.fpart >= 0xE0000000u) {
         // compute next TAI second boundary
         scratch.fpart = 0;
         ++scratch.ipart;
         uint32_t rem = 0;
         // translate to compensated domain
         scratch.full -= clkTaiOffset;
-        scratch.full += corrFracRem64(-clkTaiRate, scratch.full - clkTaiRef, &rem);
+        scratch.full += corrFracRem(-clkTaiRate, scratch.full - clkTaiRef, rem);
         // translate to monotonic domain
         scratch.full -= clkCompOffset;
-        scratch.full += corrFracRem64(-clkCompRate, scratch.full - clkCompRef, &rem);
+        scratch.full += corrFracRem(-clkCompRate, scratch.full - clkCompRef, rem);
         // translate to raw timer ticks
         scratch.full *= CLK_FREQ;
         // compute PPS output interval
-        int32_t delta = (int32_t) (scratch.ipart - clkMonoPps);
-        while(delta <= CLK_FREQ / 2) delta += CLK_FREQ;
-        while(delta >= CLK_FREQ * 2) delta -= CLK_FREQ;
+        auto delta = static_cast<int32_t>(scratch.ipart - clkMonoPps);
+        while (delta <= CLK_FREQ / 2)
+            delta += CLK_FREQ;
+        while (delta >= CLK_FREQ * 2)
+            delta -= CLK_FREQ;
         clkPpsLow = delta - PPS_INTV_HI - 1;
         // update PPS output interval
         __disable_irq();
-        if(PPS_TIMER.TAMR.TCACT == 0x3)
+        if (PPS_TIMER.TAMR.TCACT == 0x3)
             PPS_TIMER.TAILR = clkPpsLow;
         __enable_irq();
     }
@@ -119,10 +121,10 @@ void initClkTai() {
     PPS_PORT.LOCK = 0;
 
     // initialize UTC offset
-    clkTaiUtcOffset = ((uint64_t) GPS_taiOffset()) << 32;
+    clkTaiUtcOffset = static_cast<uint64_t>(GPS_taiOffset()) << 32;
     // schedule updates
-    runSleep(RUN_SEC >> 2, runClkTai, NULL);
-    runSleep(RUN_SEC >> 6, runPpsTai, NULL);
+    runSleep(RUN_SEC >> 2, runClkTai, nullptr);
+    runSleep(RUN_SEC >> 6, runPpsTai, nullptr);
 }
 
 uint64_t CLK_TAI() {
@@ -130,20 +132,20 @@ uint64_t CLK_TAI() {
     // get monotonic time
     uint64_t ts = CLK_MONO();
     // translate to compensated domain
-    ts += corrFracRem64(clkCompRate, ts - clkCompRef, &rem);
+    ts += corrFracRem(clkCompRate, ts - clkCompRef, rem);
     ts += clkCompOffset;
     // translate to TAI domain
-    ts += corrFracRem64(clkTaiRate, ts - clkTaiRef, &rem);
+    ts += corrFracRem(clkTaiRate, ts - clkTaiRef, rem);
     ts += clkTaiOffset;
     return ts;
 }
 
 uint64_t CLK_TAI_fromMono(uint64_t ts) {
     // translate to compensated domain
-    ts += corrValue(clkCompRate, (int64_t) (ts - clkCompRef));
+    ts += corrValue(clkCompRate, static_cast<int64_t>(ts - clkCompRef));
     ts += clkCompOffset;
     // translate to TAI domain
-    ts += corrValue(clkTaiRate, (int64_t) (ts - clkTaiRef));
+    ts += corrValue(clkTaiRate, static_cast<int64_t>(ts - clkTaiRef));
     ts += clkTaiOffset;
     return ts;
 }
@@ -151,7 +153,7 @@ uint64_t CLK_TAI_fromMono(uint64_t ts) {
 void CLK_TAI_setTrim(int32_t comp) {
     // prepare update values
     const uint64_t now = CLK_COMP();
-    const int32_t offset = corrFracRem64(clkTaiRate, now - clkTaiRef, &clkTaiRem);
+    const int32_t offset = corrFracRem(clkTaiRate, now - clkTaiRef, clkTaiRem);
 
     // apply update
     __disable_irq();

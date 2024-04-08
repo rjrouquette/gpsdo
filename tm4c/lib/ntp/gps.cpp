@@ -8,10 +8,10 @@
 #include "common.hpp"
 #include "ntp.hpp"
 #include "../run.h"
-#include "../clk/clk.h"
+#include "../clk/clk.hpp"
 #include "../clk/mono.h"
-#include "../clk/tai.h"
-#include "../clk/util.h"
+#include "../clk/tai.hpp"
+#include "../clk/util.hpp"
 
 
 ntp::GPS::GPS() :

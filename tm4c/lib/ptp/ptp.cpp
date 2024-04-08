@@ -8,7 +8,7 @@
 #include "../led.h"
 #include "../net.h"
 #include "../run.h"
-#include "../clk/tai.h"
+#include "../clk/tai.hpp"
 #include "../net/util.h"
 #include "../ntp/ntp.hpp"
 #include "../ntp/pll.hpp"

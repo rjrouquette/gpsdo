@@ -2,16 +2,9 @@
 // Created by robert on 4/26/23.
 //
 
-#ifndef GPSDO_CLK_COMP_H
-#define GPSDO_CLK_COMP_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#else
-#define static_assert _Static_assert
-#endif
-
-#include <stdint.h>
+#include <cstdint>
 
 extern volatile uint64_t clkCompOffset;
 extern volatile uint64_t clkCompRef;
@@ -41,10 +34,3 @@ void CLK_COMP_setComp(int32_t comp);
  * @return current compensation rate (0.31 fixed-point)
  */
 int32_t CLK_COMP_getComp();
-
-#ifdef __cplusplus
-}
-#endif
-
-
-#endif //GPSDO_CLK_COMP_H

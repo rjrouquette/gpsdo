@@ -2,16 +2,17 @@
 // Created by robert on 4/26/23.
 //
 
+#include "mono.h"
+
+#include "comp.hpp"
+#include "tai.hpp"
+#include "util.hpp"
 #include "../delay.h"
 #include "../hw/emac.h"
 #include "../hw/gpio.h"
 #include "../hw/interrupts.h"
 #include "../hw/sys.h"
 #include "../hw/timer.h"
-#include "mono.h"
-#include "tai.h"
-#include "comp.h"
-#include "util.h"
 
 volatile uint32_t clkMonoInt = 0;
 volatile uint32_t clkMonoOff = 0;
@@ -19,7 +20,7 @@ volatile uint32_t clkMonoEth = 0;
 volatile uint32_t clkMonoPps = 0;
 
 // pps edge capture state
-volatile struct ClockEvent clkMonoPpsEvent;
+volatile ClockEvent clkMonoPpsEvent;
 
 
 void initClkMono() {
@@ -60,8 +61,8 @@ void initClkEth() {
     // enable MAC and PHY clocks
     RCGCEMAC.EN0 = 1;
     RCGCEPHY.EN0 = 1;
-    while(!PREMAC.RDY0);
-    while(!PREPHY.RDY0);
+    while (!PREMAC.RDY0) {}
+    while (!PREPHY.RDY0) {}
 
     // disable timer interrupts
     EMAC0.IM.TS = 1;

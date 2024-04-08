@@ -71,16 +71,16 @@ add_executable(
         lib/chrony/candm.h
 
         # timekeeping
-        lib/clk/clk.c
-        lib/clk/clk.h
-        lib/clk/comp.c
-        lib/clk/comp.h
-        lib/clk/mono.c
+        lib/clk/clk.cpp
+        lib/clk/clk.hpp
+        lib/clk/comp.cpp
+        lib/clk/comp.hpp
+        lib/clk/mono.cpp
         lib/clk/mono.h
-        lib/clk/tai.c
-        lib/clk/tai.h
-        lib/clk/util.c
-        lib/clk/util.h
+        lib/clk/tai.cpp
+        lib/clk/tai.hpp
+        lib/clk/util.cpp
+        lib/clk/util.hpp
 
         lib/delay.cpp
         lib/delay.h
