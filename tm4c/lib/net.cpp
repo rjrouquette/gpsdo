@@ -23,6 +23,8 @@
 #include "net/ip.h"
 #include "net/util.h"
 
+#include <memory.h>
+
 static constexpr int RX_RING_SIZE = 64;
 static constexpr int RX_RING_MASK = RX_RING_SIZE - 1;
 static constexpr int RX_BUFF_SIZE = 256;

@@ -16,6 +16,8 @@
 #include "../net/ip.h"
 #include "../net/util.h"
 
+#include <memory.h>
+
 #define IDLE_INTV (RUN_SEC >> 1)
 #define ACTV_INTV (RUN_SEC >> 4)
 

@@ -11,7 +11,6 @@ extern "C" {
 #define static_assert _Static_assert
 #endif
 
-#include <memory.h>
 #include <stdint.h>
 
 /**

@@ -20,6 +20,7 @@
 #include "../net/dns.h"
 #include "../net/util.h"
 
+#include <memory.h>
 #include <memory>
 
 #define MAX_NTP_PEERS (8)

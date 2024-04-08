@@ -6,10 +6,12 @@
 #include "../clk/util.h"
 #include "../net/util.h"
 
+#include <memory.h>
+
 
 // convert 64-bit fixed point timestamp to chrony TimeSpec
 void chrony::toTimespec(const uint64_t timestamp, volatile Timespec *ts) {
-    fixed_32_32 scratch;
+    fixed_32_32 scratch = {};
     scratch.full = timestamp;
     // rough reduction from fraction to nanoseconds
     const uint32_t temp = scratch.fpart;

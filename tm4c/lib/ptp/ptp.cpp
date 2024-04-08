@@ -13,6 +13,8 @@
 #include "../ntp/ntp.hpp"
 #include "../ntp/pll.hpp"
 
+#include <memory.h>
+
 
 #define PTP2_ANNC_LOG_INTV (0) // 1 s
 #define PTP2_SYNC_LOG_INTV (-4) // 16 Hz
