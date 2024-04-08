@@ -2,12 +2,7 @@
 // Created by robert on 4/30/23.
 //
 
-#ifndef GPSDO_TCMP_H
-#define GPSDO_TCMP_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#pragma once
 
 /**
  * Initialize the temperature compensation module
@@ -39,9 +34,3 @@ void TCMP_update(float target, float weight);
  * @return number of bytes written to buffer
  */
 unsigned TCMP_status(char *buffer);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_TCMP_H

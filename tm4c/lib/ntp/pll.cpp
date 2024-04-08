@@ -2,9 +2,9 @@
 // Created by robert on 4/29/23.
 //
 
-#include "pll.h"
+#include "pll.hpp"
 
-#include "tcmp.h"
+#include "tcmp.hpp"
 #include "../format.h"
 #include "../clk/comp.h"
 #include "../clk/tai.h"

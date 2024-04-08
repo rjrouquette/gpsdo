@@ -11,7 +11,7 @@
 #include "../clk/tai.h"
 #include "../net/util.h"
 #include "../ntp/ntp.hpp"
-#include "../ntp/pll.h"
+#include "../ntp/pll.hpp"
 
 
 #define PTP2_ANNC_LOG_INTV (0) // 1 s

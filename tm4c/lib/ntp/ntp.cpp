@@ -7,7 +7,7 @@
 #include "common.hpp"
 #include "gps.hpp"
 #include "peer.hpp"
-#include "pll.h"
+#include "pll.hpp"
 
 #include "../led.h"
 #include "../net.h"

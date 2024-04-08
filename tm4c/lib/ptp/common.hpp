@@ -2,8 +2,7 @@
 // Created by robert on 5/20/23.
 //
 
-#ifndef GPSDO_LIB_PTP_COMMON_H
-#define GPSDO_LIB_PTP_COMMON_H
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -174,6 +173,3 @@ uint64_t fromPtpTimestamp(const PTP2_TIMESTAMP *tsPtp);
  * @return PTP accuracy code
  */
 uint32_t toPtpClkAccuracy(float rmsError);
-
-
-#endif //GPSDO_LIB_PTP_COMMON_H

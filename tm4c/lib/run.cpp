@@ -11,12 +11,6 @@
 #include <memory>
 
 
-inline uint32_t toMonoRaw(const uint32_t fixed_8_24) {
-    uint64_t scratch = fixed_8_24;
-    scratch *= CLK_FREQ;
-    return scratch >> 24;
-}
-
 class Task {
     /**
      * Scheduling type
@@ -70,7 +64,22 @@ class Task {
      */
     uint32_t runInterval;
 
-    static void doNothing(void *ref) {}
+    /**
+     * Task callback which does nothing. Used for task cancellation.
+     * @param ref task reference pointer
+     */
+    static void doNothing([[maybe_unused]] void *ref) {}
+
+    /**
+     * Convert 8.24 fixed-point seconds into raw timer ticks.
+     * @param fixed_8_24 fixed-point value to convert
+     * @return number of timer ticks equivalent to the fixed-point value
+     */
+    static uint32_t toMonoRaw(const uint32_t fixed_8_24) {
+        uint64_t scratch = fixed_8_24;
+        scratch *= CLK_FREQ;
+        return scratch >> 24;
+    }
 
 public:
     Task();

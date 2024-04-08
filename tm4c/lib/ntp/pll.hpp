@@ -2,16 +2,9 @@
 // Created by robert on 4/29/23.
 //
 
-#ifndef GPSDO_PLL_H
-#define GPSDO_PLL_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#else
-#define static_assert _Static_assert
-#endif
-
-#include <stdint.h>
+#include <cstdint>
 
 #define PLL_STATS_ALPHA (0x1p-4f)
 
@@ -63,9 +56,3 @@ float PLL_driftRms();
 float PLL_driftStdDev();
 float PLL_driftCorr();
 float PLL_driftFreq();
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_PLL_H

@@ -43,8 +43,8 @@ add_executable(
         gpsdo
 
         main.cpp
-        lib/snmp/snmp.c
-        lib/snmp/snmp.h
+        lib/snmp/snmp.cpp
+        lib/snmp/snmp.hpp
         status.cpp
         status.hpp
 
@@ -119,11 +119,11 @@ add_executable(
         lib/ntp/peer.cpp
         lib/ntp/peer.hpp
         lib/ntp/pll.cpp
-        lib/ntp/pll.h
+        lib/ntp/pll.hpp
         lib/ntp/source.cpp
         lib/ntp/source.hpp
         lib/ntp/tcmp.cpp
-        lib/ntp/tcmp.h
+        lib/ntp/tcmp.hpp
         lib/chrony/util.cpp
         lib/chrony/util.hpp
 
@@ -138,10 +138,10 @@ add_executable(
         lib/run.cpp
         lib/run.h
 
-        lib/snmp/sensors.c
-        lib/snmp/sensors.h
-        lib/snmp/util.c
-        lib/snmp/util.h
+        lib/snmp/sensors.cpp
+        lib/snmp/sensors.hpp
+        lib/snmp/util.cpp
+        lib/snmp/util.hpp
 )
 
 target_link_libraries(

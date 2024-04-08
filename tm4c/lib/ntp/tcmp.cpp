@@ -2,7 +2,7 @@
 // Created by robert on 4/30/23.
 //
 
-#include "tcmp.h"
+#include "tcmp.hpp"
 
 #include "../delay.h"
 #include "../format.h"

@@ -23,7 +23,7 @@
 #include "lib/net/ip.h"
 #include "lib/net/udp.h"
 #include "lib/net/util.h"
-#include "lib/ntp/pll.h"
+#include "lib/ntp/pll.hpp"
 
 #include <cstring>
 

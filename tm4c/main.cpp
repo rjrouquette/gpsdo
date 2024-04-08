@@ -18,7 +18,7 @@
 #include "lib/clk/clk.h"
 #include "lib/ntp/ntp.hpp"
 #include "lib/ptp/ptp.hpp"
-#include "lib/snmp/snmp.h"
+#include "lib/snmp/snmp.hpp"
 
 #define EEPROM_FORMAT (0x00000006)
 
@@ -48,7 +48,7 @@ int main() {
     NET_init();
     ntp::init();
     PTP_init();
-    SNMP_init();
+    snmp::init();
     status::init();
 
     // run task scheduler
