@@ -2,16 +2,9 @@
 // Created by robert on 5/19/22.
 //
 
-#ifndef GPSDO_UTIL_H
-#define GPSDO_UTIL_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#else
-#define static_assert _Static_assert
-#endif
-
-#include <stdint.h>
+#include <cstdint>
 
 /**
  * Get the primary MAC address of the NIC
@@ -64,7 +57,7 @@ char* addrToStr(uint32_t addr, char *str);
 
 /**
  * Get string representation of MAC address
- * @param addr
+ * @param mac
  * @param str
  * @return pointer to end of MAC string
  */
@@ -87,9 +80,3 @@ __attribute__((always_inline))
 inline uint64_t htonll(uint64_t value) {
     return __builtin_bswap64(value);
 }
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_UTIL_H

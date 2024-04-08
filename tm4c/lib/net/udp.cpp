@@ -12,14 +12,14 @@ static volatile uint16_t registryPort[MAX_ENTRIES];
 static volatile CallbackUDP registryCallback[MAX_ENTRIES];
 
 
-void UDP_process(uint8_t *frame, int flen) {
+void UDP_process(uint8_t *frame, const int flen) {
     // map headers
-    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
-    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    const auto headerEth = reinterpret_cast<struct HEADER_ETH*>(frame);
+    const auto headerIPv4 = reinterpret_cast<struct HEADER_IP4*>(headerEth + 1);
+    const auto headerUDP = reinterpret_cast<struct HEADER_UDP*>(headerIPv4 + 1);
 
     // load port number
-    uint16_t port = htons(headerUDP->portDst);
+    const uint16_t port = htons(headerUDP->portDst);
     // discard if port is invalid
     if(port == 0) return;
 
@@ -33,8 +33,8 @@ void UDP_process(uint8_t *frame, int flen) {
 }
 
 void UDP_finalize(uint8_t *frame, int flen) {
-    HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (frame + sizeof(struct HEADER_ETH));
-    HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    const auto headerIPv4 = reinterpret_cast<struct HEADER_IP4*>(frame + sizeof(struct HEADER_ETH));
+    const auto headerUDP = reinterpret_cast<struct HEADER_UDP*>(headerIPv4 + 1);
 
     // compute UDP length
     flen -= sizeof(struct HEADER_ETH);
@@ -44,7 +44,7 @@ void UDP_finalize(uint8_t *frame, int flen) {
     // clear checksum field
     headerUDP->chksum = 0;
     // partial checksum of header and data
-    uint16_t partial = RFC1071_checksum(headerUDP, flen);
+    const uint16_t partial = RFC1071_checksum(headerUDP, flen);
 
     // append pseudo header to checksum
     const struct [[gnu::packed]] {
@@ -73,11 +73,11 @@ void UDP_finalize(uint8_t *frame, int flen) {
     headerUDP->chksum = RFC1071_checksum(&chkbuf, sizeof(chkbuf));
 }
 
-void UDP_returnToSender(uint8_t *frame, uint32_t ipAddr, uint16_t port) {
+void UDP_returnToSender(uint8_t *frame, const uint32_t ipAddr, const uint16_t port) {
     // map headers
-    struct HEADER_ETH *headerEth = (struct HEADER_ETH *) frame;
-    struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (headerEth + 1);
-    struct HEADER_UDP *headerUDP = (struct HEADER_UDP *) (headerIPv4 + 1);
+    const auto headerEth = reinterpret_cast<struct HEADER_ETH*>(frame);
+    const auto headerIPv4 = reinterpret_cast<struct HEADER_IP4*>(headerEth + 1);
+    const auto headerUDP = reinterpret_cast<struct HEADER_UDP*>(headerIPv4 + 1);
 
     // modify ethernet frame header
     copyMAC(headerEth->macDst, headerEth->macSrc);
@@ -89,7 +89,7 @@ void UDP_returnToSender(uint8_t *frame, uint32_t ipAddr, uint16_t port) {
     headerUDP->portSrc = htons(port);
 }
 
-int UDP_register(uint16_t port, CallbackUDP callback) {
+int UDP_register(const uint16_t port, const CallbackUDP callback) {
     for(int i = 0; i < MAX_ENTRIES; i++) {
         if(registryPort[i] == port)
             return (registryCallback[i] == callback) ? 0 : -1;
@@ -104,11 +104,11 @@ int UDP_register(uint16_t port, CallbackUDP callback) {
     return -2;
 }
 
-int UDP_deregister(uint16_t port) {
+int UDP_deregister(const uint16_t port) {
     for(int i = 0; i < MAX_ENTRIES; i++) {
         if(registryPort[i] == port) {
             registryPort[i] = 0;
-            registryCallback[i] = 0;
+            registryCallback[i] = nullptr;
             return 0;
         }
     }

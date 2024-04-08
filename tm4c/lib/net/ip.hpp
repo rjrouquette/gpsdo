@@ -2,35 +2,26 @@
 // Created by robert on 5/16/22.
 //
 
-#ifndef GPSDO_IP_H
-#define GPSDO_IP_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#else
-#define static_assert _Static_assert
-#endif
-
-#include <stdint.h>
-
-#ifndef PACKED
-#define PACKED __attribute__((packed))
-#endif
+#include <cstdint>
 
 #define IP_PROTO_ICMP   (1)
 #define IP_PROTO_TCP    (6)
 #define IP_PROTO_UDP    (17)
 
-typedef struct PACKED HEADER_IP4 {
-    union PACKED {
-        struct PACKED {
-            unsigned IHL: 4;
-            unsigned VER: 4;
-            unsigned ECN: 2;
-            unsigned DSCP: 6;
+struct [[gnu::packed]] HEADER_IP4 {
+    union [[gnu::packed]] {
+        struct [[gnu::packed]] {
+            unsigned IHL  : 4;
+            unsigned VER  : 4;
+            unsigned ECN  : 2;
+            unsigned DSCP : 6;
         };
+
         uint16_t bits;
     } head;
+
     uint16_t len;
     uint16_t id;
     uint8_t flags;
@@ -40,8 +31,9 @@ typedef struct PACKED HEADER_IP4 {
     uint16_t chksum;
     uint32_t src;
     uint32_t dst;
-} HEADER_IP4;
-static_assert(sizeof(struct HEADER_IP4) == 20, "HEADER_IP4 must be 20 bytes");
+};
+
+static_assert(sizeof(HEADER_IP4) == 20, "HEADER_IP4 must be 20 bytes");
 
 extern volatile uint32_t ipBroadcast;
 extern volatile uint32_t ipAddress;
@@ -74,9 +66,3 @@ void IPv4_setMulticast(uint8_t *frame, uint32_t groupAddress);
 void IPv4_macMulticast(uint8_t *mac, uint32_t groupAddress);
 
 uint16_t RFC1071_checksum(volatile const void *buffer, int len);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_IP_H

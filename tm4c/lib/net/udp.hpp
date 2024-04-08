@@ -2,28 +2,21 @@
 // Created by robert on 5/20/22.
 //
 
-#ifndef GPSDO_UDP_H
-#define GPSDO_UDP_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#else
-#define static_assert _Static_assert
-#endif
+#include "eth.hpp"
+#include "ip.hpp"
 
-#include <stdint.h>
+#include <cstddef>
 
-#ifndef PACKED
-#define PACKED __attribute__((packed))
-#endif
-
-typedef struct PACKED HEADER_UDP {
+struct [[gnu::packed]] HEADER_UDP {
     uint16_t portSrc;
     uint16_t portDst;
     uint16_t length;
     uint16_t chksum;
-} HEADER_UDP;
-static_assert(sizeof(struct HEADER_UDP) == 8, "HEADER_UDP must be 8 bytes");
+};
+
+static_assert(sizeof(HEADER_UDP) == 8, "HEADER_UDP must be 8 bytes");
 
 #define UDP_DATA_OFFSET (14+20+8)
 
@@ -66,15 +59,7 @@ int UDP_register(uint16_t port, CallbackUDP callback);
  */
 int UDP_deregister(uint16_t port);
 
-#ifdef __cplusplus
-}
-
-#include "eth.hpp"
-#include "ip.hpp"
-
-#include <cstddef>
-
-template<typename T>
+template <typename T>
 struct [[gnu::packed]] PacketUDP {
     static constexpr int DATA_OFFSET = sizeof(HEADER_ETH) + sizeof(HEADER_IP4) + sizeof(HEADER_UDP);
 
@@ -103,7 +88,3 @@ struct [[gnu::packed]] PacketUDP {
 };
 
 static_assert(offsetof(PacketUDP<uint64_t>, data) == PacketUDP<uint64_t>::DATA_OFFSET, "PacketUDP.data is misaligned");
-
-#endif
-
-#endif //GPSDO_UDP_H

@@ -22,19 +22,20 @@
 
 struct [[gnu::packed]] HEADER_DNS {
     uint16_t id;
-    uint16_t rd:1;
-    uint16_t tc:1;
-    uint16_t aa:1;
-    uint16_t opcode:4;
-    uint16_t qr:1;
-    uint16_t rcode:4;
-    uint16_t zero:3;
-    uint16_t ra:1;
+    uint16_t rd     : 1;
+    uint16_t tc     : 1;
+    uint16_t aa     : 1;
+    uint16_t opcode : 4;
+    uint16_t qr     : 1;
+    uint16_t rcode  : 4;
+    uint16_t zero   : 3;
+    uint16_t ra     : 1;
     uint16_t qcount;
     uint16_t ancount;
     uint16_t nscount;
     uint16_t arcount;
 };
+
 static_assert(sizeof(HEADER_DNS) == 12, "HEADER_DNS must be 12 bytes");
 
 static struct {
@@ -63,8 +64,8 @@ void DNS_init() {
     UDP_register(DNS_CLIENT_PORT, processFrame);
 }
 
-static void callbackARP(void *ref, uint32_t remoteAddress, const uint8_t *macAddress) {
-    if(remoteAddress == ipDNS) {
+static void callbackARP(void *ref, const uint32_t remoteAddress, const uint8_t *macAddress) {
+    if (remoteAddress == ipDNS) {
         // retry if request timed-out
         if (isNullMAC(macAddress))
             DNS_updateMAC();
@@ -75,81 +76,88 @@ static void callbackARP(void *ref, uint32_t remoteAddress, const uint8_t *macAdd
 
 void DNS_updateMAC() {
     lastArp = CLK_MONO_INT();
-    if(IPv4_testSubnet(ipSubnet, ipAddress, ipDNS))
+    if (IPv4_testSubnet(ipSubnet, ipAddress, ipDNS))
         copyMAC(dnsMAC, macRouter);
     else
         ARP_request(ipDNS, callbackARP, nullptr);
 }
 
-int DNS_lookup(const char *hostname, CallbackDNS callback, volatile void *ref) {
+int DNS_lookup(const char *hostname, const CallbackDNS callback, volatile void *ref) {
     // check MAC address age
-    uint32_t now = CLK_MONO_INT();
-    if((now - lastArp) > ARP_MAX_AGE)
+    const uint32_t now = CLK_MONO_INT();
+    if ((now - lastArp) > ARP_MAX_AGE)
         DNS_updateMAC();
 
     // abort if MAC address is invalid
-    if(isNullMAC(dnsMAC))
+    if (isNullMAC(dnsMAC))
         return -2;
 
-    for(int i = 0; i < MAX_REQUESTS; i++) {
+    for (auto &request : requests) {
         // look for empty or expired slot
-        if(requests[i].callback != 0 && ((int32_t) (now - requests[i].expire) > 0))
+        if (request.callback != nullptr && static_cast<int32_t>(now - request.expire) > 0)
             continue;
 
         // register callback
-        requests[i].callback = callback;
-        requests[i].ref = (void *) ref;
-        requests[i].requestId = nextRequest++;
-        requests[i].expire = now + REQUEST_EXPIRE;
+        request.callback = callback;
+        request.ref = const_cast<void*>(ref);
+        request.requestId = nextRequest++;
+        request.expire = now + REQUEST_EXPIRE;
 
         // send request
-        sendRequest(hostname, requests[i].requestId);
+        sendRequest(hostname, request.requestId);
         return 0;
     }
     return -1;
 }
 
-static void processFrame(uint8_t *frame, int flen) {
+static void processFrame(uint8_t *frame, const int flen) {
     // discard malformed packets
-    if(flen < DNS_HEAD_SIZE) return;
+    if (flen < DNS_HEAD_SIZE)
+        return;
     // map headers
-    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
-    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
-    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
-    HEADER_DNS *headerDNS = (HEADER_DNS *) (headerUDP + 1);
+    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
+    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
+    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
+    const auto headerDNS = reinterpret_cast<HEADER_DNS*>(headerUDP + 1);
     // verify destination
-    if(isMyMAC(headerEth->macDst)) return;
-    if(headerIP4->dst != ipAddress) return;
+    if (isMyMAC(headerEth->macDst))
+        return;
+    if (headerIP4->dst != ipAddress)
+        return;
 
     // must be a query response
-    if(headerDNS->qr != 1) return;
+    if (headerDNS->qr != 1)
+        return;
     // must be a standard query response
-    if(headerDNS->opcode != 0) return;
+    if (headerDNS->opcode != 0)
+        return;
 
     // find matching request
     int match = -1;
-    for(int i = 0; i < MAX_REQUESTS; i++) {
-        if(requests[i].callback != 0 && requests[i].requestId == headerDNS->id) {
+    for (int i = 0; i < MAX_REQUESTS; i++) {
+        if (requests[i].callback != nullptr && requests[i].requestId == headerDNS->id) {
             match = i;
             break;
         }
     }
     // discard unknown requests
-    if(match < 0) return;
+    if (match < 0)
+        return;
 
     // process response body
-    char *end = (char *) (frame + flen);
-    char *body = (char *) (headerDNS + 1);
+    const char *end = reinterpret_cast<char*>(frame + flen);
+    char *body = reinterpret_cast<char*>(headerDNS + 1);
     char *next = body;
 
     // skip over question if present
     uint16_t cnt = htons(headerDNS->qcount);
-    for(uint16_t i = 0; i < cnt; i++) {
+    for (uint16_t i = 0; i < cnt; i++) {
         // skip over name
-        while(next < end) {
-            uint8_t len = *(next++);
-            if(len == 0) break;
-            if(len == 0xC0) {
+        while (next < end) {
+            const uint8_t len = *next++;
+            if (len == 0)
+                break;
+            if (len == 0xC0) {
                 ++next;
                 break;
             }
@@ -159,43 +167,60 @@ static void processFrame(uint8_t *frame, int flen) {
         next += 4;
     }
     // guard against malformed packets
-    if(next >= end) return;
+    if (next >= end)
+        return;
 
     // process answers
     cnt = htons(headerDNS->ancount);
-    for(uint16_t i = 0; i < cnt; i++) {
+    for (uint16_t i = 0; i < cnt; i++) {
         // skip over name
-        while(next < end) {
-            uint8_t len = *(next++);
-            if(len == 0) break;
-            if(len == 0xC0) {
+        while (next < end) {
+            const uint8_t len = *(next++);
+            if (len == 0)
+                break;
+            if (len == 0xC0) {
                 ++next;
                 break;
             }
             next += len;
         }
         // guard against malformed packets
-        if(next >= end) return;
-        uint16_t atype = htons(*(uint16_t *)next); next += 2;
-        uint16_t aclass = htons(*(uint16_t *)next); next += 2;
+        if (next >= end)
+            return;
+        const uint16_t atype = htons(*(uint16_t*) next);
+        next += 2;
+        const uint16_t aclass = htons(*(uint16_t*) next);
+        next += 2;
         next += 4; // skip TTL field
-        uint16_t length = htons(*(uint16_t *)next); next += 2;
+        const uint16_t length = htons(*(uint16_t*) next);
+        next += 2;
         // guard against malformed packets
-        if(next >= end) return;
+        if (next >= end)
+            return;
         // only accept A record IN IPv4 answers
-        if(atype != 1) { next += length; continue; }
-        if(aclass != 1) { next += length; continue; }
-        if(length != 4) { next += length; continue; }
+        if (atype != 1) {
+            next += length;
+            continue;
+        }
+        if (aclass != 1) {
+            next += length;
+            continue;
+        }
+        if (length != 4) {
+            next += length;
+            continue;
+        }
         // read address
-        uint32_t addr = *(uint32_t *) next; next += 4;
+        const uint32_t addr = *(uint32_t*) next;
+        next += 4;
         // report address via callback
         (*requests[match].callback)(requests[match].ref, addr);
     }
     // clear request slot
-    requests[match].callback = 0;
+    requests[match].callback = nullptr;
 }
 
-static void sendRequest(const char *hostname, uint16_t requestId) {
+static void sendRequest(const char *hostname, const uint16_t requestId) {
     const int txDesc = NET_getTxDesc();
     uint8_t *frame = NET_getTxBuff(txDesc);
 
@@ -203,10 +228,10 @@ static void sendRequest(const char *hostname, uint16_t requestId) {
     memset(frame, 0, DNS_HEAD_SIZE);
 
     // map headers
-    HEADER_ETH *headerEth = (HEADER_ETH *) frame;
-    HEADER_IP4 *headerIP4 = (HEADER_IP4 *) (headerEth + 1);
-    HEADER_UDP *headerUDP = (HEADER_UDP *) (headerIP4 + 1);
-    HEADER_DNS *headerDNS = (HEADER_DNS *) (headerUDP + 1);
+    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
+    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
+    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
+    const auto headerDNS = reinterpret_cast<HEADER_DNS*>(headerUDP + 1);
 
     // MAC address
     copyMAC(headerEth->macDst, dnsMAC);
@@ -227,29 +252,33 @@ static void sendRequest(const char *hostname, uint16_t requestId) {
     headerDNS->qcount = htons(1);
 
     // append query
-    char *base = (char *) (headerDNS + 1);
+    char *base = reinterpret_cast<char*>(headerDNS + 1);
     char *tail = base;
     // append domain name
-    for(;;) {
+    for (;;) {
         // skip dots
-        if(*hostname == '.') ++hostname;
+        if (*hostname == '.')
+            ++hostname;
         // check for null-terminator
-        if(*hostname == 0) break;
+        if (*hostname == 0)
+            break;
 
         // pin section length byte
         char *lenbyte = tail++;
         // append section characters
-        while(*hostname != 0 && *hostname != '.')
+        while (*hostname != 0 && *hostname != '.')
             *(tail++) = *(hostname++);
         // set section length byte
         *lenbyte = (tail - lenbyte) - 1;
     }
-    *(tail++) = 0;
-    *(uint16_t *) tail = htons(1); tail += 2;
-    *(uint16_t *) tail = htons(1); tail += 2;
+    *tail++ = 0;
+    *reinterpret_cast<uint16_t*>(tail) = htons(1);
+    tail += 2;
+    *reinterpret_cast<uint16_t*>(tail) = htons(1);
+    tail += 2;
 
     // transmit request
-    int flen = DNS_HEAD_SIZE + (tail - base);
+    const int flen = DNS_HEAD_SIZE + (tail - base);
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
     NET_transmit(txDesc, flen);
