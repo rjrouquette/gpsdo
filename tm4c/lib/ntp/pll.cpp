@@ -5,7 +5,7 @@
 #include "pll.hpp"
 
 #include "tcmp.hpp"
-#include "../format.h"
+#include "../format.hpp"
 #include "../clk/comp.h"
 #include "../clk/tai.h"
 

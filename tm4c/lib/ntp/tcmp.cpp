@@ -5,7 +5,7 @@
 #include "tcmp.hpp"
 
 #include "../delay.h"
-#include "../format.h"
+#include "../format.hpp"
 #include "../run.h"
 #include "../../hw/adc.h"
 #include "../../hw/eeprom.h"

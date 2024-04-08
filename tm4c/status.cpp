@@ -8,7 +8,7 @@
 #include "hw/eeprom.h"
 #include "hw/emac.h"
 #include "hw/sys.h"
-#include "lib/format.h"
+#include "lib/format.hpp"
 #include "lib/gps.h"
 #include "lib/led.h"
 #include "lib/net.h"

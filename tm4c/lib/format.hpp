@@ -2,14 +2,9 @@
 // Created by robert on 4/17/22.
 //
 
-#ifndef GPSDO_FORMAT_H
-#define GPSDO_FORMAT_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <stdint.h>
+#include <cstdint>
 
 char* append(char *dst, const char *src);
 char* toHexBytes(char *tail, const uint8_t *bytes, int size);
@@ -28,9 +23,3 @@ int toHMS(uint32_t value, char *origin);
 int fmtFloat(float value, int width, int places, char *origin);
 
 uint32_t fromHex(const char *str, int len);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_FORMAT_H

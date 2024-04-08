@@ -85,7 +85,7 @@ add_executable(
         lib/delay.cpp
         lib/delay.h
         lib/format.cpp
-        lib/format.h
+        lib/format.hpp
         lib/gps.cpp
         lib/gps.h
         lib/led.cpp
@@ -107,7 +107,7 @@ add_executable(
         lib/net/ip.h
         lib/net/udp.c
         lib/net/udp.h
-        lib/net/util.c
+        lib/net/util.cpp
         lib/net/util.h
 
         # NTP server
