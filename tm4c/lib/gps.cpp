@@ -14,8 +14,8 @@
 
 #include <memory>
 
-#define GPS_RING_SIZE (256)
-#define GPS_RING_MASK (GPS_RING_SIZE - 1)
+static constexpr int GPS_RING_SIZE = 256;
+static constexpr int GPS_RING_MASK = GPS_RING_SIZE - 1;
 
 #define GPS_RST_PORT (PORTP)
 #define GPS_RST_PIN (1<<5)
@@ -23,8 +23,6 @@
 #define GPS_RST_THR (60)
 
 #define INTV_HEALTH (RUN_SEC >> 1)
-
-#define ADV_RING(ptr) ((ptr) = ((ptr) + 1) & GPS_RING_MASK)
 
 static constexpr int MAX_LENGTH = 256;
 
@@ -66,6 +64,10 @@ static void runHealth(void *ref);
 static void runParse(void *ref);
 
 static void startTx();
+
+inline void incrRing(int &ptr) {
+    ptr = (ptr + 1) & GPS_RING_MASK;
+}
 
 void GPS_init() {
     // enable GPIO J
@@ -167,7 +169,7 @@ void ISR_UART3() {
         int head = rxHead;
         while (!UART3.FR.RXFE) {
             rxBuff[head] = UART3.DR.DATA;
-            ADV_RING(head);
+            incrRing(head);
         }
         rxHead = head;
         // wake parser
@@ -181,7 +183,7 @@ void ISR_UART3() {
         int tail = txTail;
         while ((!UART3.FR.TXFF) && (tail != head)) {
             UART3.DR.DATA = txBuff[tail];
-            ADV_RING(tail);
+            incrRing(tail);
         }
         txTail = tail;
         // explicitly clear flag
@@ -197,7 +199,7 @@ static void startTx() {
     int tail = txTail;
     while ((!UART3.FR.TXFF) && (tail != head)) {
         UART3.DR.DATA = txBuff[tail];
-        ADV_RING(tail);
+        incrRing(tail);
     }
     txTail = tail;
     // enable interrupt to complete any deferred bytes
@@ -209,7 +211,7 @@ static void runParse(void *ref) {
     while (tail != rxHead) {
         // get next byte
         uint8_t byte = rxBuff[tail];
-        ADV_RING(tail);
+        incrRing(tail);
 
         // process UBX message
         if (lenUBX) {
@@ -386,22 +388,22 @@ static void sendUBX(const uint8_t _class, const uint8_t id, int len, const uint8
 
     // send preamble
     txBuff[head] = 0xB5;
-    ADV_RING(head);
+    incrRing(head);
     txBuff[head] = 0x62;
-    ADV_RING(head);
+    incrRing(head);
 
     // initialize checksum
     uint8_t chkA = 0, chkB = 0;
 
     // send class
     txBuff[head] = _class;
-    ADV_RING(head);
+    incrRing(head);
     chkA += _class;
     chkB += chkA;
 
     // send id
     txBuff[head] = id;
-    ADV_RING(head);
+    incrRing(head);
     chkA += id;
     chkB += chkA;
 
@@ -409,7 +411,7 @@ static void sendUBX(const uint8_t _class, const uint8_t id, int len, const uint8
     const auto _len = reinterpret_cast<uint8_t*>(&len);
     for (int i = 0; i < 2; i++) {
         txBuff[head] = _len[i];
-        ADV_RING(head);
+        incrRing(head);
         chkA += _len[i];
         chkB += chkA;
     }
@@ -417,16 +419,16 @@ static void sendUBX(const uint8_t _class, const uint8_t id, int len, const uint8
     // send payload
     for (int i = 0; i < len; i++) {
         txBuff[head] = payload[i];
-        ADV_RING(head);
+        incrRing(head);
         chkA += payload[i];
         chkB += chkA;
     }
 
     // send checksum
     txBuff[head] = chkA;
-    ADV_RING(head);
+    incrRing(head);
     txBuff[head] = chkB;
-    ADV_RING(head);
+    incrRing(head);
 
     txHead = head;
     startTx();
