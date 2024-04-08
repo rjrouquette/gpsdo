@@ -9,7 +9,7 @@
 #include "../net.h"
 #include "../run.h"
 #include "../clk/tai.hpp"
-#include "../net/util.h"
+#include "../net/util.hpp"
 #include "../ntp/ntp.hpp"
 #include "../ntp/pll.hpp"
 

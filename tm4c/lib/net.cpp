@@ -16,12 +16,12 @@
 #include "clk/mono.h"
 #include "clk/tai.hpp"
 #include "clk/util.hpp"
-#include "net/arp.h"
-#include "net/dhcp.h"
-#include "net/dns.h"
-#include "net/eth.h"
-#include "net/ip.h"
-#include "net/util.h"
+#include "net/arp.hpp"
+#include "net/dhcp.hpp"
+#include "net/dns.hpp"
+#include "net/eth.hpp"
+#include "net/ip.hpp"
+#include "net/util.hpp"
 
 #include <memory.h>
 

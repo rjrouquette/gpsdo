@@ -2,27 +2,16 @@
 // Created by robert on 5/16/22.
 //
 
-#ifndef GPSDO_ARP_H
-#define GPSDO_ARP_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#else
-#define static_assert _Static_assert
-#endif
-
-#include <stdint.h>
-
-#ifndef PACKED
-#define PACKED __attribute__((packed))
-#endif
+#include <cstdint>
 
 #define ARP_MAX_AGE (64) // refresh old MAC addresses
 
 #define ARP_OP_REQUEST (0x0100)
 #define ARP_OP_REPLY (0x0200)
 
-typedef struct PACKED ARP_IP4 {
+struct [[gnu::packed]] ARP_IP4 {
         uint16_t HTYPE;
         uint16_t PTYPE;
         uint8_t HLEN;
@@ -32,8 +21,8 @@ typedef struct PACKED ARP_IP4 {
         uint32_t SPA;
         uint8_t THA[6];
         uint32_t TPA;
-} ARP_IP4;
-static_assert(sizeof(struct ARP_IP4) == 28, "ARP_IP4 must be 28 bytes");
+};
+static_assert(sizeof(ARP_IP4) == 28, "ARP_IP4 must be 28 bytes");
 
 #define ARP_FRAME_LEN (60)
 
@@ -46,9 +35,3 @@ void ARP_init();
 void ARP_process(uint8_t *frame, int flen);
 int ARP_request(uint32_t remoteAddress, CallbackARP callback, void *ref);
 void ARP_refreshRouter();
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_ARP_H

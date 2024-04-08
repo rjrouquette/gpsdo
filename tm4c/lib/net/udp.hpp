@@ -69,8 +69,8 @@ int UDP_deregister(uint16_t port);
 #ifdef __cplusplus
 }
 
-#include "eth.h"
-#include "ip.h"
+#include "eth.hpp"
+#include "ip.hpp"
 
 #include <cstddef>
 

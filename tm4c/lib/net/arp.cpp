@@ -2,14 +2,16 @@
 // Created by robert on 5/16/22.
 //
 
-#include <strings.h>
-#include "../clk/mono.h"
+#include "arp.hpp"
+
+#include "eth.hpp"
+#include "ip.hpp"
+#include "util.hpp"
 #include "../net.h"
 #include "../run.h"
-#include "arp.h"
-#include "eth.h"
-#include "ip.h"
-#include "util.h"
+#include "../clk/mono.h"
+
+#include <strings.h>
 
 #define ANNOUNCE_INTERVAL (60) // 60 seconds
 #define MAX_REQUESTS (16)
@@ -39,7 +41,7 @@ static void arpRouter(void *ref, uint32_t remoteAddress, const uint8_t *macAddre
 
 void ARP_refreshRouter() {
     lastRouterPoll = CLK_MONO_INT();
-    ARP_request(ipRouter, arpRouter, NULL);
+    ARP_request(ipRouter, arpRouter, nullptr);
 }
 
 void makeArpIp4(
@@ -50,8 +52,8 @@ void makeArpIp4(
 ) {
     bzero(packet, ARP_FRAME_LEN);
 
-    HEADER_ETH *header = (HEADER_ETH *) packet;
-    ARP_IP4 *payload = (ARP_IP4 *) (header + 1);
+    const auto header = static_cast<HEADER_ETH*>(packet);
+    const auto payload = reinterpret_cast<ARP_IP4*>(header + 1);
 
     // ARP frame type
     header->ethType = ETHTYPE_ARP;
@@ -71,21 +73,21 @@ static void arpAnnounce() {
     // our IP address must be valid
     if(ipAddress == 0) return;
     // get TX descriptor
-    int txDesc = NET_getTxDesc();
+    const int txDesc = NET_getTxDesc();
     if(txDesc < 0) return;
     // create request frame
-    uint8_t wildCard[6] = { 0, 0, 0, 0, 0, 0 };
+    const uint8_t wildCard[6] = { 0, 0, 0, 0, 0, 0 };
     uint8_t *packetTX = NET_getTxBuff(txDesc);
     makeArpIp4(
             packetTX, ARP_OP_REQUEST,
             wildCard, ipAddress
     );
-    broadcastMAC(((HEADER_ETH *)packetTX)->macDst);
+    broadcastMAC(reinterpret_cast<HEADER_ETH*>(packetTX)->macDst);
     // transmit frame
     NET_transmit(txDesc, ARP_FRAME_LEN);
 }
 
-static void arpRun() {
+static void arpRun(void *ref) {
     // process request expiration
     const uint32_t now = CLK_MONO_INT();
     for(int i = 0; i < MAX_REQUESTS; i++) {
@@ -93,9 +95,9 @@ static void arpRun() {
         // skip empty slots
         if(request->remoteAddress == 0) continue;
         // skip fresh requests
-        if(((int32_t) (now - request->expire)) <= 0) continue;
+        if(static_cast<int32_t>(now - request->expire) <= 0) continue;
         // report expiration
-        uint8_t nullMac[6] = {0,0,0,0,0,0};
+        const uint8_t nullMac[6] = {0,0,0,0,0,0};
         (*(request->callback))(request->ref, request->remoteAddress, nullMac);
         bzero(request, sizeof(ArpRequest));
     }
@@ -105,7 +107,7 @@ static void arpRun() {
         return;
 
     // announce presence
-    if(((int32_t)(nextAnnounce - now)) <= 0) {
+    if(static_cast<int32_t>(nextAnnounce - now) <= 0) {
         nextAnnounce = now + ANNOUNCE_INTERVAL;
         arpAnnounce();
     }
@@ -117,15 +119,15 @@ static void arpRun() {
 
 void ARP_init() {
     // wake every 0.5 seconds
-    runSleep(RUN_SEC >> 1, arpRun, NULL);
+    runSleep(RUN_SEC >> 1, arpRun, nullptr);
 }
 
-void ARP_process(uint8_t *frame, int flen) {
+void ARP_process(uint8_t *frame, const int flen) {
     // reject if packet is incorrect size
     if(flen != ARP_FRAME_LEN) return;
     // map header and payload
-    HEADER_ETH *header = (HEADER_ETH *) frame;
-    ARP_IP4 *payload = (ARP_IP4 *) (header + 1);
+    const auto header = reinterpret_cast<HEADER_ETH*>(frame);
+    const auto payload = reinterpret_cast<ARP_IP4*>(header + 1);
     // verify payload fields
     if(payload->HTYPE != 0x0100) return;
     if(payload->PTYPE != ETHTYPE_IP4) return;
@@ -142,7 +144,7 @@ void ARP_process(uint8_t *frame, int flen) {
                         packetTX, ARP_OP_REPLY,
                         payload->SHA, payload->SPA
                 );
-                copyMAC(((HEADER_ETH *)packetTX)->macDst, header->macSrc);
+                copyMAC(reinterpret_cast<HEADER_ETH*>(packetTX)->macDst, header->macSrc);
                 NET_transmit(txDesc, ARP_FRAME_LEN);
             }
         }
@@ -155,34 +157,34 @@ void ARP_process(uint8_t *frame, int flen) {
             for(int i = 0; i < MAX_REQUESTS; i++) {
                 if(requests[i].remoteAddress == payload->SPA) {
                     (*requests[i].callback)(requests[i].ref, requests[i].remoteAddress, payload->SHA);
-                    bzero((void *) (requests + i), sizeof(ArpRequest));
+                    bzero(requests + i, sizeof(ArpRequest));
                 }
             }
         }
     }
 }
 
-int ARP_request(uint32_t remoteAddress, CallbackARP callback, void *ref) {
-    uint32_t now = CLK_MONO_INT();
-    for(int i = 0; i < MAX_REQUESTS; i++) {
+int ARP_request(const uint32_t remoteAddress, const CallbackARP callback, void *ref) {
+    const uint32_t now = CLK_MONO_INT();
+    for(auto &request : requests) {
         // look for empty slot
-        if(requests[i].remoteAddress != 0)
+        if(request.remoteAddress != 0)
             continue;
         // get TX descriptor
         const int txDesc = NET_getTxDesc();
         // create request frame
-        uint8_t wildCard[6] = { 0, 0, 0, 0, 0, 0 };
+        const uint8_t wildCard[6] = { 0, 0, 0, 0, 0, 0 };
         uint8_t *packetTX = NET_getTxBuff(txDesc);
         makeArpIp4(
                 packetTX, ARP_OP_REQUEST,
                 wildCard, remoteAddress
         );
-        broadcastMAC(((HEADER_ETH *)packetTX)->macDst);
+        broadcastMAC(reinterpret_cast<HEADER_ETH*>(packetTX)->macDst);
         // register callback
-        requests[i].callback = callback;
-        requests[i].ref = ref;
-        requests[i].remoteAddress = remoteAddress;
-        requests[i].expire = now + REQUEST_EXPIRE;
+        request.callback = callback;
+        request.ref = ref;
+        request.remoteAddress = remoteAddress;
+        request.expire = now + REQUEST_EXPIRE;
         // transmit frame
         NET_transmit(txDesc, ARP_FRAME_LEN);
         return 0;

@@ -7,18 +7,18 @@
 #include "../clk/mono.h"
 #include "../net.h"
 #include "../run.h"
-#include "arp.h"
-#include "dhcp.h"
-#include "dns.h"
-#include "eth.h"
-#include "ip.h"
-#include "udp.h"
-#include "util.h"
+#include "arp.hpp"
+#include "dhcp.hpp"
+#include "dns.hpp"
+#include "eth.hpp"
+#include "ip.hpp"
+#include "udp.hpp"
+#include "util.hpp"
 
 #define DHCP_MAGIC (0x63538263)
 #define REATTEMPT_INTVL (10)
 
-typedef struct PACKED HEADER_DHCP {
+struct [[gnu::packed]] HEADER_DHCP {
     uint8_t OP;
     uint8_t HTYPE;
     uint8_t HLEN;
@@ -34,8 +34,8 @@ typedef struct PACKED HEADER_DHCP {
     uint8_t SNAME[64];
     uint8_t FILE[128];
     uint32_t MAGIC;
-} HEADER_DHCP;
-_Static_assert(sizeof(struct HEADER_DHCP) == 240, "HEADER_DHCP must be 240 bytes");
+};
+static_assert(sizeof(HEADER_DHCP) == 240, "HEADER_DHCP must be 240 bytes");
 
 static uint32_t dhcpUUID;
 static uint32_t dhcpXID = 0;
@@ -56,7 +56,7 @@ static void processFrame(uint8_t *frame, int flen);
 static void sendReply(HEADER_DHCP *response);
 
 __attribute__((always_inline))
-static inline void pad_opts(uint8_t *frame, int *flen) {
+inline void pad_opts(uint8_t *frame, int *flen) {
     if((*flen) & 1) { frame[(*flen)++] = 0; }
 }
 
@@ -75,12 +75,12 @@ static void initPacket(void *frame) {
     // broadcast MAC address
     broadcastMAC(headerEth->macDst);
     // IPv4 Header
-    IPv4_init(frame);
+    IPv4_init(static_cast<uint8_t*>(frame));
     headerIP4->dst = 0xFFFFFFFF;
     headerIP4->proto = IP_PROTO_UDP;
     // UDP Header
-    headerUDP->portSrc = __builtin_bswap16(DHCP_PORT_CLI);
-    headerUDP->portDst = __builtin_bswap16(DHCP_PORT_SRV);
+    headerUDP->portSrc = htons(DHCP_PORT_CLI);
+    headerUDP->portDst = htons(DHCP_PORT_SRV);
     // DHCP Header
     headerDHCP->OP = 1;
     headerDHCP->HTYPE = 1;
@@ -90,7 +90,7 @@ static void initPacket(void *frame) {
     headerDHCP->MAGIC = DHCP_MAGIC;
 }
 
-static void dhcpRun() {
+static void dhcpRun(void *ref) {
     // link must be up to send packets
     if(!(NET_getPhyStatus() & PHY_STATUS_LINK))
         return;
@@ -194,7 +194,7 @@ static void processFrame(uint8_t *frame, int flen) {
     // discard if not directly addressed to us
     if(isMyMAC(headerEth->macDst)) return;
     // discard if not from a server
-    if(headerUDP->portSrc != __builtin_bswap16(DHCP_PORT_SRV))
+    if(headerUDP->portSrc != htons(DHCP_PORT_SRV))
         return;
     // discard if not a server response
     if(headerDHCP->OP != 2) return;

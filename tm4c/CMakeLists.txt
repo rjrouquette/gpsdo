@@ -94,21 +94,21 @@ add_executable(
         # networking
         lib/net.cpp
         lib/net.h
-        lib/net/arp.c
-        lib/net/arp.h
-        lib/net/dhcp.c
-        lib/net/dhcp.h
-        lib/net/dns.c
-        lib/net/dns.h
-        lib/net/eth.h
-        lib/net/icmp.c
-        lib/net/icmp.h
-        lib/net/ip.c
-        lib/net/ip.h
-        lib/net/udp.c
-        lib/net/udp.h
+        lib/net/arp.cpp
+        lib/net/arp.hpp
+        lib/net/dhcp.cpp
+        lib/net/dhcp.hpp
+        lib/net/dns.cpp
+        lib/net/dns.hpp
+        lib/net/eth.hpp
+        lib/net/icmp.cpp
+        lib/net/icmp.hpp
+        lib/net/ip.cpp
+        lib/net/ip.hpp
+        lib/net/udp.cpp
+        lib/net/udp.hpp
         lib/net/util.cpp
-        lib/net/util.h
+        lib/net/util.hpp
 
         # NTP server
         lib/ntp/common.hpp

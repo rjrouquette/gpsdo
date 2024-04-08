@@ -7,7 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "../net/eth.h"
+#include "../net/eth.hpp"
 
 #define PTP2_VERSION (2)
 #define PTP2_DOMAIN (1)

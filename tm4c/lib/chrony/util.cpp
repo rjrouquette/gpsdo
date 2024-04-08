@@ -4,7 +4,7 @@
 
 #include "util.hpp"
 #include "../clk/util.hpp"
-#include "../net/util.h"
+#include "../net/util.hpp"
 
 #include <memory.h>
 

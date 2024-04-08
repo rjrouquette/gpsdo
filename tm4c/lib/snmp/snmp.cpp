@@ -8,10 +8,10 @@
 #include "util.hpp"
 #include "../led.h"
 #include "../net.h"
-#include "../net/eth.h"
-#include "../net/ip.h"
-#include "../net/udp.h"
-#include "../net/util.h"
+#include "../net/eth.hpp"
+#include "../net/ip.hpp"
+#include "../net/udp.hpp"
+#include "../net/util.hpp"
 
 #include <memory.h>
 

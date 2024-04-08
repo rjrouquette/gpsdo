@@ -2,10 +2,11 @@
 // Created by robert on 5/16/22.
 //
 
-#include "eth.h"
-#include "icmp.h"
-#include "ip.h"
-#include "udp.h"
+#include "eth.hpp"
+#include "icmp.hpp"
+#include "ip.hpp"
+#include "udp.hpp"
+#include "util.hpp"
 
 volatile uint32_t ipBroadcast = 0;
 volatile uint32_t ipAddress = 0;
@@ -40,7 +41,7 @@ void IPv4_init(uint8_t *frame) {
     struct HEADER_IP4 *headerIPv4 = (struct HEADER_IP4 *) (frame + sizeof(struct HEADER_ETH));
     headerIPv4->head.VER = 4;
     headerIPv4->head.IHL = 5;
-    headerIPv4->id = __builtin_bswap16(ipID);
+    headerIPv4->id = htons(ipID);
     headerIPv4->flags = 0x40;
     headerIPv4->ttl = 32;
     ++ipID;
@@ -56,7 +57,7 @@ void IPv4_finalize(uint8_t *frame, int flen) {
     // compute IPv4 length
     flen -= sizeof(HEADER_ETH);
     // set IPv4 length
-    headerIP4->len = __builtin_bswap16(flen);
+    headerIP4->len = htons(flen);
     // clear checksum
     headerIP4->chksum = 0;
     // compute checksum

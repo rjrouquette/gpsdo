@@ -9,8 +9,8 @@
 #include "../chrony/util.hpp"
 #include "../clk/mono.h"
 #include "../clk/util.hpp"
-#include "../net/ip.h"
-#include "../net/util.h"
+#include "../net/ip.hpp"
+#include "../net/util.hpp"
 
 #include <cmath>
 

@@ -4,7 +4,7 @@
 
 #include "common.hpp"
 #include "../clk/util.hpp"
-#include "../net/util.h"
+#include "../net/util.hpp"
 
 // lut for PTP clock accuracy codes
 const float lutClkAccuracy[17] = {

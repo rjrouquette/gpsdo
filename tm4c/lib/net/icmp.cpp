@@ -3,10 +3,10 @@
 //
 
 #include <memory.h>
-#include "eth.h"
-#include "icmp.h"
-#include "ip.h"
-#include "util.h"
+#include "eth.hpp"
+#include "icmp.hpp"
+#include "ip.hpp"
+#include "util.hpp"
 #include "../net.h"
 
 static void sendPingResponse(uint8_t *frame, int flen);

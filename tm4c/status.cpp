@@ -17,12 +17,12 @@
 #include "lib/clk/comp.hpp"
 #include "lib/clk/mono.h"
 #include "lib/clk/tai.hpp"
-#include "lib/net/arp.h"
-#include "lib/net/dhcp.h"
-#include "lib/net/eth.h"
-#include "lib/net/ip.h"
-#include "lib/net/udp.h"
-#include "lib/net/util.h"
+#include "lib/net/arp.hpp"
+#include "lib/net/dhcp.hpp"
+#include "lib/net/eth.hpp"
+#include "lib/net/ip.hpp"
+#include "lib/net/udp.hpp"
+#include "lib/net/util.hpp"
 #include "lib/ntp/pll.hpp"
 
 #include <cstring>

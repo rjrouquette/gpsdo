@@ -5,8 +5,8 @@
 #pragma once
 
 #include <cstdint>
-#include "../net/ip.h"
-#include "../net/udp.h"
+#include "../net/ip.hpp"
+#include "../net/udp.hpp"
 
 #define NTP4_SIZE (UDP_DATA_OFFSET + 48)
 

@@ -2,16 +2,17 @@
 // Created by robert on 12/4/22.
 //
 
-#include <string.h>
+#include "dns.hpp"
 
-#include "../clk/mono.h"
+#include "arp.hpp"
+#include "eth.hpp"
+#include "ip.hpp"
+#include "udp.hpp"
+#include "util.hpp"
 #include "../net.h"
-#include "arp.h"
-#include "eth.h"
-#include "dns.h"
-#include "ip.h"
-#include "udp.h"
-#include "util.h"
+#include "../clk/mono.h"
+
+#include <cstring>
 
 #define DNS_HEAD_SIZE (UDP_DATA_OFFSET + 12)
 #define DNS_CLIENT_PORT (1367)
@@ -19,7 +20,7 @@
 #define MAX_REQUESTS (16)
 #define REQUEST_EXPIRE (5)
 
-typedef struct PACKED HEADER_DNS {
+struct [[gnu::packed]] HEADER_DNS {
     uint16_t id;
     uint16_t rd:1;
     uint16_t tc:1;
@@ -33,8 +34,8 @@ typedef struct PACKED HEADER_DNS {
     uint16_t ancount;
     uint16_t nscount;
     uint16_t arcount;
-} HEADER_DNS;
-_Static_assert(sizeof(struct HEADER_DNS) == 12, "HEADER_DNS must be 12 bytes");
+};
+static_assert(sizeof(HEADER_DNS) == 12, "HEADER_DNS must be 12 bytes");
 
 static struct {
     uint32_t expire;
@@ -77,7 +78,7 @@ void DNS_updateMAC() {
     if(IPv4_testSubnet(ipSubnet, ipAddress, ipDNS))
         copyMAC(dnsMAC, macRouter);
     else
-        ARP_request(ipDNS, callbackARP, NULL);
+        ARP_request(ipDNS, callbackARP, nullptr);
 }
 
 int DNS_lookup(const char *hostname, CallbackDNS callback, volatile void *ref) {
@@ -142,7 +143,7 @@ static void processFrame(uint8_t *frame, int flen) {
     char *next = body;
 
     // skip over question if present
-    uint16_t cnt = __builtin_bswap16(headerDNS->qcount);
+    uint16_t cnt = htons(headerDNS->qcount);
     for(uint16_t i = 0; i < cnt; i++) {
         // skip over name
         while(next < end) {
@@ -161,7 +162,7 @@ static void processFrame(uint8_t *frame, int flen) {
     if(next >= end) return;
 
     // process answers
-    cnt = __builtin_bswap16(headerDNS->ancount);
+    cnt = htons(headerDNS->ancount);
     for(uint16_t i = 0; i < cnt; i++) {
         // skip over name
         while(next < end) {
@@ -175,10 +176,10 @@ static void processFrame(uint8_t *frame, int flen) {
         }
         // guard against malformed packets
         if(next >= end) return;
-        uint16_t atype = __builtin_bswap16(*(uint16_t *)next); next += 2;
-        uint16_t aclass = __builtin_bswap16(*(uint16_t *)next); next += 2;
+        uint16_t atype = htons(*(uint16_t *)next); next += 2;
+        uint16_t aclass = htons(*(uint16_t *)next); next += 2;
         next += 4; // skip TTL field
-        uint16_t length = __builtin_bswap16(*(uint16_t *)next); next += 2;
+        uint16_t length = htons(*(uint16_t *)next); next += 2;
         // guard against malformed packets
         if(next >= end) return;
         // only accept A record IN IPv4 answers
@@ -217,13 +218,13 @@ static void sendRequest(const char *hostname, uint16_t requestId) {
     headerIP4->proto = IP_PROTO_UDP;
 
     // UDP Header
-    headerUDP->portSrc = __builtin_bswap16(DNS_CLIENT_PORT);
-    headerUDP->portDst = __builtin_bswap16(DNS_SERVER_PORT);
+    headerUDP->portSrc = htons(DNS_CLIENT_PORT);
+    headerUDP->portDst = htons(DNS_SERVER_PORT);
 
     // set header fields
     headerDNS->id = requestId;
     headerDNS->rd = 1;
-    headerDNS->qcount = __builtin_bswap16(1);
+    headerDNS->qcount = htons(1);
 
     // append query
     char *base = (char *) (headerDNS + 1);
@@ -244,8 +245,8 @@ static void sendRequest(const char *hostname, uint16_t requestId) {
         *lenbyte = (tail - lenbyte) - 1;
     }
     *(tail++) = 0;
-    *(uint16_t *) tail = __builtin_bswap16(1); tail += 2;
-    *(uint16_t *) tail = __builtin_bswap16(1); tail += 2;
+    *(uint16_t *) tail = htons(1); tail += 2;
+    *(uint16_t *) tail = htons(1); tail += 2;
 
     // transmit request
     int flen = DNS_HEAD_SIZE + (tail - base);

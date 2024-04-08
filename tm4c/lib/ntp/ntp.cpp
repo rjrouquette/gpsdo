@@ -16,9 +16,9 @@
 #include "../chrony/util.hpp"
 #include "../clk/comp.hpp"
 #include "../clk/tai.hpp"
-#include "../net/dhcp.h"
-#include "../net/dns.h"
-#include "../net/util.h"
+#include "../net/dhcp.hpp"
+#include "../net/dns.hpp"
+#include "../net/util.hpp"
 
 #include <memory.h>
 #include <memory>
