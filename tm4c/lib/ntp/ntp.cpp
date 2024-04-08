@@ -77,7 +77,7 @@ static void runSelect(void *ref);
 static void runDnsFill(void *ref);
 
 // called by PLL for hard TAI adjustments
-extern "C" void ntpApplyOffset(const int64_t offset) {
+void ntpApplyOffset(const int64_t offset) {
     for (uint32_t i = 0; i < cntSources; i++) {
         if (sources[i] != nullptr)
             sources[i]->applyOffset(offset);

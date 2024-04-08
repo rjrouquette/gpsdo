@@ -2,11 +2,11 @@
 // Created by robert on 4/15/22.
 //
 
-#include <stddef.h>
-#include "../hw/gpio.h"
-#include "delay.h"
 #include "led.h"
+
+#include "delay.h"
 #include "run.h"
+#include "../hw/gpio.h"
 
 
 static volatile uint8_t status = 0;
@@ -34,7 +34,7 @@ void LED_init() {
     PORTN.LOCK = 0;
 
     // schedule LED update to run at 16 Hz
-    runSleep(RUN_SEC >> 4, runLed, NULL);
+    runSleep(RUN_SEC >> 4, runLed, nullptr);
 }
 
 void LED0_ON() { PORTN.DATA[0x01u] = 0x01u; }
@@ -53,13 +53,12 @@ void LED_act1() {
     status |= 0x02u;
 }
 
-_Noreturn
-void faultBlink(int a, int b) {
-    int c;
+[[noreturn]]
+void faultBlink(const int a, const int b) {
     for(;;) {
         LED0_OFF();
         LED1_OFF();
-        c = a;
+        auto c = a;
         while (c--) {
             delay_ms(250);
             LED0_ON();

@@ -82,13 +82,13 @@ add_executable(
         lib/clk/util.c
         lib/clk/util.h
 
-        lib/delay.c
+        lib/delay.cpp
         lib/delay.h
-        lib/format.c
+        lib/format.cpp
         lib/format.h
         lib/gps.cpp
         lib/gps.h
-        lib/led.c
+        lib/led.cpp
         lib/led.h
 
         # networking
@@ -118,7 +118,7 @@ add_executable(
         lib/ntp/ntp.hpp
         lib/ntp/peer.cpp
         lib/ntp/peer.hpp
-        lib/ntp/pll.c
+        lib/ntp/pll.cpp
         lib/ntp/pll.h
         lib/ntp/source.cpp
         lib/ntp/source.hpp
@@ -133,7 +133,7 @@ add_executable(
         lib/ptp/ptp.cpp
         lib/ptp/ptp.hpp
 
-        lib/rand.c
+        lib/rand.cpp
         lib/rand.h
         lib/run.cpp
         lib/run.h

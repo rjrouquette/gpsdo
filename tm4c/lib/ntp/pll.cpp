@@ -2,12 +2,14 @@
 // Created by robert on 4/29/23.
 //
 
-#include <math.h>
+#include "pll.h"
+
+#include "tcmp.h"
+#include "../format.h"
 #include "../clk/comp.h"
 #include "../clk/tai.h"
-#include "../format.h"
-#include "pll.h"
-#include "tcmp.h"
+
+#include <cmath>
 
 
 // offset statistics
@@ -41,12 +43,12 @@ void PLL_init() {
 // from ntp.c
 void ntpApplyOffset(int64_t offset);
 
-static void ntpSetTaiClock(int64_t offset) {
+static void ntpSetTaiClock(const int64_t offset) {
     CLK_TAI_adjust(offset);
     ntpApplyOffset(offset);
 }
 
-void PLL_updateOffset(int interval, int64_t offset) {
+void PLL_updateOffset(const int interval, const int64_t offset) {
     // apply hard correction to TAI clock for large offsets
     if((offset > PLL_OFFSET_HARD_ALIGN) || (offset < -PLL_OFFSET_HARD_ALIGN)) {
         ntpSetTaiClock(offset);
@@ -54,7 +56,7 @@ void PLL_updateOffset(int interval, int64_t offset) {
         return;
     }
 
-    float fltOffset = 0x1p-32f * (float) (int32_t) offset;
+    const float fltOffset = 0x1p-32f * static_cast<float>(static_cast<int32_t>(offset));
     offsetLast = fltOffset;
     if(offsetMS == 0) {
         // initialize stats
@@ -79,7 +81,7 @@ void PLL_updateOffset(int interval, int64_t offset) {
     if(rate > PLL_OFFSET_CORR_MAX) rate = PLL_OFFSET_CORR_MAX;
     if(rate < PLL_OFFSET_CORR_MIN) rate = PLL_OFFSET_CORR_MIN;
     // adjust rate to match polling interval
-    rate *= 0x1p-16f * (float) (1u << (16 - interval));
+    rate *= 0x1p-16f * static_cast<float>(1u << (16 - interval));
     // update offset compensation
     offsetProportion = fltOffset * rate;
     offsetIntegral += offsetProportion * PLL_OFFSET_INT_RATE;
@@ -90,7 +92,7 @@ void PLL_updateOffset(int interval, int64_t offset) {
     float trim = offsetProportion + offsetIntegral;
     if(trim >  PLL_MAX_FREQ_TRIM) trim =  PLL_MAX_FREQ_TRIM;
     if(trim < -PLL_MAX_FREQ_TRIM) trim = -PLL_MAX_FREQ_TRIM;
-    CLK_TAI_setTrim((int32_t) (0x1p32f * trim));
+    CLK_TAI_setTrim(static_cast<int32_t>(0x1p32f * trim));
 }
 
 void PLL_updateDrift(int interval, const float drift) {
@@ -104,7 +106,7 @@ void PLL_updateDrift(int interval, const float drift) {
     driftRms = sqrtf(driftMS);
 
     // update temperature compensation
-    driftFreq = drift + (0x1p-32f * (float) CLK_COMP_getComp());
+    driftFreq = drift + (0x1p-32f * static_cast<float>(CLK_COMP_getComp()));
     TCMP_update(driftFreq, 100e-9f / (100e-9f + driftStdDev + fabsf(diff)));
 }
 
@@ -169,12 +171,12 @@ float PLL_offsetRms() { return offsetRms; }
 float PLL_offsetStdDev() { return offsetStdDev; }
 float PLL_offsetProp() { return offsetProportion; }
 float PLL_offsetInt() { return offsetIntegral; }
-float PLL_offsetCorr() { return 0x1p-32f * (float) CLK_TAI_getTrim(); }
+float PLL_offsetCorr() { return 0x1p-32f * static_cast<float>(CLK_TAI_getTrim()); }
 
 // drift stats
 float PLL_driftLast() { return driftLast; }
 float PLL_driftMean() { return driftMean; }
 float PLL_driftRms() { return driftRms; }
 float PLL_driftStdDev() { return driftStdDev; }
-float PLL_driftCorr() { return 0x1p-32f * (float) CLK_COMP_getComp(); }
+float PLL_driftCorr() { return 0x1p-32f * static_cast<float>(CLK_COMP_getComp()); }
 float PLL_driftFreq() { return driftFreq; }

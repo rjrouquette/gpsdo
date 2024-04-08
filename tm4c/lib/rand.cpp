@@ -1,5 +1,5 @@
-#include "../hw/sys.h"
 #include "rand.h"
+#include "../hw/sys.h"
 
 static uint32_t state;
 
