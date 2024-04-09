@@ -7,7 +7,7 @@
 #include "comp.hpp"
 #include "tai.hpp"
 #include "util.hpp"
-#include "../delay.h"
+#include "../delay.hpp"
 #include "../hw/emac.h"
 #include "../hw/gpio.h"
 #include "../hw/interrupts.h"

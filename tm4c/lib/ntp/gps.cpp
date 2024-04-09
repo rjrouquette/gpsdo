@@ -3,11 +3,11 @@
 //
 
 #include "gps.hpp"
-#include "../gps.h"
+#include "../gps.hpp"
 
 #include "common.hpp"
 #include "ntp.hpp"
-#include "../run.h"
+#include "../run.hpp"
 #include "../clk/clk.hpp"
 #include "../clk/mono.h"
 #include "../clk/tai.hpp"

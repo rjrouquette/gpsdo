@@ -7,8 +7,8 @@
 #include "eth.hpp"
 #include "ip.hpp"
 #include "util.hpp"
-#include "../net.h"
-#include "../run.h"
+#include "../net.hpp"
+#include "../run.hpp"
 #include "../clk/mono.h"
 
 #include <strings.h>

@@ -6,8 +6,8 @@
 
 #include "mono.h"
 #include "util.hpp"
-#include "../delay.h"
-#include "../run.h"
+#include "../delay.hpp"
+#include "../run.hpp"
 #include "../../hw/gpio.h"
 #include "../../hw/interrupts.h"
 #include "../../hw/timer.h"

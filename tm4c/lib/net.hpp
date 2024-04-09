@@ -2,14 +2,9 @@
 // Created by robert on 4/26/22.
 //
 
-#ifndef GPSDO_NET_H
-#define GPSDO_NET_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <stdint.h>
+#include <cstdint>
 
 #define PHY_STATUS_DUPLEX (4)
 #define PHY_STATUS_100M (2)
@@ -29,9 +24,3 @@ void NET_transmit(int desc, int len);
 void NET_getRxTime(volatile uint64_t *stamps);
 
 void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_NET_H

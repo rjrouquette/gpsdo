@@ -5,9 +5,9 @@
 #include "peer.hpp"
 
 #include "common.hpp"
-#include "../net.h"
-#include "../rand.h"
-#include "../run.h"
+#include "../net.hpp"
+#include "../rand.hpp"
+#include "../run.hpp"
 #include "../clk/mono.h"
 #include "../clk/tai.hpp"
 #include "../clk/util.hpp"

@@ -5,9 +5,9 @@
 #include "ptp.hpp"
 
 #include "common.hpp"
-#include "../led.h"
-#include "../net.h"
-#include "../run.h"
+#include "../led.hpp"
+#include "../net.hpp"
+#include "../run.hpp"
 #include "../clk/tai.hpp"
 #include "../net/util.hpp"
 #include "../ntp/ntp.hpp"

@@ -1,4 +1,4 @@
-#include "rand.h"
+#include "rand.hpp"
 #include "../hw/sys.h"
 
 static uint32_t state;

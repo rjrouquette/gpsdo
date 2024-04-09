@@ -2,15 +2,7 @@
 // Created by robert on 4/15/22.
 //
 
-#ifndef GPSDO_LED_H
-#define GPSDO_LED_H
-
-#ifdef __cplusplus
-extern "C" {
-    #define _Noreturn [[noreturn]]
-#else
-    #define static_assert _Static_assert
-#endif
+#pragma once
 
 void LED_init();
 
@@ -25,11 +17,5 @@ void LED1_TGL();
 void LED_act0();
 void LED_act1();
 
-_Noreturn
+[[noreturn]]
 void faultBlink(int a, int b);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_LED_H

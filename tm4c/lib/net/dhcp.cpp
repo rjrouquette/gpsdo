@@ -10,8 +10,8 @@
 #include "ip.hpp"
 #include "udp.hpp"
 #include "util.hpp"
-#include "../net.h"
-#include "../run.h"
+#include "../net.hpp"
+#include "../run.hpp"
 #include "../../hw/sys.h"
 #include "../clk/mono.h"
 

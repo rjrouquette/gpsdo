@@ -9,7 +9,7 @@
 #include "ip.hpp"
 #include "udp.hpp"
 #include "util.hpp"
-#include "../net.h"
+#include "../net.hpp"
 #include "../clk/mono.h"
 
 #include <cstring>

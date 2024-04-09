@@ -2,7 +2,7 @@
 // Created by robert on 4/15/22.
 //
 
-#include "delay.h"
+#include "delay.hpp"
 #include "clk/mono.h"
 
 static constexpr uint32_t CLK_KHZ = CLK_FREQ / 1000;

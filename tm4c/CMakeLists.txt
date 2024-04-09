@@ -83,17 +83,17 @@ add_executable(
         lib/clk/util.hpp
 
         lib/delay.cpp
-        lib/delay.h
+        lib/delay.hpp
         lib/format.cpp
         lib/format.hpp
         lib/gps.cpp
-        lib/gps.h
+        lib/gps.hpp
         lib/led.cpp
-        lib/led.h
+        lib/led.hpp
 
         # networking
         lib/net.cpp
-        lib/net.h
+        lib/net.hpp
         lib/net/arp.cpp
         lib/net/arp.hpp
         lib/net/dhcp.cpp
@@ -134,9 +134,9 @@ add_executable(
         lib/ptp/ptp.hpp
 
         lib/rand.cpp
-        lib/rand.h
+        lib/rand.hpp
         lib/run.cpp
-        lib/run.h
+        lib/run.hpp
 
         lib/snmp/sensors.cpp
         lib/snmp/sensors.hpp

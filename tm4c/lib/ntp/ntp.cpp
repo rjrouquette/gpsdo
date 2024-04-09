@@ -9,9 +9,9 @@
 #include "peer.hpp"
 #include "pll.hpp"
 
-#include "../led.h"
-#include "../net.h"
-#include "../run.h"
+#include "../led.hpp"
+#include "../net.hpp"
+#include "../run.hpp"
 #include "../chrony/candm.h"
 #include "../chrony/util.hpp"
 #include "../clk/comp.hpp"

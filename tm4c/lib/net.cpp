@@ -2,11 +2,11 @@
 // Created by robert on 4/26/22.
 //
 
-#include "net.h"
+#include "net.hpp"
 
-#include "delay.h"
-#include "led.h"
-#include "run.h"
+#include "delay.hpp"
+#include "led.hpp"
+#include "run.hpp"
 #include "../hw/crc.h"
 #include "../hw/emac.h"
 #include "../hw/gpio.h"

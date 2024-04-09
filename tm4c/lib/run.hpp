@@ -2,14 +2,9 @@
 // Created by robert on 5/15/23.
 //
 
-#ifndef GPSDO_LIB_RUN_H
-#define GPSDO_LIB_RUN_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <stdint.h>
+#include <cstdint>
 
 #define RUN_MAX (1u << 28)
 #define RUN_SEC (1u << 24)
@@ -27,11 +22,7 @@ void initScheduler();
 /**
  * Run scheduler (infinite loop)
 */
-#ifdef __cplusplus
 [[noreturn]]
-#else
-_Noreturn
-#endif
 void runScheduler();
 
 /**
@@ -86,9 +77,3 @@ void runCancel(RunCall callback, const void *ref);
  * @return number of bytes written to buffer
  */
 unsigned runStatus(char *buffer);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_LIB_RUN_H

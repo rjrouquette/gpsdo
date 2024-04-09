@@ -4,9 +4,9 @@
 
 #include "tcmp.hpp"
 
-#include "../delay.h"
+#include "../delay.hpp"
 #include "../format.hpp"
-#include "../run.h"
+#include "../run.hpp"
 #include "../../hw/adc.h"
 #include "../../hw/eeprom.h"
 #include "../clk/comp.hpp"

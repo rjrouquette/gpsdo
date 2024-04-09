@@ -5,7 +5,7 @@
 #include "source.hpp"
 
 #include "common.hpp"
-#include "../run.h"
+#include "../run.hpp"
 #include "../chrony/util.hpp"
 #include "../clk/mono.h"
 #include "../clk/util.hpp"

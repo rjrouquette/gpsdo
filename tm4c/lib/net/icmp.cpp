@@ -7,7 +7,7 @@
 #include "eth.hpp"
 #include "ip.hpp"
 #include "util.hpp"
-#include "../net.h"
+#include "../net.hpp"
 
 #include <memory.h>
 

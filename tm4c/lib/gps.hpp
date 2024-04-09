@@ -2,14 +2,9 @@
 // Created by robert on 5/28/22.
 //
 
-#ifndef GPSDO_GPS_H
-#define GPSDO_GPS_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <stdint.h>
+#include <cstdint>
 
 void GPS_init();
 
@@ -27,9 +22,3 @@ int GPS_hasFix();
 uint64_t GPS_taiEpochUpdate();
 uint32_t GPS_taiEpoch();
 int GPS_taiOffset();
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_GPS_H

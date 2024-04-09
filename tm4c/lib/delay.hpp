@@ -2,20 +2,15 @@
 // Created by robert on 4/15/22.
 //
 
-#ifndef GPSDO_DELAY_H
-#define GPSDO_DELAY_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <stdint.h>
+#include <cstdint>
 
 /**
  * Delay one instruction cycle
  */
 __attribute__((always_inline))
-inline void delay_cycles_1(void) {
+inline void delay_cycles_1() {
     __asm volatile("nop");
 }
 
@@ -23,7 +18,7 @@ inline void delay_cycles_1(void) {
  * Delay two instruction cycles
  */
 __attribute__((always_inline))
-inline void delay_cycles_2(void) {
+inline void delay_cycles_2() {
     delay_cycles_1();
     delay_cycles_1();
 }
@@ -32,7 +27,7 @@ inline void delay_cycles_2(void) {
  * Delay four instruction cycles
  */
 __attribute__((always_inline))
-inline void delay_cycles_4(void) {
+inline void delay_cycles_4() {
     delay_cycles_2();
     delay_cycles_2();
 }
@@ -48,9 +43,3 @@ void delay_us(uint16_t delay);
  * @param delay in milliseconds
  */
 void delay_ms(uint16_t delay);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif //GPSDO_DELAY_H

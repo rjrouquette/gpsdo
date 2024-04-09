@@ -5,7 +5,7 @@
 #include "sensors.hpp"
 
 #include "util.hpp"
-#include "../gps.h"
+#include "../gps.hpp"
 #include "../clk/mono.h"
 #include "../ntp/pll.hpp"
 #include "../ntp/tcmp.hpp"

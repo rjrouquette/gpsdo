@@ -6,8 +6,8 @@
 
 #include "sensors.hpp"
 #include "util.hpp"
-#include "../led.h"
-#include "../net.h"
+#include "../led.hpp"
+#include "../net.hpp"
 #include "../net/eth.hpp"
 #include "../net/ip.hpp"
 #include "../net/udp.hpp"
