@@ -29,6 +29,8 @@ struct [[gnu::packed]] FrameUdp4 : FrameIp4 {
         return *static_cast<const FrameUdp4*>(frame);
     }
 
+    void returnToSender();
+
     void returnToSender(uint32_t ipAddr, uint16_t port);
 };
 
@@ -51,14 +53,6 @@ void UDP_process(uint8_t *frame, int flen);
  * @param flen raw frame buffer length
  */
 void UDP_finalize(uint8_t *frame, int flen);
-
-/**
- * Modify headers from a received frame to create a direct reply to the sender
- * @param frame raw frame buffer
- * @param ipAddr new source address
- * @param port new source port
- */
-void UDP_returnToSender(uint8_t *frame, uint32_t ipAddr, uint16_t port);
 
 /**
  * Register callback to receive inbound UDP port traffic

@@ -92,8 +92,8 @@ static void status::process(uint8_t *frame, int flen) {
     const int txDesc = NET_getTxDesc();
     uint8_t *txFrame = NET_getTxBuff(txDesc);
     memcpy(txFrame, frame, flen);
-    UDP_returnToSender(txFrame, ipAddress, STATUS_PORT);
     auto &response = FrameStatus::from(txFrame);
+    response.returnToSender();
 
     // get packet body
     char *body = response.data;

@@ -13,6 +13,21 @@ static volatile struct {
     CallbackUDP callback;
 } registry[16];
 
+
+void FrameUdp4::returnToSender() {
+    const auto ipAddr = ip4.dst;
+    const auto port = udp.portDst;
+
+    // modify ethernet frame header
+    copyMAC(eth.macDst, eth.macSrc);
+    // modify IP header
+    ip4.dst = ip4.src;
+    ip4.src = ipAddr;
+    // modify UDP header
+    udp.portDst = udp.portSrc;
+    udp.portSrc = port;
+}
+
 void FrameUdp4::returnToSender(const uint32_t ipAddr, const uint16_t port) {
     // modify ethernet frame header
     copyMAC(eth.macDst, eth.macSrc);
@@ -78,10 +93,6 @@ void UDP_finalize(uint8_t *frame, int flen) {
 
     // finalize checksum calculation
     packet.udp.chksum = RFC1071_checksum(&chkbuf, sizeof(chkbuf));
-}
-
-void UDP_returnToSender(uint8_t *frame, const uint32_t ipAddr, const uint16_t port) {
-    FrameUdp4::from(frame).returnToSender(ipAddr, port);
 }
 
 int UDP_register(const uint16_t port, const CallbackUDP callback) {

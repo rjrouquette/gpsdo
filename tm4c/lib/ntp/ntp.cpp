@@ -169,11 +169,10 @@ static void ntpRequest(uint8_t *frame, const int flen) {
     const auto txFrame = NET_getTxBuff(txDesc);
     memcpy(txFrame, frame, flen);
 
-    // return the response directly to the sender
-    UDP_returnToSender(txFrame, ipAddress, NTP_PORT_SRV);
-
     // map headers
     auto &response = FrameNtp::from(txFrame);
+    // return the response directly to the sender
+    response.returnToSender();
 
     // set type to server response
     response.ntp.mode = NTP_MODE_SRV;
@@ -472,12 +471,12 @@ static void chronycRequest(uint8_t *frame, const int flen) {
     // allocate and clear frame buffer
     uint8_t *resp = NET_getTxBuff(txDesc);
     memset(resp, 0, UDP_DATA_OFFSET + sizeof(CMD_Reply));
-    // return to sender
     memcpy(resp, frame, UDP_DATA_OFFSET);
-    UDP_returnToSender(resp, ipAddress, DEFAULT_CANDM_PORT);
 
-    // remap headers
+    // map headers
     auto &response = FrameChronyReply::from(resp);
+    // return to sender
+    response.returnToSender();
 
     // begin response
     chronycReply(response.ptr(), packet.ptr());

@@ -154,11 +154,10 @@ static void sendResults(const uint8_t *frame, const uint8_t *data, int dlen) {
     uint8_t *txFrame = NET_getTxBuff(txDesc);
     memcpy(txFrame, frame, UDP_DATA_OFFSET);
 
-    // return frame to sender
-    UDP_returnToSender(txFrame, ipAddress, snmp::PORT);
-
     // map headers
     auto &response = snmp::FrameSnmp::from(txFrame);
+    // return response directly to sender
+    response.returnToSender();
 
     int flen = snmp::FrameSnmp::DATA_OFFSET;
     flen += snmp::wrapVars(snmp::reqId, response.data, data, dlen);
