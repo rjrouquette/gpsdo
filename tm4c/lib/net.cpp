@@ -301,7 +301,7 @@ static bool processFrame() {
     // only process the frame if the source MAC is not a broadcast address
     // (prevents packet amplification attacks)
     if (
-        const auto headerEth = reinterpret_cast<HEADER_ETH*>(buffer);
+        const auto headerEth = reinterpret_cast<HeaderEthernet*>(buffer);
         !(headerEth->macSrc[0] & 1)
     ) {
         const auto ethType = headerEth->ethType;

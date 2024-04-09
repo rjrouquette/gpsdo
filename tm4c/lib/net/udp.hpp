@@ -4,19 +4,35 @@
 
 #pragma once
 
-#include "eth.hpp"
 #include "ip.hpp"
 
-#include <cstddef>
 
-struct [[gnu::packed]] HEADER_UDP {
+struct [[gnu::packed]] HeaderUdp4 {
     uint16_t portSrc;
     uint16_t portDst;
     uint16_t length;
     uint16_t chksum;
 };
 
-static_assert(sizeof(HEADER_UDP) == 8, "HEADER_UDP must be 8 bytes");
+static_assert(sizeof(HeaderUdp4) == 8, "HeaderUdp must be 8 bytes");
+
+struct [[gnu::packed]] FrameUdp4 : FrameIp4 {
+    static constexpr int DATA_OFFSET = FrameIp4::DATA_OFFSET + sizeof(HeaderUdp4);
+
+    HeaderUdp4 udp;
+
+    static auto& from(void *frame) {
+        return *static_cast<FrameUdp4*>(frame);
+    }
+
+    static auto& from(const void *frame) {
+        return *static_cast<const FrameUdp4*>(frame);
+    }
+
+    void returnToSender(uint32_t ipAddr, uint16_t port);
+};
+
+static_assert(sizeof(FrameUdp4) == 42, "FrameUdp4 must be 42 bytes");
 
 #define UDP_DATA_OFFSET (14+20+8)
 
@@ -58,33 +74,3 @@ int UDP_register(uint16_t port, CallbackUDP callback);
  * @return 0 on success, -1 if port was not registered
  */
 int UDP_deregister(uint16_t port);
-
-template <typename T>
-struct [[gnu::packed]] PacketUDP {
-    static constexpr int DATA_OFFSET = sizeof(HEADER_ETH) + sizeof(HEADER_IP4) + sizeof(HEADER_UDP);
-
-    HEADER_ETH eth;
-    HEADER_IP4 ip4;
-    HEADER_UDP udp;
-    T data;
-
-    static auto& from(void *frame) {
-        return *static_cast<PacketUDP<T>*>(frame);
-    }
-
-    static auto& from(const void *frame) {
-        return *static_cast<const PacketUDP<T>*>(frame);
-    }
-
-    [[nodiscard]]
-    auto ptr() const {
-        return reinterpret_cast<const T*>(reinterpret_cast<const char*>(this) + DATA_OFFSET);
-    }
-
-    [[nodiscard]]
-    auto ptr() {
-        return reinterpret_cast<T*>(reinterpret_cast<char*>(this) + DATA_OFFSET);
-    }
-};
-
-static_assert(offsetof(PacketUDP<uint64_t>, data) == PacketUDP<uint64_t>::DATA_OFFSET, "PacketUDP.data is misaligned");

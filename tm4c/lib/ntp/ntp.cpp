@@ -109,7 +109,7 @@ uint32_t ntp::refId() {
 
 static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
     // map headers
-    auto &packet = PacketUDP<HEADER_NTP>::from(frame);
+    auto &packet = FrameNtp::from(frame);
 
     // retrieve hardware transmit time
     uint64_t stamps[3];
@@ -118,17 +118,17 @@ static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
 
     // record hardware transmit time
     const uint32_t cell = hashXleave(packet.ip4.dst);
-    tsXleave[cell].rxTime = packet.data.rxTime;
+    tsXleave[cell].rxTime = packet.ntp.rxTime;
     tsXleave[cell].txTime = htonll(txTime);
 }
 
 // process client request
 static void ntpRequest(uint8_t *frame, const int flen) {
     // discard malformed packets
-    if (flen < NTP4_SIZE)
+    if (flen < static_cast<int>(sizeof(FrameNtp)))
         return;
     // map headers
-    const auto &request = PacketUDP<HEADER_NTP>::from(frame);
+    const auto &request = FrameNtp::from(frame);
 
     // verify destination
     if (request.ip4.dst != ipAddress)
@@ -137,7 +137,7 @@ static void ntpRequest(uint8_t *frame, const int flen) {
     if (request.ip4.src == ipAddress)
         return;
     // filter non-client frames
-    if (request.data.mode != NTP_MODE_CLI)
+    if (request.ntp.mode != NTP_MODE_CLI)
         return;
     // indicate time-server activity
     LED_act0();
@@ -145,9 +145,9 @@ static void ntpRequest(uint8_t *frame, const int flen) {
     // check for interleaved request
     int xleave = -1;
     if (
-        const uint64_t orgTime = request.data.origTime;
+        const uint64_t orgTime = request.ntp.origTime;
         orgTime != 0 &&
-        request.data.rxTime != request.data.txTime
+        request.ntp.rxTime != request.ntp.txTime
     ) {
         // load TX timestamp if available
         const int cell = hashXleave(request.ip4.src);
@@ -173,33 +173,33 @@ static void ntpRequest(uint8_t *frame, const int flen) {
     UDP_returnToSender(txFrame, ipAddress, NTP_PORT_SRV);
 
     // map headers
-    auto &response = PacketUDP<HEADER_NTP>::from(txFrame);
+    auto &response = FrameNtp::from(txFrame);
 
     // set type to server response
-    response.data.mode = NTP_MODE_SRV;
-    response.data.status = leapIndicator;
+    response.ntp.mode = NTP_MODE_SRV;
+    response.ntp.status = leapIndicator;
     // set stratum and precision
-    response.data.stratum = clockStratum;
-    response.data.precision = NTP_CLK_PREC;
+    response.ntp.stratum = clockStratum;
+    response.ntp.precision = NTP_CLK_PREC;
     // set root delay
-    response.data.rootDelay = htonl(rootDelay);
+    response.ntp.rootDelay = htonl(rootDelay);
     // set root dispersion
-    response.data.rootDispersion = htonl(rootDispersion);
+    response.ntp.rootDispersion = htonl(rootDispersion);
     // set reference ID
-    response.data.refID = refId;
+    response.ntp.refID = refId;
     // set reference timestamp
-    response.data.refTime = htonll(CLK_TAI_fromMono(lastUpdate) - clkTaiUtcOffset + NTP_UTC_OFFSET);
+    response.ntp.refTime = htonll(CLK_TAI_fromMono(lastUpdate) - clkTaiUtcOffset + NTP_UTC_OFFSET);
     // set origin and TX timestamps
     if (xleave < 0) {
-        response.data.origTime = request.data.txTime;
-        response.data.txTime = htonll(CLK_TAI() - clkTaiUtcOffset + NTP_UTC_OFFSET);
+        response.ntp.origTime = request.ntp.txTime;
+        response.ntp.txTime = htonll(CLK_TAI() - clkTaiUtcOffset + NTP_UTC_OFFSET);
     }
     else {
-        response.data.origTime = request.data.rxTime;
-        response.data.txTime = tsXleave[xleave].txTime;
+        response.ntp.origTime = request.ntp.rxTime;
+        response.ntp.txTime = tsXleave[xleave].txTime;
     }
     // set RX timestamp
-    response.data.rxTime = htonll(rxTime);
+    response.ntp.rxTime = htonll(rxTime);
 
     // finalize packet
     UDP_finalize(txFrame, flen);
@@ -211,10 +211,10 @@ static void ntpRequest(uint8_t *frame, const int flen) {
 // process peer response
 static void ntpResponse(uint8_t *frame, const int flen) {
     // discard malformed packets
-    if (flen < NTP4_SIZE)
+    if (flen < static_cast<int>(sizeof(FrameNtp)))
         return;
     // map headers
-    auto &response = PacketUDP<HEADER_NTP>::from(frame);
+    auto &response = FrameNtp::from(frame);
 
     // verify destination
     if (isMyMAC(response.eth.macDst))
@@ -225,10 +225,10 @@ static void ntpResponse(uint8_t *frame, const int flen) {
     if (response.ip4.src == ipAddress)
         return;
     // filter non-server frames
-    if (response.data.mode != NTP_MODE_SRV)
+    if (response.ntp.mode != NTP_MODE_SRV)
         return;
     // filter invalid frames
-    if (response.data.origTime == 0)
+    if (response.ntp.origTime == 0)
         return;
 
     // locate recipient
@@ -410,6 +410,40 @@ static const struct {
     {chronycNtpData, REP_LEN_NTP_DATA, REQ_NTP_DATA}
 };
 
+struct [[gnu::packed]] FrameChronyRequest : FrameUdp4 {
+    CMD_Request request;
+
+    static auto& from(void *frame) {
+        return *static_cast<FrameChronyRequest*>(frame);
+    }
+
+    static auto& from(const void *frame) {
+        return *static_cast<const FrameChronyRequest*>(frame);
+    }
+
+    [[nodiscard]]
+    auto ptr() const {
+        return reinterpret_cast<const CMD_Request*>(reinterpret_cast<const char*>(this) + DATA_OFFSET);
+    }
+};
+
+struct [[gnu::packed]] FrameChronyReply : FrameUdp4 {
+    CMD_Reply reply;
+
+    static auto& from(void *frame) {
+        return *static_cast<FrameChronyReply*>(frame);
+    }
+
+    static auto& from(const void *frame) {
+        return *static_cast<const FrameChronyReply*>(frame);
+    }
+
+    [[nodiscard]]
+    auto ptr() {
+        return reinterpret_cast<CMD_Reply*>(reinterpret_cast<char*>(this) + DATA_OFFSET);
+    }
+};
+
 static void chronycRequest(uint8_t *frame, const int flen) {
     // drop invalid packets
     if (flen < UDP_DATA_OFFSET + REQ_MIN_LEN)
@@ -418,19 +452,19 @@ static void chronycRequest(uint8_t *frame, const int flen) {
         return;
 
     // map headers
-    const auto &request = PacketUDP<CMD_Request>::from(frame);
+    const auto &packet = FrameChronyRequest::from(frame);
 
     // drop invalid packets
-    if (request.data.pkt_type != PKT_TYPE_CMD_REQUEST)
+    if (packet.request.pkt_type != PKT_TYPE_CMD_REQUEST)
         return;
-    if (request.data.pad1 != 0)
+    if (packet.request.pad1 != 0)
         return;
-    if (request.data.pad2 != 0)
+    if (packet.request.pad2 != 0)
         return;
 
     // drop packet if nack is not possible
-    if (request.data.version != PROTO_VERSION_NUMBER) {
-        if (request.data.version < PROTO_VERSION_MISMATCH_COMPAT_SERVER)
+    if (packet.request.version != PROTO_VERSION_NUMBER) {
+        if (packet.request.version < PROTO_VERSION_MISMATCH_COMPAT_SERVER)
             return;
     }
 
@@ -443,25 +477,25 @@ static void chronycRequest(uint8_t *frame, const int flen) {
     UDP_returnToSender(resp, ipAddress, DEFAULT_CANDM_PORT);
 
     // remap headers
-    auto &response = PacketUDP<CMD_Reply>::from(resp);
+    auto &response = FrameChronyReply::from(resp);
 
     // begin response
-    chronycReply(response.ptr(), request.ptr());
+    chronycReply(response.ptr(), packet.ptr());
 
     // nack bad protocol version
-    if (response.data.version != PROTO_VERSION_NUMBER) {
-        response.data.status = htons(STT_BADPKTVERSION);
+    if (response.reply.version != PROTO_VERSION_NUMBER) {
+        response.reply.status = htons(STT_BADPKTVERSION);
     }
     else {
-        response.data.status = htons(STT_INVALID);
-        const uint16_t cmd = htons(response.data.command);
+        response.reply.status = htons(STT_INVALID);
+        const uint16_t cmd = htons(response.reply.command);
         const int len = flen - UDP_DATA_OFFSET;
         for (const auto &handler : handlers) {
             if (handler.cmd == cmd) {
                 if (handler.len == len)
-                    response.data.status = handler(response.ptr(), request.ptr());
+                    response.reply.status = handler(response.ptr(), packet.ptr());
                 else
-                    response.data.status = htons(STT_BADPKTLENGTH);
+                    response.reply.status = htons(STT_BADPKTLENGTH);
                 break;
             }
         }

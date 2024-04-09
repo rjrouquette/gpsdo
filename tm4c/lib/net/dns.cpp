@@ -115,9 +115,9 @@ static void processFrame(uint8_t *frame, const int flen) {
     if (flen < DNS_HEAD_SIZE)
         return;
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
+    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
+    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
+    const auto headerUDP = reinterpret_cast<HeaderUdp4*>(headerIP4 + 1);
     const auto headerDNS = reinterpret_cast<HEADER_DNS*>(headerUDP + 1);
     // verify destination
     if (isMyMAC(headerEth->macDst))
@@ -228,9 +228,9 @@ static void sendRequest(const char *hostname, const uint16_t requestId) {
     memset(frame, 0, DNS_HEAD_SIZE);
 
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
+    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
+    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
+    const auto headerUDP = reinterpret_cast<HeaderUdp4*>(headerIP4 + 1);
     const auto headerDNS = reinterpret_cast<HEADER_DNS*>(headerUDP + 1);
 
     // MAC address

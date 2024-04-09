@@ -94,9 +94,9 @@ public:
      * Cancel the task.
      */
     void cancel() {
+        schedule = Canceled;
         callback = doNothing;
         reference = nullptr;
-        schedule = Canceled;
     }
 
     /**
@@ -130,7 +130,7 @@ public:
      */
     [[nodiscard]]
     bool isCanceled() const {
-        return callback == doNothing;
+        return schedule == Canceled;
     }
 
     /**
@@ -282,11 +282,11 @@ Task* Task::alloc() {
 
 void Task::update() {
     // free task if it has been canceled
-    if (callback == doNothing) {
+    if (schedule == Canceled) {
         pop();
         // push onto free stack
-        callback = nullptr;
         schedule = Free;
+        callback = nullptr;
         qPrev = nullptr;
         qNext = taskFree;
         taskFree = this;

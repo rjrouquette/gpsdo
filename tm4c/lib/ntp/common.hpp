@@ -5,10 +5,7 @@
 #pragma once
 
 #include <cstdint>
-#include "../net/ip.hpp"
 #include "../net/udp.hpp"
-
-#define NTP4_SIZE (UDP_DATA_OFFSET + 48)
 
 #define NTP_PORT_SRV (123)
 #define NTP_PORT_CLI (12345)
@@ -20,7 +17,7 @@
 
 #define NTP_UTC_OFFSET (0x83AA7E8000000000ull)
 
-struct [[gnu::packed]] HEADER_NTP {
+struct [[gnu::packed]] HeaderNtp {
     uint16_t mode    : 3;
     uint16_t version : 3;
     uint16_t status  : 2;
@@ -36,4 +33,18 @@ struct [[gnu::packed]] HEADER_NTP {
     uint64_t txTime;
 };
 
-static_assert(sizeof(HEADER_NTP) == 48, "HEADER_NTP4 must be 48 bytes");
+static_assert(sizeof(HeaderNtp) == 48, "HEADER_NTP4 must be 48 bytes");
+
+struct [[gnu::packed]] FrameNtp : FrameUdp4 {
+    HeaderNtp ntp;
+
+    static auto& from(void *frame) {
+        return *static_cast<FrameNtp*>(frame);
+    }
+
+    static auto& from(const void *frame) {
+        return *static_cast<const FrameNtp*>(frame);
+    }
+};
+
+static_assert(sizeof(FrameNtp) == 90, "FrameNtp must be 90 bytes");

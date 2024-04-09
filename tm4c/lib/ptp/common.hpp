@@ -80,7 +80,7 @@ struct [[gnu::packed]] HEADER_PTP {
 
 static_assert(sizeof(HEADER_PTP) == 34, "HEADER_PTP must be 34 bytes");
 
-constexpr int PTP2_MIN_SIZE = sizeof(HEADER_ETH) + sizeof(HEADER_PTP);
+constexpr int PTP2_MIN_SIZE = sizeof(HeaderEthernet) + sizeof(HEADER_PTP);
 
 struct [[gnu::packed]] PTP2_ANNOUNCE {
     PTP2_TIMESTAMP originTimestamp;
@@ -126,9 +126,9 @@ static_assert(sizeof(PTP2_PDELAY_RESP) == 20, "PTP2_PDELAY_FOLLOW_UP must be 34 
 
 template <typename T>
 struct PacketPTP {
-    static constexpr int DATA_OFFSET = sizeof(HEADER_ETH) + sizeof(HEADER_PTP);
+    static constexpr int DATA_OFFSET = sizeof(HeaderEthernet) + sizeof(HEADER_PTP);
 
-    HEADER_ETH eth;
+    HeaderEthernet eth;
     HEADER_PTP ptp;
     T data;
 

@@ -240,64 +240,61 @@ void ntp::Peer::pollSend() {
     const int txDesc = NET_getTxDesc();
     // allocate and clear frame buffer
     uint8_t *frame = NET_getTxBuff(txDesc);
-    memset(frame, 0, NTP4_SIZE);
+    memset(frame, 0, sizeof(FrameNtp));
 
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
-    const auto headerNTP = reinterpret_cast<HEADER_NTP*>(headerUDP + 1);
+    auto &packet = FrameNtp::from(frame);
 
     // MAC address
-    copyMAC(headerEth->macDst, macAddr);
+    copyMAC(packet.eth.macDst, macAddr);
 
     // IPv4 Header
     IPv4_init(frame);
-    headerIP4->dst = id;
-    headerIP4->src = ipAddress;
-    headerIP4->proto = IP_PROTO_UDP;
+    packet.ip4.dst = id;
+    packet.ip4.src = ipAddress;
+    packet.ip4.proto = IP_PROTO_UDP;
 
     // UDP Header
-    headerUDP->portSrc = htons(NTP_PORT_CLI);
-    headerUDP->portDst = htons(NTP_PORT_SRV);
+    packet.udp.portSrc = htons(NTP_PORT_CLI);
+    packet.udp.portDst = htons(NTP_PORT_SRV);
 
     // set type to client request
-    headerNTP->version = 4;
-    headerNTP->mode = 3;
-    headerNTP->poll = poll;
+    packet.ntp.version = 4;
+    packet.ntp.mode = 3;
+    packet.ntp.poll = poll;
     // set stratum and precision
-    headerNTP->stratum = 16;
-    headerNTP->precision = NTP_CLK_PREC;
+    packet.ntp.stratum = 16;
+    packet.ntp.precision = NTP_CLK_PREC;
     // set reference ID
-    headerNTP->refID = 0;
+    packet.ntp.refID = 0;
     // set reference timestamp
-    headerNTP->refTime = 0;
+    packet.ntp.refTime = 0;
     if (pollXleave) {
         // set filter timestamps
         filterRx = htonll(local_rx_hw[0]);
         filterTx = htonll(local_tx_hw[0]);
         // interleaved query
-        headerNTP->origTime = remote_rx;
-        headerNTP->rxTime = filterRx;
-        headerNTP->txTime = filterTx;
+        packet.ntp.origTime = remote_rx;
+        packet.ntp.rxTime = filterRx;
+        packet.ntp.txTime = filterTx;
     }
     else {
         // set filter timestamps
         filterRx = 0;
         filterTx = htonll(CLK_MONO());
         // standard query
-        headerNTP->origTime = 0;
-        headerNTP->rxTime = filterRx;
-        headerNTP->txTime = filterTx;
+        packet.ntp.origTime = 0;
+        packet.ntp.rxTime = filterRx;
+        packet.ntp.txTime = filterTx;
         // set callback for tx timestamp
         NET_setTxCallback(txDesc, txCallback, this);
     }
 
     // transmit request
     ++txCount;
-    UDP_finalize(frame, NTP4_SIZE);
-    IPv4_finalize(frame, NTP4_SIZE);
-    NET_transmit(txDesc, NTP4_SIZE);
+    UDP_finalize(frame, sizeof(FrameNtp));
+    IPv4_finalize(frame, sizeof(FrameNtp));
+    NET_transmit(txDesc, sizeof(FrameNtp));
 }
 
 bool ntp::Peer::isMacInvalid() {
@@ -339,25 +336,22 @@ void ntp::Peer::receive(uint8_t *frame, int flen) {
     ++rxCount;
 
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
-    const auto headerNTP = reinterpret_cast<HEADER_NTP*>(headerUDP + 1);
+    const auto &packet = FrameNtp::from(frame);
 
     // check for interleaved response
     if (pollXleave) {
         // discard non-interleaved packets
-        if (headerNTP->origTime == filterTx) {
+        if (packet.ntp.origTime == filterTx) {
             // packet received, but it was not interleaved
             pktRecv = true;
             xleave = false;
             return;
         }
         // discard unsolicited packets
-        if (headerNTP->origTime != filterRx)
+        if (packet.ntp.origTime != filterRx)
             return;
         // replace remote TX timestamp with updated value
-        remote_tx = headerNTP->txTime;
+        remote_tx = packet.ntp.txTime;
         // packet received, and it was interleaved
         pktRecv = true;
         xleave = true;
@@ -367,7 +361,7 @@ void ntp::Peer::receive(uint8_t *frame, int flen) {
     }
 
     // drop unsolicited packets
-    if (headerNTP->origTime != filterTx)
+    if (packet.ntp.origTime != filterTx)
         return;
     // prevent reception of duplicate packets
     filterTx = 0;
@@ -377,19 +371,19 @@ void ntp::Peer::receive(uint8_t *frame, int flen) {
     NET_getRxTime(local_rx_hw);
 
     // set stratum
-    stratum = headerNTP->stratum;
-    leap = headerNTP->status;
-    precision = headerNTP->precision;
-    version = headerNTP->version;
-    ntpMode = headerNTP->mode;
-    refId = headerNTP->refID;
-    refTime = headerNTP->refTime;
+    stratum = packet.ntp.stratum;
+    leap = packet.ntp.status;
+    precision = packet.ntp.precision;
+    version = packet.ntp.version;
+    ntpMode = packet.ntp.mode;
+    refId = packet.ntp.refID;
+    refTime = packet.ntp.refTime;
     // set remote timestamps
-    remote_rx = headerNTP->rxTime;
-    remote_tx = headerNTP->txTime;
+    remote_rx = packet.ntp.rxTime;
+    remote_tx = packet.ntp.txTime;
     // set root metrics
-    rootDelay = htonl(headerNTP->rootDelay);
-    rootDispersion = htonl(headerNTP->rootDispersion);
+    rootDelay = htonl(packet.ntp.rootDelay);
+    rootDispersion = htonl(packet.ntp.rootDispersion);
     // increment count of valid packets
     ++rxValid;
 }

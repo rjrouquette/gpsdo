@@ -20,7 +20,7 @@ void IPv4_process(uint8_t *frame, const int flen) {
     if (flen < 60)
         return;
 
-    const auto headerIPv4 = reinterpret_cast<struct HEADER_IP4*>(frame + sizeof(struct HEADER_ETH));
+    const auto headerIPv4 = reinterpret_cast<struct HeaderIp4*>(frame + sizeof(struct HeaderEthernet));
     // must be version 4
     if (headerIPv4->head.VER != 4)
         return;
@@ -43,7 +43,7 @@ void IPv4_process(uint8_t *frame, const int flen) {
 volatile uint16_t ipID = 0x1234;
 
 void IPv4_init(uint8_t *frame) {
-    const auto headerIPv4 = reinterpret_cast<struct HEADER_IP4*>(frame + sizeof(struct HEADER_ETH));
+    const auto headerIPv4 = reinterpret_cast<struct HeaderIp4*>(frame + sizeof(struct HeaderEthernet));
     headerIPv4->head.VER = 4;
     headerIPv4->head.IHL = 5;
     headerIPv4->id = htons(ipID);
@@ -54,19 +54,19 @@ void IPv4_init(uint8_t *frame) {
 
 void IPv4_finalize(uint8_t *frame, int flen) {
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
+    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
+    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
 
     // set EtherType
     headerEth->ethType = ETHTYPE_IP4;
     // compute IPv4 length
-    flen -= sizeof(HEADER_ETH);
+    flen -= sizeof(HeaderEthernet);
     // set IPv4 length
     headerIP4->len = htons(flen);
     // clear checksum
     headerIP4->chksum = 0;
     // compute checksum
-    headerIP4->chksum = RFC1071_checksum(headerIP4, sizeof(HEADER_IP4));
+    headerIP4->chksum = RFC1071_checksum(headerIP4, sizeof(HeaderIp4));
 }
 
 void IPv4_macMulticast(uint8_t *mac, const uint32_t groupAddress) {
@@ -80,8 +80,8 @@ void IPv4_macMulticast(uint8_t *mac, const uint32_t groupAddress) {
 
 void IPv4_setMulticast(uint8_t *frame, const uint32_t groupAddress) {
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
+    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
+    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
 
     // set MAC address
     IPv4_macMulticast(headerEth->macDst, groupAddress);

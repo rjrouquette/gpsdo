@@ -19,7 +19,6 @@
 #include "lib/clk/tai.hpp"
 #include "lib/net/arp.hpp"
 #include "lib/net/dhcp.hpp"
-#include "lib/net/eth.hpp"
 #include "lib/net/ip.hpp"
 #include "lib/net/udp.hpp"
 #include "lib/net/util.hpp"
@@ -30,6 +29,22 @@
 #define STATUS_PORT (23) // telnet port
 
 namespace status {
+    struct [[gnu::packed]] FrameStatus : FrameUdp4 {
+        static constexpr int DATA_OFFSET = FrameUdp4::DATA_OFFSET;
+
+        char data[0];
+
+        static auto& from(void *frame) {
+            return *static_cast<FrameStatus*>(frame);
+        }
+
+        static auto& from(const void *frame) {
+            return *static_cast<const FrameStatus*>(frame);
+        }
+    };
+
+    static_assert(sizeof(FrameStatus) == 42, "FrameStatus must be 42 bytes");
+
     static void process(uint8_t *frame, int flen);
 }
 
@@ -60,14 +75,14 @@ static void status::process(uint8_t *frame, int flen) {
     if (flen > 128)
         return;
     // map headers
-    const auto &request = PacketUDP<char>::from(frame);
+    const auto &request = FrameStatus::from(frame);
     // verify destination
     if (isMyMAC(request.eth.macDst))
         return;
     if (request.ip4.dst != ipAddress)
         return;
     // restrict length
-    unsigned size = htons(request.udp.length) - sizeof(HEADER_UDP);
+    unsigned size = htons(request.udp.length) - sizeof(HeaderUdp4);
     if (size > 31)
         return;
     // status activity
@@ -78,10 +93,10 @@ static void status::process(uint8_t *frame, int flen) {
     uint8_t *txFrame = NET_getTxBuff(txDesc);
     memcpy(txFrame, frame, flen);
     UDP_returnToSender(txFrame, ipAddress, STATUS_PORT);
-    auto &response = PacketUDP<char>::from(txFrame);
+    auto &response = FrameStatus::from(txFrame);
 
     // get packet body
-    char *body = response.ptr();
+    char *body = response.data;
     // force null termination
     body[size] = 0;
     if (strncmp(body, "clock", 5) == 0 && hasTerminus(body, 8)) {

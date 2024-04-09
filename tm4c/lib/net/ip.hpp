@@ -6,11 +6,13 @@
 
 #include <cstdint>
 
+#include "eth.hpp"
+
 #define IP_PROTO_ICMP   (1)
 #define IP_PROTO_TCP    (6)
 #define IP_PROTO_UDP    (17)
 
-struct [[gnu::packed]] HEADER_IP4 {
+struct [[gnu::packed]] HeaderIp4 {
     union [[gnu::packed]] {
         struct [[gnu::packed]] {
             unsigned IHL  : 4;
@@ -33,7 +35,23 @@ struct [[gnu::packed]] HEADER_IP4 {
     uint32_t dst;
 };
 
-static_assert(sizeof(HEADER_IP4) == 20, "HEADER_IP4 must be 20 bytes");
+static_assert(sizeof(HeaderIp4) == 20, "HEADER_IP4 must be 20 bytes");
+
+struct [[gnu::packed]] FrameIp4 : FrameEthernet {
+    static constexpr int DATA_OFFSET = FrameEthernet::DATA_OFFSET + sizeof(HeaderIp4);
+
+    HeaderIp4 ip4;
+
+    static auto& from(void *frame) {
+        return *static_cast<FrameIp4*>(frame);
+    }
+
+    static auto& from(const void *frame) {
+        return *static_cast<const FrameIp4*>(frame);
+    }
+};
+
+static_assert(sizeof(FrameIp4) == 34, "FrameIp4 must be 42 bytes");
 
 extern volatile uint32_t ipBroadcast;
 extern volatile uint32_t ipAddress;

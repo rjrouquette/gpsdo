@@ -16,6 +16,22 @@
 #include <memory.h>
 
 namespace snmp {
+    struct [[gnu::packed]] FrameSnmp : FrameUdp4 {
+        static constexpr int DATA_OFFSET = FrameUdp4::DATA_OFFSET;
+
+        uint8_t data[0];
+
+        static auto& from(void *frame) {
+            return *static_cast<FrameSnmp*>(frame);
+        }
+
+        static auto& from(const void *frame) {
+            return *static_cast<const FrameSnmp*>(frame);
+        }
+    };
+
+    static_assert(sizeof(FrameSnmp) == 42, "FrameSnmp must be 42 bytes");
+
     static constexpr int PORT = 161;
 
     static constexpr uint8_t OID_PREFIX_MGMT[] = {0x2B, 6, 1, 2, 1};
@@ -37,8 +53,8 @@ void snmp::init() {
 
 static void snmp::process(uint8_t *frame, int flen) {
     // map headers
-    const auto &request = PacketUDP<uint8_t>::from(frame);
-    const int dlen = flen - PacketUDP<uint8_t>::DATA_OFFSET;
+    const auto &request = FrameSnmp::from(frame);
+    const int dlen = flen - FrameSnmp::DATA_OFFSET;
 
     // verify destination
     if (isMyMAC(request.eth.macDst))
@@ -49,7 +65,7 @@ static void snmp::process(uint8_t *frame, int flen) {
     LED_act1();
 
     // parse packet
-    const auto dataSNMP = &request.data;
+    const auto dataSNMP = request.data;
     int offset = 0;
     uint8_t buff[16];
     // must be an ANS.1 sequence
@@ -142,10 +158,10 @@ static void sendResults(const uint8_t *frame, const uint8_t *data, int dlen) {
     UDP_returnToSender(txFrame, ipAddress, snmp::PORT);
 
     // map headers
-    auto &response = PacketUDP<uint8_t>::from(txFrame);
+    auto &response = snmp::FrameSnmp::from(txFrame);
 
-    int flen = PacketUDP<uint8_t>::DATA_OFFSET;
-    flen += snmp::wrapVars(snmp::reqId, &response.data, data, dlen);
+    int flen = snmp::FrameSnmp::DATA_OFFSET;
+    flen += snmp::wrapVars(snmp::reqId, response.data, data, dlen);
 
     // transmit response
     UDP_finalize(txFrame, flen);

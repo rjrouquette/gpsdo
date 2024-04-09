@@ -20,7 +20,9 @@
 #define ARP_OP_REQUEST (0x0100)
 #define ARP_OP_REPLY (0x0200)
 
-struct [[gnu::packed]] ARP_IP4 {
+#define ARP_FRAME_LEN (60)
+
+struct [[gnu::packed]] HeaderArp4 {
     uint16_t HTYPE;
     uint16_t PTYPE;
     uint8_t HLEN;
@@ -32,16 +34,28 @@ struct [[gnu::packed]] ARP_IP4 {
     uint32_t TPA;
 };
 
-static_assert(sizeof(ARP_IP4) == 28, "ARP_IP4 must be 28 bytes");
+static_assert(sizeof(HeaderArp4) == 28, "HeaderArp4 must be 28 bytes");
 
-#define ARP_FRAME_LEN (60)
+struct [[gnu::packed]] FrameArp4 : FrameEthernet {
+    HeaderArp4 arp;
 
-typedef struct ArpRequest {
+    static auto& from(void *frame) {
+        return *static_cast<FrameArp4*>(frame);
+    }
+
+    static auto& from(const void *frame) {
+        return *static_cast<const FrameArp4*>(frame);
+    }
+};
+
+static_assert(sizeof(FrameArp4) == 42, "FrameArp4 must be 42 bytes");
+
+struct ArpRequest {
     uint32_t expire;
     uint32_t remoteAddress;
     CallbackARP callback;
     void *ref;
-} ArpRequest;
+};
 
 ArpRequest requests[MAX_REQUESTS];
 
@@ -65,28 +79,26 @@ void ARP_refreshRouter() {
 }
 
 void makeArpIp4(
-    void *packet,
+    void *frame,
     const uint16_t op,
     const void *macTrg,
     const uint32_t ipTrg
 ) {
-    bzero(packet, ARP_FRAME_LEN);
-
-    const auto header = static_cast<HEADER_ETH*>(packet);
-    const auto payload = reinterpret_cast<ARP_IP4*>(header + 1);
-
+    bzero(frame, ARP_FRAME_LEN);
+    // map headers
+    auto &packet = FrameArp4::from(frame);
     // ARP frame type
-    header->ethType = ETHTYPE_ARP;
+    packet.eth.ethType = ETHTYPE_ARP;
     // ARP payload
-    payload->HTYPE = 0x0100;
-    payload->PTYPE = ETHTYPE_IP4;
-    payload->HLEN = 6;
-    payload->PLEN = 4;
-    payload->OPER = op;
-    getMAC(payload->SHA);
-    payload->SPA = ipAddress;
-    copyMAC(payload->THA, macTrg);
-    payload->TPA = ipTrg;
+    packet.arp.HTYPE = 0x0100;
+    packet.arp.PTYPE = ETHTYPE_IP4;
+    packet.arp.HLEN = 6;
+    packet.arp.PLEN = 4;
+    packet.arp.OPER = op;
+    getMAC(packet.arp.SHA);
+    packet.arp.SPA = ipAddress;
+    copyMAC(packet.arp.THA, macTrg);
+    packet.arp.TPA = ipTrg;
 }
 
 static void arpAnnounce() {
@@ -104,7 +116,7 @@ static void arpAnnounce() {
         packetTX, ARP_OP_REQUEST,
         wildCard, ipAddress
     );
-    broadcastMAC(reinterpret_cast<HEADER_ETH*>(packetTX)->macDst);
+    broadcastMAC(reinterpret_cast<HeaderEthernet*>(packetTX)->macDst);
     // transmit frame
     NET_transmit(txDesc, ARP_FRAME_LEN);
 }
@@ -112,18 +124,17 @@ static void arpAnnounce() {
 static void arpRun(void *ref) {
     // process request expiration
     const uint32_t now = CLK_MONO_INT();
-    for (int i = 0; i < MAX_REQUESTS; i++) {
-        ArpRequest *request = requests + i;
+    for (auto &request : requests) {
         // skip empty slots
-        if (request->remoteAddress == 0)
+        if (request.remoteAddress == 0)
             continue;
         // skip fresh requests
-        if (static_cast<int32_t>(now - request->expire) <= 0)
+        if (static_cast<int32_t>(now - request.expire) <= 0)
             continue;
         // report expiration
         const uint8_t nullMac[6] = {0, 0, 0, 0, 0, 0};
-        (*(request->callback))(request->ref, request->remoteAddress, nullMac);
-        bzero(request, sizeof(ArpRequest));
+        (*request.callback)(request.ref, request.remoteAddress, nullMac);
+        request.remoteAddress = 0;
     }
 
     // link must be up to send packets
@@ -151,43 +162,43 @@ void ARP_process(uint8_t *frame, const int flen) {
     if (flen != ARP_FRAME_LEN)
         return;
     // map header and payload
-    const auto header = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto payload = reinterpret_cast<ARP_IP4*>(header + 1);
+    const auto &packet = FrameArp4::from(frame);
+
     // verify payload fields
-    if (payload->HTYPE != 0x0100)
+    if (packet.arp.HTYPE != 0x0100)
         return;
-    if (payload->PTYPE != ETHTYPE_IP4)
+    if (packet.arp.PTYPE != ETHTYPE_IP4)
         return;
-    if (payload->HLEN != 6)
+    if (packet.arp.HLEN != 6)
         return;
-    if (payload->PLEN != 4)
+    if (packet.arp.PLEN != 4)
         return;
     // perform operation
-    if (payload->OPER == ARP_OP_REQUEST) {
+    if (packet.arp.OPER == ARP_OP_REQUEST) {
         // send response
         if (ipAddress) {
-            if (ipAddress == payload->TPA) {
+            if (ipAddress == packet.arp.TPA) {
                 const int txDesc = NET_getTxDesc();
                 uint8_t *packetTX = NET_getTxBuff(txDesc);
                 makeArpIp4(
                     packetTX, ARP_OP_REPLY,
-                    payload->SHA, payload->SPA
+                    packet.arp.SHA, packet.arp.SPA
                 );
-                copyMAC(reinterpret_cast<HEADER_ETH*>(packetTX)->macDst, header->macSrc);
+                copyMAC(reinterpret_cast<HeaderEthernet*>(packetTX)->macDst, packet.eth.macSrc);
                 NET_transmit(txDesc, ARP_FRAME_LEN);
             }
         }
     }
-    else if (payload->OPER == ARP_OP_REPLY) {
+    else if (packet.arp.OPER == ARP_OP_REPLY) {
         // discard if not directly addressed to us
-        if (isMyMAC(header->macDst))
+        if (isMyMAC(packet.eth.macDst))
             return;
         // process reply
-        if (payload->SPA != 0) {
-            for (int i = 0; i < MAX_REQUESTS; i++) {
-                if (requests[i].remoteAddress == payload->SPA) {
-                    (*requests[i].callback)(requests[i].ref, requests[i].remoteAddress, payload->SHA);
-                    bzero(requests + i, sizeof(ArpRequest));
+        if (packet.arp.SPA != 0) {
+            for (auto &request : requests) {
+                if (request.remoteAddress == packet.arp.SPA) {
+                    (*request.callback)(request.ref, request.remoteAddress, packet.arp.SHA);
+                    request.remoteAddress = 0;
                 }
             }
         }
@@ -209,7 +220,7 @@ int ARP_request(const uint32_t remoteAddress, const CallbackARP callback, void *
             packetTX, ARP_OP_REQUEST,
             wildCard, remoteAddress
         );
-        broadcastMAC(reinterpret_cast<HEADER_ETH*>(packetTX)->macDst);
+        broadcastMAC(reinterpret_cast<HeaderEthernet*>(packetTX)->macDst);
         // register callback
         request.callback = callback;
         request.ref = ref;

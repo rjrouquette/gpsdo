@@ -66,15 +66,15 @@ inline void pad_opts(uint8_t *frame, int *flen) {
 }
 
 static void initPacket(void *frame) {
-    const auto headerEth = static_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
+    const auto headerEth = static_cast<HeaderEthernet*>(frame);
+    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
+    const auto headerUDP = reinterpret_cast<HeaderUdp4*>(headerIP4 + 1);
     const auto headerDHCP = reinterpret_cast<HEADER_DHCP*>(headerUDP + 1);
 
     // clear frame buffer
-    memset(headerEth, 0, sizeof(HEADER_ETH));
-    memset(headerIP4, 0, sizeof(HEADER_IP4));
-    memset(headerUDP, 0, sizeof(HEADER_UDP));
+    memset(headerEth, 0, sizeof(HeaderEthernet));
+    memset(headerIP4, 0, sizeof(HeaderIp4));
+    memset(headerUDP, 0, sizeof(HeaderUdp4));
     memset(headerDHCP, 0, sizeof(HEADER_DHCP));
 
     // broadcast MAC address
@@ -136,14 +136,14 @@ void DHCP_renew() {
     // initialize frame
     uint8_t *frame = NET_getTxBuff(txDesc);
     initPacket(frame);
-    int flen = sizeof(HEADER_ETH);
-    flen += sizeof(HEADER_IP4);
-    flen += sizeof(HEADER_UDP);
+    int flen = sizeof(HeaderEthernet);
+    flen += sizeof(HeaderIp4);
+    flen += sizeof(HeaderUdp4);
     flen += sizeof(HEADER_DHCP);
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
+    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
+    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
+    const auto headerUDP = reinterpret_cast<HeaderUdp4*>(headerIP4 + 1);
     const auto headerDHCP = reinterpret_cast<HEADER_DHCP*>(headerUDP + 1);
 
     if (ipAddress == 0) {
@@ -194,9 +194,9 @@ static void processFrame(uint8_t *frame, int flen) {
     if (flen < 282)
         return;
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
+    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
+    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
+    const auto headerUDP = reinterpret_cast<HeaderUdp4*>(headerIP4 + 1);
     const auto headerDHCP = reinterpret_cast<HEADER_DHCP*>(headerUDP + 1);
     // discard if not directly addressed to us
     if (isMyMAC(headerEth->macDst))
@@ -351,14 +351,14 @@ static void sendReply(HEADER_DHCP *response) {
     // initialize frame
     uint8_t *frame = NET_getTxBuff(txDesc);
     initPacket(frame);
-    int flen = sizeof(HEADER_ETH);
-    flen += sizeof(HEADER_IP4);
-    flen += sizeof(HEADER_UDP);
+    int flen = sizeof(HeaderEthernet);
+    flen += sizeof(HeaderIp4);
+    flen += sizeof(HeaderUdp4);
     flen += sizeof(HEADER_DHCP);
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HEADER_UDP*>(headerIP4 + 1);
+    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
+    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
+    const auto headerUDP = reinterpret_cast<HeaderUdp4*>(headerIP4 + 1);
     const auto headerDHCP = reinterpret_cast<HEADER_DHCP*>(headerUDP + 1);
     // request proposed lease
     headerDHCP->CIADDR = response->YIADDR;

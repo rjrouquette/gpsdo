@@ -15,8 +15,8 @@ static void sendPingResponse(uint8_t *frame, int flen);
 
 void ICMP_process(uint8_t *frame, int flen) {
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
+    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
+    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
     const auto headerICMP = reinterpret_cast<HEADER_ICMP4*>(headerIP4 + 1);
 
     // verify destination
@@ -38,8 +38,8 @@ void ICMP_process(uint8_t *frame, int flen) {
 
 static void sendPingResponse(uint8_t *frame, const int flen) {
     // map headers
-    const auto headerEth = reinterpret_cast<HEADER_ETH*>(frame);
-    const auto headerIP4 = reinterpret_cast<HEADER_IP4*>(headerEth + 1);
+    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
+    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
     const auto headerICMP = reinterpret_cast<HEADER_ICMP4*>(headerIP4 + 1);
 
     // change type to echo response
