@@ -36,8 +36,6 @@ struct [[gnu::packed]] FrameUdp4 : FrameIp4 {
 
 static_assert(sizeof(FrameUdp4) == 42, "FrameUdp4 must be 42 bytes");
 
-#define UDP_DATA_OFFSET (14+20+8)
-
 typedef void (*CallbackUDP)(uint8_t *frame, int flen);
 
 /**

@@ -445,9 +445,9 @@ struct [[gnu::packed]] FrameChronyReply : FrameUdp4 {
 
 static void chronycRequest(uint8_t *frame, const int flen) {
     // drop invalid packets
-    if (flen < UDP_DATA_OFFSET + REQ_MIN_LEN)
+    if (flen < FrameUdp4::DATA_OFFSET + REQ_MIN_LEN)
         return;
-    if (flen > UDP_DATA_OFFSET + REQ_MAX_LEN)
+    if (flen > FrameUdp4::DATA_OFFSET + REQ_MAX_LEN)
         return;
 
     // map headers
@@ -470,8 +470,8 @@ static void chronycRequest(uint8_t *frame, const int flen) {
     const int txDesc = NET_getTxDesc();
     // allocate and clear frame buffer
     uint8_t *resp = NET_getTxBuff(txDesc);
-    memset(resp, 0, UDP_DATA_OFFSET + sizeof(CMD_Reply));
-    memcpy(resp, frame, UDP_DATA_OFFSET);
+    memset(resp, 0, FrameUdp4::DATA_OFFSET + sizeof(CMD_Reply));
+    memcpy(resp, frame, FrameUdp4::DATA_OFFSET);
 
     // map headers
     auto &response = FrameChronyReply::from(resp);
@@ -488,7 +488,7 @@ static void chronycRequest(uint8_t *frame, const int flen) {
     else {
         response.reply.status = htons(STT_INVALID);
         const uint16_t cmd = htons(response.reply.command);
-        const int len = flen - UDP_DATA_OFFSET;
+        const int len = flen - FrameUdp4::DATA_OFFSET;
         for (const auto &handler : handlers) {
             if (handler.cmd == cmd) {
                 if (handler.len == len)

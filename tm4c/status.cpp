@@ -134,7 +134,7 @@ static void status::process(uint8_t *frame, int flen) {
     }
 
     // finalize response
-    flen = UDP_DATA_OFFSET + size;
+    flen = FrameUdp4::DATA_OFFSET + static_cast<int>(size);
     UDP_finalize(txFrame, flen);
     IPv4_finalize(txFrame, flen);
     // transmit response

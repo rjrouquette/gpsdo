@@ -152,7 +152,7 @@ static void sendResults(const uint8_t *frame, const uint8_t *data, int dlen) {
     // copy request frame
     const int txDesc = NET_getTxDesc();
     uint8_t *txFrame = NET_getTxBuff(txDesc);
-    memcpy(txFrame, frame, UDP_DATA_OFFSET);
+    memcpy(txFrame, frame, FrameUdp4::DATA_OFFSET);
 
     // map headers
     auto &response = snmp::FrameSnmp::from(txFrame);

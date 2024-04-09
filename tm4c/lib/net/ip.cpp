@@ -15,58 +15,61 @@ volatile uint32_t ipSubnet = -1;
 volatile uint32_t ipRouter = 0;
 volatile uint32_t ipDNS = 0;
 
+static constexpr struct {
+    uint8_t proto;
+    void (*handler)(uint8_t *frame, int flen);
+} registry[] = {
+    {IP_PROTO_ICMP, ICMP_process},
+    {IP_PROTO_UDP, UDP_process}
+};
+
 void IPv4_process(uint8_t *frame, const int flen) {
     // discard malformed frames
     if (flen < 60)
         return;
 
-    const auto headerIPv4 = reinterpret_cast<struct HeaderIp4*>(frame + sizeof(struct HeaderEthernet));
+    const auto &packet = FrameIp4::from(frame);
     // must be version 4
-    if (headerIPv4->head.VER != 4)
+    if (packet.ip4.head.VER != 4)
         return;
-    // must standard 5 word header
-    if (headerIPv4->head.IHL != 5)
+    // must have standard 5 word header
+    if (packet.ip4.head.IHL != 5)
         return;
 
-    // process ICMP frame
-    if (headerIPv4->proto == IP_PROTO_ICMP) {
-        ICMP_process(frame, flen);
-        return;
-    }
-    // process UDP frame
-    if (headerIPv4->proto == IP_PROTO_UDP) {
-        UDP_process(frame, flen);
-        return;
+    for (const auto &entry : registry) {
+        if(packet.ip4.proto == entry.proto) {
+            (*entry.handler)(frame, flen);
+            break;
+        }
     }
 }
 
 volatile uint16_t ipID = 0x1234;
 
 void IPv4_init(uint8_t *frame) {
-    const auto headerIPv4 = reinterpret_cast<struct HeaderIp4*>(frame + sizeof(struct HeaderEthernet));
-    headerIPv4->head.VER = 4;
-    headerIPv4->head.IHL = 5;
-    headerIPv4->id = htons(ipID);
-    headerIPv4->flags = 0x40;
-    headerIPv4->ttl = 32;
+    auto &packet = FrameIp4::from(frame);
+    packet.ip4.head.VER = 4;
+    packet.ip4.head.IHL = 5;
+    packet.ip4.id = htons(ipID);
+    packet.ip4.flags = 0x40;
+    packet.ip4.ttl = 32;
     ++ipID;
 }
 
 void IPv4_finalize(uint8_t *frame, int flen) {
     // map headers
-    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
-    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
+    auto &packet = FrameIp4::from(frame);
 
     // set EtherType
-    headerEth->ethType = ETHTYPE_IP4;
+    packet.eth.ethType = ETHTYPE_IP4;
     // compute IPv4 length
     flen -= sizeof(HeaderEthernet);
     // set IPv4 length
-    headerIP4->len = htons(flen);
+    packet.ip4.len = htons(flen);
     // clear checksum
-    headerIP4->chksum = 0;
+    packet.ip4.chksum = 0;
     // compute checksum
-    headerIP4->chksum = RFC1071_checksum(headerIP4, sizeof(HeaderIp4));
+    packet.ip4.chksum = RFC1071_checksum(&packet.ip4, sizeof(HeaderIp4));
 }
 
 void IPv4_macMulticast(uint8_t *mac, const uint32_t groupAddress) {
@@ -80,13 +83,12 @@ void IPv4_macMulticast(uint8_t *mac, const uint32_t groupAddress) {
 
 void IPv4_setMulticast(uint8_t *frame, const uint32_t groupAddress) {
     // map headers
-    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
-    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
+    auto &packet = FrameIp4::from(frame);
 
     // set MAC address
-    IPv4_macMulticast(headerEth->macDst, groupAddress);
+    IPv4_macMulticast(packet.eth.macDst, groupAddress);
     // set group address
-    headerIP4->dst = groupAddress;
+    packet.ip4.dst = groupAddress;
 }
 
 uint16_t RFC1071_checksum(volatile const void *buffer, const int len) {

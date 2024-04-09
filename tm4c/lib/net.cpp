@@ -67,6 +67,15 @@ static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
 void PTP_process(uint8_t *frame, int flen);
 
+static constexpr struct {
+    uint16_t ethType;
+    void (*handler)(uint8_t *frame, int flen);
+} registry[] = {
+    {ETHTYPE_ARP, ARP_process},
+    {ETHTYPE_PTP, PTP_process},
+    {ETHTYPE_IP4, IPv4_process},
+};
+
 static void initDescriptors() {
     // init receive descriptors
     for (int i = 0; i < RX_RING_SIZE; i++) {
@@ -306,12 +315,12 @@ static bool processFrame() {
     ) {
         const auto ethType = headerEth->ethType;
         // dispatch frame processor
-        if (ethType == ETHTYPE_ARP)
-            ARP_process(buffer, length);
-        else if (ethType == ETHTYPE_IP4)
-            IPv4_process(buffer, length);
-        else if (ethType == ETHTYPE_PTP)
-            PTP_process(buffer, length);
+        for (const auto &entry : registry) {
+            if(ethType == entry.ethType) {
+                (*entry.handler)(buffer, length);
+                break;
+            }
+        }
     }
     return true;
 }

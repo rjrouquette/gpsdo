@@ -14,13 +14,12 @@
 
 #include <cstring>
 
-#define DNS_HEAD_SIZE (UDP_DATA_OFFSET + 12)
 #define DNS_CLIENT_PORT (1367)
 #define DNS_SERVER_PORT (53)
 #define MAX_REQUESTS (16)
 #define REQUEST_EXPIRE (5)
 
-struct [[gnu::packed]] HEADER_DNS {
+struct [[gnu::packed]] HeaderDns {
     uint16_t id;
     uint16_t rd     : 1;
     uint16_t tc     : 1;
@@ -36,7 +35,24 @@ struct [[gnu::packed]] HEADER_DNS {
     uint16_t arcount;
 };
 
-static_assert(sizeof(HEADER_DNS) == 12, "HEADER_DNS must be 12 bytes");
+static_assert(sizeof(HeaderDns) == 12, "HeaderDns must be 12 bytes");
+
+struct [[gnu::packed]] FrameDns : FrameUdp4 {
+    static constexpr int DATA_OFFSET = FrameUdp4::DATA_OFFSET + sizeof(HeaderDns);
+
+    HeaderDns dns;
+    char body[0];
+
+    static auto& from(void *frame) {
+        return *static_cast<FrameDns*>(frame);
+    }
+
+    static auto& from(const void *frame) {
+        return *static_cast<const FrameDns*>(frame);
+    }
+};
+
+static_assert(sizeof(FrameDns) == 54, "FrameDns must be 54 bytes");
 
 static struct {
     uint32_t expire;
@@ -112,30 +128,27 @@ int DNS_lookup(const char *hostname, const CallbackDNS callback, volatile void *
 
 static void processFrame(uint8_t *frame, const int flen) {
     // discard malformed packets
-    if (flen < DNS_HEAD_SIZE)
+    if (flen < FrameDns::DATA_OFFSET)
         return;
     // map headers
-    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
-    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HeaderUdp4*>(headerIP4 + 1);
-    const auto headerDNS = reinterpret_cast<HEADER_DNS*>(headerUDP + 1);
+    const auto &packet = FrameDns::from(frame);
     // verify destination
-    if (isMyMAC(headerEth->macDst))
+    if (isMyMAC(packet.eth.macDst))
         return;
-    if (headerIP4->dst != ipAddress)
+    if (packet.ip4.dst != ipAddress)
         return;
 
     // must be a query response
-    if (headerDNS->qr != 1)
+    if (packet.dns.qr != 1)
         return;
     // must be a standard query response
-    if (headerDNS->opcode != 0)
+    if (packet.dns.opcode != 0)
         return;
 
     // find matching request
     int match = -1;
     for (int i = 0; i < MAX_REQUESTS; i++) {
-        if (requests[i].callback != nullptr && requests[i].requestId == headerDNS->id) {
+        if (requests[i].callback != nullptr && requests[i].requestId == packet.dns.id) {
             match = i;
             break;
         }
@@ -145,12 +158,12 @@ static void processFrame(uint8_t *frame, const int flen) {
         return;
 
     // process response body
-    const char *end = reinterpret_cast<char*>(frame + flen);
-    char *body = reinterpret_cast<char*>(headerDNS + 1);
-    char *next = body;
+    const auto end = reinterpret_cast<const char*>(frame + flen);
+    const auto body = packet.body;
+    auto next = body;
 
     // skip over question if present
-    uint16_t cnt = htons(headerDNS->qcount);
+    uint16_t cnt = htons(packet.dns.qcount);
     for (uint16_t i = 0; i < cnt; i++) {
         // skip over name
         while (next < end) {
@@ -171,7 +184,7 @@ static void processFrame(uint8_t *frame, const int flen) {
         return;
 
     // process answers
-    cnt = htons(headerDNS->ancount);
+    cnt = htons(packet.dns.ancount);
     for (uint16_t i = 0; i < cnt; i++) {
         // skip over name
         while (next < end) {
@@ -187,12 +200,12 @@ static void processFrame(uint8_t *frame, const int flen) {
         // guard against malformed packets
         if (next >= end)
             return;
-        const uint16_t atype = htons(*(uint16_t*) next);
+        const auto atype = htons(*reinterpret_cast<const uint16_t*>(next));
         next += 2;
-        const uint16_t aclass = htons(*(uint16_t*) next);
+        const auto aclass = htons(*reinterpret_cast<const uint16_t*>(next));
         next += 2;
         next += 4; // skip TTL field
-        const uint16_t length = htons(*(uint16_t*) next);
+        const auto length = htons(*reinterpret_cast<const uint16_t*>(next));
         next += 2;
         // guard against malformed packets
         if (next >= end)
@@ -211,7 +224,7 @@ static void processFrame(uint8_t *frame, const int flen) {
             continue;
         }
         // read address
-        const uint32_t addr = *(uint32_t*) next;
+        const auto addr = *reinterpret_cast<const uint32_t*>(next);
         next += 4;
         // report address via callback
         (*requests[match].callback)(requests[match].ref, addr);
@@ -225,35 +238,32 @@ static void sendRequest(const char *hostname, const uint16_t requestId) {
     uint8_t *frame = NET_getTxBuff(txDesc);
 
     // clear frame buffer
-    memset(frame, 0, DNS_HEAD_SIZE);
+    memset(frame, 0, FrameDns::DATA_OFFSET);
 
     // map headers
-    const auto headerEth = reinterpret_cast<HeaderEthernet*>(frame);
-    const auto headerIP4 = reinterpret_cast<HeaderIp4*>(headerEth + 1);
-    const auto headerUDP = reinterpret_cast<HeaderUdp4*>(headerIP4 + 1);
-    const auto headerDNS = reinterpret_cast<HEADER_DNS*>(headerUDP + 1);
+    auto &packet = FrameDns::from(frame);
 
     // MAC address
-    copyMAC(headerEth->macDst, dnsMAC);
+    copyMAC(packet.eth.macDst, dnsMAC);
 
     // IPv4 Header
     IPv4_init(frame);
-    headerIP4->dst = ipDNS;
-    headerIP4->src = ipAddress;
-    headerIP4->proto = IP_PROTO_UDP;
+    packet.ip4.dst = ipDNS;
+    packet.ip4.src = ipAddress;
+    packet.ip4.proto = IP_PROTO_UDP;
 
     // UDP Header
-    headerUDP->portSrc = htons(DNS_CLIENT_PORT);
-    headerUDP->portDst = htons(DNS_SERVER_PORT);
+    packet.udp.portSrc = htons(DNS_CLIENT_PORT);
+    packet.udp.portDst = htons(DNS_SERVER_PORT);
 
     // set header fields
-    headerDNS->id = requestId;
-    headerDNS->rd = 1;
-    headerDNS->qcount = htons(1);
+    packet.dns.id = requestId;
+    packet.dns.rd = 1;
+    packet.dns.qcount = htons(1);
 
     // append query
-    char *base = reinterpret_cast<char*>(headerDNS + 1);
-    char *tail = base;
+    const auto base = packet.body;
+    auto tail = base;
     // append domain name
     for (;;) {
         // skip dots
@@ -278,7 +288,7 @@ static void sendRequest(const char *hostname, const uint16_t requestId) {
     tail += 2;
 
     // transmit request
-    const int flen = DNS_HEAD_SIZE + (tail - base);
+    const int flen = FrameDns::DATA_OFFSET + (tail - base);
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
     NET_transmit(txDesc, flen);
