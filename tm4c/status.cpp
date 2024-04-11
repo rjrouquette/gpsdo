@@ -15,7 +15,7 @@
 #include "lib/run.hpp"
 #include "lib/clk/clk.hpp"
 #include "lib/clk/comp.hpp"
-#include "lib/clk/mono.h"
+#include "lib/clk/mono.hpp"
 #include "lib/clk/tai.hpp"
 #include "lib/net/arp.hpp"
 #include "lib/net/dhcp.hpp"

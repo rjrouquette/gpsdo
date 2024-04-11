@@ -9,6 +9,9 @@
 #include "../hw/gpio.h"
 
 
+static constexpr int FAULT_BLINK = 200;
+static constexpr int FAULT_PAUSE = 1000;
+
 static volatile uint8_t status = 0;
 
 static void runLed(void *ref) {
@@ -34,7 +37,7 @@ void LED_init() {
     PORTN.LOCK = 0;
 
     // schedule LED update to run at 16 Hz
-    runSleep(RUN_SEC >> 4, runLed, nullptr);
+    runSleep(RUN_SEC / 16, runLed, nullptr);
 }
 
 void LED0_ON() { PORTN.DATA[0x01u] = 0x01u; }
@@ -60,19 +63,19 @@ void faultBlink(const int a, const int b) {
         LED1_OFF();
         auto c = a;
         while (c--) {
-            delay_ms(250);
+            delay_ms(FAULT_BLINK);
             LED0_ON();
-            delay_ms(250);
+            delay_ms(FAULT_BLINK);
             LED0_OFF();
         }
-        delay_ms(250);
+        delay_ms(FAULT_BLINK);
         c = b;
         while (c--) {
-            delay_ms(250);
+            delay_ms(FAULT_BLINK);
             LED1_ON();
-            delay_ms(250);
+            delay_ms(FAULT_BLINK);
             LED1_OFF();
         }
-        delay_ms(1000);
+        delay_ms(FAULT_PAUSE);
     }
 }

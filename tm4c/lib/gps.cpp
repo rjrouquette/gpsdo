@@ -9,7 +9,7 @@
 #include "../hw/interrupts.h"
 #include "../hw/uart.h"
 #include "clk/clk.hpp"
-#include "clk/mono.h"
+#include "clk/mono.hpp"
 #include "clk/util.hpp"
 
 #include <memory>
@@ -22,7 +22,7 @@ static constexpr int GPS_RING_MASK = GPS_RING_SIZE - 1;
 #define GPS_RST_INTV (300)
 #define GPS_RST_THR (60)
 
-#define INTV_HEALTH (RUN_SEC >> 1)
+static constexpr uint32_t INTV_HEALTH = RUN_SEC / 2;
 
 static constexpr int MAX_LENGTH = 256;
 
@@ -106,7 +106,7 @@ void GPS_init() {
     // configure UART 3
     UART3.CTL.UARTEN = 0;
     // baud divisor
-    constexpr float divisor = CLK_FREQ / (16.0f * 9600.0f);
+    constexpr float divisor = static_cast<float>(CLK_FREQ) / (16.0f * 9600.0f);
     constexpr int divisorInt = static_cast<int>(divisor);
     constexpr int divisorFrac = static_cast<int>((divisor - divisorInt) * 64.0f);
     UART3.IBRD.DIVINT = divisorInt;

@@ -4,7 +4,7 @@
 
 #include "comp.hpp"
 
-#include "mono.h"
+#include "mono.hpp"
 #include "util.hpp"
 #include "../delay.hpp"
 #include "../run.hpp"
@@ -16,7 +16,7 @@
 #define FRQ_TIMER GPTM1
 #define FRQ_PORT PORTA
 #define FRQ_PIN (1<<2)
-#define FRQ_INTV (CLK_FREQ / 2000) // 1 kHz
+static constexpr int FRQ_INTV = CLK_FREQ / 2000; // 1 kHz
 
 volatile uint64_t clkCompOffset = 0;
 volatile uint64_t clkCompRef = 0;
@@ -85,7 +85,7 @@ void initClkComp() {
 
     CLK_COMP_setComp(0);
     // schedule updates
-    runSleep(RUN_SEC >> 2, runClkComp, nullptr);
+    runSleep(RUN_SEC / 4, runClkComp, nullptr);
 }
 
 uint64_t CLK_COMP() {

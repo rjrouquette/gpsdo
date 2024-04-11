@@ -13,7 +13,7 @@
 #include "../net.hpp"
 #include "../run.hpp"
 #include "../../hw/sys.h"
-#include "../clk/mono.h"
+#include "../clk/mono.hpp"
 
 #include <memory.h>
 
@@ -124,7 +124,7 @@ void DHCP_init() {
     // register DHCP client port
     UDP_register(DHCP_PORT_CLI, processFrame);
     // wake every 0.5 seconds
-    runSleep(RUN_SEC >> 1, dhcpRun, nullptr);
+    runSleep(RUN_SEC / 2, dhcpRun, nullptr);
 }
 
 void DHCP_renew() {

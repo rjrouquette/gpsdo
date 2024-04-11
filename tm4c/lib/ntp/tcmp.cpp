@@ -10,7 +10,7 @@
 #include "../../hw/adc.h"
 #include "../../hw/eeprom.h"
 #include "../clk/comp.hpp"
-#include "../clk/mono.h"
+#include "../clk/mono.hpp"
 
 #include <cmath>
 

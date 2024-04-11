@@ -2,20 +2,14 @@
 // Created by robert on 4/26/23.
 //
 
-#ifndef GPSDO_CLK_MONO_H
-#define GPSDO_CLK_MONO_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#else
-#define static_assert _Static_assert
-#endif
-
-#include <stdint.h>
+#include <cstdint>
 #include "../hw/timer.h"
 
-#define CLK_FREQ (100000000)
-#define CLK_NANO (1000000000 / CLK_FREQ)
+static constexpr int MAX_RAW_INTV = 1u << 30;
+static constexpr int CLK_FREQ = 125000000;
+static constexpr int CLK_NANO = 1000000000 / CLK_FREQ;
 #define TIMER_MONO (GPTM0)
 
 /**
@@ -44,7 +38,7 @@ extern volatile uint32_t clkMonoEth;
 // timer tick capture of the PPS output
 extern volatile uint32_t clkMonoPps;
 // pps edge capture state
-extern volatile struct ClockEvent clkMonoPpsEvent;
+extern volatile ClockEvent clkMonoPpsEvent;
 
 /**
  * Returns the current value of the system clock (1s resolution)
@@ -61,11 +55,6 @@ uint64_t CLK_MONO();
 /**
  * Returns the raw value of the system clock timer
  */
-#define CLK_MONO_RAW (TIMER_MONO.TAV.raw)
-
-#ifdef __cplusplus
+inline uint32_t CLK_MONO_RAW() {
+    return TIMER_MONO.TAV.raw;
 }
-#endif
-
-
-#endif //GPSDO_CLK_MONO_H

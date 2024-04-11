@@ -28,8 +28,8 @@
 
 #define NTP_POOL_FQDN ("pool.ntp.org")
 
-#define DNS_UPDT_INTV (RUN_SEC << 4)    // every 16 seconds
-#define SRC_UPDT_INTV (RUN_SEC >> 4)    // 16 Hz
+static constexpr uint32_t DNS_UPDT_INTV = RUN_SEC * 16; // every 16 seconds
+static constexpr uint32_t SRC_UPDT_INTV = RUN_SEC / 16; // 16 Hz
 
 // static allocation for GPS source
 static char rawGps[sizeof(ntp::GPS)] alignas(ntp::GPS);

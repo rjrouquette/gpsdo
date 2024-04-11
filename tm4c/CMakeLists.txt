@@ -76,7 +76,7 @@ add_executable(
         lib/clk/comp.cpp
         lib/clk/comp.hpp
         lib/clk/mono.cpp
-        lib/clk/mono.h
+        lib/clk/mono.hpp
         lib/clk/tai.cpp
         lib/clk/tai.hpp
         lib/clk/util.cpp

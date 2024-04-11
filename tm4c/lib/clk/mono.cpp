@@ -2,7 +2,7 @@
 // Created by robert on 4/26/23.
 //
 
-#include "mono.h"
+#include "mono.hpp"
 
 #include "comp.hpp"
 #include "tai.hpp"
@@ -167,7 +167,7 @@ uint32_t CLK_MONO_INT() {
 uint64_t CLK_MONO() {
     // capture current time
     __disable_irq();
-    uint32_t snapF = CLK_MONO_RAW;
+    uint32_t snapF = CLK_MONO_RAW();
     uint32_t snapI = clkMonoInt;
     uint32_t snapO = clkMonoOff;
     __enable_irq();
@@ -179,7 +179,7 @@ uint64_t CLK_MONO() {
 // capture rising edge of PPS output for offset measurement
 void ISR_Timer4A() {
     // snapshot edge time
-    uint32_t timer = CLK_MONO_RAW;
+    uint32_t timer = CLK_MONO_RAW();
     uint32_t event = GPTM4.TAR.raw;
     // clear capture interrupt flag
     GPTM4.ICR = GPTM_ICR_CAE;
@@ -197,7 +197,7 @@ void ISR_Timer4B() {
 // capture rising edge of ethernet PPS for offset measurement
 void ISR_Timer5A() {
     // snapshot edge time
-    uint32_t timer = CLK_MONO_RAW;
+    uint32_t timer = CLK_MONO_RAW();
     uint32_t event = GPTM5.TAR.raw;
     // clear capture interrupt flag
     GPTM5.ICR = GPTM_ICR_CAE;
@@ -210,7 +210,7 @@ void ISR_Timer5A() {
 // capture rising edge of GPS PPS for offset measurement
 void ISR_Timer5B() {
     // snapshot edge time
-    uint32_t timer = CLK_MONO_RAW;
+    uint32_t timer = CLK_MONO_RAW();
     uint32_t event = GPTM5.TBR.raw;
     // clear capture interrupt flag
     GPTM5.ICR = GPTM_ICR_CBE;

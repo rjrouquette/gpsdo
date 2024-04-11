@@ -6,7 +6,7 @@
 
 #include "format.hpp"
 #include "led.hpp"
-#include "clk/mono.h"
+#include "clk/mono.hpp"
 
 #include <memory>
 
@@ -75,7 +75,9 @@ class Task {
      * @param fixed_8_24 fixed-point value to convert
      * @return number of timer ticks equivalent to the fixed-point value
      */
-    static uint32_t toMonoRaw(const uint32_t fixed_8_24) {
+    static uint32_t toMonoRaw(uint32_t fixed_8_24) {
+        if (fixed_8_24 > RUN_MAX)
+            fixed_8_24 = RUN_MAX;
         uint64_t scratch = fixed_8_24;
         scratch *= CLK_FREQ;
         return scratch >> 24;
@@ -112,7 +114,7 @@ public:
      */
     [[nodiscard]]
     bool isReady() const {
-        return static_cast<int32_t>(CLK_MONO_RAW - runNext) >= 0;
+        return static_cast<int32_t>(CLK_MONO_RAW() - runNext) >= 0;
     }
 
     /**
@@ -298,7 +300,7 @@ void Task::update() {
         // remove from queue
         pop();
         // set to run immediately
-        runNext = CLK_MONO_RAW;
+        runNext = CLK_MONO_RAW();
         // update schedule queue
         insert();
     }
@@ -327,7 +329,7 @@ void Task::requeue() {
     // remove from queue
     pop();
     // set next run time
-    runNext = runInterval + ((schedule == Periodic) ? runNext : CLK_MONO_RAW);
+    runNext = runInterval + ((schedule == Periodic) ? runNext : CLK_MONO_RAW());
     // schedule next run
     insert();
 }
@@ -340,7 +342,7 @@ void Task::setPeriodic(const uint32_t interval, const RunCall callback, void *re
     // convert fixed-point interval to raw monotonic domain
     runInterval = toMonoRaw(interval);
     // start after delay
-    runNext = CLK_MONO_RAW + runInterval;
+    runNext = CLK_MONO_RAW() + runInterval;
     // add to schedule
     insert();
 }
@@ -353,7 +355,7 @@ void Task::setSleep(const uint32_t delay, const RunCall callback, void *ref) {
     // convert fixed-point interval to raw monotonic domain
     runInterval = toMonoRaw(delay);
     // start after delay
-    runNext = CLK_MONO_RAW + runInterval;
+    runNext = CLK_MONO_RAW() + runInterval;
     // add to schedule
     insert();
 }
@@ -363,10 +365,10 @@ void Task::setWait(const RunCall callback, void *ref) {
     this->callback = callback;
     reference = ref;
 
-    // set run interval to a reasonably long value (without wrapping)
-    runInterval = 1u << 30;
+    // set run interval to the maximum raw clock interval
+    runInterval = MAX_RAW_INTV;
     // start after delay
-    runNext = CLK_MONO_RAW + runInterval;
+    runNext = CLK_MONO_RAW() + runInterval;
     // add to schedule
     insert();
 }

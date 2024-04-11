@@ -5,9 +5,10 @@
 #pragma once
 
 #include <cstdint>
+#include "clk/mono.hpp"
 
-#define RUN_MAX (1u << 28)
-#define RUN_SEC (1u << 24)
+static constexpr uint32_t RUN_SEC = 1u << 24;
+static constexpr uint32_t RUN_MAX = static_cast<uint64_t>(MAX_RAW_INTV) * RUN_SEC / CLK_FREQ;
 
 /**
  * Callback function typedef

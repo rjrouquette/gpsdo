@@ -4,7 +4,7 @@
 
 #include "clk.hpp"
 
-#include "mono.h"
+#include "mono.hpp"
 #include "util.hpp"
 #include "../hw/interrupts.h"
 #include "../hw/sys.h"

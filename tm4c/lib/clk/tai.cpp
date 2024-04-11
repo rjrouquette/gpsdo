@@ -5,7 +5,7 @@
 #include "tai.hpp"
 
 #include "comp.hpp"
-#include "mono.h"
+#include "mono.hpp"
 #include "util.hpp"
 #include "../delay.hpp"
 #include "../gps.hpp"
@@ -123,8 +123,8 @@ void initClkTai() {
     // initialize UTC offset
     clkTaiUtcOffset = static_cast<uint64_t>(GPS_taiOffset()) << 32;
     // schedule updates
-    runSleep(RUN_SEC >> 2, runClkTai, nullptr);
-    runSleep(RUN_SEC >> 6, runPpsTai, nullptr);
+    runSleep(RUN_SEC / 4, runClkTai, nullptr);
+    runSleep(RUN_SEC / 64, runPpsTai, nullptr);
 }
 
 uint64_t CLK_TAI() {

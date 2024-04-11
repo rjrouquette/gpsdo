@@ -9,7 +9,7 @@
 #include "ntp.hpp"
 #include "../run.hpp"
 #include "../clk/clk.hpp"
-#include "../clk/mono.h"
+#include "../clk/mono.hpp"
 #include "../clk/tai.hpp"
 #include "../clk/util.hpp"
 
@@ -29,7 +29,7 @@ ntp::GPS::GPS() :
     poll = 0;
 
     // run updates at 16Hz
-    runSleep(RUN_SEC >> 4, &run, this);
+    runSleep(RUN_SEC / 16, &run, this);
 }
 
 ntp::GPS::~GPS() {

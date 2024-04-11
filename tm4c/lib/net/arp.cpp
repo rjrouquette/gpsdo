@@ -9,7 +9,7 @@
 #include "util.hpp"
 #include "../net.hpp"
 #include "../run.hpp"
-#include "../clk/mono.h"
+#include "../clk/mono.hpp"
 
 #include <strings.h>
 
@@ -154,7 +154,7 @@ static void arpRun(void *ref) {
 
 void ARP_init() {
     // wake every 0.5 seconds
-    runSleep(RUN_SEC >> 1, arpRun, nullptr);
+    runSleep(RUN_SEC / 2, arpRun, nullptr);
 }
 
 void ARP_process(uint8_t *frame, const int flen) {

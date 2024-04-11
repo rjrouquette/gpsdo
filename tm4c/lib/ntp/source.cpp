@@ -7,7 +7,7 @@
 #include "common.hpp"
 #include "../run.hpp"
 #include "../chrony/util.hpp"
-#include "../clk/mono.h"
+#include "../clk/mono.hpp"
 #include "../clk/util.hpp"
 #include "../net/ip.hpp"
 #include "../net/util.hpp"
@@ -106,7 +106,7 @@ void ntp::Source::updateFilter() {
 
     // compute time spanned by samples
     int j = (ringPtr - (sampleCount - 1)) & (MAX_HISTORY - 1);
-    span = (int) ((sample.comp - ringSamples[j].comp) >> 32);
+    span = static_cast<int>((sample.comp - ringSamples[j].comp) >> 32);
 
     // convert offsets to floats
     int index[MAX_HISTORY];
@@ -186,7 +186,7 @@ void ntp::Source::updateFilter() {
     freqDrift = mean;
     freqSkew = sqrtf(var);
     // set overall score
-    float score = std::abs(0x1p-16f * (float) rootDelay);
+    float score = std::abs(0x1p-16f * static_cast<float>(rootDelay));
     score += 0x1p-16f * static_cast<float>(rootDispersion);
     score += delayMean;
     score += delayStdDev;

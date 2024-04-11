@@ -13,7 +13,7 @@
 #include "../hw/interrupts.h"
 #include "../hw/sys.h"
 #include "clk/comp.hpp"
-#include "clk/mono.h"
+#include "clk/mono.hpp"
 #include "clk/tai.hpp"
 #include "clk/util.hpp"
 #include "net/arp.hpp"

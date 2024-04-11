@@ -8,7 +8,7 @@
 #include "../net.hpp"
 #include "../rand.hpp"
 #include "../run.hpp"
-#include "../clk/mono.h"
+#include "../clk/mono.hpp"
 #include "../clk/tai.hpp"
 #include "../clk/util.hpp"
 #include "../net/arp.hpp"
@@ -18,8 +18,8 @@
 
 #include <memory.h>
 
-#define IDLE_INTV (RUN_SEC >> 1)
-#define ACTV_INTV (RUN_SEC >> 4)
+static constexpr uint32_t IDLE_INTV = RUN_SEC / 2;
+static constexpr uint32_t ACTV_INTV = RUN_SEC / 16;
 
 inline uint64_t avg64(const uint64_t a, const uint64_t b) {
     return a + (static_cast<int64_t>(b - a) >> 1);
