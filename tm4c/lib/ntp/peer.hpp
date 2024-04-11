@@ -8,8 +8,8 @@
 
 namespace ntp {
     class Peer final : public Source {
-        // 500 ms
-        static constexpr uint64_t PEER_RESPONSE_TIMEOUT = 0x80000000ull;
+        // 500 ms (32.32 fixed point)
+        static constexpr uint64_t PEER_RESPONSE_TIMEOUT = 1ull << 31;
         static constexpr int PEER_MIN_POLL = 4;
         static constexpr int PEER_MAX_POLL = 6;
 
