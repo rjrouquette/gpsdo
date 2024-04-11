@@ -483,6 +483,18 @@ static unsigned statusSystem(char *body) {
     end = append(end, tmp);
     end = append(end, "\n");
 
+    // RAM size
+    tmp[toBase(RAM_used(), 10, tmp)] = 0;
+    end = append(end, "ram used: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // RAM size
+    tmp[toBase(FLASH_used(), 10, tmp)] = 0;
+    end = append(end, "flash used: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
     // return size
     return end - body;
 }
