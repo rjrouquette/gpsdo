@@ -36,7 +36,7 @@ static volatile float offsetProportion;
 static volatile float offsetIntegral;
 
 void PLL_init() {
-    TCMP_init();
+    tcmp::init();
 }
 
 
@@ -107,7 +107,7 @@ void PLL_updateDrift(int interval, const float drift) {
 
     // update temperature compensation
     driftFreq = drift + (0x1p-32f * static_cast<float>(CLK_COMP_getComp()));
-    TCMP_update(driftFreq, 100e-9f / (100e-9f + driftStdDev + fabsf(diff)));
+    tcmp::update(driftFreq, 100e-9f / (100e-9f + driftStdDev + fabsf(diff)));
 }
 
 unsigned PLL_status(char *buffer) {
@@ -159,7 +159,7 @@ unsigned PLL_status(char *buffer) {
     end = append(end, tmp);
     end = append(end, " ppm\n\n");
 
-    end += TCMP_status(end);
+    end += tcmp::status(end);
 
     return end - buffer;
 }

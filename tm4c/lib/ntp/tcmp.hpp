@@ -4,33 +4,35 @@
 
 #pragma once
 
-/**
- * Initialize the temperature compensation module
- */
-void TCMP_init();
+namespace tcmp {
+    /**
+     * Initialize the temperature compensation module
+     */
+    void init();
 
-/**
- * Get the current temperature measurement
- * @return the current temperature in Celsius
- */
-float TCMP_temp();
+    /**
+     * Get the current temperature measurement
+     * @return the current temperature in Celsius
+     */
+    float temp();
 
-/**
- * Get the current temperature correction value
- * @return frequency correction value
- */
-float TCMP_get();
+    /**
+     * Get the current temperature correction value
+     * @return frequency correction value
+     */
+    float get();
 
-/**
- * Update the temperature compensation with a new sample
- * @param target new compensation value for current temperature
- * @param weight relative confidence in target accuracy
- */
-void TCMP_update(float target, float weight);
+    /**
+     * Update the temperature compensation with a new sample
+     * @param target new compensation value for current temperature
+     * @param weight relative confidence in target accuracy
+     */
+    void update(float target, float weight);
 
-/**
- * Write current status of the temperature compensation to a buffer
- * @param buffer destination for status information
- * @return number of bytes written to buffer
- */
-unsigned TCMP_status(char *buffer);
+    /**
+     * Write current status of the temperature compensation to a buffer
+     * @param buffer destination for status information
+     * @return number of bytes written to buffer
+     */
+    unsigned status(char *buffer);
+}

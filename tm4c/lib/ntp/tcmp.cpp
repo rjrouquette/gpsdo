@@ -106,7 +106,7 @@ static void runComp(void *ref) {
     CLK_COMP_setComp(static_cast<int32_t>(0x1p32f * tcmpValue));
 }
 
-void TCMP_init() {
+void tcmp::init() {
     // Enable ADC0
     RCGCADC.EN_ADC0 = 1;
     delay_cycles_4();
@@ -162,15 +162,15 @@ void TCMP_init() {
     runPeriodic(INTV_TCMP, runComp, nullptr);
 }
 
-float TCMP_temp() {
+float tcmp::temp() {
     return tempValue;
 }
 
-float TCMP_get() {
+float tcmp::get() {
     return tcmpValue;
 }
 
-void TCMP_update(const float target, const float weight) {
+void tcmp::update(const float target, const float weight) {
     updateSom(tempValue, target, weight);
 
     const uint32_t now = CLK_MONO_INT();
@@ -189,7 +189,7 @@ void TCMP_update(const float target, const float weight) {
     }
 }
 
-unsigned TCMP_status(char *buffer) {
+unsigned tcmp::status(char *buffer) {
     char tmp[32];
     char *end = buffer;
 

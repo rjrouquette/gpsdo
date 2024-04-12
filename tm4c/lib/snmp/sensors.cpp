@@ -55,7 +55,7 @@ static constexpr uint8_t OID_SENSOR_PREFIX[] = {0x06, 0x0A, 0x2B, 6, 1, 2, 1, 99
 
 // CPU temperature getter
 static int getCpuTemp() {
-    return lroundf(TCMP_temp() * 1e4f);
+    return lroundf(tcmp::temp() * 1e4f);
 }
 
 // GPS timing status getters
