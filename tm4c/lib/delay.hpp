@@ -6,40 +6,26 @@
 
 #include <cstdint>
 
-/**
- * Delay one instruction cycle
- */
-__attribute__((always_inline))
-inline void delay_cycles_1() {
-    __asm volatile("nop");
+namespace delay {
+    /**
+     * Pause execution for an exact number of instruction cycles by inserting "nop" instrcutions.
+     * @param count number of instruction cycles to wait
+     */
+    [[gnu::always_inline, gnu::optimize("unroll-loops")]]
+    inline void cycles(int count) {
+        for(int i = 0; i < count; ++i)
+            __asm volatile("nop");
+    }
+
+    /**
+     * Pause with microsecond precsion
+     * @param delay in microseconds
+     */
+    void micros(uint16_t delay);
+
+    /**
+     * Pause with millisecond precision
+     * @param delay in milliseconds
+     */
+    void millis(uint16_t delay);
 }
-
-/**
- * Delay two instruction cycles
- */
-__attribute__((always_inline))
-inline void delay_cycles_2() {
-    delay_cycles_1();
-    delay_cycles_1();
-}
-
-/**
- * Delay four instruction cycles
- */
-__attribute__((always_inline))
-inline void delay_cycles_4() {
-    delay_cycles_2();
-    delay_cycles_2();
-}
-
-/**
- * Delay with microsecond precsion
- * @param delay in microseconds
- */
-void delay_us(uint16_t delay);
-
-/**
- * Delay with millisecond precision
- * @param delay in milliseconds
- */
-void delay_ms(uint16_t delay);

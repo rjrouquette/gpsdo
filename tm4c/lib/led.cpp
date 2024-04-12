@@ -23,7 +23,7 @@ static void runLed(void *ref) {
 void LED_init() {
     // enable port
     RCGCGPIO.EN_PORTN = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     // unlock configuration
     PORTN.LOCK = GPIO_LOCK_KEY;
     PORTN.CR = 0x03u;
@@ -63,19 +63,19 @@ void faultBlink(const int a, const int b) {
         LED1_OFF();
         auto c = a;
         while (c--) {
-            delay_ms(FAULT_BLINK);
+            delay::millis(FAULT_BLINK);
             LED0_ON();
-            delay_ms(FAULT_BLINK);
+            delay::millis(FAULT_BLINK);
             LED0_OFF();
         }
-        delay_ms(FAULT_BLINK);
+        delay::millis(FAULT_BLINK);
         c = b;
         while (c--) {
-            delay_ms(FAULT_BLINK);
+            delay::millis(FAULT_BLINK);
             LED1_ON();
-            delay_ms(FAULT_BLINK);
+            delay::millis(FAULT_BLINK);
             LED1_OFF();
         }
-        delay_ms(FAULT_PAUSE);
+        delay::millis(FAULT_PAUSE);
     }
 }

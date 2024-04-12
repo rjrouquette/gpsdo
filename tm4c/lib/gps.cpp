@@ -76,7 +76,7 @@ void GPS_init() {
     RCGCGPIO.EN_PORTP = 1;
     // enable UART 3
     RCGCUART.EN_UART3 = 1;
-    delay_cycles_4();
+    delay::cycles(4);
 
     // configure pins J0-J1
     PORTJ.LOCK = GPIO_LOCK_KEY;

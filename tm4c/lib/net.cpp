@@ -115,7 +115,7 @@ static void initDescriptors() {
 static void initPHY() {
     // configure LEDs
     RCGCGPIO.EN_PORTF = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     // unlock GPIO config
     PORTF.LOCK = GPIO_LOCK_KEY;
     PORTF.CR = 0x11u;
@@ -135,11 +135,11 @@ static void initPHY() {
     EMAC0.PC.PHYHOLD = 1;
     // enable clock
     RCGCEPHY.EN0 = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     while (!PREPHY.RDY0) {}
     // enable power
     PCEPHY.EN0 = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     while (!PREPHY.RDY0) {}
 
     // enable PHY interrupt for relevant link changes
@@ -159,7 +159,7 @@ static void initPHY() {
 static void initHwAddr() {
     // enable CRC module
     RCGCCCM.EN = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     while (!PRCCM.RDY) {}
     // compute MAC address
     CRC.CTRL.TYPE = CRC_TYPE_04C11DB7;
@@ -186,7 +186,7 @@ static void initMAC() {
     FLASHCONF.FPFOFF = 1;
     // enable clock
     RCGCEMAC.EN0 = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     while (!PREMAC.RDY0) {}
     // initialize PHY
     initPHY();

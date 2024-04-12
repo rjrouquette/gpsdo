@@ -9,7 +9,7 @@ static constexpr uint32_t CLK_KHZ = CLK_FREQ / 1000;
 static constexpr uint32_t CLK_MHZ = CLK_KHZ / 1000;
 static constexpr uint32_t DELAY_MAX_MS = MAX_RAW_INTV / CLK_KHZ;
 
-void delay_us(const uint16_t delay) {
+void delay::micros(const uint16_t delay) {
     // get current time
     uint32_t target = CLK_MONO_RAW();
     // compute target count for delay
@@ -18,7 +18,7 @@ void delay_us(const uint16_t delay) {
     while(static_cast<int32_t>(target - CLK_MONO_RAW()) > 0);
 }
 
-void delay_ms(uint16_t delay) {
+void delay::millis(uint16_t delay) {
     // get current time
     uint32_t target = CLK_MONO_RAW();
     // coarse delay

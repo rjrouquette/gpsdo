@@ -109,7 +109,7 @@ static void runComp(void *ref) {
 void tcmp::init() {
     // Enable ADC0
     RCGCADC.EN_ADC0 = 1;
-    delay_cycles_4();
+    delay::cycles(4);
 
     // configure ADC0 for temperature measurement
     ADC0.CC.CLKDIV = 0;

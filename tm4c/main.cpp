@@ -74,13 +74,12 @@ void Fault_Usage() {
 static void EEPROM_init() {
     // enable EEPROM
     RCGCEEPROM.EN_EEPROM = 1;
-    delay_us(1);
+    delay::micros(1);
     EEPROM_wait();
 
     // verify eeprom format
     EEPROM_seek(0);
-    const uint32_t format = EEPROM_read();
-    if (format != EEPROM_FORMAT) {
+    if (EEPROM_read() != EEPROM_FORMAT) {
         // reformat EEPROM
         EEPROM_mass_erase();
         EEPROM_seek(0);
