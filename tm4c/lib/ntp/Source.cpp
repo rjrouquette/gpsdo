@@ -15,7 +15,7 @@
 #include <cmath>
 
 
-static void getMeanVar(int cnt, const float *v, float *mean, float *var);
+static void getMeanVar(int cnt, const float *v, float &mean, float &var);
 
 ntp::Source::Source(const uint32_t id_, const uint16_t mode_) :
     ringSamples{}, id(id_), mode(mode_) {
@@ -122,12 +122,12 @@ void ntp::Source::updateFilter() {
 
     // compute mean and variance
     float mean, var;
-    getMeanVar(sampleCount, delay, &mean, &var);
+    getMeanVar(sampleCount, delay, mean, var);
     delayMean = mean;
     delayStdDev = sqrtf(var);
 
     // compute mean and variance
-    getMeanVar(sampleCount, offset, &mean, &var);
+    getMeanVar(sampleCount, offset, mean, var);
     // remove extrema
     float limit = var * 4;
     if (limit > 0) {
@@ -143,7 +143,7 @@ void ntp::Source::updateFilter() {
         cnt = j;
         // recompute mean and variance
         if (cnt > 0)
-            getMeanVar(cnt, offset, &mean, &var);
+            getMeanVar(cnt, offset, mean, var);
     }
     // update offset stats
     usedOffset = cnt;
@@ -164,7 +164,7 @@ void ntp::Source::updateFilter() {
                    toFloatU(current.comp - previous.comp);
     }
     // compute mean and variance
-    getMeanVar(cnt, drift, &mean, &var);
+    getMeanVar(cnt, drift, mean, var);
     // exclude outliers
     limit = var * 4;
     if (limit > 0) {
@@ -179,7 +179,7 @@ void ntp::Source::updateFilter() {
         cnt = j;
         // recompute mean and variance
         if (cnt > 0)
-            getMeanVar(cnt, drift, &mean, &var);
+            getMeanVar(cnt, drift, mean, var);
     }
     // set frequency status
     usedDrift = cnt;
@@ -290,29 +290,29 @@ void ntp::Source::getSourceData(RPY_Source_Data &rpySourceData) const {
     rpySourceData.state = htons(state);
 }
 
-static void getMeanVar(const int cnt, const float *v, float *mean, float *var) {
+static void getMeanVar(const int cnt, const float *v, float &mean, float &var) {
     // return zeros if count is less than one
     if(cnt < 1) {
-        *mean = 0;
-        *var = 0;
+        mean = 0;
+        var = 0;
         return;
     }
 
     // compute the mean
-    float _mean = 0;
-    for(int k = 0; k < cnt; k++)
-        _mean += v[k];
-    _mean /= static_cast<float>(cnt);
+    float mean_ = 0;
+    for(int k = 0; k < cnt; ++k)
+        mean_ += v[k];
+    mean_ /= static_cast<float>(cnt);
 
     // compute the variance
-    float _var = 0;
-    for(int k = 0; k < cnt; k++) {
-        float diff = v[k] - _mean;
-        _var += diff * diff;
+    float var_ = 0;
+    for(int k = 0; k < cnt; ++k) {
+        const float diff = v[k] - mean_;
+        var_ += diff * diff;
     }
-    _var /= static_cast<float>(cnt - 1);
+    var_ /= static_cast<float>(cnt - 1);
 
     // return result
-    *mean = _mean;
-    *var = _var;
+    mean = mean_;
+    var = var_;
 }
