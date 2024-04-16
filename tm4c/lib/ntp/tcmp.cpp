@@ -14,13 +14,13 @@
 
 #include <cmath>
 
-#define ADC_RATE_MEAN (0x1p-11f)
-#define ADC_RATE_VAR (0x1p-12f)
+#define ADC_RATE_MEAN (0x1p-12f)
+#define ADC_RATE_VAR (0x1p-13f)
 #define ADC_SCALE (0.0604248047f)
 
 #define INTV_REGR (1u << (24 - 14)) // 16384 Hz
-#define INTV_TEMP (1u << (24 - 10)) // 1024 Hz
-#define INTV_TCMP (1u << (24 - 4))  // 16 Hz
+#define INTV_TEMP (1u << (24 - 12)) // 4096 Hz
+#define INTV_TCMP (1u << (24 - 5))  // 32 Hz
 
 #define TCMP_SAVE_INTV (3600) // save state every hour
 
