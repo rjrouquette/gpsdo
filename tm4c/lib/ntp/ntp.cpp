@@ -557,7 +557,7 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
     cmdReply->data.tracking.ref_id = refId;
     cmdReply->data.tracking.stratum = htons(clockStratum);
     cmdReply->data.tracking.leap_status = htons(leapIndicator);
-    if (refId == NTP_REF_GPS) {
+    if (refId == ntp::REF_ID_GPS) {
         cmdReply->data.tracking.ip_addr.family = htons(IPADDR_UNSPEC);
         cmdReply->data.tracking.ip_addr.addr.in4 = refId;
     }

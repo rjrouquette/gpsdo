@@ -367,47 +367,47 @@ static unsigned statusGPS(char *body) {
 
     // gps fix
     end = append(end, "fix good: ");
-    end = append(end, GPS_hasFix() ? "yes" : "no");
+    end = append(end, gps::hasFix() ? "yes" : "no");
     end = append(end, "\n");
 
     // latitude
-    tmp[fmtFloat(GPS_locLat(), 0, 5, tmp)] = 0;
+    tmp[fmtFloat(gps::locLat(), 0, 5, tmp)] = 0;
     end = append(end, "latitude: ");
     end = append(end, tmp);
     end = append(end, " deg\n");
 
     // longitude
-    tmp[fmtFloat(GPS_locLon(), 0, 5, tmp)] = 0;
+    tmp[fmtFloat(gps::locLon(), 0, 5, tmp)] = 0;
     end = append(end, "longitude: ");
     end = append(end, tmp);
     end = append(end, " deg\n");
 
     // altitude
-    tmp[fmtFloat(GPS_locAlt(), 0, 2, tmp)] = 0;
+    tmp[fmtFloat(gps::locAlt(), 0, 2, tmp)] = 0;
     end = append(end, "altitude: ");
     end = append(end, tmp);
     end = append(end, " m\n");
 
     // clock bias
-    tmp[fmtFloat(static_cast<float>(GPS_clkBias()), 0, 0, tmp)] = 0;
+    tmp[fmtFloat(static_cast<float>(gps::clkBias()), 0, 0, tmp)] = 0;
     end = append(end, "clock bias: ");
     end = append(end, tmp);
     end = append(end, " ns\n");
 
     // clock drift
-    tmp[fmtFloat(static_cast<float>(GPS_clkDrift()), 0, 0, tmp)] = 0;
+    tmp[fmtFloat(static_cast<float>(gps::clkDrift()), 0, 0, tmp)] = 0;
     end = append(end, "clock drift: ");
     end = append(end, tmp);
     end = append(end, " ns/s\n");
 
     // time accuracy
-    tmp[toBase(GPS_accTime(), 10, tmp)] = 0;
+    tmp[toBase(gps::accTime(), 10, tmp)] = 0;
     end = append(end, "time accuracy: ");
     end = append(end, tmp);
     end = append(end, " ns\n");
 
     // frequency accuracy
-    tmp[toBase(GPS_accFreq(), 10, tmp)] = 0;
+    tmp[toBase(gps::accFreq(), 10, tmp)] = 0;
     end = append(end, "frequency accuracy: ");
     end = append(end, tmp);
     end = append(end, " ps/s\n");

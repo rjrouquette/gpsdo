@@ -69,7 +69,7 @@ inline void incrRing(int &ptr) {
     ptr = (ptr + 1) & GPS_RING_MASK;
 }
 
-void GPS_init() {
+void gps::init() {
     // enable GPIO J
     RCGCGPIO.EN_PORTJ = 1;
     // enable GPIO P
@@ -277,35 +277,35 @@ static void runParse(void *ref) {
     rxTail = tail;
 }
 
-float GPS_locLat() {
-    return locLat;
+float gps::locLat() {
+    return ::locLat;
 }
 
-float GPS_locLon() {
-    return locLon;
+float gps::locLon() {
+    return ::locLon;
 }
 
-float GPS_locAlt() {
-    return locAlt;
+float gps::locAlt() {
+    return ::locAlt;
 }
 
-int GPS_clkBias() {
-    return clkBias;
+int gps::clkBias() {
+    return ::clkBias;
 }
 
-int GPS_clkDrift() {
-    return clkDrift;
+int gps::clkDrift() {
+    return ::clkDrift;
 }
 
-int GPS_accTime() {
-    return accTime;
+int gps::accTime() {
+    return ::accTime;
 }
 
-int GPS_accFreq() {
-    return accFreq;
+int gps::accFreq() {
+    return ::accFreq;
 }
 
-int GPS_hasFix() {
+int gps::hasFix() {
     return fixGood;
 }
 
@@ -594,14 +594,14 @@ static void processUbxPVT(const uint8_t *payload) {
         taiEpochUpdate = CLK_MONO();
 }
 
-uint64_t GPS_taiEpochUpdate() {
-    return taiEpochUpdate;
+uint64_t gps::taiEpochUpdate() {
+    return ::taiEpochUpdate;
 }
 
-uint32_t GPS_taiEpoch() {
-    return taiEpoch;
+uint32_t gps::taiEpoch() {
+    return ::taiEpoch;
 }
 
-int GPS_taiOffset() {
-    return taiOffset;
+int gps::taiOffset() {
+    return ::taiOffset;
 }

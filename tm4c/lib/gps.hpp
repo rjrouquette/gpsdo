@@ -6,19 +6,21 @@
 
 #include <cstdint>
 
-void GPS_init();
+namespace gps {
+    void init();
 
-float GPS_locLat();
-float GPS_locLon();
-float GPS_locAlt();
+    float locLat();
+    float locLon();
+    float locAlt();
 
-int GPS_clkBias();
-int GPS_clkDrift();
-int GPS_accTime();
-int GPS_accFreq();
+    int clkBias();
+    int clkDrift();
+    int accTime();
+    int accFreq();
 
-int GPS_hasFix();
+    int hasFix();
 
-uint64_t GPS_taiEpochUpdate();
-uint32_t GPS_taiEpoch();
-int GPS_taiOffset();
+    uint64_t taiEpochUpdate();
+    uint32_t taiEpoch();
+    int taiOffset();
+}

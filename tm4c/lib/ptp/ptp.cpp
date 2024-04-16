@@ -28,7 +28,7 @@ static void processPDelayRequest(uint8_t *frame, int flen);
 static void sendAnnounce(void *ref);
 static void sendSync(void *ref);
 
-void PTP_init() {
+void ptp::init() {
     // set clock ID to MAC address
     getMAC(ptpClockId + 2);
 
@@ -46,25 +46,26 @@ void PTP_process(uint8_t *frame, const int flen) {
     auto &packet = PacketPTP<char>::from(frame);
 
     // ignore anything we sent ourselves
-    if(isMyMAC(packet.eth.macSrc) == 0)
+    if (isMyMAC(packet.eth.macSrc) == 0)
         return;
     // ignore unsupported versions
-    if(packet.ptp.versionPTP != 2) return;
+    if (packet.ptp.versionPTP != 2)
+        return;
     // flip mac address for reply
     copyMAC(packet.eth.macDst, packet.eth.macSrc);
 
     // indicate time-server activity
     LED_act0();
 
-    if(packet.ptp.messageType == PTP2_MT_DELAY_REQ)
+    if (packet.ptp.messageType == PTP2_MT_DELAY_REQ)
         return processDelayRequest(frame, flen);
-    if(packet.ptp.messageType == PTP2_MT_PDELAY_REQ)
+    if (packet.ptp.messageType == PTP2_MT_PDELAY_REQ)
         return processPDelayRequest(frame, flen);
 }
 
 static void processDelayRequest(uint8_t *frame, int flen) {
     // verify request length
-    if(flen < static_cast<int>(PTP2_MIN_SIZE + sizeof(PTP2_TIMESTAMP)))
+    if (flen < static_cast<int>(PTP2_MIN_SIZE + sizeof(PTP2_TIMESTAMP)))
         return;
 
     const int txDesc = NET_getTxDesc();
@@ -121,7 +122,7 @@ static void peerDelayRespFollowup(void *ref, uint8_t *txFrame, int flen) {
 
 static void processPDelayRequest(uint8_t *frame, int flen) {
     // verify request length
-    if(flen < static_cast<int>(PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_REQ)))
+    if (flen < static_cast<int>(PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_REQ)))
         return;
 
     const int txDesc = NET_getTxDesc();
@@ -181,13 +182,13 @@ static void sendAnnounce(void *ref) {
 
     // PTP Announce
     const auto refId = ntp::refId();
-    announce.data.timeSource = (refId== NTP_REF_GPS) ? PTP2_TSRC_GPS : PTP2_TSRC_NTP;
+    announce.data.timeSource = (refId == ntp::REF_ID_GPS) ? PTP2_TSRC_GPS : PTP2_TSRC_NTP;
     announce.data.currentUtcOffset = (clkTaiUtcOffset >> 32);
     memcpy(announce.data.grandMasterIdentity, ptpClockId, sizeof(ptpClockId));
     announce.data.grandMasterPriority = 0;
     announce.data.grandMasterPriority2 = 0;
     announce.data.stepsRemoved = 0;
-    if(refId != 0)
+    if (refId != 0)
         announce.data.grandMasterClockQuality = toPtpClkAccuracy(PLL_offsetRms());
     else
         announce.data.grandMasterClockQuality = 0x31;

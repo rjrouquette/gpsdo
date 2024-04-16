@@ -43,11 +43,11 @@ int main() {
     // initialize EEPROM
     EEPROM_init();
     // initialize GPS
-    GPS_init();
+    gps::init();
     // initialize networking
     NET_init();
     ntp::init();
-    PTP_init();
+    ptp::init();
     snmp::init();
     status::init();
 

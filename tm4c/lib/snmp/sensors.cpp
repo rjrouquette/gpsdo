@@ -60,7 +60,7 @@ static int getCpuTemp() {
 
 // GPS timing status getters
 static int getGpsHasFix() {
-    return GPS_hasFix() ? 1 : 2;
+    return gps::hasFix() ? 1 : 2;
 }
 
 // PLL offset getters
@@ -131,9 +131,9 @@ static constexpr struct SnmpSensor {
     {"cpu.temp", "C", OID_SENSOR_TYPE_CELSIUS, OID_SENSOR_SCALE_1, 4, getCpuTemp},
     // GPS timing status
     {"gps.hasFix", "", OID_SENSOR_TYPE_BOOL, OID_SENSOR_SCALE_1, 0, getGpsHasFix},
-    {"gps.taiOffset", "s", OID_SENSOR_TYPE_OTHER, OID_SENSOR_SCALE_1, 0, GPS_taiOffset},
-    {"gps.accuracy.time", "s", OID_SENSOR_TYPE_OTHER, OID_SENSOR_SCALE_1E_9, 0, GPS_accTime},
-    {"gps.accuracy.freq", "s/s", OID_SENSOR_TYPE_OTHER, OID_SENSOR_SCALE_1E_12, 0, GPS_accFreq},
+    {"gps.taiOffset", "s", OID_SENSOR_TYPE_OTHER, OID_SENSOR_SCALE_1, 0, gps::taiOffset},
+    {"gps.accuracy.time", "s", OID_SENSOR_TYPE_OTHER, OID_SENSOR_SCALE_1E_9, 0, gps::accTime},
+    {"gps.accuracy.freq", "s/s", OID_SENSOR_TYPE_OTHER, OID_SENSOR_SCALE_1E_12, 0, gps::accFreq},
     // PLL offset stats
     {"pll.offset.last", "s", OID_SENSOR_TYPE_OTHER, OID_SENSOR_SCALE_1E_6, 4, getPllOffsetLast},
     {"pll.offset.mean", "s", OID_SENSOR_TYPE_OTHER, OID_SENSOR_SCALE_1E_6, 4, getPllOffsetMean},

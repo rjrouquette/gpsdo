@@ -4,4 +4,6 @@
 
 #pragma once
 
-void PTP_init();
+namespace ptp {
+    void init();
+}

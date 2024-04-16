@@ -15,7 +15,7 @@
 
 
 ntp::GPS::GPS() :
-    Source(NTP_REF_GPS, RPY_SD_MD_REF) {
+    Source(REF_ID_GPS, RPY_SD_MD_REF) {
     // clear PPS status
     lastPps = 0;
     lastPoll = 0;
@@ -59,7 +59,7 @@ void ntp::GPS::run() {
         return;
     }
     // GPS must have time set
-    if (GPS_taiEpoch() == 0)
+    if (gps::taiEpoch() == 0)
         return;
     // wait for update
     if (ppsTime[0] == lastPps)
@@ -77,7 +77,7 @@ void ntp::GPS::run() {
     // update TAI/UTC offset
     fixed_32_32 scratch = {};
     scratch.fpart = 0;
-    scratch.ipart = static_cast<uint32_t>(GPS_taiOffset());
+    scratch.ipart = static_cast<uint32_t>(gps::taiOffset());
     clkTaiUtcOffset = scratch.full;
 
     // advance sample buffer
@@ -87,8 +87,8 @@ void ntp::GPS::run() {
     sample.taiSkew = ppsTime[2] - ppsTime[1];
     // compute TAI offset
     scratch.full = ppsTime[0];
-    scratch.full -= GPS_taiEpochUpdate();
-    scratch.ipart += GPS_taiEpoch() + 1;
+    scratch.full -= gps::taiEpochUpdate();
+    scratch.ipart += gps::taiEpoch() + 1;
     scratch.fpart = 0;
     sample.offset = static_cast<int64_t>(scratch.full - ppsTime[2]);
     sample.delay = 0;

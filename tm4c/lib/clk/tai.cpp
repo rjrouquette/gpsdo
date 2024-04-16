@@ -121,7 +121,7 @@ void initClkTai() {
     PPS_PORT.LOCK = 0;
 
     // initialize UTC offset
-    clkTaiUtcOffset = static_cast<uint64_t>(GPS_taiOffset()) << 32;
+    clkTaiUtcOffset = static_cast<uint64_t>(gps::taiOffset()) << 32;
     // schedule updates
     runSleep(RUN_SEC / 4, runClkTai, nullptr);
     runSleep(RUN_SEC / 64, runPpsTai, nullptr);
