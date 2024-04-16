@@ -13,7 +13,7 @@
 #include "lib/gps.hpp"
 #include "lib/led.hpp"
 #include "lib/net.hpp"
-#include "lib/rand.hpp"
+#include "lib/random.hpp"
 #include "lib/run.hpp"
 #include "lib/clk/clk.hpp"
 #include "lib/ntp/ntp.hpp"
@@ -39,7 +39,7 @@ int main() {
     // initialize clock
     CLK_init();
     // initialize RNG
-    RAND_init();
+    random::init();
     // initialize EEPROM
     EEPROM_init();
     // initialize GPS

@@ -133,8 +133,8 @@ add_executable(
         lib/ptp/ptp.cpp
         lib/ptp/ptp.hpp
 
-        lib/rand.cpp
-        lib/rand.hpp
+        lib/random.cpp
+        lib/random.hpp
         lib/run.cpp
         lib/run.hpp
 

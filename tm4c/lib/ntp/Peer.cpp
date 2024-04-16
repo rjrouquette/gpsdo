@@ -6,7 +6,7 @@
 
 #include "common.hpp"
 #include "../net.hpp"
-#include "../rand.hpp"
+#include "../random.hpp"
 #include "../run.hpp"
 #include "../clk/mono.hpp"
 #include "../clk/tai.hpp"
@@ -76,7 +76,7 @@ void ntp::Peer::run() {
         // (maximum of 1/16 of polling interval)
         fixed_32_32 scratch = {};
         scratch.fpart = 0;
-        scratch.ipart = RAND_next();
+        scratch.ipart = random::next();
         scratch.full >>= 36 - poll;
         scratch.full |= 1ull << (32 + poll);
         // schedule next update
