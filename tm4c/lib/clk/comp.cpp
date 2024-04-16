@@ -53,7 +53,7 @@ void runClkComp(void *ref) {
 void initClkComp() {
     // Enable Timer 1
     RCGCTIMER.EN_GPTM1 = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     // Configure Timer
     FRQ_TIMER.TAILR = FRQ_INTV - 1;
     FRQ_TIMER.TAMR.MR = 0x2;
@@ -69,7 +69,7 @@ void initClkComp() {
 
     // enable CCP output on PA2
     RCGCGPIO.EN_PORTA = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     // unlock GPIO config
     FRQ_PORT.LOCK = GPIO_LOCK_KEY;
     FRQ_PORT.CR = FRQ_PIN;

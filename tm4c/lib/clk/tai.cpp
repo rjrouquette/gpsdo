@@ -90,7 +90,7 @@ static void runPpsTai(void *ref) {
 void initClkTai() {
     // Enable Timer 2
     RCGCTIMER.EN_GPTM2 = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     // Configure Timer
     PPS_TIMER.TAILR = CLK_FREQ;
     PPS_TIMER.TAMR.MR = 0x2;
@@ -106,7 +106,7 @@ void initClkTai() {
 
     // enable CCP output on PA2
     RCGCGPIO.EN_PORTA = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     // unlock GPIO config
     PPS_PORT.LOCK = GPIO_LOCK_KEY;
     PPS_PORT.CR = PPS_PIN;

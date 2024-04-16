@@ -26,7 +26,7 @@ volatile ClockEvent clkMonoPpsEvent;
 void initClkMono() {
     // Enable Timer 0
     RCGCTIMER.EN_GPTM0 = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     // Configure Timer 0
     TIMER_MONO.TAILR = -1;
     TIMER_MONO.TAMATCHR = CLK_FREQ;
@@ -42,7 +42,7 @@ void initClkMono() {
 void initClkEth() {
     // configure PPS output pin
     RCGCGPIO.EN_PORTG = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     // unlock GPIO config
     PORTG.LOCK = GPIO_LOCK_KEY;
     PORTG.CR = 0x01u;
@@ -120,7 +120,7 @@ static void initCaptureTimer(volatile struct GPTM_MAP *timer) {
 void initClkSync() {
     // enable capture timers
     RCGCTIMER.raw |= 0x31;
-    delay_cycles_4();
+    delay::cycles(4);
     initCaptureTimer(&GPTM4);
     initCaptureTimer(&GPTM5);
     // disable timer 4B interrupt
@@ -130,7 +130,7 @@ void initClkSync() {
 
     // configure capture pins
     RCGCGPIO.EN_PORTM = 1;
-    delay_cycles_4();
+    delay::cycles(4);
     // unlock GPIO config
     PORTM.LOCK = GPIO_LOCK_KEY;
     PORTM.CR = 0xD0u;
