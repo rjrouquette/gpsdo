@@ -5,8 +5,8 @@
 #include "ntp.hpp"
 
 #include "common.hpp"
-#include "gps.hpp"
-#include "peer.hpp"
+#include "GPS.hpp"
+#include "Peer.hpp"
 #include "pll.hpp"
 
 #include "../led.hpp"
@@ -557,7 +557,7 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
     cmdReply->data.tracking.ref_id = refId;
     cmdReply->data.tracking.stratum = htons(clockStratum);
     cmdReply->data.tracking.leap_status = htons(leapIndicator);
-    if (refId == ntp::REF_ID_GPS) {
+    if (refId == ntp::GPS::REF_ID) {
         cmdReply->data.tracking.ip_addr.family = htons(IPADDR_UNSPEC);
         cmdReply->data.tracking.ip_addr.addr.in4 = refId;
     }

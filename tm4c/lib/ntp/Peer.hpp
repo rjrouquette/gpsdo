@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "source.hpp"
+#include "Source.hpp"
 
 namespace ntp {
     class Peer final : public Source {

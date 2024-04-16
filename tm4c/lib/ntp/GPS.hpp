@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "source.hpp"
+#include "Source.hpp"
 
 namespace ntp {
     class GPS final : public Source {
@@ -18,6 +18,8 @@ namespace ntp {
         void updateStatus();
 
     public:
+        static constexpr uint32_t REF_ID = 0x00535047u;
+
         GPS();
 
         ~GPS();

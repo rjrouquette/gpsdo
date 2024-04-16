@@ -112,16 +112,16 @@ add_executable(
 
         # NTP server
         lib/ntp/common.hpp
-        lib/ntp/gps.cpp
-        lib/ntp/gps.hpp
+        lib/ntp/GPS.cpp
+        lib/ntp/GPS.hpp
         lib/ntp/ntp.cpp
         lib/ntp/ntp.hpp
-        lib/ntp/peer.cpp
-        lib/ntp/peer.hpp
+        lib/ntp/Peer.cpp
+        lib/ntp/Peer.hpp
         lib/ntp/pll.cpp
         lib/ntp/pll.hpp
-        lib/ntp/source.cpp
-        lib/ntp/source.hpp
+        lib/ntp/Source.cpp
+        lib/ntp/Source.hpp
         lib/ntp/tcmp.cpp
         lib/ntp/tcmp.hpp
         lib/chrony/util.cpp

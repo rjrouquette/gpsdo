@@ -2,7 +2,7 @@
 // Created by robert on 3/26/24.
 //
 
-#include "gps.hpp"
+#include "GPS.hpp"
 #include "../gps.hpp"
 
 #include "common.hpp"
@@ -15,7 +15,7 @@
 
 
 ntp::GPS::GPS() :
-    Source(REF_ID_GPS, RPY_SD_MD_REF) {
+    Source(REF_ID, RPY_SD_MD_REF) {
     // clear PPS status
     lastPps = 0;
     lastPoll = 0;

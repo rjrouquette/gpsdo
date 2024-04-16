@@ -2,7 +2,7 @@
 // Created by robert on 3/26/24.
 //
 
-#include "peer.hpp"
+#include "Peer.hpp"
 
 #include "common.hpp"
 #include "../net.hpp"

@@ -10,6 +10,7 @@
 #include "../run.hpp"
 #include "../clk/tai.hpp"
 #include "../net/util.hpp"
+#include "../ntp/GPS.hpp"
 #include "../ntp/ntp.hpp"
 #include "../ntp/pll.hpp"
 
@@ -182,7 +183,7 @@ static void sendAnnounce(void *ref) {
 
     // PTP Announce
     const auto refId = ntp::refId();
-    announce.data.timeSource = (refId == ntp::REF_ID_GPS) ? PTP2_TSRC_GPS : PTP2_TSRC_NTP;
+    announce.data.timeSource = (refId == ntp::GPS::REF_ID) ? PTP2_TSRC_GPS : PTP2_TSRC_NTP;
     announce.data.currentUtcOffset = (clkTaiUtcOffset >> 32);
     memcpy(announce.data.grandMasterIdentity, ptpClockId, sizeof(ptpClockId));
     announce.data.grandMasterPriority = 0;
