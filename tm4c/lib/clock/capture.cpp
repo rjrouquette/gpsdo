@@ -20,12 +20,12 @@ static volatile uint32_t ppsEthernetOffset = 0;
 void ISR_Timer5A() {
     // snapshot edge time
     uint32_t timer = clock::monotonic::raw();
-    const uint32_t event = GPTM5.TAR.raw;
     // clear capture interrupt flag
     GPTM5.ICR = GPTM_ICR_CAE;
     // compute ethernet clock offset
-    timer -= (timer - event) & 0xFFFF;
+    timer -= (timer - GPTM5.TAR.raw) & 0xFFFF;
     timer -= EMAC0.TIMSEC * CLK_FREQ;
+    // update edge offset
     ppsEthernetOffset = timer;
 }
 
@@ -48,11 +48,10 @@ static void runPpsGps([[maybe_unused]] void *ref) {
 void ISR_Timer5B() {
     // snapshot edge time
     uint32_t timer = clock::monotonic::raw();
-    const uint32_t event = GPTM5.TBR.raw;
     // clear capture interrupt flag
     GPTM5.ICR = GPTM_ICR_CBE;
     // update pps edge state
-    timer -= (timer - event) & 0xFFFF;
+    timer -= (timer - GPTM5.TBR.raw) & 0xFFFF;
     // update edge time
     ppsGpsEvent = timer;
     // trigger computation of full timestamps
