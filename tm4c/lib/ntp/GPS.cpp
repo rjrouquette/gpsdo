@@ -6,12 +6,11 @@
 #include "../gps.hpp"
 
 #include "common.hpp"
-#include "ntp.hpp"
 #include "../run.hpp"
-#include "../clk/clk.hpp"
-#include "../clk/mono.hpp"
-#include "../clk/tai.hpp"
-#include "../clk/util.hpp"
+#include "../clock/capture.hpp"
+#include "../clock/mono.hpp"
+#include "../clock/tai.hpp"
+#include "../clock/util.hpp"
 
 
 ntp::GPS::GPS() :
@@ -43,10 +42,10 @@ void ntp::GPS::run(void *ref) {
 void ntp::GPS::run() {
     // get pps timestamps
     uint64_t ppsTime[3];
-    CLK_PPS(ppsTime);
+    clock::capture::ppsGps(ppsTime);
 
     // is pps too old?
-    const uint64_t now = CLK_MONO();
+    const uint64_t now = clock::monotonic::now();
     if (now - ppsTime[0] > 0x140000000ull) {
         // advance reach indicator if the pulse has been missed
         if (static_cast<int64_t>(now - lastPoll) > 0x100000000ll) {

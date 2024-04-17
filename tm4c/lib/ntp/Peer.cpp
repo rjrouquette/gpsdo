@@ -8,9 +8,9 @@
 #include "../net.hpp"
 #include "../random.hpp"
 #include "../run.hpp"
-#include "../clk/mono.hpp"
-#include "../clk/tai.hpp"
-#include "../clk/util.hpp"
+#include "../clock/mono.hpp"
+#include "../clock/tai.hpp"
+#include "../clock/util.hpp"
 #include "../net/arp.hpp"
 #include "../net/eth.hpp"
 #include "../net/ip.hpp"
@@ -100,7 +100,7 @@ void ntp::Peer::run() {
     }
 
     // start poll
-    pollStart = CLK_MONO();
+    pollStart = clock::monotonic::now();
     pollActive = true;
     pollXleave = false;
     filterTx = 0;
@@ -179,7 +179,7 @@ bool ntp::Peer::pollRun() {
         pollEnd();
     }
     else {
-        uint64_t elapsed = CLK_MONO() - pollStart;
+        uint64_t elapsed = clock::monotonic::now() - pollStart;
         if (elapsed > PEER_RESPONSE_TIMEOUT) {
             // fallback to original response if we were waiting for an interleaved followup
             if (pollXleave) {
@@ -281,7 +281,7 @@ void ntp::Peer::pollSend() {
     else {
         // set filter timestamps
         filterRx = 0;
-        filterTx = htonll(CLK_MONO());
+        filterTx = htonll(clock::monotonic::now());
         // standard query
         packet.ntp.origTime = 0;
         packet.ntp.rxTime = filterRx;
@@ -299,14 +299,14 @@ void ntp::Peer::pollSend() {
 
 bool ntp::Peer::isMacInvalid() {
     // refresh stale MAC addresses
-    if (!lastArp || (CLK_MONO_INT() - lastArp) > ARP_MAX_AGE)
+    if (!lastArp || (clock::monotonic::seconds() - lastArp) > ARP_MAX_AGE)
         updateMac();
     // report if MAC address is invalid
     return isNullMAC(macAddr);
 }
 
 void ntp::Peer::updateMac() {
-    lastArp = CLK_MONO_INT();
+    lastArp = clock::monotonic::seconds();
     if (IPv4_testSubnet(ipSubnet, ipAddress, id))
         copyMAC(const_cast<uint8_t*>(macAddr), macRouter);
     else

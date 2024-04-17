@@ -41,7 +41,7 @@ void ISR_Timer2A() {
 
 static void runClkTai(void *ref) {
     // prepare update values
-    const uint64_t now = CLK_COMP();
+    const uint64_t now = clock::compensated::now();
     const int32_t offset = corrFracRem(clkTaiRate, now - clkTaiRef, clkTaiRem);
 
     // apply update
@@ -55,7 +55,7 @@ static void runPpsTai(void *ref) {
     // update PPS output alignment
     fixed_32_32 scratch = {};
     // use imprecise TAI calculation to reduce overhead
-    scratch.full = CLK_MONO();
+    scratch.full = clock::monotonic::now();
     scratch.full += clkCompOffset;
     scratch.full += clkTaiOffset;
     // wait for end-of-second
@@ -127,10 +127,10 @@ void initClkTai() {
     runSleep(RUN_SEC / 64, runPpsTai, nullptr);
 }
 
-uint64_t CLK_TAI() {
+uint64_t clock::tai::now() {
     uint32_t rem = 0;
     // get monotonic time
-    uint64_t ts = CLK_MONO();
+    uint64_t ts = monotonic::now();
     // translate to compensated domain
     ts += corrFracRem(clkCompRate, ts - clkCompRef, rem);
     ts += clkCompOffset;
@@ -140,7 +140,7 @@ uint64_t CLK_TAI() {
     return ts;
 }
 
-uint64_t CLK_TAI_fromMono(uint64_t ts) {
+uint64_t clock::tai::fromMono(uint64_t ts) {
     // translate to compensated domain
     ts += corrValue(clkCompRate, static_cast<int64_t>(ts - clkCompRef));
     ts += clkCompOffset;
@@ -150,9 +150,9 @@ uint64_t CLK_TAI_fromMono(uint64_t ts) {
     return ts;
 }
 
-void CLK_TAI_setTrim(int32_t comp) {
+void clock::tai::setTrim(int32_t comp) {
     // prepare update values
-    const uint64_t now = CLK_COMP();
+    const uint64_t now = compensated::now();
     const int32_t offset = corrFracRem(clkTaiRate, now - clkTaiRef, clkTaiRem);
 
     // apply update
@@ -163,11 +163,11 @@ void CLK_TAI_setTrim(int32_t comp) {
     __enable_irq();
 }
 
-int32_t CLK_TAI_getTrim() {
+int32_t clock::tai::getTrim() {
     return clkTaiRate;
 }
 
-void CLK_TAI_adjust(int64_t delta) {
+void clock::tai::adjust(int64_t delta) {
     __disable_irq();
     clkTaiOffset += delta;
     __enable_irq();

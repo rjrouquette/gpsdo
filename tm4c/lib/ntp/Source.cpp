@@ -7,8 +7,8 @@
 #include "common.hpp"
 #include "../run.hpp"
 #include "../chrony/util.hpp"
-#include "../clk/mono.hpp"
-#include "../clk/util.hpp"
+#include "../clock/mono.hpp"
+#include "../clock/util.hpp"
 #include "../net/ip.hpp"
 #include "../net/util.hpp"
 
@@ -194,7 +194,7 @@ void ntp::Source::updateFilter() {
     this->score = score;
 
     // set update time
-    lastUpdate = CLK_MONO();
+    lastUpdate = clock::monotonic::now();
 }
 
 bool ntp::Source::isSelectable() {
@@ -285,7 +285,7 @@ void ntp::Source::getSourceData(RPY_Source_Data &rpySourceData) const {
     rpySourceData.orig_latest_meas.f = chrony::htonf(lastOffsetOrig);
     rpySourceData.latest_meas.f = chrony::htonf(lastOffset);
     rpySourceData.latest_meas_err.f = chrony::htonf(lastDelay);
-    rpySourceData.since_sample = htonl((CLK_MONO() - lastUpdate) >> 32);
+    rpySourceData.since_sample = htonl((clock::monotonic::now() - lastUpdate) >> 32);
     rpySourceData.poll = static_cast<int16_t>(htons(poll));
     rpySourceData.state = htons(state);
 }

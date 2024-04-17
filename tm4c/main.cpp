@@ -15,7 +15,7 @@
 #include "lib/net.hpp"
 #include "lib/random.hpp"
 #include "lib/run.hpp"
-#include "lib/clk/clk.hpp"
+#include "lib/clock/clock.hpp"
 #include "lib/ntp/ntp.hpp"
 #include "lib/ptp/ptp.hpp"
 #include "lib/snmp/snmp.hpp"
@@ -31,13 +31,13 @@ int main() {
     CPAC.CP11 = 3;
 
     // initialize system clock
-    CLK_initSys();
+    clock::initSystem();
     // initialize task scheduler
     initScheduler();
     // initialize status LEDs
     LED_init();
     // initialize clock
-    CLK_init();
+    clock::init();
     // initialize RNG
     random::init();
     // initialize EEPROM

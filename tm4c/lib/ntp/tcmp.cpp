@@ -9,8 +9,8 @@
 #include "../run.hpp"
 #include "../../hw/adc.h"
 #include "../../hw/eeprom.h"
-#include "../clk/comp.hpp"
-#include "../clk/mono.hpp"
+#include "../clock/comp.hpp"
+#include "../clock/mono.hpp"
 
 #include <cmath>
 
@@ -103,7 +103,7 @@ static void runComp(void *ref) {
     // update temperature compensation
     tempValue = 147.5f - ADC_SCALE * adcMean;
     tcmpValue = tcmpEstimate(tempValue);
-    CLK_COMP_setComp(static_cast<int32_t>(0x1p32f * tcmpValue));
+    clock::compensated::setTrim(static_cast<int32_t>(0x1p32f * tcmpValue));
 }
 
 void tcmp::init() {
@@ -173,7 +173,7 @@ float tcmp::get() {
 void tcmp::update(const float target, const float weight) {
     updateSom(tempValue, target, weight);
 
-    const uint32_t now = CLK_MONO_INT();
+    const uint32_t now = clock::monotonic::seconds();
     if (now - tcmpSaved > TCMP_SAVE_INTV) {
         tcmpSaved = now;
         saveSom();

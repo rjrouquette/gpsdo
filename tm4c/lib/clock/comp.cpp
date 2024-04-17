@@ -40,7 +40,7 @@ void ISR_Timer1A() {
 
 void runClkComp(void *ref) {
     // prepare update values
-    const uint64_t now = CLK_MONO();
+    const uint64_t now = clock::monotonic::now();
     const int32_t offset = corrFracRem(clkCompRate, now - clkCompRef, clkCompRem);
 
     // apply update
@@ -83,43 +83,43 @@ void initClkComp() {
     FRQ_PORT.CR = 0;
     FRQ_PORT.LOCK = 0;
 
-    CLK_COMP_setComp(0);
+    clock::compensated::setTrim(0);
     // schedule updates
     runSleep(RUN_SEC / 4, runClkComp, nullptr);
 }
 
-uint64_t CLK_COMP() {
+uint64_t clock::compensated::now() {
     // get monotonic time
-    const uint64_t clkMono = CLK_MONO();
+    const uint64_t clkMono = monotonic::now();
     // translate to compensated domain
     int64_t scratch = static_cast<int32_t>(clkMono - clkCompRef);
     scratch *= clkCompRate;
     return clkMono + clkCompOffset + static_cast<int32_t>(scratch >> 32);
 }
 
-uint64_t CLK_COMP_fromMono(uint64_t ts) {
+uint64_t clock::compensated::fromMono(uint64_t ts) {
     ts += corrValue(clkCompRate, static_cast<int64_t>(ts - clkCompRef));
     ts += clkCompOffset;
     return ts;
 }
 
-void CLK_COMP_setComp(int32_t comp) {
+void clock::compensated::setTrim(int32_t rate) {
     // prepare compensation update
-    const uint64_t now = CLK_MONO();
+    const uint64_t now = monotonic::now();
     const uint64_t offset = clkCompOffset + corrFracRem(clkCompRate, now - clkCompRef, clkCompRem);
 
     // prepare frequency output update
-    const uint64_t incr = (static_cast<int64_t>(comp) * -FRQ_INTV) + (static_cast<uint64_t>((FRQ_INTV - 1)) << 32);
+    const uint64_t incr = (static_cast<int64_t>(rate) * -FRQ_INTV) + (static_cast<uint64_t>((FRQ_INTV - 1)) << 32);
 
     // apply update
     __disable_irq();
-    clkCompRate = comp;
+    clkCompRate = rate;
     clkCompRef = now;
     clkCompOffset = offset;
     frqInc = incr;
     __enable_irq();
 }
 
-int32_t CLK_COMP_getComp() {
+int32_t clock::compensated::getTrim() {
     return clkCompRate;
 }

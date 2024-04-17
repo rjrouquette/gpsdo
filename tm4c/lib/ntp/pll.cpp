@@ -6,8 +6,8 @@
 
 #include "tcmp.hpp"
 #include "../format.hpp"
-#include "../clk/comp.hpp"
-#include "../clk/tai.hpp"
+#include "../clock/comp.hpp"
+#include "../clock/tai.hpp"
 
 #include <cmath>
 
@@ -44,7 +44,7 @@ void PLL_init() {
 void ntpApplyOffset(int64_t offset);
 
 static void ntpSetTaiClock(const int64_t offset) {
-    CLK_TAI_adjust(offset);
+    clock::tai::adjust(offset);
     ntpApplyOffset(offset);
 }
 
@@ -92,7 +92,7 @@ void PLL_updateOffset(const int interval, const int64_t offset) {
     float trim = offsetProportion + offsetIntegral;
     if(trim >  PLL_MAX_FREQ_TRIM) trim =  PLL_MAX_FREQ_TRIM;
     if(trim < -PLL_MAX_FREQ_TRIM) trim = -PLL_MAX_FREQ_TRIM;
-    CLK_TAI_setTrim(static_cast<int32_t>(0x1p32f * trim));
+    clock::tai::setTrim(static_cast<int32_t>(0x1p32f * trim));
 }
 
 void PLL_updateDrift(int interval, const float drift) {
@@ -106,7 +106,7 @@ void PLL_updateDrift(int interval, const float drift) {
     driftRms = sqrtf(driftMS);
 
     // update temperature compensation
-    driftFreq = drift + (0x1p-32f * static_cast<float>(CLK_COMP_getComp()));
+    driftFreq = drift + (0x1p-32f * static_cast<float>(clock::compensated::getTrim()));
     tcmp::update(driftFreq, 100e-9f / (100e-9f + driftStdDev + fabsf(diff)));
 }
 
@@ -171,12 +171,12 @@ float PLL_offsetRms() { return offsetRms; }
 float PLL_offsetStdDev() { return offsetStdDev; }
 float PLL_offsetProp() { return offsetProportion; }
 float PLL_offsetInt() { return offsetIntegral; }
-float PLL_offsetCorr() { return 0x1p-32f * static_cast<float>(CLK_TAI_getTrim()); }
+float PLL_offsetCorr() { return 0x1p-32f * static_cast<float>(clock::tai::getTrim()); }
 
 // drift stats
 float PLL_driftLast() { return driftLast; }
 float PLL_driftMean() { return driftMean; }
 float PLL_driftRms() { return driftRms; }
 float PLL_driftStdDev() { return driftStdDev; }
-float PLL_driftCorr() { return 0x1p-32f * static_cast<float>(CLK_COMP_getComp()); }
+float PLL_driftCorr() { return 0x1p-32f * static_cast<float>(clock::compensated::getTrim()); }
 float PLL_driftFreq() { return driftFreq; }

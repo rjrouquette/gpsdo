@@ -9,7 +9,7 @@
 #include "util.hpp"
 #include "../net.hpp"
 #include "../run.hpp"
-#include "../clk/mono.hpp"
+#include "../clock/mono.hpp"
 
 #include <strings.h>
 
@@ -74,7 +74,7 @@ static void arpRouter(void *ref, uint32_t remoteAddress, const uint8_t *macAddre
 }
 
 void ARP_refreshRouter() {
-    lastRouterPoll = CLK_MONO_INT();
+    lastRouterPoll = clock::monotonic::seconds();
     ARP_request(ipRouter, arpRouter, nullptr);
 }
 
@@ -123,7 +123,7 @@ static void arpAnnounce() {
 
 static void arpRun(void *ref) {
     // process request expiration
-    const uint32_t now = CLK_MONO_INT();
+    const uint32_t now = clock::monotonic::seconds();
     for (auto &request : requests) {
         // skip empty slots
         if (request.remoteAddress == 0)
@@ -206,7 +206,7 @@ void ARP_process(uint8_t *frame, const int flen) {
 }
 
 int ARP_request(const uint32_t remoteAddress, const CallbackARP callback, void *ref) {
-    const uint32_t now = CLK_MONO_INT();
+    const uint32_t now = clock::monotonic::seconds();
     for (auto &request : requests) {
         // look for empty slot
         if (request.remoteAddress != 0)

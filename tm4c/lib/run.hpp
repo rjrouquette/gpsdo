@@ -5,7 +5,7 @@
 #pragma once
 
 #include <cstdint>
-#include "clk/mono.hpp"
+#include "clock/mono.hpp"
 
 static constexpr uint32_t RUN_SEC = 1u << 24;
 static constexpr uint32_t RUN_MAX = static_cast<uint64_t>(MAX_RAW_INTV) * RUN_SEC / CLK_FREQ;

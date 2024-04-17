@@ -14,8 +14,8 @@
 #include "../run.hpp"
 #include "../chrony/candm.h"
 #include "../chrony/util.hpp"
-#include "../clk/comp.hpp"
-#include "../clk/tai.hpp"
+#include "../clock/comp.hpp"
+#include "../clock/tai.hpp"
 #include "../net/dhcp.hpp"
 #include "../net/dns.hpp"
 #include "../net/util.hpp"
@@ -187,11 +187,11 @@ static void ntpRequest(uint8_t *frame, const int flen) {
     // set reference ID
     response.ntp.refID = refId;
     // set reference timestamp
-    response.ntp.refTime = htonll(CLK_TAI_fromMono(lastUpdate) - clkTaiUtcOffset + NTP_UTC_OFFSET);
+    response.ntp.refTime = htonll(clock::tai::fromMono(lastUpdate) - clkTaiUtcOffset + NTP_UTC_OFFSET);
     // set origin and TX timestamps
     if (xleave < 0) {
         response.ntp.origTime = request.ntp.txTime;
-        response.ntp.txTime = htonll(CLK_TAI() - clkTaiUtcOffset + NTP_UTC_OFFSET);
+        response.ntp.txTime = htonll(clock::tai::now() - clkTaiUtcOffset + NTP_UTC_OFFSET);
     }
     else {
         response.ntp.origTime = request.ntp.rxTime;
@@ -568,15 +568,15 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
 
     const ntp::Source *source = selectedSource;
 
-    chrony::toTimespec(CLK_TAI_fromMono(lastUpdate) - clkTaiUtcOffset, &(cmdReply->data.tracking.ref_time));
+    chrony::toTimespec(clock::tai::fromMono(lastUpdate) - clkTaiUtcOffset, &(cmdReply->data.tracking.ref_time));
 
     cmdReply->data.tracking.current_correction.f = chrony::htonf(PLL_offsetMean());
     cmdReply->data.tracking.last_offset.f = chrony::htonf(PLL_offsetLast());
     cmdReply->data.tracking.rms_offset.f = chrony::htonf(PLL_offsetRms());
 
-    cmdReply->data.tracking.freq_ppm.f = chrony::htonf(-1e6f * (0x1p-32f * static_cast<float>(CLK_COMP_getComp())));
+    cmdReply->data.tracking.freq_ppm.f = chrony::htonf(-1e6f * (0x1p-32f * static_cast<float>(clock::compensated::getTrim())));
     cmdReply->data.tracking.resid_freq_ppm.f =
-        chrony::htonf(-1e6f * (0x1p-32f * static_cast<float>(CLK_TAI_getTrim())));
+        chrony::htonf(-1e6f * (0x1p-32f * static_cast<float>(clock::tai::getTrim())));
     cmdReply->data.tracking.skew_ppm.f = chrony::htonf(1e6f * PLL_driftStdDev());
 
     cmdReply->data.tracking.root_delay.f = chrony::htonf(0x1p-16f * static_cast<float>(rootDelay));

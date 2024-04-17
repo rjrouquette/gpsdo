@@ -8,9 +8,9 @@
 #include "run.hpp"
 #include "../hw/interrupts.h"
 #include "../hw/uart.h"
-#include "clk/clk.hpp"
-#include "clk/mono.hpp"
-#include "clk/util.hpp"
+#include "clock/capture.hpp"
+#include "clock/mono.hpp"
+#include "clock/util.hpp"
 
 #include <memory>
 
@@ -145,12 +145,12 @@ static void runHealth(void *ref) {
     }
 
     // reset GPS if PPS has ceased
-    const uint32_t now = CLK_MONO_INT();
+    const uint32_t now = clock::monotonic::seconds();
     if ((now - lastReset) > GPS_RST_INTV) {
         fixed_32_32 age = {};
-        age.full = CLK_MONO();
+        age.full = clock::monotonic::now();
         uint64_t pps[3];
-        CLK_PPS(pps);
+        clock::capture::ppsGps(pps);
         age.full -= pps[0];
         if (age.ipart > GPS_RST_THR) {
             // reset GPS
@@ -591,7 +591,7 @@ static void processUbxPVT(const uint8_t *payload) {
     taiEpoch = offset;
     // mark as updated
     if (taiOffset != 0)
-        taiEpochUpdate = CLK_MONO();
+        taiEpochUpdate = clock::monotonic::now();
 }
 
 uint64_t gps::taiEpochUpdate() {

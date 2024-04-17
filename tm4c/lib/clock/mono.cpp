@@ -4,8 +4,6 @@
 
 #include "mono.hpp"
 
-#include "comp.hpp"
-#include "tai.hpp"
 #include "util.hpp"
 #include "../delay.hpp"
 #include "../hw/emac.h"
@@ -89,40 +87,40 @@ void initClkEth() {
     FLASHCONF.FPFOFF = 0;
 }
 
-static void initCaptureTimer(volatile struct GPTM_MAP *timer) {
+static void initCaptureTimer(volatile GPTM_MAP &timer) {
     // configure timer for capture mode
-    timer->CFG.GPTMCFG = 4;
-    timer->TAMR.MR = 0x3;
-    timer->TBMR.MR = 0x3;
+    timer.CFG.GPTMCFG = 4;
+    timer.TAMR.MR = 0x3;
+    timer.TBMR.MR = 0x3;
     // edge-time mode
-    timer->TAMR.CMR = 1;
-    timer->TBMR.CMR = 1;
+    timer.TAMR.CMR = 1;
+    timer.TBMR.CMR = 1;
     // rising edge
-    timer->CTL.TAEVENT = 0;
-    timer->CTL.TBEVENT = 0;
+    timer.CTL.TAEVENT = 0;
+    timer.CTL.TBEVENT = 0;
     // count up
-    timer->TAMR.CDIR = 1;
-    timer->TBMR.CDIR = 1;
+    timer.TAMR.CDIR = 1;
+    timer.TBMR.CDIR = 1;
     // disable overflow interrupt
-    timer->TAMR.CINTD = 0;
-    timer->TBMR.CINTD = 0;
+    timer.TAMR.CINTD = 0;
+    timer.TBMR.CINTD = 0;
     // full count range
-    timer->TAILR = -1;
-    timer->TBILR = -1;
+    timer.TAILR = -1;
+    timer.TBILR = -1;
     // interrupts
-    timer->IMR.CAE = 1;
-    timer->IMR.CBE = 1;
+    timer.IMR.CAE = 1;
+    timer.IMR.CBE = 1;
     // start timer
-    timer->CTL.TAEN = 1;
-    timer->CTL.TBEN = 1;
+    timer.CTL.TAEN = 1;
+    timer.CTL.TBEN = 1;
 }
 
 void initClkSync() {
     // enable capture timers
     RCGCTIMER.raw |= 0x31;
     delay::cycles(4);
-    initCaptureTimer(&GPTM4);
-    initCaptureTimer(&GPTM5);
+    initCaptureTimer(GPTM4);
+    initCaptureTimer(GPTM5);
     // disable timer 4B interrupt
     GPTM4.IMR.CBE = 0;
     // synchronize capture timers with monotonic clock
@@ -159,15 +157,15 @@ void ISR_Timer0A() {
 }
 
 // return integer part of current time
-uint32_t CLK_MONO_INT() {
+uint32_t clock::monotonic::seconds() {
     return clkMonoInt;
 }
 
 // return current time as 32.32 fixed point value
-uint64_t CLK_MONO() {
+uint64_t clock::monotonic::now() {
     // capture current time
     __disable_irq();
-    uint32_t snapF = CLK_MONO_RAW();
+    uint32_t snapF = raw();
     uint32_t snapI = clkMonoInt;
     uint32_t snapO = clkMonoOff;
     __enable_irq();
@@ -179,7 +177,7 @@ uint64_t CLK_MONO() {
 // capture rising edge of PPS output for offset measurement
 void ISR_Timer4A() {
     // snapshot edge time
-    uint32_t timer = CLK_MONO_RAW();
+    uint32_t timer = clock::monotonic::raw();
     uint32_t event = GPTM4.TAR.raw;
     // clear capture interrupt flag
     GPTM4.ICR = GPTM_ICR_CAE;
@@ -192,40 +190,4 @@ void ISR_Timer4A() {
 void ISR_Timer4B() {
     // clear capture interrupt flag
     GPTM4.ICR = GPTM_ICR_CBE;
-}
-
-// capture rising edge of ethernet PPS for offset measurement
-void ISR_Timer5A() {
-    // snapshot edge time
-    uint32_t timer = CLK_MONO_RAW();
-    uint32_t event = GPTM5.TAR.raw;
-    // clear capture interrupt flag
-    GPTM5.ICR = GPTM_ICR_CAE;
-    // compute ethernet clock offset
-    timer -= (timer - event) & 0xFFFF;
-    timer -= EMAC0.TIMSEC * CLK_FREQ;
-    clkMonoEth = timer;
-}
-
-// capture rising edge of GPS PPS for offset measurement
-void ISR_Timer5B() {
-    // snapshot edge time
-    uint32_t timer = CLK_MONO_RAW();
-    uint32_t event = GPTM5.TBR.raw;
-    // clear capture interrupt flag
-    GPTM5.ICR = GPTM_ICR_CBE;
-    // update pps edge state
-    timer -= (timer - event) & 0xFFFF;
-    // monotonic clock state
-    clkMonoPpsEvent.timer = timer;
-    clkMonoPpsEvent.offset = clkMonoOff;
-    clkMonoPpsEvent.integer = clkMonoInt;
-    // compensated clock state
-    clkMonoPpsEvent.compRate = clkCompRate;
-    clkMonoPpsEvent.compRef = clkCompRef;
-    clkMonoPpsEvent.compOff = clkCompOffset;
-    // tai clock state
-    clkMonoPpsEvent.taiRate = clkTaiRate;
-    clkMonoPpsEvent.taiRef = clkTaiRef;
-    clkMonoPpsEvent.taiOff = clkTaiOffset;
 }

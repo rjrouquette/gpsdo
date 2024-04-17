@@ -6,7 +6,7 @@
 
 #include "util.hpp"
 #include "../gps.hpp"
-#include "../clk/mono.hpp"
+#include "../clock/mono.hpp"
 #include "../ntp/pll.hpp"
 #include "../ntp/tcmp.hpp"
 
@@ -248,7 +248,7 @@ int snmp::writeSensorUpdateTimes(uint8_t *const dst) {
     uint8_t *ptr = dst;
 
     // sensors are virtual and always current
-    const uint32_t timeTicks = ((CLK_MONO() * 100) >> 32);
+    const uint32_t timeTicks = ((clock::monotonic::now() * 100) >> 32);
     for (int i = 0; i < SENSOR_CNT; ++i) {
         ptr += snmp::writeValueInt32(
             ptr,

@@ -13,10 +13,10 @@
 #include "lib/led.hpp"
 #include "lib/net.hpp"
 #include "lib/run.hpp"
-#include "lib/clk/clk.hpp"
-#include "lib/clk/comp.hpp"
-#include "lib/clk/mono.hpp"
-#include "lib/clk/tai.hpp"
+#include "lib/clock/capture.hpp"
+#include "lib/clock/comp.hpp"
+#include "lib/clock/mono.hpp"
+#include "lib/clock/tai.hpp"
 #include "lib/net/arp.hpp"
 #include "lib/net/dhcp.hpp"
 #include "lib/net/ip.hpp"
@@ -146,7 +146,7 @@ static unsigned statusClock(char *body) {
     char *end = body;
 
     // current time
-    uint64_t mono = CLK_MONO();
+    const uint64_t mono = clock::monotonic::now();
     strcpy(tmp, "0x");
     toHex(mono >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
@@ -157,7 +157,7 @@ static unsigned statusClock(char *body) {
     end = append(end, "\n");
 
     // current time
-    uint64_t comp = CLK_COMP();
+    const uint64_t comp = clock::compensated::now();
     strcpy(tmp, "0x");
     toHex(comp >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
@@ -168,7 +168,7 @@ static unsigned statusClock(char *body) {
     end = append(end, "\n");
 
     // TAI time
-    uint64_t tai = CLK_TAI();
+    const uint64_t tai = clock::tai::now();
     strcpy(tmp, "0x");
     toHex(tai >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
@@ -236,7 +236,7 @@ static unsigned statusClock(char *body) {
 
     // PPS status
     uint64_t pps[3];
-    CLK_PPS(pps);
+    clock::capture::ppsGps(pps);
     strcpy(tmp, "0x");
     toHex(pps[0] >> 32, 8, '0', tmp + 2);
     tmp[10] = '.';
@@ -345,7 +345,7 @@ static unsigned statusETH(char *body) {
     end = append(end, "\n");
 
     // link status
-    int phyStatus = NET_getPhyStatus();
+    const int phyStatus = NET_getPhyStatus();
     end = append(end, "link speed: ");
     end = append(end, (phyStatus & PHY_STATUS_100M) ? "100M " : "10M ");
     end = append(end, (phyStatus & PHY_STATUS_DUPLEX) ? "FDX" : "HDX");
@@ -466,8 +466,8 @@ static unsigned statusSystem(char *body) {
 
     // eeprom status
     EEPROM_seek(0);
-    uint32_t eeprom_format = EEPROM_read();
-    uint32_t eeprom_version = EEPROM_read();
+    const uint32_t eeprom_format = EEPROM_read();
+    const uint32_t eeprom_version = EEPROM_read();
 
     // eeprom format
     toHex(eeprom_format, 8, '0', tmp);

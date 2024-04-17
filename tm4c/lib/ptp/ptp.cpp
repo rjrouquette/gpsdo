@@ -8,7 +8,7 @@
 #include "../led.hpp"
 #include "../net.hpp"
 #include "../run.hpp"
-#include "../clk/tai.hpp"
+#include "../clock/tai.hpp"
 #include "../net/util.hpp"
 #include "../ntp/GPS.hpp"
 #include "../ntp/ntp.hpp"
@@ -193,7 +193,7 @@ static void sendAnnounce(void *ref) {
         announce.data.grandMasterClockQuality = toPtpClkAccuracy(PLL_offsetRms());
     else
         announce.data.grandMasterClockQuality = 0x31;
-    toPtpTimestamp(CLK_TAI(), &announce.data.originTimestamp);
+    toPtpTimestamp(clock::tai::now(), &announce.data.originTimestamp);
 
     // transmit request
     NET_transmit(txDesc, flen);
@@ -243,7 +243,7 @@ static void sendSync(void *ref) {
     sync.ptp.sequenceId = htons(seqId++);
 
     // set preliminary timestamp
-    toPtpTimestamp(CLK_TAI(), &sync.data);
+    toPtpTimestamp(clock::tai::now(), &sync.data);
 
     // transmit request
     NET_setTxCallback(txDesc, syncFollowup, nullptr);

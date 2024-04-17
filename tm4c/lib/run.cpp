@@ -6,7 +6,7 @@
 
 #include "format.hpp"
 #include "led.hpp"
-#include "clk/mono.hpp"
+#include "clock/mono.hpp"
 
 #include <memory>
 
@@ -114,7 +114,7 @@ public:
      */
     [[nodiscard]]
     bool isReady() const {
-        return static_cast<int32_t>(CLK_MONO_RAW() - runNext) >= 0;
+        return static_cast<int32_t>(clock::monotonic::raw() - runNext) >= 0;
     }
 
     /**
@@ -243,18 +243,21 @@ public:
     friend void initScheduler();
 };
 
-#define SLOT_CNT (32)
+// Pointer to the next free task.
 static Task *taskFree;
-static Task taskPool[SLOT_CNT];
+// Root element of task queue.
 static volatile Task taskQueue;
+// Task element pool.
+static Task taskPool[32];
+// Out-of-band update flag.
 static volatile bool taskUpdate;
-#define queueHead (taskQueue.next())
-#define queueRoot ((Task *) &taskQueue)
+// Pointer to root element of task queue. Used for detecting the beginning and end of the queue.
+static constexpr auto queueRoot = const_cast<Task*>(&taskQueue);
 
 void initScheduler() {
     // initialize queue nodes
     taskFree = taskPool;
-    for (int i = 1; i < SLOT_CNT; i++)
+    for (size_t i = 1; i < std::size(taskPool); i++)
         taskPool[i - 1].qNext = taskPool + i;
 
     // initialize queue pointers
@@ -300,7 +303,7 @@ void Task::update() {
         // remove from queue
         pop();
         // set to run immediately
-        runNext = CLK_MONO_RAW();
+        runNext = clock::monotonic::raw();
         // update schedule queue
         insert();
     }
@@ -308,7 +311,7 @@ void Task::update() {
 
 void Task::insert() {
     // locate optimal insertion point
-    auto ins = queueHead;
+    auto ins = taskQueue.next();
     while (ins != queueRoot) {
         if (static_cast<int32_t>(runNext - ins->runNext) < 0)
             break;
@@ -329,7 +332,7 @@ void Task::requeue() {
     // remove from queue
     pop();
     // set next run time
-    runNext = runInterval + ((schedule == Periodic) ? runNext : CLK_MONO_RAW());
+    runNext = runInterval + (schedule == Periodic ? runNext : clock::monotonic::raw());
     // schedule next run
     insert();
 }
@@ -342,7 +345,7 @@ void Task::setPeriodic(const uint32_t interval, const RunCall callback, void *re
     // convert fixed-point interval to raw monotonic domain
     runInterval = toMonoRaw(interval);
     // start after delay
-    runNext = CLK_MONO_RAW() + runInterval;
+    runNext = clock::monotonic::raw() + runInterval;
     // add to schedule
     insert();
 }
@@ -355,7 +358,7 @@ void Task::setSleep(const uint32_t delay, const RunCall callback, void *ref) {
     // convert fixed-point interval to raw monotonic domain
     runInterval = toMonoRaw(delay);
     // start after delay
-    runNext = CLK_MONO_RAW() + runInterval;
+    runNext = clock::monotonic::raw() + runInterval;
     // add to schedule
     insert();
 }
@@ -368,7 +371,7 @@ void Task::setWait(const RunCall callback, void *ref) {
     // set run interval to the maximum raw clock interval
     runInterval = MAX_RAW_INTV;
     // start after delay
-    runNext = CLK_MONO_RAW() + runInterval;
+    runNext = clock::monotonic::raw() + runInterval;
     // add to schedule
     insert();
 }
@@ -394,7 +397,7 @@ void runScheduler() {
         }
 
         // check for scheduled tasks
-        const auto task = queueHead;
+        const auto task = taskQueue.next();
         if (!task->isReady())
             continue;
 
@@ -443,7 +446,7 @@ static void runCancel(void *taskHandle) {
 void runCancel(const RunCall callback, const void *ref) {
     // match by reference
     if (callback == nullptr) {
-        auto iter = queueHead;
+        auto iter = taskQueue.next();
         while (iter != queueRoot) {
             const auto task = iter;
             iter = iter->next();
@@ -456,7 +459,7 @@ void runCancel(const RunCall callback, const void *ref) {
 
     // match by callback
     if (ref == nullptr) {
-        auto iter = queueHead;
+        auto iter = taskQueue.next();
         while (iter != queueRoot) {
             const auto task = iter;
             iter = iter->next();
@@ -468,7 +471,7 @@ void runCancel(const RunCall callback, const void *ref) {
     }
 
     // match both callback and reference
-    auto iter = queueHead;
+    auto iter = taskQueue.next();
     while (iter != queueRoot) {
         const auto task = iter;
         iter = iter->next();

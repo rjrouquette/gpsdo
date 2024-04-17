@@ -13,7 +13,7 @@
 #include "../net.hpp"
 #include "../run.hpp"
 #include "../../hw/sys.h"
-#include "../clk/mono.hpp"
+#include "../clock/mono.hpp"
 
 #include <memory.h>
 
@@ -56,7 +56,7 @@ static uint32_t ntpAddr[8];
 static int ntpLen;
 
 static void processFrame(uint8_t *frame, int flen);
-static void sendReply(HEADER_DHCP *response);
+static void sendReply(const HEADER_DHCP *response);
 
 __attribute__((always_inline))
 inline void pad_opts(uint8_t *frame, int *flen) {
@@ -100,7 +100,7 @@ static void dhcpRun(void *ref) {
     if (!(NET_getPhyStatus() & PHY_STATUS_LINK))
         return;
 
-    const uint32_t now = CLK_MONO_INT();
+    const uint32_t now = clock::monotonic::seconds();
     if (static_cast<int32_t>(now - dhcpLeaseExpire) >= 0) {
         // re-attempt if renewal fails
         dhcpLeaseExpire += REATTEMPT_INTVL;
@@ -129,7 +129,7 @@ void DHCP_init() {
 
 void DHCP_renew() {
     // create request ID
-    dhcpXID = dhcpUUID + CLK_MONO_INT();
+    dhcpXID = dhcpUUID + clock::monotonic::seconds();
 
     // get TX descriptor
     const int txDesc = NET_getTxDesc();
@@ -186,10 +186,10 @@ void DHCP_renew() {
 }
 
 uint32_t DHCP_expires() {
-    return dhcpLeaseExpire - CLK_MONO_INT();
+    return dhcpLeaseExpire - clock::monotonic::seconds();
 }
 
-static void processFrame(uint8_t *frame, int flen) {
+static void processFrame(uint8_t *frame, const int flen) {
     // discard malformed packets
     if (flen < 282)
         return;
@@ -340,12 +340,12 @@ static void processFrame(uint8_t *frame, int flen) {
         dhcpLeaseExpire -= optLease / 10;
         if (dhcpLeaseExpire > 86400)
             dhcpLeaseExpire = 86400;
-        dhcpLeaseExpire += CLK_MONO_INT();
+        dhcpLeaseExpire += clock::monotonic::seconds();
         return;
     }
 }
 
-static void sendReply(HEADER_DHCP *response) {
+static void sendReply(const HEADER_DHCP *response) {
     // get TX descriptor
     const int txDesc = NET_getTxDesc();
     // initialize frame

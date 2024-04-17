@@ -40,21 +40,23 @@ extern volatile uint32_t clkMonoPps;
 // pps edge capture state
 extern volatile ClockEvent clkMonoPpsEvent;
 
-/**
- * Returns the current value of the system clock (1s resolution)
- * @return Raw 32-bit count of 1s ticks
- */
-uint32_t CLK_MONO_INT();
+namespace clock::monotonic {
+    /**
+     * Returns the current value of the system clock (1s resolution)
+     * @return Raw 32-bit count of 1s ticks
+     */
+    uint32_t seconds();
 
-/**
- * Returns the current value of the system clock (~0.232ns resolution)
- * @return 64-bit fixed-point format (32.32)
- */
-uint64_t CLK_MONO();
+    /**
+     * Returns the current value of the system clock (~0.232ns resolution)
+     * @return 64-bit fixed-point format (32.32)
+     */
+    uint64_t now();
 
-/**
- * Returns the raw value of the system clock timer
- */
-inline uint32_t CLK_MONO_RAW() {
-    return TIMER_MONO.TAV.raw;
+    /**
+     * Returns the raw value of the system clock timer
+     */
+    inline uint32_t raw() {
+        return TIMER_MONO.TAV.raw;
+    }
 }

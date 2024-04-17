@@ -10,7 +10,7 @@
 #include "udp.hpp"
 #include "util.hpp"
 #include "../net.hpp"
-#include "../clk/mono.hpp"
+#include "../clock/mono.hpp"
 
 #include <cstring>
 
@@ -91,7 +91,7 @@ static void callbackARP(void *ref, const uint32_t remoteAddress, const uint8_t *
 }
 
 void DNS_updateMAC() {
-    lastArp = CLK_MONO_INT();
+    lastArp = clock::monotonic::seconds();
     if (IPv4_testSubnet(ipSubnet, ipAddress, ipDNS))
         copyMAC(dnsMAC, macRouter);
     else
@@ -100,7 +100,7 @@ void DNS_updateMAC() {
 
 int DNS_lookup(const char *hostname, const CallbackDNS callback, volatile void *ref) {
     // check MAC address age
-    const uint32_t now = CLK_MONO_INT();
+    const uint32_t now = clock::monotonic::seconds();
     if ((now - lastArp) > ARP_MAX_AGE)
         DNS_updateMAC();
 
