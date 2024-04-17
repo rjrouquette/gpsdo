@@ -68,6 +68,7 @@ void clock::initSystem() {
 }
 
 void clock::init() {
+    capture::init();
     initClkSync();
     initClkEth();
     initClkComp();
