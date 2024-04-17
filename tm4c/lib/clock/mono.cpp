@@ -12,10 +12,6 @@
 #include "../hw/sys.h"
 #include "../hw/timer.h"
 
-volatile uint32_t clkMonoInt = 0;
-volatile uint32_t clkMonoOff = 0;
-volatile uint32_t clkMonoPps = 0;
-
 
 void initClkMono() {
     // Enable Timer 0
@@ -141,6 +137,11 @@ void initClkSync() {
     PORTM.LOCK = 0;
 }
 
+// raw internal monotonic clock state
+static volatile uint32_t clkMonoInt = 0;
+// raw internal monotonic clock state
+static volatile uint32_t clkMonoOff = 0;
+
 // second boundary comparison
 void ISR_Timer0A() {
     // increment counter
@@ -183,23 +184,4 @@ uint64_t clock::monotonic::fromRaw(uint32_t monoRaw) {
     scratch.fpart = nanosToFrac(ticks * CLK_NANO);
     scratch.ipart = integer;
     return scratch.full;
-}
-
-
-// capture rising edge of PPS output for offset measurement
-void ISR_Timer4A() {
-    // snapshot edge time
-    uint32_t timer = clock::monotonic::raw();
-    const uint32_t event = GPTM4.TAR.raw;
-    // clear capture interrupt flag
-    GPTM4.ICR = GPTM_ICR_CAE;
-    // compute pps output time
-    timer -= (timer - event) & 0xFFFF;
-    clkMonoPps = timer;
-}
-
-// currently unused, but included for completeness
-void ISR_Timer4B() {
-    // clear capture interrupt flag
-    GPTM4.ICR = GPTM_ICR_CBE;
 }

@@ -12,12 +12,6 @@ static constexpr int CLK_FREQ = 125000000;
 static constexpr int CLK_NANO = 1000000000 / CLK_FREQ;
 #define TIMER_MONO (GPTM0)
 
-// raw internal monotonic clock state
-extern volatile uint32_t clkMonoInt;
-extern volatile uint32_t clkMonoOff;
-// timer tick capture of the PPS output
-extern volatile uint32_t clkMonoPps;
-
 namespace clock::monotonic {
     /**
      * Returns the current value of the system clock (1s resolution)

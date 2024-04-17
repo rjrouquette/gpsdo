@@ -27,7 +27,8 @@ volatile int32_t clkTaiRate = 0;
 static volatile uint32_t clkTaiRem = 0;
 
 static volatile uint32_t clkPpsLow = CLK_FREQ - PPS_INTV_HI - 1;
-
+// timer tick capture of the PPS output
+static volatile uint32_t clkMonoPps = 0;
 
 // PPS output timer
 void ISR_Timer2A() {
@@ -37,6 +38,24 @@ void ISR_Timer2A() {
     const int isHi = (PPS_TIMER.TAMR.TCACT == 0x3);
     PPS_TIMER.TAMR.TCACT = isHi ? 0x2 : 0x3;
     PPS_TIMER.TAILR = isHi ? (PPS_INTV_HI - 1) : clkPpsLow;
+}
+
+// capture rising edge of PPS output for offset measurement
+void ISR_Timer4A() {
+    // snapshot edge time
+    uint32_t timer = clock::monotonic::raw();
+    const uint32_t event = GPTM4.TAR.raw;
+    // clear capture interrupt flag
+    GPTM4.ICR = GPTM_ICR_CAE;
+    // compute pps output time
+    timer -= (timer - event) & 0xFFFF;
+    clkMonoPps = timer;
+}
+
+// currently unused, but included for completeness
+void ISR_Timer4B() {
+    // clear capture interrupt flag
+    GPTM4.ICR = GPTM_ICR_CBE;
 }
 
 static void runClkTai(void *ref) {
@@ -148,7 +167,7 @@ uint64_t clock::tai::fromMono(uint64_t ts) {
     return ts;
 }
 
-void clock::tai::setTrim(int32_t trim) {
+void clock::tai::setTrim(const int32_t trim) {
     // prepare update values
     const uint64_t now = compensated::now();
     const int32_t offset = corrFracRem(clkTaiRate, now - clkTaiRef, clkTaiRem);
@@ -163,6 +182,6 @@ int32_t clock::tai::getTrim() {
     return clkTaiRate;
 }
 
-void clock::tai::adjust(int64_t delta) {
+void clock::tai::adjust(const int64_t delta) {
     clkTaiOffset += delta;
 }
