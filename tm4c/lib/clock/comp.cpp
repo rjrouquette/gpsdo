@@ -44,10 +44,8 @@ void runClkComp(void *ref) {
     const int32_t offset = corrFracRem(clkCompRate, now - clkCompRef, clkCompRem);
 
     // apply update
-    __disable_irq();
     clkCompRef = now;
     clkCompOffset += offset;
-    __enable_irq();
 }
 
 void initClkComp() {
@@ -112,12 +110,10 @@ void clock::compensated::setTrim(int32_t rate) {
     const uint64_t incr = (static_cast<int64_t>(rate) * -FRQ_INTV) + (static_cast<uint64_t>((FRQ_INTV - 1)) << 32);
 
     // apply update
-    __disable_irq();
     clkCompRate = rate;
     clkCompRef = now;
     clkCompOffset = offset;
     frqInc = incr;
-    __enable_irq();
 }
 
 int32_t clock::compensated::getTrim() {

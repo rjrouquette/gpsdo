@@ -45,10 +45,8 @@ static void runClkTai(void *ref) {
     const int32_t offset = corrFracRem(clkTaiRate, now - clkTaiRef, clkTaiRem);
 
     // apply update
-    __disable_irq();
     clkTaiRef = now;
     clkTaiOffset += offset;
-    __enable_irq();
 }
 
 static void runPpsTai(void *ref) {
@@ -150,17 +148,15 @@ uint64_t clock::tai::fromMono(uint64_t ts) {
     return ts;
 }
 
-void clock::tai::setTrim(int32_t comp) {
+void clock::tai::setTrim(int32_t trim) {
     // prepare update values
     const uint64_t now = compensated::now();
     const int32_t offset = corrFracRem(clkTaiRate, now - clkTaiRef, clkTaiRem);
 
     // apply update
-    __disable_irq();
     clkTaiRef = now;
-    clkTaiRate = comp;
+    clkTaiRate = trim;
     clkTaiOffset += offset;
-    __enable_irq();
 }
 
 int32_t clock::tai::getTrim() {
@@ -168,7 +164,5 @@ int32_t clock::tai::getTrim() {
 }
 
 void clock::tai::adjust(int64_t delta) {
-    __disable_irq();
     clkTaiOffset += delta;
-    __enable_irq();
 }

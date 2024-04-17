@@ -12,33 +12,11 @@ static constexpr int CLK_FREQ = 125000000;
 static constexpr int CLK_NANO = 1000000000 / CLK_FREQ;
 #define TIMER_MONO (GPTM0)
 
-/**
- * Precision Clock Event Structure
- */
-struct ClockEvent {
-    // monotonic clock state
-    uint32_t timer;
-    uint32_t offset;
-    uint32_t integer;
-    // compensated clock state
-    int32_t compRate;
-    uint64_t compRef;
-    uint64_t compOff;
-    // tai clock state
-    int32_t taiRate;
-    uint64_t taiRef;
-    uint64_t taiOff;
-};
-
 // raw internal monotonic clock state
 extern volatile uint32_t clkMonoInt;
 extern volatile uint32_t clkMonoOff;
-// timer tick offset between the ethernet clock and monotonic clock
-extern volatile uint32_t clkMonoEth;
 // timer tick capture of the PPS output
 extern volatile uint32_t clkMonoPps;
-// pps edge capture state
-extern volatile ClockEvent clkMonoPpsEvent;
 
 namespace clock::monotonic {
     /**
@@ -52,6 +30,12 @@ namespace clock::monotonic {
      * @return 64-bit fixed-point format (32.32)
      */
     uint64_t now();
+
+    /**
+     * Converts a raw monotonic timer value into a full precision timestamp (~0.232ns resolution)
+     * @return 64-bit fixed-point format (32.32)
+     */
+    uint64_t fromRaw(uint32_t monoRaw);
 
     /**
      * Returns the raw value of the system clock timer

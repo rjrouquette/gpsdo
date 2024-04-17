@@ -8,6 +8,7 @@
 #include "../net.hpp"
 #include "../random.hpp"
 #include "../run.hpp"
+#include "../clock/capture.hpp"
 #include "../clock/mono.hpp"
 #include "../clock/tai.hpp"
 #include "../clock/util.hpp"
@@ -88,7 +89,7 @@ void ntp::Peer::run() {
 
     // requires hardware time synchronization
     // requires valid MAC address
-    if (clkMonoEth == 0 || isMacInvalid()) {
+    if (clock::capture::ppsEthernetRaw() == 0 || isMacInvalid()) {
         runAdjust(taskHandle, IDLE_INTV);
         return;
     }

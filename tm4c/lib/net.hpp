@@ -21,6 +21,6 @@ uint8_t * NET_getTxBuff(int desc);
 void NET_setTxCallback(int desc, CallbackNetTX callback, volatile void *ref);
 void NET_transmit(int desc, int len);
 
-void NET_getRxTime(volatile uint64_t *stamps);
+void NET_getRxTime(uint64_t *stamps);
 
-void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps);
+void NET_getTxTime(const uint8_t *txFrame, uint64_t *stamps);

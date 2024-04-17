@@ -12,10 +12,8 @@
 #include "../hw/gpio.h"
 #include "../hw/interrupts.h"
 #include "../hw/sys.h"
-#include "clock/comp.hpp"
+#include "clock/capture.hpp"
 #include "clock/mono.hpp"
-#include "clock/tai.hpp"
-#include "clock/util.hpp"
 #include "net/arp.hpp"
 #include "net/dhcp.hpp"
 #include "net/dns.hpp"
@@ -316,7 +314,7 @@ static bool processFrame() {
         const auto ethType = headerEth->ethType;
         // dispatch frame processor
         for (const auto &entry : registry) {
-            if(ethType == entry.ethType) {
+            if (ethType == entry.ethType) {
                 (*entry.handler)(buffer, length);
                 break;
             }
@@ -417,35 +415,23 @@ void NET_transmit(int desc, int len) {
     EMAC0.TXPOLLD = 1;
 }
 
-/**
- * Assemble 64-bit fixed-point timestamps from raw counter value
- * @param timer raw counter value (125 MHz)
- * @param stamps array of 3 64-bit timestamps [ monotonic, compensated, tai ]
- */
-static void toStamps(uint32_t timer, volatile uint64_t *stamps) {
-    // snapshot clock state
-    __disable_irq();
-    const uint32_t monoEth = clkMonoEth;
-    const uint32_t offset = clkMonoOff;
-    const uint32_t integer = clkMonoInt;
-    __enable_irq();
-    // adjust timer offset
-    timer += monoEth;
+void NET_getRxTime(uint64_t *stamps) {
     // assemble timestamps
-    stamps[0] = fromClkMono(timer, offset, integer);
-    stamps[1] = stamps[0] + corrValue(clkCompRate, static_cast<int64_t>(stamps[0] - clkCompRef)) + clkCompOffset;
-    stamps[2] = stamps[1] + corrValue(clkTaiRate, static_cast<int64_t>(stamps[1] - clkTaiRef)) + clkTaiOffset;
+    clock::capture::rawToFull(
+        clock::capture::ppsEthernetRaw() +
+        rxTimestamp.hi * CLK_FREQ + rxTimestamp.lo / CLK_NANO,
+        stamps
+    );
 }
 
-void NET_getRxTime(volatile uint64_t *stamps) {
-    // assemble timestamps
-    toStamps((rxTimestamp.hi * CLK_FREQ) + (rxTimestamp.lo / CLK_NANO), stamps);
-}
-
-void NET_getTxTime(const uint8_t *txFrame, volatile uint64_t *stamps) {
+void NET_getTxTime(const uint8_t *txFrame, uint64_t *stamps) {
     // compute descriptor offset
     const int i = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
-    toStamps((txDesc[i].TTSH * CLK_FREQ) + (txDesc[i].TTSL / CLK_NANO), stamps);
+    clock::capture::rawToFull(
+        clock::capture::ppsEthernetRaw() +
+        txDesc[i].TTSH * CLK_FREQ + txDesc[i].TTSL / CLK_NANO,
+        stamps
+    );
 }
 
 

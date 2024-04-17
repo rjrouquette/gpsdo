@@ -46,13 +46,20 @@ static void initClkSys() {
     RSCLKCFG.USEPLL = 1;
 }
 
-// mono.c
+// capture.cpp
+namespace clock::capture {
+    void init();
+}
+
+// mono.cpp
 void initClkMono();
 void initClkEth();
 void initClkSync();
-// comp.c
+
+// comp.cpp
 void initClkComp();
-// tai.c
+
+// tai.cpp
 void initClkTai();
 
 void clock::initSystem() {

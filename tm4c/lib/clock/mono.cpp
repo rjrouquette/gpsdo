@@ -14,11 +14,7 @@
 
 volatile uint32_t clkMonoInt = 0;
 volatile uint32_t clkMonoOff = 0;
-volatile uint32_t clkMonoEth = 0;
 volatile uint32_t clkMonoPps = 0;
-
-// pps edge capture state
-volatile ClockEvent clkMonoPpsEvent;
 
 
 void initClkMono() {
@@ -163,14 +159,32 @@ uint32_t clock::monotonic::seconds() {
 
 // return current time as 32.32 fixed point value
 uint64_t clock::monotonic::now() {
-    // capture current time
+    return fromRaw(raw());
+}
+
+uint64_t clock::monotonic::fromRaw(uint32_t monoRaw) {
     __disable_irq();
-    uint32_t snapF = raw();
-    uint32_t snapI = clkMonoInt;
-    uint32_t snapO = clkMonoOff;
+    uint32_t integer = clkMonoInt;
+    uint32_t offset = clkMonoOff;
     __enable_irq();
-    // convert to timestamp
-    return fromClkMono(snapF, snapO, snapI);
+
+    auto ticks = static_cast<int32_t>(monoRaw - offset);
+    // adjust for underflow
+    while (ticks < 0) {
+        ticks += CLK_FREQ;
+        --integer;
+    }
+    // adjust for overflow
+    while (ticks >= CLK_FREQ) {
+        ticks -= CLK_FREQ;
+        ++integer;
+    }
+
+    // assemble result
+    fixed_32_32 scratch = {};
+    scratch.fpart = nanosToFrac(ticks * CLK_NANO);
+    scratch.ipart = integer;
+    return scratch.full;
 }
 
 
@@ -178,7 +192,7 @@ uint64_t clock::monotonic::now() {
 void ISR_Timer4A() {
     // snapshot edge time
     uint32_t timer = clock::monotonic::raw();
-    uint32_t event = GPTM4.TAR.raw;
+    const uint32_t event = GPTM4.TAR.raw;
     // clear capture interrupt flag
     GPTM4.ICR = GPTM_ICR_CAE;
     // compute pps output time

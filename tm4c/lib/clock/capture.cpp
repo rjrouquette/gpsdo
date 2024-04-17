@@ -8,8 +8,13 @@
 #include "mono.hpp"
 #include "tai.hpp"
 #include "util.hpp"
+#include "../run.hpp"
 #include "../hw/emac.h"
 #include "../hw/interrupts.h"
+
+
+// timer tick offset between the ethernet clock and monotonic clock
+static volatile uint32_t ppsEthernetOffset = 0;
 
 // capture rising edge of ethernet PPS for offset measurement
 void ISR_Timer5A() {
@@ -21,7 +26,22 @@ void ISR_Timer5A() {
     // compute ethernet clock offset
     timer -= (timer - event) & 0xFFFF;
     timer -= EMAC0.TIMSEC * CLK_FREQ;
-    clkMonoEth = timer;
+    ppsEthernetOffset = timer;
+}
+
+uint32_t clock::capture::ppsEthernetRaw() {
+    return ppsEthernetOffset;
+}
+
+// timer time of most recent GPS PPS
+static volatile uint32_t ppsGpsEvent;
+// full 64-bit fixed point timestamps
+static volatile uint64_t ppsStamp[3];
+// task handle for timestamp update
+static void *volatile taskPpsUpdate;
+
+static void runPpsGps([[maybe_unused]] void *ref) {
+    clock::capture::rawToFull(ppsGpsEvent, const_cast<uint64_t*>(ppsStamp));
 }
 
 // capture rising edge of GPS PPS for offset measurement
@@ -33,67 +53,21 @@ void ISR_Timer5B() {
     GPTM5.ICR = GPTM_ICR_CBE;
     // update pps edge state
     timer -= (timer - event) & 0xFFFF;
-    // monotonic clock state
-    clkMonoPpsEvent.timer = timer;
-    clkMonoPpsEvent.offset = clkMonoOff;
-    clkMonoPpsEvent.integer = clkMonoInt;
-    // compensated clock state
-    clkMonoPpsEvent.compRate = clkCompRate;
-    clkMonoPpsEvent.compRef = clkCompRef;
-    clkMonoPpsEvent.compOff = clkCompOffset;
-    // tai clock state
-    clkMonoPpsEvent.taiRate = clkTaiRate;
-    clkMonoPpsEvent.taiRef = clkTaiRef;
-    clkMonoPpsEvent.taiOff = clkTaiOffset;
+    // update edge time
+    ppsGpsEvent = timer;
+    // trigger computation of full timestamps
+    runWake(taskPpsUpdate);
 }
 
-// internal state for clock::capture::pps (reduces overhead)
-static volatile ClockEvent ppsEvent;
-static volatile uint64_t ppsStamp[3];
-
 void clock::capture::ppsGps(uint64_t *tsResult) {
-    if (
-        ppsEvent.timer == clkMonoPpsEvent.timer &&
-        ppsEvent.integer == clkMonoPpsEvent.integer
-    ) {
-        tsResult[0] = ppsStamp[0];
-        tsResult[1] = ppsStamp[1];
-        tsResult[2] = ppsStamp[2];
-        return;
-    }
-
-    __disable_irq();
-    const_cast<ClockEvent&>(ppsEvent) = const_cast<ClockEvent&>(clkMonoPpsEvent);
-    __enable_irq();
-
-    // convert snapshot to timestamps
-    uint32_t rem = 0;
-    // monotonic clock
-    ppsStamp[0] = fromClkMono(ppsEvent.timer, ppsEvent.offset, ppsEvent.integer);
-    // frequency compensated clock
-    ppsStamp[1] = ppsStamp[0] +
-                  corrFracRem(ppsEvent.compRate, ppsStamp[0] - ppsEvent.compRef, rem) +
-                  ppsEvent.compOff;
-    // TAI disciplined clock
-    ppsStamp[2] = ppsStamp[1] +
-                  corrFracRem(ppsEvent.taiRate, ppsStamp[1] - ppsEvent.taiRef, rem) +
-                  ppsEvent.taiOff;
-
-    // return result
     tsResult[0] = ppsStamp[0];
     tsResult[1] = ppsStamp[1];
     tsResult[2] = ppsStamp[2];
 }
 
-void clock::capture::toStamps(const uint32_t monoRaw, uint64_t *stamps) {
-    // snapshot clock state
-    __disable_irq();
-    const uint32_t offset = clkMonoOff;
-    const uint32_t integer = clkMonoInt;
-    __enable_irq();
-
+void clock::capture::rawToFull(const uint32_t monoRaw, uint64_t *stamps) {
     // monotonic clock
-    stamps[0] = fromClkMono(monoRaw, offset, integer);
+    stamps[0] = monotonic::fromRaw(monoRaw);
 
     // frequency compensated clock
     uint32_t rem = 0;
@@ -105,4 +79,10 @@ void clock::capture::toStamps(const uint32_t monoRaw, uint64_t *stamps) {
     stamps[2] = stamps[1] +
                 corrFracRem(clkTaiRate, stamps[1] - clkTaiRef, rem) +
                 clkTaiOffset;
+}
+
+namespace clock::capture {
+    void init() {
+        taskPpsUpdate = runWait(runPpsGps, nullptr);
+    }
 }

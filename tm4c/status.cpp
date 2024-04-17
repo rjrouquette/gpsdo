@@ -276,7 +276,7 @@ static unsigned statusClock(char *body) {
 
     // mono - eth
     strcpy(tmp, "0x");
-    toHex(clkMonoEth, 8, '0', tmp + 2);
+    toHex(clock::capture::ppsEthernetRaw(), 8, '0', tmp + 2);
     tmp[10] = 0;
     end = append(end, "mon - eth: ");
     end = append(end, tmp);

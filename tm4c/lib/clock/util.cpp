@@ -19,26 +19,6 @@ uint32_t nanosToFrac(uint32_t nanos) {
     return nanos;
 }
 
-uint64_t fromClkMono(const uint32_t timer, const uint32_t offset, uint32_t integer) {
-    auto ticks = static_cast<int32_t>(timer - offset);
-    // adjust for underflow
-    while (ticks < 0) {
-        ticks += CLK_FREQ;
-        --integer;
-    }
-    // adjust for overflow
-    while (ticks >= CLK_FREQ) {
-        ticks -= CLK_FREQ;
-        ++integer;
-    }
-
-    // assemble result
-    fixed_32_32 scratch = {};
-    scratch.fpart = nanosToFrac(ticks * CLK_NANO);
-    scratch.ipart = integer;
-    return scratch.full;
-}
-
 int64_t corrValue(const int32_t rate, int64_t delta) {
     const bool neg = delta < 0;
     if (neg)
