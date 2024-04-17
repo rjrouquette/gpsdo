@@ -152,12 +152,10 @@ void ISR_Timer0A() {
     TIMER_MONO.ICR = GPTM_ICR_TAM;
 }
 
-// return integer part of current time
 uint32_t clock::monotonic::seconds() {
     return clkMonoInt;
 }
 
-// return current time as 32.32 fixed point value
 uint64_t clock::monotonic::now() {
     return fromRaw(raw());
 }
