@@ -5,7 +5,6 @@
 #include "clock.hpp"
 
 #include "mono.hpp"
-#include "util.hpp"
 #include "../hw/interrupts.h"
 #include "../hw/sys.h"
 
