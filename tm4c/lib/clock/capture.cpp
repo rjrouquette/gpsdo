@@ -8,8 +8,10 @@
 #include "mono.hpp"
 #include "tai.hpp"
 #include "util.hpp"
+#include "../delay.hpp"
 #include "../run.hpp"
 #include "../hw/emac.h"
+#include "../hw/gpio.h"
 #include "../hw/interrupts.h"
 
 
@@ -81,7 +83,66 @@ void clock::capture::rawToFull(const uint32_t monoRaw, uint64_t *stamps) {
 }
 
 namespace clock::capture {
-    void init() {
-        taskPpsUpdate = runWait(runPpsGps, nullptr);
-    }
+    void init();
+}
+
+static void initCaptureTimer(volatile GPTM_MAP &timer) {
+    // configure timer for capture mode
+    timer.CFG.GPTMCFG = 4;
+    timer.TAMR.MR = 0x3;
+    timer.TBMR.MR = 0x3;
+    // edge-time mode
+    timer.TAMR.CMR = 1;
+    timer.TBMR.CMR = 1;
+    // rising edge
+    timer.CTL.TAEVENT = 0;
+    timer.CTL.TBEVENT = 0;
+    // count up
+    timer.TAMR.CDIR = 1;
+    timer.TBMR.CDIR = 1;
+    // disable overflow interrupt
+    timer.TAMR.CINTD = 0;
+    timer.TBMR.CINTD = 0;
+    // full count range
+    timer.TAILR = -1;
+    timer.TBILR = -1;
+    // interrupts
+    timer.IMR.CAE = 1;
+    timer.IMR.CBE = 1;
+    // start timer
+    timer.CTL.TAEN = 1;
+    timer.CTL.TBEN = 1;
+}
+
+void clock::capture::init() {
+    // create capture interrupt worker task
+    taskPpsUpdate = runWait(runPpsGps, nullptr);
+
+    // enable capture timers
+    RCGCTIMER.raw |= 0x31;
+    delay::cycles(4);
+    initCaptureTimer(GPTM4);
+    initCaptureTimer(GPTM5);
+    // disable timer 4B interrupt
+    GPTM4.IMR.CBE = 0;
+    // synchronize capture timers with monotonic clock
+    GPTM0.SYNC = 0x0F03;
+
+    // configure capture pins
+    RCGCGPIO.EN_PORTM = 1;
+    delay::cycles(4);
+    // unlock GPIO config
+    PORTM.LOCK = GPIO_LOCK_KEY;
+    PORTM.CR = 0xD0u;
+    // configure pins;
+    PORTM.PCTL.PMC4 = 3;
+    PORTM.PCTL.PMC6 = 3;
+    PORTM.PCTL.PMC7 = 3;
+    PORTM.AFSEL.ALT4 = 1;
+    PORTM.AFSEL.ALT6 = 1;
+    PORTM.AFSEL.ALT7 = 1;
+    PORTM.DEN = 0xD0u;
+    // lock GPIO config
+    PORTM.CR = 0;
+    PORTM.LOCK = 0;
 }

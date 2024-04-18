@@ -7,10 +7,7 @@
 #include "clock.hpp"
 #include "util.hpp"
 #include "../delay.hpp"
-#include "../hw/emac.h"
-#include "../hw/gpio.h"
 #include "../hw/interrupts.h"
-#include "../hw/sys.h"
 #include "../hw/timer.h"
 
 
@@ -28,114 +25,6 @@ void initClkMono() {
     TIMER_MONO.TAMR.MIE = 1;
     // start timer
     TIMER_MONO.CTL.TAEN = 1;
-}
-
-void initClkEth() {
-    // configure PPS output pin
-    RCGCGPIO.EN_PORTG = 1;
-    delay::cycles(4);
-    // unlock GPIO config
-    PORTG.LOCK = GPIO_LOCK_KEY;
-    PORTG.CR = 0x01u;
-    // configure pins
-    PORTG.DIR = 0x01u;
-    PORTG.DR8R = 0x01u;
-    PORTG.PCTL.PMC0 = 0x5;
-    PORTG.AFSEL.ALT0 = 1;
-    PORTG.DEN = 0x01u;
-    // lock GPIO config
-    PORTG.CR = 0;
-    PORTG.LOCK = 0;
-
-    // disable flash prefetch per errata
-    FLASHCONF.FPFOFF = 1;
-    // enable MAC and PHY clocks
-    RCGCEMAC.EN0 = 1;
-    RCGCEPHY.EN0 = 1;
-    while (!PREMAC.RDY0) {}
-    while (!PREPHY.RDY0) {}
-
-    // disable timer interrupts
-    EMAC0.IM.TS = 1;
-    // enable PTP clock
-    EMAC0.CC.PTPCEN = 1;
-    // configure PTP
-    EMAC0.TIMSTCTRL.ALLF = 1;
-    EMAC0.TIMSTCTRL.DGTLBIN = 1;
-    EMAC0.TIMSTCTRL.TSEN = 1;
-    // 25MHz = 40ns
-    EMAC0.SUBSECINC.SSINC = 40;
-    // init timer
-    EMAC0.TIMSECU = 0;
-    EMAC0.TIMNANOU.VALUE = 0;
-    // start timer
-    EMAC0.TIMSTCTRL.TSINIT = 1;
-    // use PPS free-running mode
-    EMAC0.PPSCTRL.TRGMODS0 = 3;
-    // start 1 Hz PPS output
-    EMAC0.PPSCTRL.PPSEN0 = 0;
-    EMAC0.PPSCTRL.PPSCTRL = 0;
-
-    // re-enable flash prefetch per errata
-    FLASHCONF.FPFOFF = 0;
-}
-
-static void initCaptureTimer(volatile GPTM_MAP &timer) {
-    // configure timer for capture mode
-    timer.CFG.GPTMCFG = 4;
-    timer.TAMR.MR = 0x3;
-    timer.TBMR.MR = 0x3;
-    // edge-time mode
-    timer.TAMR.CMR = 1;
-    timer.TBMR.CMR = 1;
-    // rising edge
-    timer.CTL.TAEVENT = 0;
-    timer.CTL.TBEVENT = 0;
-    // count up
-    timer.TAMR.CDIR = 1;
-    timer.TBMR.CDIR = 1;
-    // disable overflow interrupt
-    timer.TAMR.CINTD = 0;
-    timer.TBMR.CINTD = 0;
-    // full count range
-    timer.TAILR = -1;
-    timer.TBILR = -1;
-    // interrupts
-    timer.IMR.CAE = 1;
-    timer.IMR.CBE = 1;
-    // start timer
-    timer.CTL.TAEN = 1;
-    timer.CTL.TBEN = 1;
-}
-
-void initClkSync() {
-    // enable capture timers
-    RCGCTIMER.raw |= 0x31;
-    delay::cycles(4);
-    initCaptureTimer(GPTM4);
-    initCaptureTimer(GPTM5);
-    // disable timer 4B interrupt
-    GPTM4.IMR.CBE = 0;
-    // synchronize capture timers with monotonic clock
-    TIMER_MONO.SYNC = 0x0F03;
-
-    // configure capture pins
-    RCGCGPIO.EN_PORTM = 1;
-    delay::cycles(4);
-    // unlock GPIO config
-    PORTM.LOCK = GPIO_LOCK_KEY;
-    PORTM.CR = 0xD0u;
-    // configure pins;
-    PORTM.PCTL.PMC4 = 3;
-    PORTM.PCTL.PMC6 = 3;
-    PORTM.PCTL.PMC7 = 3;
-    PORTM.AFSEL.ALT4 = 1;
-    PORTM.AFSEL.ALT6 = 1;
-    PORTM.AFSEL.ALT7 = 1;
-    PORTM.DEN = 0xD0u;
-    // lock GPIO config
-    PORTM.CR = 0;
-    PORTM.LOCK = 0;
 }
 
 // raw internal monotonic clock state
