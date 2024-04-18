@@ -13,7 +13,6 @@
 #include "../hw/interrupts.h"
 #include "../hw/sys.h"
 #include "clock/capture.hpp"
-#include "clock/mono.hpp"
 #include "net/arp.hpp"
 #include "net/dhcp.hpp"
 #include "net/dns.hpp"
