@@ -153,15 +153,6 @@ public:
     }
 
     /**
-     * Get the next task in the queue.
-     * @return the next task in the queue
-     */
-    [[nodiscard]]
-    Task* next() const {
-        return qNext;
-    }
-
-    /**
      * Run the task.
      */
     void run() {
