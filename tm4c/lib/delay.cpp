@@ -3,6 +3,7 @@
 //
 
 #include "delay.hpp"
+#include "clock/clock.hpp"
 #include "clock/mono.hpp"
 
 static constexpr uint32_t CLK_KHZ = CLK_FREQ / 1000;

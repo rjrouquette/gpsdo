@@ -8,8 +8,6 @@
 #include "../hw/interrupts.h"
 #include "../hw/sys.h"
 
-#define XTL_FREQ (25000000)
-
 static void initClkSys() {
     // Enable external clock
     MOSCCTL.NOXTAL = 0;
@@ -24,7 +22,7 @@ static void initClkSys() {
     // Configure PLL
     PLLFREQ1.N = 0;
     PLLFREQ1.Q = 0;
-    PLLFREQ0.MINT = (2 * CLK_FREQ) / XTL_FREQ;
+    PLLFREQ0.MINT = (2 * CLK_FREQ) / MOSC_FREQ;
     PLLFREQ0.MFRAC = 0;
     RSCLKCFG.PSYSDIV = 1;
     RSCLKCFG.NEWFREQ = 1;

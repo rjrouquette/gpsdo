@@ -415,11 +415,20 @@ void NET_transmit(int desc, int len) {
     EMAC0.TXPOLLD = 1;
 }
 
+/**
+ * Reduce a split timestamp into the raw counter value of the monotonic clock.
+ * @param seconds seconds
+ * @param nanos nanoseconds
+ * @return monotonic clock raw timer value
+ */
+inline uint32_t nanosToRaw(const uint32_t seconds, const uint32_t nanos) {
+    return seconds * CLK_FREQ + nanos / CLK_NANOS;
+}
+
 void NET_getRxTime(uint64_t *stamps) {
     // assemble timestamps
     clock::capture::rawToFull(
-        clock::capture::ppsEthernetRaw() +
-        rxTimestamp.hi * CLK_FREQ + rxTimestamp.lo / CLK_NANO,
+        clock::capture::ppsEthernetRaw() + nanosToRaw(rxTimestamp.hi, rxTimestamp.lo),
         stamps
     );
 }
@@ -428,8 +437,7 @@ void NET_getTxTime(const uint8_t *txFrame, uint64_t *stamps) {
     // compute descriptor offset
     const int i = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
     clock::capture::rawToFull(
-        clock::capture::ppsEthernetRaw() +
-        txDesc[i].TTSH * CLK_FREQ + txDesc[i].TTSL / CLK_NANO,
+        clock::capture::ppsEthernetRaw() + nanosToRaw(txDesc[i].TTSH, txDesc[i].TTSL),
         stamps
     );
 }

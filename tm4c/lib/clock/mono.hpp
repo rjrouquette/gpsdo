@@ -8,8 +8,6 @@
 #include "../hw/timer.h"
 
 static constexpr int MAX_RAW_INTV = 1u << 30;
-static constexpr int CLK_FREQ = 125000000;
-static constexpr int CLK_NANO = 1000000000 / CLK_FREQ;
 #define TIMER_MONO (GPTM0)
 
 namespace clock::monotonic {

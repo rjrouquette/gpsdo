@@ -4,6 +4,7 @@
 
 #include "mono.hpp"
 
+#include "clock.hpp"
 #include "util.hpp"
 #include "../delay.hpp"
 #include "../hw/emac.h"
@@ -181,7 +182,7 @@ uint64_t clock::monotonic::fromRaw(uint32_t monoRaw) {
 
     // assemble result
     fixed_32_32 scratch = {};
-    scratch.fpart = nanosToFrac(ticks * CLK_NANO);
+    scratch.fpart = nanosToFrac(ticks * CLK_NANOS);
     scratch.ipart = integer;
     return scratch.full;
 }

@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstdint>
+#include "clock/clock.hpp"
 #include "clock/mono.hpp"
 
 static constexpr uint32_t RUN_SEC = 1u << 24;
