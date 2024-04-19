@@ -8,14 +8,14 @@
 
 namespace clock::capture {
     /**
-     * Get the filtered mean of the oscillator temperature sensor.
-     * @return the filtered mean of the oscillator temperature sensor
+     * Get the filtered mean of the oscillator temperature sensor. (Kelvin)
+     * @return the filtered mean of the oscillator temperature sensor (Kelvin)
      */
     float temperature();
 
     /**
-     * Get the sampling noise of the oscillator temperature sensor.
-     * @return the sampling noise of the oscillator temperature sensor.
+     * Get the sampling noise of the oscillator temperature sensor. (Kelvin)
+     * @return the sampling noise of the oscillator temperature sensor. (Kelvin)
      */
     float temperatureNoise();
 
