@@ -42,10 +42,10 @@ void ISR_Timer2A() {
 
 // capture rising edge of PPS output for offset measurement
 void ISR_Timer4A() {
-    // snapshot edge time
-    uint32_t timer = clock::monotonic::raw();
     // clear capture interrupt flag
     GPTM4.ICR = GPTM_ICR_CAE;
+    // snapshot edge time
+    uint32_t timer = clock::monotonic::raw();
     // compute pps output time
     timer -= (timer - GPTM4.TAR.raw) & 0xFFFF;
     // update edge time
