@@ -14,6 +14,58 @@
 #include "../hw/gpio.h"
 #include "../hw/interrupts.h"
 
+#include <cmath>
+
+
+// scale factor for converting timer ticks to seconds
+static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
+// ema accumulator for period mean
+static volatile float emaPeriodMean = 0;
+// ema accumulator for period variance
+static volatile float emaPeriodVar = 0;
+// time of current edge event
+static volatile uint32_t edgeCurrent = 0;
+// time of prior edge event
+static volatile uint32_t egdePrior = 0;
+// task handle for temperature update
+static void *volatile taskTemperature;
+
+// capture rising edge of temperature sensor output offset measurement
+void ISR_Timer4B() {
+    // clear capture interrupt flag
+    GPTM4.ICR = GPTM_ICR_CBE;
+    // snapshot edge time
+    uint32_t timer = clock::monotonic::raw();
+    // determine edge time
+    timer -= (timer - GPTM4.TBR.raw) & 0xFFFF;
+    // update edge time
+    edgeCurrent = timer;
+    // trigger computation of full timestamps
+    runWake(taskTemperature);
+}
+
+// update mean and standard deviation
+static void runTemperature([[maybe_unused]] void *ref) {
+    // compute cycle period
+    const auto period = static_cast<float>(edgeCurrent - egdePrior) * timeScale;
+    // update mean
+    const auto diff = period - emaPeriodMean;
+    emaPeriodMean = diff * period;
+    // update variance
+    emaPeriodVar = (diff * diff - emaPeriodVar) * period;
+    // set prior edge
+    egdePrior = edgeCurrent;
+}
+
+float clock::capture::temperature() {
+    return 1.0f / emaPeriodMean;
+}
+
+float clock::capture::temperatureNoise() {
+    const auto scale = 1.0f / emaPeriodMean;
+    return scale * scale * std::sqrt(emaPeriodVar);
+}
+
 
 // timer tick offset between the ethernet clock and monotonic clock
 static volatile uint32_t ppsEthernetOffset = 0;
@@ -34,6 +86,7 @@ void ISR_Timer5A() {
 uint32_t clock::capture::ppsEthernetRaw() {
     return ppsEthernetOffset;
 }
+
 
 // timer time of most recent GPS PPS
 static volatile uint32_t ppsGpsEvent;
@@ -82,9 +135,6 @@ void clock::capture::rawToFull(const uint32_t monoRaw, uint64_t *stamps) {
                 clkTaiOffset;
 }
 
-namespace clock::capture {
-    void init();
-}
 
 static void initCaptureTimer(volatile GPTM_MAP &timer) {
     // configure timer for capture mode
@@ -114,7 +164,13 @@ static void initCaptureTimer(volatile GPTM_MAP &timer) {
     timer.CTL.TBEN = 1;
 }
 
+namespace clock::capture {
+    void init();
+}
+
 void clock::capture::init() {
+    // create temperature interrupt worker task
+    taskTemperature = runWait(runTemperature, nullptr);
     // create capture interrupt worker task
     taskPpsUpdate = runWait(runPpsGps, nullptr);
 

@@ -8,6 +8,18 @@
 
 namespace clock::capture {
     /**
+     * Get the filtered mean of the oscillator temperature sensor.
+     * @return the filtered mean of the oscillator temperature sensor
+     */
+    float temperature();
+
+    /**
+     * Get the sampling noise of the oscillator temperature sensor.
+     * @return the sampling noise of the oscillator temperature sensor.
+     */
+    float temperatureNoise();
+
+    /**
      * Returns the raw offset between the ethernet PHY PPS output and the monotonic clock timer.
      * @return the raw offset of the ethernet PHY PPS output
      */

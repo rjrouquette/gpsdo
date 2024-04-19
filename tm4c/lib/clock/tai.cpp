@@ -52,12 +52,6 @@ void ISR_Timer4A() {
     clkMonoPps = timer;
 }
 
-// currently unused, but included for completeness
-void ISR_Timer4B() {
-    // clear capture interrupt flag
-    GPTM4.ICR = GPTM_ICR_CBE;
-}
-
 static void runClkTai(void *ref) {
     // prepare update values
     const uint64_t now = clock::compensated::now();
