@@ -243,16 +243,17 @@ void ISR_EthernetMAC() {
         return;
     }
 
-    // receive interrupt
-    if (EMAC0.DMARIS.RI)
+    // copy and clear interrupt flags
+    const auto DMARIS = const_cast<EMAC_MAP&>(EMAC0).DMARIS;
+    EMAC0.DMARIS.raw = DMARIS.raw;
+
+    // check for receive interrupt
+    if (DMARIS.RI)
         runWake(taskRx);
 
-    // transmit interruot
-    if (EMAC0.DMARIS.TI)
+    // check for transmit interruot
+    if (DMARIS.TI)
         runWake(taskTx);
-
-    // clear all interrupt flags
-    EMAC0.DMARIS.raw = EMAC0.DMARIS.raw;
 }
 
 static bool processFrame() {
