@@ -243,15 +243,16 @@ void ISR_EthernetMAC() {
         return;
     }
 
-    if (EMAC0.DMARIS.RI) {
-        EMAC0.DMARIS.RI = 1;
+    // receive interrupt
+    if (EMAC0.DMARIS.RI)
         runWake(taskRx);
-    }
 
-    if (EMAC0.DMARIS.TI) {
-        EMAC0.DMARIS.TI = 1;
+    // transmit interruot
+    if (EMAC0.DMARIS.TI)
         runWake(taskTx);
-    }
+
+    // clear all interrupt flags
+    EMAC0.DMARIS.raw = EMAC0.DMARIS.raw;
 }
 
 static bool processFrame() {
