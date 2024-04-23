@@ -118,24 +118,6 @@ public:
     }
 
     /**
-     * Determine if the task has been freed.
-     * @return true if the task has been freed
-     */
-    [[nodiscard]]
-    bool isFree() const {
-        return schedule == Free;
-    }
-
-    /**
-     * Determine if the task has been canceled.
-     * @return true if the task has been canceled
-     */
-    [[nodiscard]]
-    bool isCanceled() const {
-        return schedule == Canceled;
-    }
-
-    /**
      * Remove the task from the queue.
      */
     void pop() const {
@@ -399,19 +381,19 @@ void runScheduler() {
     }
 }
 
-void* runWait(RunCall callback, void *ref) {
+void* runWait(const RunCall callback, void *ref) {
     const auto task = Task::alloc();
     task->setWait(callback, ref);
     return task;
 }
 
-void* runSleep(uint32_t delay, RunCall callback, void *ref) {
+void* runSleep(const uint32_t delay, const RunCall callback, void *ref) {
     const auto task = Task::alloc();
     task->setSleep(delay, callback, ref);
     return task;
 }
 
-void* runPeriodic(uint32_t interval, RunCall callback, void *ref) {
+void* runPeriodic(const uint32_t interval, const RunCall callback, void *ref) {
     const auto task = Task::alloc();
     task->setPeriodic(interval, callback, ref);
     return task;
@@ -422,10 +404,7 @@ void runAdjust(void *taskHandle, const uint32_t interval) {
 }
 
 void runWake(void *taskHandle) {
-    const auto task = static_cast<Task*>(taskHandle);
-    if (task->isFree() || task->isCanceled())
-        return;
-    task->wake();
+    static_cast<Task*>(taskHandle)->wake();
     taskUpdate = true;
 }
 
