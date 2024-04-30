@@ -14,6 +14,8 @@
 
 #include <cmath>
 
+#include "../clock/capture.hpp"
+
 #define ADC_RATE_MEAN (0x1p-12f)
 #define ADC_RATE_VAR (0x1p-13f)
 #define ADC_SCALE (0.0604248047f)
@@ -101,7 +103,7 @@ static void runAdc([[maybe_unused]] void *ref) {
  */
 static void runComp(void *ref) {
     // update temperature compensation
-    tempValue = 147.5f - ADC_SCALE * adcMean;
+    tempValue = clock::capture::temperature(); //147.5f - ADC_SCALE * adcMean;
     tcmpValue = tcmpEstimate(tempValue);
     clock::compensated::setTrim(static_cast<int32_t>(0x1p32f * tcmpValue));
 }
@@ -200,7 +202,8 @@ unsigned tcmp::status(char *buffer) {
     end = append(end, tmp);
     end = append(end, " C\n");
 
-    tmp[fmtFloat(ADC_SCALE * std::sqrt(adcVar), 12, 4, tmp)] = 0;
+    // tmp[fmtFloat(ADC_SCALE * std::sqrt(adcVar), 12, 4, tmp)] = 0;
+    tmp[fmtFloat(clock::capture::temperatureNoise(), 12, 4, tmp)] = 0;
     end = append(end, "  - noise:   ");
     end = append(end, tmp);
     end = append(end, " C\n");

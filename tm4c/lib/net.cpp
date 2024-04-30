@@ -254,6 +254,12 @@ void ISR_EthernetMAC() {
     // check for transmit interruot
     if (DMARIS.TI)
         runWake(taskTx);
+
+    // reset rx buffer on overflow
+    if (DMARIS.OVF) {
+        for (auto &desc : rxDesc)
+            desc.RDES0.OWN = 1;
+    }
 }
 
 static bool processFrame() {

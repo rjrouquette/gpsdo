@@ -20,7 +20,7 @@
 #include "lib/ptp/ptp.hpp"
 #include "lib/snmp/snmp.hpp"
 
-#define EEPROM_FORMAT (0x00000006)
+#define EEPROM_FORMAT (0x00000007)
 
 static void EEPROM_init();
 

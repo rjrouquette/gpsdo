@@ -50,20 +50,20 @@ static void runTemperature([[maybe_unused]] void *ref) {
     const auto period = static_cast<float>(edgeCurrent - egdePrior) * timeScale;
     // update mean
     const auto diff = period - emaPeriodMean;
-    emaPeriodMean = diff * period;
+    emaPeriodMean += diff * period;
     // update variance
-    emaPeriodVar = (diff * diff - emaPeriodVar) * period;
+    emaPeriodVar += (diff * diff - emaPeriodVar) * period;
     // set prior edge
     egdePrior = edgeCurrent;
 }
 
 float clock::capture::temperature() {
-    return 1.0f / emaPeriodMean;
+    return 0.25f / emaPeriodMean - 273.15f;
 }
 
 float clock::capture::temperatureNoise() {
     const auto scale = 1.0f / emaPeriodMean;
-    return scale * scale * std::sqrt(emaPeriodVar);
+    return 0.25f * scale * scale * std::sqrt(emaPeriodVar);
 }
 
 
@@ -179,8 +179,6 @@ void clock::capture::init() {
     delay::cycles(4);
     initCaptureTimer(GPTM4);
     initCaptureTimer(GPTM5);
-    // disable timer 4B interrupt
-    GPTM4.IMR.CBE = 0;
     // synchronize capture timers with monotonic clock
     GPTM0.SYNC = 0x0F03;
 
@@ -189,15 +187,17 @@ void clock::capture::init() {
     delay::cycles(4);
     // unlock GPIO config
     PORTM.LOCK = GPIO_LOCK_KEY;
-    PORTM.CR = 0xD0u;
+    PORTM.CR = 0xF0u;
     // configure pins;
     PORTM.PCTL.PMC4 = 3;
+    PORTM.PCTL.PMC5 = 3;
     PORTM.PCTL.PMC6 = 3;
     PORTM.PCTL.PMC7 = 3;
     PORTM.AFSEL.ALT4 = 1;
+    PORTM.AFSEL.ALT5 = 1;
     PORTM.AFSEL.ALT6 = 1;
     PORTM.AFSEL.ALT7 = 1;
-    PORTM.DEN = 0xD0u;
+    PORTM.DEN = 0xF0u;
     // lock GPIO config
     PORTM.CR = 0;
     PORTM.LOCK = 0;
