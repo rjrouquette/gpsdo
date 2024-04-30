@@ -16,13 +16,8 @@
 
 #include "../clock/capture.hpp"
 
-#define ADC_RATE_MEAN (0x1p-12f)
-#define ADC_RATE_VAR (0x1p-13f)
-#define ADC_SCALE (0.0604248047f)
-
 #define INTV_REGR (1u << (24 - 14)) // 16384 Hz
-#define INTV_TEMP (1u << (24 - 12)) // 4096 Hz
-#define INTV_TCMP (1u << (24 - 5))  // 32 Hz
+#define INTV_TCMP (1u << (24 - 4))  // 16 Hz
 
 #define TCMP_SAVE_INTV (3600) // save state every hour
 
@@ -36,8 +31,6 @@
 #define REG_DIM_COEF (3)
 #define REG_MIN_RMSE (250e-9f)
 
-static volatile float adcMean;
-static volatile float adcVar;
 static volatile float tempValue;
 
 static volatile uint32_t tcmpSaved;
@@ -72,95 +65,22 @@ static void computeMSE(const float *data);
 static float tcmpEstimate(float temp);
 
 /**
- * Retrieve ADC samples and update moving average.
- * @param ref unused context argument
- */
-static void runAdc([[maybe_unused]] void *ref) {
-    // ADC FIFO will always contain eight samples
-    uint32_t acc = ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    // trigger next sample
-    ADC0.PSSI.SS0 = 1;
-
-    // store result
-    const float adcValue = 0x1p-3f * static_cast<float>(acc);
-    const float diff = adcValue - adcMean;
-    const float var = diff * diff;
-    if (var <= 4 * adcVar)
-        adcMean += ADC_RATE_MEAN * diff;
-    adcVar += ADC_RATE_VAR * (var - adcVar);
-}
-
-/**
  * Update the current temperature compensation value.
  * @param ref unused context argument
  */
 static void runComp(void *ref) {
     // update temperature compensation
-    tempValue = clock::capture::temperature(); //147.5f - ADC_SCALE * adcMean;
+    tempValue = clock::capture::temperature();
     tcmpValue = tcmpEstimate(tempValue);
     clock::compensated::setTrim(static_cast<int32_t>(0x1p32f * tcmpValue));
 }
 
 void tcmp::init() {
-    // Enable ADC0
-    RCGCADC.EN_ADC0 = 1;
-    delay::cycles(4);
-
-    // configure ADC0 for temperature measurement
-    ADC0.CC.CLKDIV = 0;
-    ADC0.CC.CS = ADC_CLK_MOSC;
-    ADC0.SAC.AVG = 0;
-    ADC0.EMUX.EM0 = ADC_SS_TRIG_SOFT;
-    ADC0.SS0.CTL.TS0 = 1;
-    ADC0.SS0.TSH.TSH0 = ADC_TSH_256;
-    ADC0.SS0.CTL.TS1 = 1;
-    ADC0.SS0.TSH.TSH1 = ADC_TSH_256;
-    ADC0.SS0.CTL.TS2 = 1;
-    ADC0.SS0.TSH.TSH2 = ADC_TSH_256;
-    ADC0.SS0.CTL.TS3 = 1;
-    ADC0.SS0.TSH.TSH3 = ADC_TSH_256;
-    ADC0.SS0.CTL.TS4 = 1;
-    ADC0.SS0.TSH.TSH4 = ADC_TSH_256;
-    ADC0.SS0.CTL.TS5 = 1;
-    ADC0.SS0.TSH.TSH5 = ADC_TSH_256;
-    ADC0.SS0.CTL.TS6 = 1;
-    ADC0.SS0.TSH.TSH6 = ADC_TSH_256;
-    ADC0.SS0.CTL.TS7 = 1;
-    ADC0.SS0.TSH.TSH7 = ADC_TSH_256;
-    ADC0.SS0.CTL.IE7 = 1;
-    ADC0.SS0.CTL.END7 = 1;
-    ADC0.ACTSS.ASEN0 = 1;
-    // take and discard some initial measurements
-    ADC0.PSSI.SS0 = 1;        // trigger temperature measurement
-    while (!ADC0.RIS.INR0) {} // wait for data
-    ADC0.ISC.IN0 = 1;         // clear flag
-    // ADC FIFO will always contain eight samples
-    uint32_t acc = ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    acc += ADC0.SS0.FIFO.DATA;
-    // trigger next sample
-    ADC0.PSSI.SS0 = 1;
-    // store result
-    adcMean = 0x1p-3f * static_cast<float>(acc);
-
     loadSom();
     if (std::isfinite(somNode[0][0]))
         runSleep(INTV_REGR, runRegression, nullptr);
 
     // schedule thread
-    runPeriodic(INTV_TEMP, runAdc, nullptr);
     runPeriodic(INTV_TCMP, runComp, nullptr);
 }
 
@@ -202,7 +122,6 @@ unsigned tcmp::status(char *buffer) {
     end = append(end, tmp);
     end = append(end, " C\n");
 
-    // tmp[fmtFloat(ADC_SCALE * std::sqrt(adcVar), 12, 4, tmp)] = 0;
     tmp[fmtFloat(clock::capture::temperatureNoise(), 12, 4, tmp)] = 0;
     end = append(end, "  - noise:   ");
     end = append(end, tmp);

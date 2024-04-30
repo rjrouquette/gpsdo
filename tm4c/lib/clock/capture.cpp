@@ -23,8 +23,8 @@ static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
 static volatile float emaPeriodMean = 0;
 // ema accumulator for period variance
 static volatile float emaPeriodVar = 0;
-// time of current edge event
-static volatile uint32_t edgeCurrent = 0;
+// period sample in raw timer ticks
+static volatile uint32_t periodRaw = 0;
 // time of prior edge event
 static volatile uint32_t egdePrior = 0;
 // task handle for temperature update
@@ -39,7 +39,8 @@ void ISR_Timer4B() {
     // determine edge time
     timer -= (timer - GPTM4.TBR.raw) & 0xFFFF;
     // update edge time
-    edgeCurrent = timer;
+    periodRaw = timer - egdePrior;
+    egdePrior = timer;
     // trigger computation of full timestamps
     runWake(taskTemperature);
 }
@@ -47,14 +48,12 @@ void ISR_Timer4B() {
 // update mean and standard deviation
 static void runTemperature([[maybe_unused]] void *ref) {
     // compute cycle period
-    const auto period = static_cast<float>(edgeCurrent - egdePrior) * timeScale;
+    const auto period = static_cast<float>(periodRaw) * timeScale;
     // update mean
     const auto diff = period - emaPeriodMean;
     emaPeriodMean += diff * period;
     // update variance
     emaPeriodVar += (diff * diff - emaPeriodVar) * period;
-    // set prior edge
-    egdePrior = edgeCurrent;
 }
 
 float clock::capture::temperature() {
