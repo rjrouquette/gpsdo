@@ -9,12 +9,11 @@
 #include "../run.hpp"
 #include "../../hw/adc.h"
 #include "../../hw/eeprom.h"
+#include "../clock/capture.hpp"
 #include "../clock/comp.hpp"
 #include "../clock/mono.hpp"
 
 #include <cmath>
-
-#include "../clock/capture.hpp"
 
 #define INTV_REGR (1u << (24 - 14)) // 16384 Hz
 #define INTV_TCMP (1u << (24 - 4))  // 16 Hz
@@ -371,8 +370,8 @@ unsigned statusSom(char *buffer) {
         end = append(end, ", ");
         end += fmtFloat(somNode[i][2], 0, -1, end);
         if (i < SOM_NODE_CNT - 1)
-            *(end++) = ',';
-        *(end++) = '\n';
+            *end++ = ',';
+        *end++ = '\n';
     }
     end = append(end, "};\n");
 
