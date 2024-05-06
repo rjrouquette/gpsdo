@@ -22,9 +22,12 @@
 
 #include <memory.h>
 
-static constexpr int RX_RING_SIZE = 64;
+// 128 frames = 1.31 ms
+static constexpr int RX_RING_SIZE = 128;
+// circular buffer modulo mask
 static constexpr int RX_RING_MASK = RX_RING_SIZE - 1;
-static constexpr int RX_BUFF_SIZE = 256;
+// 128 bytes = smallest ethernet frame (64-bytes) plus interframe gap (64-bytes)
+static constexpr int RX_BUFF_SIZE = 128;
 
 static constexpr int TX_RING_SIZE = 32;
 static constexpr int TX_RING_MASK = TX_RING_SIZE - 1;
@@ -42,6 +45,7 @@ static volatile int ptrRX = 0;
 static volatile int ptrTX = 0;
 static volatile int endTX = 0;
 static volatile int phyStatus = 0;
+static volatile uint32_t overflowRx = 0;
 
 static void *volatile taskRx;
 static EMAC_RX_DESC rxDesc[RX_RING_SIZE];
@@ -255,22 +259,22 @@ void ISR_EthernetMAC() {
     if (DMARIS.TI)
         runWake(taskTx);
 
-    // reset rx buffer on overflow
+    // check for overflow interrupt
     if (DMARIS.OVF) {
-        for (auto &desc : rxDesc)
-            desc.RDES0.OWN = 1;
+        ++overflowRx;
     }
 }
 
 static bool processFrame() {
+    // determine if a complete frame is available
     auto ptr = ptrRX;
     for (;;) {
-        const auto &desc = rxDesc[ptr];
-        // check DMA ownership
-        if (desc.RDES0.OWN)
+        const auto status = rxDesc[ptr].RDES0;
+        // check for DMA ownership
+        if (status.OWN)
             return false;
         // check for last segment flag
-        if (desc.RDES0.LS)
+        if (status.LS)
             break;
         incrRx(ptr);
     }
@@ -383,6 +387,10 @@ void NET_getMacAddress(char *strAddr) {
 
 int NET_getPhyStatus() {
     return phyStatus;
+}
+
+uint32_t NET_getOverflowRx() {
+    return overflowRx;
 }
 
 int NET_getTxDesc() {

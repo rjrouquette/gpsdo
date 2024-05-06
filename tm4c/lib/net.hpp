@@ -15,6 +15,7 @@ typedef void (*CallbackNetTX)(void *ref, uint8_t *frame, int flen);
 void NET_init();
 void NET_getMacAddress(char *strAddr);
 int NET_getPhyStatus();
+uint32_t NET_getOverflowRx();
 
 int NET_getTxDesc();
 uint8_t * NET_getTxBuff(int desc);

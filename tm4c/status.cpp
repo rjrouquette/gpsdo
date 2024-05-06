@@ -338,6 +338,18 @@ static unsigned statusETH(char *body) {
     end = append(end, tmp);
     end = append(end, "\n");
 
+    // rx crc errors
+    tmp[toBase(EMAC0.RXCNTCRCERR, 10, tmp)] = 0;
+    end = append(end, "rx crc errors: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
+    // rx overflow errors
+    tmp[toBase(NET_getOverflowRx(), 10, tmp)] = 0;
+    end = append(end, "rx overflows: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
     // tx packets
     tmp[toBase(EMAC0.TXCNTGB, 10, tmp)] = 0;
     end = append(end, "tx packets: ");
