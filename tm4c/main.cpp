@@ -45,7 +45,7 @@ int main() {
     // initialize GPS
     gps::init();
     // initialize networking
-    NET_init();
+    network::init();
     ntp::init();
     ptp::init();
     snmp::init();

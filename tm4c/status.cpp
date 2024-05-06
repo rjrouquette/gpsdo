@@ -345,7 +345,7 @@ static unsigned statusETH(char *body) {
     end = append(end, "\n");
 
     // rx overflow errors
-    tmp[toBase(NET_getOverflowRx(), 10, tmp)] = 0;
+    tmp[toBase(network::getOverflowRx(), 10, tmp)] = 0;
     end = append(end, "rx overflows: ");
     end = append(end, tmp);
     end = append(end, "\n");

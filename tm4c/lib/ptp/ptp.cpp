@@ -83,7 +83,7 @@ static void processDelayRequest(uint8_t *frame, int flen) {
     response.data.requestingIdentity = response.ptp.sourceIdentity;
     // set RX time
     uint64_t stamps[3];
-    NET_getRxTime(stamps);
+    network::getRxTime(stamps);
     toPtpTimestamp(stamps[2], &(response.data.receiveTimestamp));
 
     // PTP header
@@ -107,7 +107,7 @@ static void peerDelayRespFollowup(void *ref, uint8_t *txFrame, int flen) {
 
     // get precise TX time
     uint64_t stamps[3];
-    NET_getTxTime(txFrame, stamps);
+    network::getTxTime(stamps);
 
     // map headers
     auto &response = PacketPTP<PTP2_PDELAY_FOLLOW_UP>::from(txFrame);
@@ -140,7 +140,7 @@ static void processPDelayRequest(uint8_t *frame, int flen) {
     response.data.requestingIdentity = response.ptp.sourceIdentity;
     // set RX time
     uint64_t stamps[3];
-    NET_getRxTime(stamps);
+    network::getRxTime(stamps);
     toPtpTimestamp(stamps[2], &(response.data.receiveTimestamp));
 
     // PTP header
@@ -206,7 +206,7 @@ static void syncFollowup(void *ref, uint8_t *txFrame, const int flen) {
 
     // get precise TX time
     uint64_t stamps[3];
-    NET_getTxTime(txFrame, stamps);
+    network::getTxTime(stamps);
 
     // map headers
     auto &response = PacketPTP<PTP2_TIMESTAMP>::from(followup);

@@ -330,7 +330,7 @@ void ntp::Peer::arpCallback(void *ref, uint32_t remoteAddr, const uint8_t *macAd
 
 void ntp::Peer::txCallback(void *ref, uint8_t *frame, int flen) {
     // set hardware timestamp
-    NET_getTxTime(frame, static_cast<Peer*>(ref)->local_tx_hw);
+    network::getTxTime(static_cast<Peer*>(ref)->local_tx_hw);
 }
 
 void ntp::Peer::receive(uint8_t *frame, int flen) {
@@ -369,7 +369,7 @@ void ntp::Peer::receive(uint8_t *frame, int flen) {
     // packet received
     pktRecv = true;
     // set hardware timestamp
-    NET_getRxTime(local_rx_hw);
+    network::getRxTime(local_rx_hw);
 
     // set stratum
     stratum = packet.ntp.stratum;

@@ -113,7 +113,7 @@ static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
 
     // retrieve hardware transmit time
     uint64_t stamps[3];
-    NET_getTxTime(frame, stamps);
+    network::getTxTime(stamps);
     const uint64_t txTime = (stamps[2] - clkTaiUtcOffset) + NTP_UTC_OFFSET;
 
     // record hardware transmit time
@@ -157,7 +157,7 @@ static void ntpRequest(uint8_t *frame, const int flen) {
 
     // retrieve rx time
     uint64_t stamps[3];
-    NET_getRxTime(stamps);
+    network::getRxTime(stamps);
     // translate TAI timestamp into NTP domain
     const uint64_t rxTime = stamps[2] - clkTaiUtcOffset + NTP_UTC_OFFSET;
 

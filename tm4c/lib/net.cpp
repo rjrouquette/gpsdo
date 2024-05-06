@@ -54,7 +54,7 @@ static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
 static volatile struct {
     uint32_t lo;
     uint32_t hi;
-} rxTimestamp;
+} rxTime, txTime;
 
 static struct {
     CallbackNetTX call;
@@ -299,8 +299,8 @@ static bool processFrame() {
 
     // assemble full frame
     uint8_t buffer[last.RDES0.FL];
-    rxTimestamp.lo = last.RTSL;
-    rxTimestamp.hi = last.RTSH;
+    rxTime.lo = last.RTSL;
+    rxTime.hi = last.RTSH;
     int length = 0;
     ptr = ptrRX;
     while (ptr != end) {
@@ -349,6 +349,9 @@ static void runTx(void *ref) {
             const auto pCall = txCallback[end].call;
             pCall != nullptr
         ) {
+            // record timestamp
+            rxTime.lo = txDesc[end].TTSL;
+            rxTime.hi = txDesc[end].TTSH;
             // invoke callback
             (*pCall)(txCallback[end].ref, txBuffer[end], txDesc[end].TDES1.TBS1);
             // clear callback
@@ -362,7 +365,7 @@ static void runTx(void *ref) {
 
 extern volatile uint16_t ipID;
 
-void NET_init() {
+void network::init() {
     // initialize ring buffers
     initDescriptors();
     // create RX/TX threads
@@ -389,7 +392,7 @@ int NET_getPhyStatus() {
     return phyStatus;
 }
 
-uint32_t NET_getOverflowRx() {
+uint32_t network::getOverflowRx() {
     return overflowRx;
 }
 
@@ -431,7 +434,7 @@ void NET_transmit(int desc, int len) {
 }
 
 /**
- * Reduce a split timestamp into the raw counter value of the monotonic clock.
+ * Reduce a split timestamp to the raw counter value of the monotonic clock.
  * @param seconds seconds
  * @param nanos nanoseconds
  * @return monotonic clock raw timer value
@@ -440,19 +443,18 @@ inline uint32_t nanosToRaw(const uint32_t seconds, const uint32_t nanos) {
     return seconds * CLK_FREQ + nanos / CLK_NANOS;
 }
 
-void NET_getRxTime(uint64_t *stamps) {
+void network::getRxTime(uint64_t *stamps) {
     // assemble timestamps
     clock::capture::rawToFull(
-        clock::capture::ppsEthernetRaw() + nanosToRaw(rxTimestamp.hi, rxTimestamp.lo),
+        clock::capture::ppsEthernetRaw() + nanosToRaw(rxTime.hi, rxTime.lo),
         stamps
     );
 }
 
-void NET_getTxTime(const uint8_t *txFrame, uint64_t *stamps) {
-    // compute descriptor offset
-    const int i = (txFrame - txBuffer[0]) / TX_BUFF_SIZE;
+void network::getTxTime(uint64_t *stamps) {
+    // assemble timestamps
     clock::capture::rawToFull(
-        clock::capture::ppsEthernetRaw() + nanosToRaw(txDesc[i].TTSH, txDesc[i].TTSL),
+        clock::capture::ppsEthernetRaw() + nanosToRaw(txTime.hi, txTime.lo),
         stamps
     );
 }
