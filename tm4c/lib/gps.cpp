@@ -19,8 +19,8 @@ static constexpr int GPS_RING_MASK = GPS_RING_SIZE - 1;
 
 #define GPS_RST_PORT (PORTP)
 #define GPS_RST_PIN (1<<5)
-#define GPS_RST_INTV (300)
-#define GPS_RST_THR (60)
+#define GPS_RST_INTV (600)
+#define GPS_RST_THR (300)
 
 static constexpr uint32_t INTV_HEALTH = RUN_SEC / 2;
 
