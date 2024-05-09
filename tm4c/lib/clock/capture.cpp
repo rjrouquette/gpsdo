@@ -16,7 +16,8 @@
 
 #include <cmath>
 
-
+// time-constant scale factor (2 seconds)
+static constexpr float TIME_CONSTANT = 0.5f;
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
 // ema accumulator for period mean
@@ -51,9 +52,10 @@ static void runTemperature([[maybe_unused]] void *ref) {
     const auto period = static_cast<float>(periodRaw) * timeScale;
     // update mean
     const auto diff = period - emaPeriodMean;
-    emaPeriodMean += diff * period;
+    const auto alpha = period * TIME_CONSTANT;
+    emaPeriodMean += diff * alpha;
     // update variance
-    emaPeriodVar += (diff * diff - emaPeriodVar) * period;
+    emaPeriodVar += (diff * diff - emaPeriodVar) * alpha;
 }
 
 float clock::capture::temperature() {
