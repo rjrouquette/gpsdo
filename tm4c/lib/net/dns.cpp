@@ -158,6 +158,7 @@ static void processFrame(uint8_t *frame, const int flen) {
         return;
 
     // process response body
+    auto &request = requests[match];
     const auto end = reinterpret_cast<const char*>(frame + flen);
     const auto body = packet.body;
     auto next = body;
@@ -211,15 +212,7 @@ static void processFrame(uint8_t *frame, const int flen) {
         if (next >= end)
             return;
         // only accept A record IN IPv4 answers
-        if (atype != 1) {
-            next += length;
-            continue;
-        }
-        if (aclass != 1) {
-            next += length;
-            continue;
-        }
-        if (length != 4) {
+        if (atype != 1 || aclass != 1 || length != 4) {
             next += length;
             continue;
         }
@@ -227,10 +220,10 @@ static void processFrame(uint8_t *frame, const int flen) {
         const auto addr = *reinterpret_cast<const uint32_t*>(next);
         next += 4;
         // report address via callback
-        (*requests[match].callback)(requests[match].ref, addr);
+        (*request.callback)(request.ref, addr);
     }
     // clear request slot
-    requests[match].callback = nullptr;
+    request.callback = nullptr;
 }
 
 static void sendRequest(const char *hostname, const uint16_t requestId) {
