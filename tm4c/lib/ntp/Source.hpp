@@ -154,17 +154,6 @@ namespace ntp {
         bool isSelectable();
 
         /**
-         * Determine if this source instance is selectable for synchronization. (Relaxed criteria)
-         * @return true if this instance is selectable for synchronization
-         */
-        [[nodiscard]]
-        bool isSelectableLax() const {
-            return state == RPY_SD_ST_SELECTED ||
-                   state == RPY_SD_ST_SELECTABLE ||
-                   state == RPY_SD_ST_JITTERY;
-        }
-
-        /**
          * Mark this source instance as selected.
          */
         void select() {

@@ -350,8 +350,8 @@ static void runTx(void *ref) {
             pCall != nullptr
         ) {
             // record timestamp
-            rxTime.lo = txDesc[end].TTSL;
-            rxTime.hi = txDesc[end].TTSH;
+            txTime.lo = txDesc[end].TTSL;
+            txTime.hi = txDesc[end].TTSH;
             // invoke callback
             (*pCall)(txCallback[end].ref, txBuffer[end], txDesc[end].TDES1.TBS1);
             // clear callback

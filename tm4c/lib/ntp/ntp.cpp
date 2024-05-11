@@ -254,6 +254,7 @@ static void runSelect(void *ref) {
         }
     }
 
+    // select best source
     selectedSource = nullptr;
     for (uint32_t i = 0; i < cntSources; i++) {
         if (!sources[i]->isSelectable())
@@ -264,21 +265,6 @@ static void runSelect(void *ref) {
         }
         if (sources[i]->getScore() < selectedSource->getScore()) {
             selectedSource = sources[i];
-        }
-    }
-
-    if (selectedSource == nullptr) {
-        // no source was selected, relax constraints
-        for (uint32_t i = 0; i < cntSources; i++) {
-            if (!sources[i]->isSelectableLax())
-                continue;
-            if (selectedSource == nullptr) {
-                selectedSource = sources[i];
-                continue;
-            }
-            if (sources[i]->getScore() < selectedSource->getScore()) {
-                selectedSource = sources[i];
-            }
         }
     }
 
