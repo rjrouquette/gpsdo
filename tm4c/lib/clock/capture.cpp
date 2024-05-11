@@ -20,8 +20,8 @@
 static constexpr float TIME_CONSTANT = 0.5f;
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
-// ema accumulator for period mean
-static volatile float emaPeriodMean = 0;
+// ema accumulator for period mean (initialize to zero Celsius)
+static volatile float emaPeriodMean = 9.152480322e-4f;
 // ema accumulator for period variance
 static volatile float emaPeriodVar = 0;
 // period sample in raw timer ticks
