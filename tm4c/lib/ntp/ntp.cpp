@@ -79,10 +79,8 @@ static void runDnsFill(void *ref);
 
 // called by PLL for hard TAI adjustments
 void ntpApplyOffset(const int64_t offset) {
-    for (uint32_t i = 0; i < cntSources; i++) {
-        if (sources[i] != nullptr)
-            sources[i]->applyOffset(offset);
-    }
+    for (uint32_t i = 0; i < cntSources; i++)
+        sources[i]->applyOffset(offset);
 }
 
 void ntp::init() {
@@ -256,7 +254,6 @@ static void runSelect(void *ref) {
         }
     }
 
-    // select best clock
     selectedSource = nullptr;
     for (uint32_t i = 0; i < cntSources; i++) {
         if (!sources[i]->isSelectable())
@@ -267,6 +264,21 @@ static void runSelect(void *ref) {
         }
         if (sources[i]->getScore() < selectedSource->getScore()) {
             selectedSource = sources[i];
+        }
+    }
+
+    if (selectedSource == nullptr) {
+        // no source was selected, relax constraints
+        for (uint32_t i = 0; i < cntSources; i++) {
+            if (!sources[i]->isSelectableLax())
+                continue;
+            if (selectedSource == nullptr) {
+                selectedSource = sources[i];
+                continue;
+            }
+            if (sources[i]->getScore() < selectedSource->getScore()) {
+                selectedSource = sources[i];
+            }
         }
     }
 
@@ -571,7 +583,8 @@ static uint16_t chronycTracking(CMD_Reply *cmdReply, const CMD_Request *cmdReque
     cmdReply->data.tracking.last_offset.f = chrony::htonf(PLL_offsetLast());
     cmdReply->data.tracking.rms_offset.f = chrony::htonf(PLL_offsetRms());
 
-    cmdReply->data.tracking.freq_ppm.f = chrony::htonf(-1e6f * (0x1p-32f * static_cast<float>(clock::compensated::getTrim())));
+    cmdReply->data.tracking.freq_ppm.f =
+        chrony::htonf(-1e6f * (0x1p-32f * static_cast<float>(clock::compensated::getTrim())));
     cmdReply->data.tracking.resid_freq_ppm.f =
         chrony::htonf(-1e6f * (0x1p-32f * static_cast<float>(clock::tai::getTrim())));
     cmdReply->data.tracking.skew_ppm.f = chrony::htonf(1e6f * PLL_driftStdDev());
