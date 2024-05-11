@@ -319,24 +319,21 @@ static void deletePeer(ntp::Source *peer) {
     if (peer == selectedSource)
         selectedSource = nullptr;
 
-    // destroy  peer
-    std::destroy_at(reinterpret_cast<ntp::Peer*>(peer));
-    uint32_t slot = -1u;
     // locate matching slot
+    uint32_t slot = -1u;
     for (uint32_t i = 0; i < cntSources; i++) {
         if (sources[i] == peer)
             slot = i;
     }
     if (slot > cntSources)
         return;
-    // compact source list
-    while (++slot < cntSources)
-        sources[slot - 1] = sources[slot];
-    // clear unused slots
-    while (slot < MAX_NTP_SRCS)
-        sources[slot++] = nullptr;
-    // reduce source count
+    // shrink source list
     --cntSources;
+    for (uint32_t i = slot; i < cntSources; i++)
+        sources[i] = sources[i + 1];
+    sources[cntSources] = nullptr;
+    // destroy  peer
+    reinterpret_cast<ntp::Peer*>(peer)->~Peer();
 }
 
 static void ntpDnsCallback(void *ref, const uint32_t addr) {

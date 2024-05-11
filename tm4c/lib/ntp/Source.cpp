@@ -80,8 +80,8 @@ ntp::Source::Source(const uint32_t id_, const uint16_t mode_) :
 
 ntp::Source::~Source() {
     runCancel(nullptr, this);
-    const_cast<uint32_t&>(id) = 0;
-    const_cast<uint16_t&>(mode) = 0;
+    const_cast<volatile uint16_t&>(mode) = 0;
+    const_cast<volatile uint32_t&>(id) = 0;
 }
 
 void ntp::Source::applyOffset(const int64_t offset) {
@@ -199,8 +199,8 @@ void ntp::Source::updateFilter() {
 
 bool ntp::Source::isSelectable() {
     // determine if the link has been lost
-    if (lost) {
-        state = RPY_SD_ST_UNSELECTED;
+    if (reach == 0 || lost) {
+        state = RPY_SD_ST_NONSELECTABLE;
         return false;
     }
 
