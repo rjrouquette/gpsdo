@@ -66,9 +66,13 @@ add_executable(
         hw/timer.h
         hw/uart.h
 
-        # chrony header files
+        # chrony features
         lib/chrony/addressing.h
         lib/chrony/candm.h
+        lib/chrony/regression.cpp
+        lib/chrony/regression.hpp
+        lib/chrony/util.cpp
+        lib/chrony/util.hpp
 
         # timekeeping
         lib/clock/clock.cpp
@@ -83,15 +87,6 @@ add_executable(
         lib/clock/tai.hpp
         lib/clock/util.cpp
         lib/clock/util.hpp
-
-        lib/delay.cpp
-        lib/delay.hpp
-        lib/format.cpp
-        lib/format.hpp
-        lib/gps.cpp
-        lib/gps.hpp
-        lib/led.cpp
-        lib/led.hpp
 
         # networking
         lib/net.cpp
@@ -126,8 +121,6 @@ add_executable(
         lib/ntp/Source.hpp
         lib/ntp/tcmp.cpp
         lib/ntp/tcmp.hpp
-        lib/chrony/util.cpp
-        lib/chrony/util.hpp
 
         # PTP server
         lib/ptp/common.cpp
@@ -135,15 +128,25 @@ add_executable(
         lib/ptp/ptp.cpp
         lib/ptp/ptp.hpp
 
-        lib/random.cpp
-        lib/random.hpp
-        lib/run.cpp
-        lib/run.hpp
-
+        # SNMP support
         lib/snmp/sensors.cpp
         lib/snmp/sensors.hpp
         lib/snmp/util.cpp
         lib/snmp/util.hpp
+
+        # library units
+        lib/delay.cpp
+        lib/delay.hpp
+        lib/format.cpp
+        lib/format.hpp
+        lib/gps.cpp
+        lib/gps.hpp
+        lib/led.cpp
+        lib/led.hpp
+        lib/random.cpp
+        lib/random.hpp
+        lib/run.cpp
+        lib/run.hpp
 )
 
 target_link_libraries(
