@@ -295,7 +295,7 @@ static void runSelect(void *ref) {
     // update offset compensation
     PLL_updateOffset(source->getPollingInterval(), source->getLastOffsetFixedPoint());
     // update frequency compensation
-    PLL_updateDrift(source->getPollingInterval(), source->getFrequencyDrift());
+    PLL_updateDrift(source->getPollingInterval(), PLL_offsetCorr());
 }
 
 static ntp::Source* newPeer(const uint32_t ipAddr) {
