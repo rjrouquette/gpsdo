@@ -215,15 +215,10 @@ void ntp::Peer::pollEnd() {
 
     // advance sample buffer
     auto &sample = advanceFilter();
-    // set compensated reference time
-    const uint64_t comp = avg64(local_tx_hw[1], local_rx_hw[1]);
-    sample.comp = comp;
     // set TAI reference time
-    const uint64_t tai = avg64(local_tx_hw[2], local_rx_hw[2]);
-    sample.taiSkew = tai - comp;
+    sample.taiLocal = avg64(local_tx_hw[2], local_rx_hw[2]);
     // compute TAI offset
-    const uint64_t offset = avg64(remote_rx, remote_tx) - tai;
-    sample.offset = static_cast<int64_t>(offset);
+    sample.taiRemote = avg64(remote_rx, remote_tx);
     // compute delay (use compensated clock for best accuracy)
     const uint64_t responseTime = remote_tx - remote_rx;
     const auto delay = static_cast<int64_t>((local_rx_hw[1] - local_tx_hw[1]) - responseTime);

@@ -82,14 +82,13 @@ void ntp::GPS::run() {
     // advance sample buffer
     auto &sample = advanceFilter();
     // store PPS timestamps
-    sample.comp = ppsTime[1];
-    sample.taiSkew = ppsTime[2] - ppsTime[1];
+    sample.taiLocal = ppsTime[2];
     // compute TAI offset
     scratch.full = ppsTime[0];
     scratch.full -= gps::taiEpochUpdate();
     scratch.ipart += gps::taiEpoch() + 1;
     scratch.fpart = 0;
-    sample.offset = static_cast<int64_t>(scratch.full - ppsTime[2]);
+    sample.taiRemote = scratch.full;
     sample.delay = 0;
 
     // update filter

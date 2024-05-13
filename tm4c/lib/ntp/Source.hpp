@@ -13,16 +13,22 @@ namespace ntp {
     protected:
         // maximum number of polling samples
         static constexpr int MAX_HISTORY = 16;
+        // ring buffer index modulo mask
+        static constexpr int RING_MASK = MAX_HISTORY - 1;
 
         static constexpr int MAX_STRATUM = 3;
 
         static constexpr float MAX_DELAY = 50e-3f;
 
         struct Sample {
-            int64_t offset;
+            uint64_t taiLocal;
+            uint64_t taiRemote;
             float delay;
-            uint32_t taiSkew;
-            uint64_t comp;
+
+            [[nodiscard]]
+            int64_t getOffset() const {
+                return static_cast<int64_t>(taiRemote - taiLocal);
+            }
         };
 
     private:
@@ -203,7 +209,7 @@ namespace ntp {
 
         [[nodiscard]]
         auto getLastOffsetFixedPoint() const {
-            return ringSamples[ringPtr].offset;
+            return ringSamples[ringPtr].getOffset();
         }
 
         [[nodiscard]]

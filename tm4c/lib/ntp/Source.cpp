@@ -85,14 +85,12 @@ ntp::Source::~Source() {
 }
 
 void ntp::Source::applyOffset(const int64_t offset) {
-    for (auto &sample : ringSamples) {
-        sample.taiSkew += offset;
-        sample.offset -= offset;
-    }
+    for (auto &sample : ringSamples)
+        sample.taiLocal += offset;
 }
 
 ntp::Source::Sample& ntp::Source::advanceFilter() {
-    ringPtr = (ringPtr + 1) & (MAX_HISTORY - 1);
+    ringPtr = (ringPtr + 1) & RING_MASK;
     if (sampleCount < MAX_HISTORY)
         ++sampleCount;
     return ringSamples[ringPtr];
@@ -100,13 +98,13 @@ ntp::Source::Sample& ntp::Source::advanceFilter() {
 
 void ntp::Source::updateFilter() {
     const auto &sample = ringSamples[ringPtr];
-    lastOffsetOrig = toFloat(sample.offset);
+    lastOffsetOrig = toFloat(sample.getOffset());
     lastOffset = lastOffsetOrig;
     lastDelay = sample.delay;
 
     // compute time spanned by samples
-    int j = (ringPtr - (sampleCount - 1)) & (MAX_HISTORY - 1);
-    span = static_cast<int>((sample.comp - ringSamples[j].comp) >> 32);
+    int j = (ringPtr - (sampleCount - 1)) & RING_MASK;
+    span = static_cast<int>((sample.taiLocal - ringSamples[j].taiLocal) >> 32);
 
     // convert offsets to floats
     int index[MAX_HISTORY];
@@ -114,9 +112,9 @@ void ntp::Source::updateFilter() {
     float delay[MAX_HISTORY];
     int cnt = sampleCount;
     for (int i = 0; i < cnt; i++) {
-        int k = (ringPtr - i) & (MAX_HISTORY - 1);
+        const int k = (ringPtr - i) & RING_MASK;
         index[i] = k;
-        offset[i] = toFloat(ringSamples[k].offset);
+        offset[i] = toFloat(ringSamples[k].getOffset());
         delay[i] = ringSamples[k].delay;
     }
 
@@ -133,7 +131,7 @@ void ntp::Source::updateFilter() {
     if (limit > 0) {
         j = 0;
         for (int i = 0; i < cnt; i++) {
-            float diff = offset[i] - mean;
+            const float diff = offset[i] - mean;
             if ((diff * diff) < limit) {
                 index[j] = index[i];
                 offset[j] = offset[i];
@@ -157,11 +155,11 @@ void ntp::Source::updateFilter() {
         const auto &current = ringSamples[index[i]];
         const auto &previous = ringSamples[index[i + 1]];
 
-        // all three deltas are required to isolate drift from offset adjustments
-        uint32_t a = current.taiSkew - previous.taiSkew;
-        uint32_t b = static_cast<uint32_t>(current.offset) - static_cast<uint32_t>(previous.offset);
-        drift[i] = 0x1p-32f * static_cast<float>(static_cast<int32_t>(a + b)) /
-                   toFloatU(current.comp - previous.comp);
+        // estimate relative clock drift
+        const auto deltaRemote = current.taiRemote - previous.taiRemote;
+        const auto deltaLocal = current.taiLocal - previous.taiLocal;
+        drift[i] = toFloat(static_cast<int64_t>(deltaRemote - deltaLocal)) /
+                   toFloatU(deltaLocal);
     }
     // compute mean and variance
     getMeanVar(cnt, drift, mean, var);
@@ -170,7 +168,7 @@ void ntp::Source::updateFilter() {
     if (limit > 0) {
         j = 0;
         for (int i = 0; i < cnt; i++) {
-            float diff = drift[i] - mean;
+            const float diff = drift[i] - mean;
             if ((diff * diff) < limit) {
                 drift[j] = drift[i];
                 ++j;
@@ -292,7 +290,7 @@ void ntp::Source::getSourceData(RPY_Source_Data &rpySourceData) const {
 
 static void getMeanVar(const int cnt, const float *v, float &mean, float &var) {
     // return zeros if count is less than one
-    if(cnt < 1) {
+    if (cnt < 1) {
         mean = 0;
         var = 0;
         return;
@@ -300,13 +298,13 @@ static void getMeanVar(const int cnt, const float *v, float &mean, float &var) {
 
     // compute the mean
     float mean_ = 0;
-    for(int k = 0; k < cnt; ++k)
+    for (int k = 0; k < cnt; ++k)
         mean_ += v[k];
     mean_ /= static_cast<float>(cnt);
 
     // compute the variance
     float var_ = 0;
-    for(int k = 0; k < cnt; ++k) {
+    for (int k = 0; k < cnt; ++k) {
         const float diff = v[k] - mean_;
         var_ += diff * diff;
     }
