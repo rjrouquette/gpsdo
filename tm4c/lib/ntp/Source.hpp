@@ -147,11 +147,6 @@ namespace ntp {
             return !isReference() && prune;
         }
 
-        [[nodiscard]]
-        bool isInterleaved() const {
-            return xleave;
-        }
-
         /**
          * Determine if this source instance is selectable for synchronization.
          * @return true if this instance is selectable for synchronization
