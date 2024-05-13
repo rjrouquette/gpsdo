@@ -10,11 +10,10 @@
 
 namespace ntp {
     class Source {
-    public:
+    protected:
         // maximum number of polling samples
         static constexpr int MAX_HISTORY = 16;
 
-    protected:
         // ring buffer index modulo mask
         static constexpr int RING_MASK = MAX_HISTORY - 1;
 

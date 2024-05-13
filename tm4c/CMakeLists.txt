@@ -69,8 +69,6 @@ add_executable(
         # chrony features
         lib/chrony/addressing.h
         lib/chrony/candm.h
-        lib/chrony/regression.cpp
-        lib/chrony/regression.hpp
         lib/chrony/util.cpp
         lib/chrony/util.hpp
 

@@ -52,8 +52,7 @@ static int n_runs_from_residuals(const float *resid, const int n) {
 bool chrony::findBestRegression(
     const float *x, /* independent variable */
     const float *y, /* measured data */
-    const float *w, /* weightings (large => data
-                                   less reliable) */
+    const float *w, /* weightings (small => data less reliable) */
 
     const int n,           /* number of data points */
     const int m,           /* number of extra samples in x and y arrays
@@ -96,8 +95,8 @@ bool chrony::findBestRegression(
     for (;;) {
         W = U = 0;
         for (i = start; i < n; i++) {
-            U += x[i] / w[i];
-            W += 1.0f / w[i];
+            U += x[i] * w[i];
+            W += w[i];
         }
 
         u = U / W;
@@ -105,9 +104,9 @@ bool chrony::findBestRegression(
         float P = Q = V = 0.0;
         for (i = start; i < n; i++) {
             const float ui = x[i] - u;
-            P += y[i] / w[i];
-            Q += y[i] * ui / w[i];
-            V += ui * ui / w[i];
+            P += y[i] * w[i];
+            Q += y[i] * ui * w[i];
+            V += ui * ui * w[i];
         }
 
         b = Q / V;
@@ -145,7 +144,7 @@ bool chrony::findBestRegression(
 
     float ss = 0.0;
     for (i = start; i < n; i++) {
-        ss += resid[i - resid_start] * resid[i - resid_start] / w[i];
+        ss += resid[i - resid_start] * resid[i - resid_start] * w[i];
     }
 
     const int npoints = n - start;
