@@ -17,6 +17,9 @@ namespace ntp {
         // ring buffer index modulo mask
         static constexpr int RING_MASK = MAX_HISTORY - 1;
 
+        // minimum number of smaples required for linear regression
+        static constexpr int MIN_REGRESSION_SAMPLES = 5;
+
         static constexpr int MAX_STRATUM = 3;
 
         static constexpr float MAX_DELAY = 50e-3f;
@@ -96,6 +99,8 @@ namespace ntp {
         Sample& advanceFilter();
 
         void updateFilter();
+
+        void updateDelay();
 
     public:
         Source(uint32_t id_, uint16_t mode_);

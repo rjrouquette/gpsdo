@@ -97,6 +97,8 @@ ntp::Source::Sample& ntp::Source::advanceFilter() {
 }
 
 void ntp::Source::updateFilter() {
+    updateDelay();
+
     const auto &sample = ringSamples[ringPtr];
     lastOffsetOrig = toFloat(sample.getOffset());
     lastOffset = lastOffsetOrig;
@@ -109,22 +111,15 @@ void ntp::Source::updateFilter() {
     // convert offsets to floats
     int index[MAX_HISTORY];
     float offset[MAX_HISTORY];
-    float delay[MAX_HISTORY];
     int cnt = sampleCount;
     for (int i = 0; i < cnt; i++) {
         const int k = (ringPtr - i) & RING_MASK;
         index[i] = k;
         offset[i] = toFloat(ringSamples[k].getOffset());
-        delay[i] = ringSamples[k].delay;
     }
 
     // compute mean and variance
     float mean, var;
-    getMeanVar(sampleCount, delay, mean, var);
-    delayMean = mean;
-    delayStdDev = sqrtf(var);
-
-    // compute mean and variance
     getMeanVar(sampleCount, offset, mean, var);
     // remove extrema
     float limit = var * 4;
@@ -194,6 +189,21 @@ void ntp::Source::updateFilter() {
     // set update time
     lastUpdate = clock::monotonic::now();
 }
+
+void ntp::Source::updateDelay() {
+    float delay[sampleCount];
+    for (int i = 0; i < sampleCount; i++) {
+        const int k = (ringPtr - i) & RING_MASK;
+        delay[i] = ringSamples[k].delay;
+    }
+
+    // compute mean and variance
+    float mean, var;
+    getMeanVar(sampleCount, delay, mean, var);
+    delayMean = mean;
+    delayStdDev = sqrtf(var);
+}
+
 
 bool ntp::Source::isSelectable() {
     // determine if the link has been lost
