@@ -15,7 +15,16 @@
 #include <cmath>
 
 
-static void getMeanVar(int cnt, const float *v, float &mean, float &var);
+static void fitLinear(
+    int cnt,
+    const float *x,
+    const float *y,
+    const float *w,
+    float &offset,
+    float &slope,
+    float &offsetVariance,
+    float &slopeVariance
+);
 
 ntp::Source::Source(const uint32_t id_, const uint16_t mode_) :
     ringSamples{}, id(id_), mode(mode_) {
@@ -105,79 +114,46 @@ void ntp::Source::updateFilter() {
     lastDelay = sample.delay;
 
     // compute time spanned by samples
-    int j = (ringPtr - (sampleCount - 1)) & RING_MASK;
-    span = static_cast<int>((sample.taiLocal - ringSamples[j].taiLocal) >> 32);
+    span = static_cast<int>(
+        (sample.taiLocal - ringSamples[(ringPtr - (sampleCount - 1)) & RING_MASK].taiLocal) >> 32
+    );
 
     // convert offsets to floats
-    int index[MAX_HISTORY];
-    float offset[MAX_HISTORY];
-    int cnt = sampleCount;
-    for (int i = 0; i < cnt; i++) {
+    float x[sampleCount];
+    float y[sampleCount];
+    float w[sampleCount];
+    const auto lastLocal = ringSamples[ringPtr].taiLocal;
+    auto delayVariance = delayStdDev + CLK_NANOS * 1e-9f;
+    delayVariance *= delayVariance;
+    for (int i = 0; i < sampleCount; i++) {
         const int k = (ringPtr - i) & RING_MASK;
-        index[i] = k;
-        offset[i] = toFloat(ringSamples[k].getOffset());
+        x[i] = toFloatU(lastLocal - ringSamples[k].taiLocal);
+        y[i] = toFloat(ringSamples[k].getOffset());
+        const auto jitter = ringSamples[k].delay - delayMean;
+        w[i] = delayVariance / (delayVariance + jitter * jitter);
     }
 
-    // compute mean and variance
-    float mean, var;
-    getMeanVar(sampleCount, offset, mean, var);
-    // remove extrema
-    float limit = var * 4;
-    if (limit > 0) {
-        j = 0;
-        for (int i = 0; i < cnt; i++) {
-            const float diff = offset[i] - mean;
-            if ((diff * diff) < limit) {
-                index[j] = index[i];
-                offset[j] = offset[i];
-                ++j;
-            }
+    float offsetVar, freqVar;
+    fitLinear(sampleCount, x, y, w, offsetMean, freqDrift, offsetVar, freqVar);
+    if (sampleCount > 4) {
+        // reduce outlier weight if there are sufficient samples
+        offsetVar += CLK_NANOS * 1e-9f * CLK_NANOS * 1e-9f;
+        for (int i = 0; i < sampleCount; i++) {
+            const float error = y[i] - offsetMean - x[i] * freqDrift;
+            w[i] *= offsetVar / (offsetVar + error * error);
+            fitLinear(sampleCount, x, y, w, offsetMean, freqDrift, offsetVar, freqVar);
         }
-        cnt = j;
-        // recompute mean and variance
-        if (cnt > 0)
-            getMeanVar(cnt, offset, mean, var);
     }
-    // update offset stats
-    usedOffset = cnt;
-    offsetMean = mean;
-    offsetStdDev = sqrtf(var);
+    offsetStdDev = std::sqrt(offsetVar);
+    freqSkew = std::sqrt(freqVar);
 
-    // analyse clock drift
-    --cnt;
-    float drift[cnt];
-    for (int i = 0; i < cnt; i++) {
-        const auto &current = ringSamples[index[i]];
-        const auto &previous = ringSamples[index[i + 1]];
+    float weight = 0;
+    for (int i = 0; i < sampleCount; i++)
+        weight += w[i];
+    int count = static_cast<int>(std::ceil(weight));
+    usedOffset = count;
+    usedDrift = count;
 
-        // estimate relative clock drift
-        const auto deltaRemote = current.taiRemote - previous.taiRemote;
-        const auto deltaLocal = current.taiLocal - previous.taiLocal;
-        drift[i] = toFloat(static_cast<int64_t>(deltaRemote - deltaLocal)) /
-                   toFloatU(deltaLocal);
-    }
-    // compute mean and variance
-    getMeanVar(cnt, drift, mean, var);
-    // exclude outliers
-    limit = var * 4;
-    if (limit > 0) {
-        j = 0;
-        for (int i = 0; i < cnt; i++) {
-            const float diff = drift[i] - mean;
-            if ((diff * diff) < limit) {
-                drift[j] = drift[i];
-                ++j;
-            }
-        }
-        cnt = j;
-        // recompute mean and variance
-        if (cnt > 0)
-            getMeanVar(cnt, drift, mean, var);
-    }
-    // set frequency status
-    usedDrift = cnt;
-    freqDrift = mean;
-    freqSkew = sqrtf(var);
     // set overall score
     float score = std::abs(0x1p-16f * static_cast<float>(rootDelay));
     score += 0x1p-16f * static_cast<float>(rootDispersion);
@@ -303,35 +279,48 @@ void ntp::Source::getSourceData(RPY_Source_Data &rpySourceData) const {
     rpySourceData.reachability = htons(reach & 0xFF);
     rpySourceData.orig_latest_meas.f = chrony::htonf(lastOffsetOrig);
     rpySourceData.latest_meas.f = chrony::htonf(lastOffset);
-    rpySourceData.latest_meas_err.f = chrony::htonf(lastDelay);
+    rpySourceData.latest_meas_err.f = chrony::htonf(delayMean + delayStdDev);
     rpySourceData.since_sample = htonl((clock::monotonic::now() - lastUpdate) >> 32);
     rpySourceData.poll = static_cast<int16_t>(htons(poll));
     rpySourceData.state = htons(state);
 }
 
-static void getMeanVar(const int cnt, const float *v, float &mean, float &var) {
-    // return zeros if count is less than one
-    if (cnt < 1) {
-        mean = 0;
-        var = 0;
-        return;
+static void fitLinear(
+    int cnt,
+    const float *x,
+    const float *y,
+    const float *w,
+    float &offset,
+    float &slope,
+    float &offsetVariance,
+    float &slopeVariance
+) {
+    float scratch[5];
+    for (auto &v : scratch)
+        v = 0;
+
+    for (int i = 0; i < cnt; ++i) {
+        scratch[0] += w[i];
+        scratch[1] += w[i] * x[i];
+        scratch[2] += w[i] * x[i] * x[i];
+
+        scratch[3] += w[i] * y[i];
+        scratch[4] += w[i] * y[i] * x[i];
     }
 
-    // compute the mean
-    float mean_ = 0;
-    for (int k = 0; k < cnt; ++k)
-        mean_ += v[k];
-    mean_ /= static_cast<float>(cnt);
+    for (int i = 1; i < 5; ++i)
+        scratch[i] /= scratch[0];
 
-    // compute the variance
-    float var_ = 0;
-    for (int k = 0; k < cnt; ++k) {
-        const float diff = v[k] - mean_;
-        var_ += diff * diff;
+    slope = (scratch[4] - scratch[1] * scratch[3]) / (scratch[2] - scratch[1] * scratch[1]);
+    offset = scratch[3] - scratch[1] * slope;
+
+    float mse = 0;
+    for (int i = 0; i < cnt; ++i) {
+        const float error = y[i] - offset - x[i] * slope;
+        mse += w[i] * error * error;
     }
-    var_ /= static_cast<float>(cnt - 1);
+    mse /= scratch[0];
 
-    // return result
-    mean = mean_;
-    var = var_;
+    slopeVariance = mse / (scratch[2] - scratch[1] * scratch[1]);
+    offsetVariance = slopeVariance * scratch[2];
 }
