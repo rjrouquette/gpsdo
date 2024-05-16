@@ -6,16 +6,6 @@
 
 #include <cstdint>
 
-#define PLL_STATS_ALPHA (0x1p-4f)
-
-#define PLL_MAX_FREQ_TRIM (250e-6f) // 250 ppm
-
-#define PLL_OFFSET_HARD_ALIGN (0x01000000ll) //  39.06 ms
-#define PLL_OFFSET_CORR_BASIS (1e-6f) // unity rate threshold
-#define PLL_OFFSET_CORR_MAX (0x1p-1f) // dampens oscillation
-#define PLL_OFFSET_CORR_MIN (0x1p-4f) // dampens oscillation
-#define PLL_OFFSET_INT_RATE (0x1p-5f)
-
 
 void PLL_init();
 

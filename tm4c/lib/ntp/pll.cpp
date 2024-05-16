@@ -12,6 +12,21 @@
 #include <cmath>
 
 
+// PLL statistics slew rate
+static constexpr float PLL_STATS_ALPHA = 0x1p-4f;
+// maximum allowed frequecny triming (250 ppm)
+static constexpr float PLL_MAX_FREQ_TRIM = 250e-6f;
+// offset hard alignment threshold (39.06 ms)
+static constexpr int64_t PLL_OFFSET_HARD_ALIGN = 0x01000000ll;
+// unity rate threshold (1 ppm)
+static constexpr float PLL_OFFSET_CORR_BASIS = 1e-6f;
+// rate ceiling (dampens oscillation)
+static constexpr float PLL_OFFSET_CORR_MAX = 0x1p-1f;
+// rate floor (dampens oscillation)
+static constexpr float PLL_OFFSET_CORR_MIN = 0x1p-4f;
+// integration rate relative to proportional coefficient
+static constexpr float PLL_OFFSET_INT_RATE = 0x1p-5f;
+
 // offset statistics
 static volatile float offsetLast;
 static volatile float offsetMean;
