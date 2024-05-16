@@ -197,13 +197,24 @@ void ntp::Source::updateDelay() {
         delay[i] = ringSamples[k].delay;
     }
 
-    // compute mean and variance
-    float mean, var;
-    getMeanVar(sampleCount, delay, mean, var);
+    // compute mean
+    float mean = 0;
+    for (const auto value : delay)
+        mean += value;
+    mean /= static_cast<float>(sampleCount);
+
+    // compute variance
+    float var = 0;
+    for (const auto value : delay) {
+        const auto diff = value - mean;
+        var += diff * diff;
+    }
+    var /= static_cast<float>(sampleCount - 1);
+
+    // update fields
     delayMean = mean;
     delayStdDev = sqrtf(var);
 }
-
 
 bool ntp::Source::isSelectable() {
     // determine if the link has been lost
