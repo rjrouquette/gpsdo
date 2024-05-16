@@ -122,13 +122,14 @@ void ntp::Source::updateFilter() {
     float x[sampleCount];
     float y[sampleCount];
     float w[sampleCount];
+    const auto lastOffset = ringSamples[ringPtr].getOffset();
     const auto lastLocal = ringSamples[ringPtr].taiLocal;
     auto delayVariance = delayStdDev + CLK_NANOS * 1e-9f;
     delayVariance *= delayVariance;
     for (int i = 0; i < sampleCount; i++) {
         const int k = (ringPtr - i) & RING_MASK;
         x[i] = toFloatU(lastLocal - ringSamples[k].taiLocal);
-        y[i] = toFloat(ringSamples[k].getOffset());
+        y[i] = toFloat(ringSamples[k].getOffset() - lastOffset);
         const auto jitter = ringSamples[k].delay - delayMean;
         w[i] = delayVariance / (delayVariance + jitter * jitter);
     }
@@ -136,14 +137,15 @@ void ntp::Source::updateFilter() {
     float offsetVar, freqVar;
     fitLinear(sampleCount, x, y, w, offsetMean, freqDrift, offsetVar, freqVar);
     if (sampleCount > 4) {
-        // reduce outlier weight if there are sufficient samples
+        // reweight by offset error if there are sufficient samples
         offsetVar += CLK_NANOS * 1e-9f * CLK_NANOS * 1e-9f;
         for (int i = 0; i < sampleCount; i++) {
             const float error = y[i] - offsetMean - x[i] * freqDrift;
-            w[i] *= offsetVar / (offsetVar + error * error);
+            w[i] = offsetVar / (offsetVar + error * error);
             fitLinear(sampleCount, x, y, w, offsetMean, freqDrift, offsetVar, freqVar);
         }
     }
+    offsetMean += toFloat(lastOffset);
     offsetStdDev = std::sqrt(offsetVar);
     freqSkew = std::sqrt(freqVar);
 
