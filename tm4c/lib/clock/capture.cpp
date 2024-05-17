@@ -44,7 +44,7 @@ void ISR_Timer4B() {
     uint32_t timer = clock::monotonic::raw();
     // determine edge time
     timer -= (timer - GPTM4.TBR.raw) & 0xFFFF;
-    // update edge time
+    // add sample to buffer
     const int next = (ringHead + 1) & RING_MASK;
     ringBuffer[next] = timer;
     ringHead = next;
