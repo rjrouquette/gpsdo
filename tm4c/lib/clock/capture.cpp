@@ -36,7 +36,7 @@ static volatile float emaPeriodMean = 0;
 // ema accumulator for period variance
 static volatile float emaPeriodVar = 0;
 
-// capture rising edge of temperature sensor output offset measurement
+// capture rising edge of temperature sensor output
 void ISR_Timer4B() {
     // clear capture interrupt flag
     GPTM4.ICR = GPTM_ICR_CBE;
