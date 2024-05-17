@@ -16,6 +16,17 @@
 
 #include <cmath>
 
+// sample ring size
+static constexpr int RING_SIZE = 16;
+// sample ring mask
+static constexpr int RING_MASK = RING_SIZE - 1;
+// ring head position
+static volatile int ringHead = 0;
+// ring tail position
+static volatile int ringTail = 0;
+// ring buffer
+static volatile uint32_t ringBuffer[16];
+
 // time-constant scale factor (2 seconds)
 static constexpr float TIME_CONSTANT = 0.5f;
 // scale factor for converting timer ticks to seconds
@@ -24,12 +35,6 @@ static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
 static volatile float emaPeriodMean = 0;
 // ema accumulator for period variance
 static volatile float emaPeriodVar = 0;
-
-static constexpr int RING_SIZE = 16;
-static constexpr int RING_MASK = RING_SIZE - 1;
-static volatile int ringHead = 0;
-static volatile int ringTail = 0;
-static volatile uint32_t ringBuffer[16];
 
 // capture rising edge of temperature sensor output offset measurement
 void ISR_Timer4B() {
