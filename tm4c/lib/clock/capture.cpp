@@ -24,12 +24,12 @@ static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
 static volatile float emaPeriodMean = 9.152480322e-4f;
 // ema accumulator for period variance
 static volatile float emaPeriodVar = 0;
-// period sample in raw timer ticks
-static volatile uint32_t periodRaw = 0;
-// time of prior edge event
-static volatile uint32_t egdePrior = 0;
-// task handle for temperature update
-static void *volatile taskTemperature;
+
+static constexpr int RING_SIZE = 16;
+static constexpr int RING_MASK = RING_SIZE - 1;
+static volatile int ringHead = 0;
+static volatile int ringTail = 0;
+static volatile uint32_t ringBuffer[16];
 
 // capture rising edge of temperature sensor output offset measurement
 void ISR_Timer4B() {
@@ -40,22 +40,29 @@ void ISR_Timer4B() {
     // determine edge time
     timer -= (timer - GPTM4.TBR.raw) & 0xFFFF;
     // update edge time
-    periodRaw = timer - egdePrior;
-    egdePrior = timer;
-    // trigger computation of full timestamps
-    runWake(taskTemperature);
+    const int next = (ringHead + 1) & RING_MASK;
+    ringBuffer[next] = timer;
+    ringHead = next;
 }
 
 // update mean and standard deviation
 static void runTemperature([[maybe_unused]] void *ref) {
-    // compute cycle period
-    const auto period = static_cast<float>(periodRaw) * timeScale;
-    // update mean
-    const auto diff = period - emaPeriodMean;
-    const auto alpha = period * TIME_CONSTANT;
-    emaPeriodMean += diff * alpha;
-    // update variance
-    emaPeriodVar += (diff * diff - emaPeriodVar) * alpha;
+    const int head = ringHead;
+    int tail = ringTail;
+    while(tail != head) {
+        // compute cycle period
+        const int next = (tail + 1) & RING_MASK;
+        const auto periodRaw = ringBuffer[next] - ringBuffer[tail];
+        const auto period = static_cast<float>(periodRaw) * timeScale;
+        tail = next;
+        // update mean
+        const auto diff = period - emaPeriodMean;
+        const auto alpha = period * TIME_CONSTANT;
+        emaPeriodMean += diff * alpha;
+        // update variance
+        emaPeriodVar += (diff * diff - emaPeriodVar) * alpha;
+    }
+    ringTail = tail;
 }
 
 float clock::capture::temperature() {
@@ -170,8 +177,8 @@ namespace clock::capture {
 }
 
 void clock::capture::init() {
-    // create temperature interrupt worker task
-    taskTemperature = runWait(runTemperature, nullptr);
+    // create temperature worker task
+    runSleep(RUN_SEC / 128, runTemperature, nullptr);
     // create capture interrupt worker task
     taskPpsUpdate = runWait(runPpsGps, nullptr);
 
