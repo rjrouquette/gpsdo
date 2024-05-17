@@ -23,7 +23,7 @@ static constexpr float PLL_OFFSET_CORR_BASIS = 1e-6f;
 // rate ceiling (dampens oscillation)
 static constexpr float PLL_OFFSET_CORR_MAX = 0x1p-1f;
 // rate floor (dampens oscillation)
-static constexpr float PLL_OFFSET_CORR_MIN = 0x1p-4f;
+static constexpr float PLL_OFFSET_CORR_MIN = 0x1p-3f;
 // integration rate relative to proportional coefficient
 static constexpr float PLL_OFFSET_INT_RATE = 0x1p-5f;
 

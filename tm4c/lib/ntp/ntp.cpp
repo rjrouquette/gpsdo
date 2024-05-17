@@ -293,7 +293,7 @@ static void runSelect(void *ref) {
     rootDispersion = source->getRootDispersion() + static_cast<uint32_t>(0x1p16f * source->getDelayStdDev());
 
     // update offset compensation
-    PLL_updateOffset(source->getPollingInterval(), source->getLastOffsetFixedPoint());
+    PLL_updateOffset(source->getPollingInterval(), source->getFilteredOffset());
     // update frequency compensation
     PLL_updateDrift(source->getPollingInterval(), PLL_offsetCorr());
 }

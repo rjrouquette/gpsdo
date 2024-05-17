@@ -39,6 +39,7 @@ ntp::Source::Source(const uint32_t id_, const uint16_t mode_) :
     span = 0;
 
     // polling state variable
+    filteredOffset = 0;
     lastUpdate = 0;
     refTime = 0;
     refId = 0;
@@ -145,6 +146,7 @@ void ntp::Source::updateFilter() {
             fitLinear(sampleCount, x, y, w, offsetMean, freqDrift, offsetVar, freqVar);
         }
     }
+    filteredOffset = lastOffset;// + toFixedPoint(offsetMean);
     offsetMean += toFloat(lastOffset);
     offsetStdDev = std::sqrt(offsetVar);
     freqSkew = std::sqrt(freqVar);

@@ -4,6 +4,8 @@
 
 #include "util.hpp"
 
+#include <cmath>
+
 #include "mono.hpp"
 
 
@@ -55,4 +57,15 @@ float toFloatU(const uint64_t value) {
 
 float toFloat(const int64_t value) {
     return (value < 0) ? -toFloatU(-value) : toFloatU(value);
+}
+
+int64_t toFixedPoint(float value) {
+    int exp;
+    value = std::frexp(value, &exp);
+    const auto mantissa = static_cast<int64_t>(std::ldexp(value, 32));
+    if (exp > 0)
+        return mantissa << exp;
+    if (exp < 0)
+        return mantissa >> -exp;
+    return mantissa;
 }

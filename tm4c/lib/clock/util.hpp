@@ -83,8 +83,15 @@ inline int32_t corrFracRem(const int32_t rate, const uint64_t delta, volatile ui
 float toFloatU(uint64_t value);
 
 /**
- * Convert signed 64-bit fixed-point timestamp (32.32) to float
+ * Convert signed 64-bit fixed-point timestamp (31.32) to float
  * @param value to convert
  * @return single-precision floating point value
  */
 float toFloat(int64_t value);
+
+/**
+ * Convert floating number to signed 64-bit fixed point timestamp (31.32)
+ * @param value to convert
+ * @return signed 64-bit fixed point timestamp (31.32)
+ */
+int64_t toFixedPoint(float value);

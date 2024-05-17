@@ -51,6 +51,7 @@ namespace ntp {
         // time span
         int span;
 
+        int64_t filteredOffset;
         uint64_t lastUpdate;
         uint64_t refTime;
         const uint32_t id;
@@ -209,8 +210,8 @@ namespace ntp {
         }
 
         [[nodiscard]]
-        auto getLastOffsetFixedPoint() const {
-            return ringSamples[ringPtr].getOffset();
+        auto getFilteredOffset() const {
+            return filteredOffset;
         }
 
         [[nodiscard]]
