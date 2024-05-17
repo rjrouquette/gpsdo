@@ -21,7 +21,7 @@ static constexpr float TIME_CONSTANT = 0.5f;
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
 // ema accumulator for period mean (initialize to zero Celsius)
-static volatile float emaPeriodMean = 9.152480322e-4f;
+static volatile float emaPeriodMean = 0;
 // ema accumulator for period variance
 static volatile float emaPeriodVar = 0;
 
@@ -49,6 +49,20 @@ void ISR_Timer4B() {
 static void runTemperature([[maybe_unused]] void *ref) {
     const int head = ringHead;
     int tail = ringTail;
+    float mean = emaPeriodMean;
+    float var = emaPeriodVar;
+
+    // check initial sample
+    if (emaPeriodMean == 0) {
+        tail = (tail + 1) & RING_MASK;
+        // compute cycle period
+        const int next = (tail + 1) & RING_MASK;
+        const auto periodRaw = ringBuffer[next] - ringBuffer[tail];
+        mean = static_cast<float>(periodRaw) * timeScale;
+        tail = next;
+    }
+
+    // append new samples
     while(tail != head) {
         // compute cycle period
         const int next = (tail + 1) & RING_MASK;
@@ -56,13 +70,17 @@ static void runTemperature([[maybe_unused]] void *ref) {
         const auto period = static_cast<float>(periodRaw) * timeScale;
         tail = next;
         // update mean
-        const auto diff = period - emaPeriodMean;
+        const auto diff = period - mean;
         const auto alpha = period * TIME_CONSTANT;
-        emaPeriodMean += diff * alpha;
+        mean += diff * alpha;
         // update variance
-        emaPeriodVar += (diff * diff - emaPeriodVar) * alpha;
+        var += (diff * diff - var) * alpha;
     }
+
+    // apply updates
     ringTail = tail;
+    emaPeriodMean = mean;
+    emaPeriodVar = var;
 }
 
 float clock::capture::temperature() {
