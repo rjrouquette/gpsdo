@@ -200,8 +200,6 @@ namespace clock::capture {
 }
 
 void clock::capture::init() {
-    // create temperature worker task
-    runSleep(RUN_SEC / 128, runTemperature, nullptr);
     // create capture interrupt worker task
     taskPpsUpdate = runWait(runPpsGps, nullptr);
 
@@ -232,4 +230,9 @@ void clock::capture::init() {
     // lock GPIO config
     PORTM.CR = 0;
     PORTM.LOCK = 0;
+
+    // start temperature worker task
+    ringHead = 0;
+    ringTail = 0;
+    runSleep(RUN_SEC / 128, runTemperature, nullptr);
 }
