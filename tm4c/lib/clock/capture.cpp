@@ -52,8 +52,8 @@ void ISR_Timer4B() {
 
 // update mean and standard deviation
 static void runTemperature([[maybe_unused]] void *ref) {
-    const int head = ringHead;
-    int tail = ringTail;
+    const auto head = ringHead;
+    auto tail = ringTail;
     float mean = emaPeriodMean;
     float var = emaPeriodVar;
 
@@ -61,7 +61,7 @@ static void runTemperature([[maybe_unused]] void *ref) {
     if (emaPeriodMean == 0) {
         tail = (tail + 1) & RING_MASK;
         // compute cycle period
-        const int next = (tail + 1) & RING_MASK;
+        const auto next = (tail + 1) & RING_MASK;
         const auto periodRaw = ringBuffer[next] - ringBuffer[tail];
         mean = static_cast<float>(periodRaw) * timeScale;
         tail = next;
@@ -70,7 +70,7 @@ static void runTemperature([[maybe_unused]] void *ref) {
     // append new samples
     while(tail != head) {
         // compute cycle period
-        const int next = (tail + 1) & RING_MASK;
+        const auto next = (tail + 1) & RING_MASK;
         const auto periodRaw = ringBuffer[next] - ringBuffer[tail];
         const auto period = static_cast<float>(periodRaw) * timeScale;
         tail = next;
