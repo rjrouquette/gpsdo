@@ -27,14 +27,12 @@ static volatile int ringTail = 0;
 // ring buffer
 static volatile uint32_t ringBuffer[16];
 
-// time-constant scale factor (2 seconds)
-static constexpr float TIME_CONSTANT = 0.5f;
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
 // ema accumulator for period mean (initialize to zero Celsius)
 static volatile float emaPeriodMean = 0;
 // ema accumulator for period variance
-static volatile float emaPeriodVar = 0;
+static volatile float emaPeriodVar = 1e-6f;
 
 // capture rising edge of temperature sensor output
 void ISR_Timer4B() {
@@ -76,10 +74,10 @@ static void runTemperature([[maybe_unused]] void *ref) {
         tail = next;
         // update mean
         const auto diff = period - mean;
-        const auto alpha = period * TIME_CONSTANT;
-        mean += diff * alpha;
+        const auto alpha = var / (var + diff * diff);
+        mean += period * alpha * diff;
         // update variance
-        var += (diff * diff - var) * alpha;
+        var += period * (diff * diff - var);
     }
 
     // apply updates
