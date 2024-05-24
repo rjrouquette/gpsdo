@@ -17,7 +17,7 @@
 #include <cmath>
 
 // sample ring size
-static constexpr int RING_SIZE = 16;
+static constexpr int RING_SIZE = 32;
 // sample ring mask
 static constexpr int RING_MASK = RING_SIZE - 1;
 // ring head position
@@ -25,7 +25,7 @@ static volatile int ringHead = 0;
 // ring tail position
 static volatile int ringTail = 0;
 // ring buffer
-static volatile uint32_t ringBuffer[16];
+static volatile uint32_t ringBuffer[RING_SIZE];
 
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
