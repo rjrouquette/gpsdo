@@ -91,8 +91,7 @@ float clock::capture::temperature() {
 }
 
 float clock::capture::temperatureNoise() {
-    const auto scale = 1.0f / emaPeriodMean;
-    return 0.25f * scale * scale * std::sqrt(emaPeriodVar);
+    return 0.25f * std::sqrt(emaPeriodVar) / (emaPeriodMean * emaPeriodMean);
 }
 
 
