@@ -203,9 +203,11 @@ static void initMAC() {
     EMAC0.DMAOPMODE.ST = 1;
     EMAC0.DMAOPMODE.SR = 1;
     // enable RX/TX interrupts
+    EMAC0.DMAIM.OVE = 1;
     EMAC0.DMAIM.RIE = 1;
     EMAC0.DMAIM.TIE = 1;
     EMAC0.DMAIM.NIE = 1;
+    EMAC0.DMAIM.AIE = 1;
 
     // set frame filter mode
     EMAC0.FRAMEFLTR.RA = 1;
