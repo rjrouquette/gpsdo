@@ -22,6 +22,11 @@
 
 #include <memory.h>
 
+// assign ethernet MAC peripheral
+static auto &EMAC = EMAC0;
+// assign ethernet PHY LED GPIO port
+static auto &PHY_GPIO = PORTF;
+
 // 128 frames = 1.31 ms
 static constexpr int RX_RING_SIZE = 128;
 // circular buffer modulo mask
@@ -118,22 +123,22 @@ static void initPHY() {
     RCGCGPIO.EN_PORTF = 1;
     delay::cycles(4);
     // unlock GPIO config
-    PORTF.LOCK = GPIO_LOCK_KEY;
-    PORTF.CR = 0x11u;
+    PHY_GPIO.LOCK = GPIO_LOCK_KEY;
+    PHY_GPIO.CR = 0x11u;
     // configure pins
-    PORTF.DIR = 0x11u;
-    PORTF.DR8R = 0x11u;
-    PORTF.PCTL.PMC0 = 0x5;
-    PORTF.PCTL.PMC4 = 0x5;
-    PORTF.AFSEL.ALT0 = 1;
-    PORTF.AFSEL.ALT4 = 1;
-    PORTF.DEN = 0x11u;
+    PHY_GPIO.DIR = 0x11u;
+    PHY_GPIO.DR8R = 0x11u;
+    PHY_GPIO.PCTL.PMC0 = 0x5;
+    PHY_GPIO.PCTL.PMC4 = 0x5;
+    PHY_GPIO.AFSEL.ALT0 = 1;
+    PHY_GPIO.AFSEL.ALT4 = 1;
+    PHY_GPIO.DEN = 0x11u;
     // lock GPIO config
-    PORTF.CR = 0;
-    PORTF.LOCK = 0;
+    PHY_GPIO.CR = 0;
+    PHY_GPIO.LOCK = 0;
 
     // prevent errant transmissions
-    EMAC0.PC.PHYHOLD = 1;
+    EMAC.PC.PHYHOLD = 1;
     // enable clock
     RCGCEPHY.EN0 = 1;
     delay::cycles(4);
@@ -144,17 +149,17 @@ static void initPHY() {
     while (!PREPHY.RDY0) {}
 
     // enable PHY interrupt for relevant link changes
-    uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYMISR1);
+    uint16_t temp = EMAC_MII_Read(&EMAC, MII_ADDR_EPHYMISR1);
     temp |= 0x3Cu;
-    EMAC_MII_Write(&EMAC0, MII_ADDR_EPHYMISR1, temp);
+    EMAC_MII_Write(&EMAC, MII_ADDR_EPHYMISR1, temp);
     // enable PHY interrupt
-    EMAC0.PHY.IM.INT = 1;
+    EMAC.PHY.IM.INT = 1;
 
     // complete configuration
-    EMAC0.PC.PHYHOLD = 0;
-    temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYCFG1);
+    EMAC.PC.PHYHOLD = 0;
+    temp = EMAC_MII_Read(&EMAC, MII_ADDR_EPHYCFG1);
     temp |= 1u << 15u;
-    EMAC_MII_Write(&EMAC0, MII_ADDR_EPHYCFG1, temp);
+    EMAC_MII_Write(&EMAC, MII_ADDR_EPHYCFG1, temp);
 }
 
 static void initHwAddr() {
@@ -177,7 +182,7 @@ static void initHwAddr() {
         static_cast<uint8_t>(CRC.SEED >> 8),
         static_cast<uint8_t>(CRC.SEED >> 0)
     };
-    EMAC_setMac(&(EMAC0.ADDR0), macAddr);
+    EMAC_setMac(&(EMAC.ADDR0), macAddr);
     // disable CRC module
     RCGCCCM.EN = 0;
 }
@@ -192,38 +197,38 @@ static void initMAC() {
     // initialize PHY
     initPHY();
     // wait for DMA reset to complete
-    while (EMAC0.DMABUSMOD.SWR) {}
+    while (EMAC.DMABUSMOD.SWR) {}
 
     initHwAddr();
 
     // configure DMA
-    EMAC0.DMABUSMOD.ATDS = 1;
-    EMAC0.RXDLADDR = reinterpret_cast<uint32_t>(rxDesc);
-    EMAC0.TXDLADDR = reinterpret_cast<uint32_t>(txDesc);
-    EMAC0.DMAOPMODE.ST = 1;
-    EMAC0.DMAOPMODE.SR = 1;
+    EMAC.DMABUSMOD.ATDS = 1;
+    EMAC.RXDLADDR = reinterpret_cast<uint32_t>(rxDesc);
+    EMAC.TXDLADDR = reinterpret_cast<uint32_t>(txDesc);
+    EMAC.DMAOPMODE.ST = 1;
+    EMAC.DMAOPMODE.SR = 1;
     // enable RX/TX interrupts
-    EMAC0.DMAIM.OVE = 1;
-    EMAC0.DMAIM.RIE = 1;
-    EMAC0.DMAIM.TIE = 1;
-    EMAC0.DMAIM.NIE = 1;
-    EMAC0.DMAIM.AIE = 1;
+    EMAC.DMAIM.OVE = 1;
+    EMAC.DMAIM.RIE = 1;
+    EMAC.DMAIM.TIE = 1;
+    EMAC.DMAIM.NIE = 1;
+    EMAC.DMAIM.AIE = 1;
 
     // set frame filter mode
-    EMAC0.FRAMEFLTR.RA = 1;
+    EMAC.FRAMEFLTR.RA = 1;
     // verify all checksum
-    EMAC0.CFG.IPC = 1;
+    EMAC.CFG.IPC = 1;
     // prevent loopback of data in half-duplex mode
-    EMAC0.CFG.DRO = 1;
+    EMAC.CFG.DRO = 1;
     // strip checksum from received frames
-    EMAC0.CFG.CST = 1;
+    EMAC.CFG.CST = 1;
     // replace source MAC address in transmissions
-    EMAC0.CFG.SADDR = EMAC_SADDR_REP0;
+    EMAC.CFG.SADDR = EMAC_SADDR_REP0;
 
     // start transmitter
-    EMAC0.CFG.TE = 1;
+    EMAC.CFG.TE = 1;
     // start receiver
-    EMAC0.CFG.RE = 1;
+    EMAC.CFG.RE = 1;
 
     // re-enable flash prefetch per errata
     FLASHCONF.FPFOFF = 0;
@@ -231,27 +236,27 @@ static void initMAC() {
 
 void ISR_EthernetMAC() {
     // process link status changes
-    if (EMAC0.PHY.MIS.INT) {
+    if (EMAC.PHY.MIS.INT) {
         // clear interrupt
-        EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYMISR1);
-        EMAC0.PHY.MIS.INT = 1;
+        EMAC_MII_Read(&EMAC, MII_ADDR_EPHYMISR1);
+        EMAC.PHY.MIS.INT = 1;
         // fetch status
-        phyStatus = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYSTS);
+        phyStatus = EMAC_MII_Read(&EMAC, MII_ADDR_EPHYSTS);
         phyStatus ^= 0x0002;
         // set speed
-        EMAC0.CFG.FES = (phyStatus >> 1u) & 1u;
+        EMAC.CFG.FES = (phyStatus >> 1u) & 1u;
         // set duplex
-        EMAC0.CFG.DUPM = (phyStatus >> 2u) & 1u;
+        EMAC.CFG.DUPM = (phyStatus >> 2u) & 1u;
         // link status bit in EPHYSTS is buggy, but EPHYBMSR works
-        const uint16_t temp = EMAC_MII_Read(&EMAC0, MII_ADDR_EPHYBMSR);
+        const uint16_t temp = EMAC_MII_Read(&EMAC, MII_ADDR_EPHYBMSR);
         if (temp & 4)
             phyStatus |= 1;
         return;
     }
 
     // copy and clear interrupt flags
-    const auto DMARIS = const_cast<EMAC_MAP&>(EMAC0).DMARIS;
-    EMAC0.DMARIS.raw = DMARIS.raw;
+    const auto DMARIS = const_cast<EMAC_MAP&>(EMAC).DMARIS;
+    EMAC.DMARIS.raw = DMARIS.raw;
 
     // check for receive interrupt
     if (DMARIS.RI)
@@ -377,7 +382,7 @@ void network::init() {
     initMAC();
 
     // unique IP identifier seed
-    ipID = EMAC0.ADDR0.HI.ADDR;
+    ipID = EMAC.ADDR0.HI.ADDR;
     // initialize network services
     ARP_init();
     DHCP_init();
@@ -432,7 +437,7 @@ void NET_transmit(int desc, int len) {
     txDesc[desc].TDES0.IC = 1;
     txDesc[desc].TDES0.OWN = 1;
     // wake TX DMA
-    EMAC0.TXPOLLD = 1;
+    EMAC.TXPOLLD = 1;
 }
 
 /**
