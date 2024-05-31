@@ -82,7 +82,7 @@ static constexpr struct {
     {ETHTYPE_IP4, IPv4_process},
 };
 
-static void initDescriptors() {
+static void initRx() {
     // init receive descriptors
     for (int i = 0; i < RX_RING_SIZE; i++) {
         rxDesc[i].BUFF1 = reinterpret_cast<uint32_t>(rxBuffer[i]);
@@ -94,6 +94,20 @@ static void initDescriptors() {
         rxDesc[i].RDES0.OWN = 1;
     }
     rxDesc[RX_RING_MASK].RDES1.RER = 1;
+}
+
+static void restartRx() {
+    // reset receive descriptors
+    initRx();
+    // reset receive pointer
+    ptrRX = 0;
+    // restart DMA controller
+    EMAC.RXDLADDR = reinterpret_cast<uint32_t>(rxDesc);
+    EMAC.DMAOPMODE.SR = 1;
+}
+
+static void initDescriptors() {
+    initRx();
 
     // init transmit descriptors
     for (int i = 0; i < TX_RING_SIZE; i++) {
@@ -269,6 +283,8 @@ void ISR_EthernetMAC() {
     // check for overflow interrupt
     if (DMARIS.OVF) {
         ++overflowRx;
+        EMAC.DMAOPMODE.SR = 0;
+        runWake(taskRx);
     }
 }
 
@@ -344,6 +360,10 @@ static bool processFrame() {
 static void runRx(void *ref) {
     // check for completed receptions
     while (processFrame()) {}
+
+    // check for receiver reset
+    if (!EMAC.DMAOPMODE.SR)
+        restartRx();
 }
 
 static void runTx(void *ref) {
