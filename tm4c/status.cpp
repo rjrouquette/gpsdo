@@ -507,6 +507,12 @@ static unsigned statusSystem(char *body) {
     end = append(end, tmp);
     end = append(end, "\n");
 
+    // CPU clock frequency
+    tmp[fmtFloat(static_cast<float>(CLK_FREQ) * 1e-6f, 0, 1, tmp)] = 0;
+    end = append(end, "cpu clock: ");
+    end = append(end, tmp);
+    end = append(end, " MHz\n");
+
     // return size
     return end - body;
 }
