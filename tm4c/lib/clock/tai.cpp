@@ -17,7 +17,10 @@
 #define PPS_TIMER GPTM2
 #define PPS_PORT PORTA
 #define PPS_PIN (1<<4)
-#define PPS_INTV_HI (CLK_FREQ / 10) // 100 ms
+// PPS high interval (100 ms)
+static constexpr int PPS_HIGH = CLK_FREQ / 10;
+// mask for timer edge events
+static constexpr int EDGE_MASK = (1 << 24) - 1;
 
 volatile uint64_t clkTaiUtcOffset = 0;
 
@@ -26,7 +29,7 @@ volatile uint64_t clkTaiRef = 0;
 volatile int32_t clkTaiRate = 0;
 static volatile uint32_t clkTaiRem = 0;
 
-static volatile uint32_t clkPpsLow = CLK_FREQ - PPS_INTV_HI - 1;
+static volatile uint32_t clkPpsLow = CLK_FREQ - PPS_HIGH - 1;
 // timer tick capture of the PPS output
 static volatile uint32_t clkMonoPps = 0;
 
@@ -37,7 +40,7 @@ void ISR_Timer2A() {
     // schedule next output transition
     const int isHi = (PPS_TIMER.TAMR.TCACT == 0x3);
     PPS_TIMER.TAMR.TCACT = isHi ? 0x2 : 0x3;
-    PPS_TIMER.TAILR = isHi ? (PPS_INTV_HI - 1) : clkPpsLow;
+    PPS_TIMER.TAILR = isHi ? (PPS_HIGH - 1) : clkPpsLow;
 }
 
 // capture rising edge of PPS output for offset measurement
@@ -47,7 +50,7 @@ void ISR_Timer4A() {
     // snapshot edge time
     uint32_t timer = clock::monotonic::raw();
     // compute pps output time
-    timer -= (timer - GPTM4.TAR.raw) & 0xFFFF;
+    timer -= (timer - GPTM4.TAR.raw) & EDGE_MASK;
     // update edge time
     clkMonoPps = timer;
 }
@@ -89,7 +92,7 @@ static void runPpsTai(void *ref) {
             delta += CLK_FREQ;
         while (delta >= CLK_FREQ * 2)
             delta -= CLK_FREQ;
-        clkPpsLow = delta - PPS_INTV_HI - 1;
+        clkPpsLow = delta - PPS_HIGH - 1;
         // update PPS output interval
         __disable_irq();
         if (PPS_TIMER.TAMR.TCACT == 0x3)

@@ -16,6 +16,9 @@
 
 #include <cmath>
 
+// mask for timer edge events
+static constexpr int EDGE_MASK = (1 << 24) - 1;
+
 // sample ring size
 static constexpr int RING_SIZE = 32;
 // sample ring mask
@@ -41,7 +44,7 @@ void ISR_Timer4B() {
     // snapshot edge time
     uint32_t timer = clock::monotonic::raw();
     // determine edge time
-    timer -= (timer - GPTM4.TBR.raw) & 0xFFFF;
+    timer -= (timer - GPTM4.TBR.raw) & EDGE_MASK;
     // add sample to buffer
     const int next = (ringHead + 1) & RING_MASK;
     ringBuffer[next] = timer;
@@ -105,7 +108,7 @@ void ISR_Timer5A() {
     // snapshot edge time
     uint32_t timer = clock::monotonic::raw();
     // compute ethernet clock offset
-    timer -= (timer - GPTM5.TAR.raw) & 0xFFFF;
+    timer -= (timer - GPTM5.TAR.raw) & EDGE_MASK;
     timer -= EMAC0.TIMSEC * CLK_FREQ;
     // update edge offset
     ppsEthernetOffset = timer;
@@ -130,7 +133,7 @@ void ISR_Timer5B() {
     // snapshot edge time
     uint32_t timer = clock::monotonic::raw();
     // update pps edge state
-    timer -= (timer - GPTM5.TBR.raw) & 0xFFFF;
+    timer -= (timer - GPTM5.TBR.raw) & EDGE_MASK;
     // update edge time
     ppsGpsEvent = timer;
     // trigger computation of full timestamps
