@@ -16,7 +16,7 @@
 #define FRQ_TIMER GPTM1
 #define FRQ_PORT PORTA
 #define FRQ_PIN (1<<2)
-static constexpr int FRQ_INTV = CLK_FREQ / 2000; // 1 kHz
+static constexpr int INTERVAL = CLK_FREQ / 2000; // 1 kHz
 
 volatile uint64_t clkCompOffset = 0;
 volatile uint64_t clkCompRef = 0;
@@ -53,7 +53,7 @@ void initClkComp() {
     RCGCTIMER.EN_GPTM1 = 1;
     delay::cycles(4);
     // Configure Timer
-    FRQ_TIMER.TAILR = FRQ_INTV - 1;
+    FRQ_TIMER.TAILR = INTERVAL - 1;
     FRQ_TIMER.TAMR.MR = 0x2;
     FRQ_TIMER.TAMR.CDIR = 1;
     // toggle CCP pin on timeout
@@ -101,13 +101,14 @@ uint64_t clock::compensated::fromMono(uint64_t ts) {
     return ts;
 }
 
-void clock::compensated::setTrim(int32_t rate) {
+void clock::compensated::setTrim(const int32_t rate) {
     // prepare compensation update
     const uint64_t now = monotonic::now();
     const uint64_t offset = clkCompOffset + corrFracRem(clkCompRate, now - clkCompRef, clkCompRem);
 
     // prepare frequency output update
-    const uint64_t incr = (static_cast<int64_t>(rate) * -FRQ_INTV) + (static_cast<uint64_t>((FRQ_INTV - 1)) << 32);
+    const uint64_t incr = (static_cast<int64_t>(rate) * -INTERVAL) +
+                          (static_cast<uint64_t>(INTERVAL - 1) << 32);
 
     // apply update
     clkCompRate = rate;
