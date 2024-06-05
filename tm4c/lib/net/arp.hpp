@@ -14,6 +14,6 @@ extern uint8_t macRouter[6];
 
 void ARP_init();
 
-void ARP_process(uint8_t *frame, int flen);
+void ARP_process(uint8_t *frame, int size);
 int ARP_request(uint32_t remoteAddress, CallbackARP callback, void *ref);
 void ARP_refreshRouter();

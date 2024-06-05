@@ -48,7 +48,7 @@ static constexpr struct {
     {8, sendPingResponse}
 };
 
-void ICMP_process(uint8_t *frame, int flen) {
+void ICMP_process(uint8_t *frame, const int size) {
     // map headers
     const auto &packet = FrameIcmp4::from(frame);
 
@@ -60,7 +60,7 @@ void ICMP_process(uint8_t *frame, int flen) {
 
     for (const auto &entry : registry) {
         if(packet.icmp.type == entry.type) {
-            (*entry.handler)(frame, flen);
+            (*entry.handler)(frame, size);
             break;
         }
     }

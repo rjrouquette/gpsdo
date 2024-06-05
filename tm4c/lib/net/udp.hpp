@@ -41,16 +41,16 @@ typedef void (*CallbackUDP)(uint8_t *frame, int flen);
 /**
  * Process received UDP frame
  * @param frame raw frame buffer
- * @param flen raw frame length
+ * @param size raw frame length
  */
-void UDP_process(uint8_t *frame, int flen);
+void UDP_process(uint8_t *frame, int size);
 
 /**
  * Finalize raw UDP frame for transmission
  * @param frame raw frame buffer
- * @param flen raw frame buffer length
+ * @param size raw frame buffer length
  */
-void UDP_finalize(uint8_t *frame, int flen);
+void UDP_finalize(uint8_t *frame, int size);
 
 /**
  * Register callback to receive inbound UDP port traffic

@@ -6,4 +6,4 @@
 
 #include <cstdint>
 
-void ICMP_process(uint8_t *frame, int flen);
+void ICMP_process(uint8_t *frame, int size);

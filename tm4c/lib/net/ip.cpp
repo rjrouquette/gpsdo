@@ -17,15 +17,15 @@ volatile uint32_t ipDNS = 0;
 
 static constexpr struct {
     uint8_t proto;
-    void (*handler)(uint8_t *frame, int flen);
+    void (*handler)(uint8_t *frame, int size);
 } registry[] = {
     {IP_PROTO_ICMP, ICMP_process},
     {IP_PROTO_UDP, UDP_process}
 };
 
-void IPv4_process(uint8_t *frame, const int flen) {
+void IPv4_process(uint8_t *frame, const int size) {
     // discard malformed frames
-    if (flen < 60)
+    if (size < 60)
         return;
 
     const auto &packet = FrameIp4::from(frame);
@@ -38,7 +38,7 @@ void IPv4_process(uint8_t *frame, const int flen) {
 
     for (const auto &entry : registry) {
         if(packet.ip4.proto == entry.proto) {
-            (*entry.handler)(frame, flen);
+            (*entry.handler)(frame, size);
             break;
         }
     }

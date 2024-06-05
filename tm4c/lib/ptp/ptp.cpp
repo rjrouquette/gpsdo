@@ -41,9 +41,9 @@ void ptp::init() {
 /**
  * Handles raw ethernet PTP frames
  * @param frame
- * @param flen
+ * @param size
  */
-void PTP_process(uint8_t *frame, const int flen) {
+void PTP_process(uint8_t *frame, const int size) {
     auto &packet = PacketPTP<char>::from(frame);
 
     // ignore anything we sent ourselves
@@ -59,9 +59,9 @@ void PTP_process(uint8_t *frame, const int flen) {
     LED_act0();
 
     if (packet.ptp.messageType == PTP2_MT_DELAY_REQ)
-        return processDelayRequest(frame, flen);
+        return processDelayRequest(frame, size);
     if (packet.ptp.messageType == PTP2_MT_PDELAY_REQ)
-        return processPDelayRequest(frame, flen);
+        return processPDelayRequest(frame, size);
 }
 
 static void processDelayRequest(uint8_t *frame, int flen) {

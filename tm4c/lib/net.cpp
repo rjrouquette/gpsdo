@@ -71,11 +71,11 @@ static EMAC_TX_DESC txDesc[TX_RING_SIZE];
 static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
 
-void PTP_process(uint8_t *frame, int flen);
+void PTP_process(uint8_t *frame, int size);
 
 static constexpr struct {
     uint16_t ethType;
-    void (*handler)(uint8_t *frame, int flen);
+    void (*handler)(uint8_t *frame, int size);
 } registry[] = {
     {ETHTYPE_ARP, ARP_process},
     {ETHTYPE_PTP, PTP_process},
@@ -487,8 +487,8 @@ void network::getTxTime(uint64_t *stamps) {
 }
 
 
-// defined as a weak reference so it may be overriden
+// defined as a weak reference so it may be overridden
 __attribute__((weak))
-void PTP_process(uint8_t *frame, int flen) {
+void PTP_process(uint8_t *frame, const int size) {
     __asm volatile("nop");
 }

@@ -39,7 +39,7 @@ void FrameUdp4::returnToSender(const uint32_t ipAddr, const uint16_t port) {
     udp.portSrc = htons(port);
 }
 
-void UDP_process(uint8_t *frame, const int flen) {
+void UDP_process(uint8_t *frame, const int size) {
     // load port number
     const uint16_t port = htons(FrameUdp4::from(frame).udp.portDst);
     // discard if port is invalid
@@ -49,24 +49,24 @@ void UDP_process(uint8_t *frame, const int flen) {
     // invoke port handler
     for (const auto &entry : registry) {
         if (entry.port == port) {
-            (*entry.callback)(frame, flen);
+            (*entry.callback)(frame, size);
             break;
         }
     }
 }
 
-void UDP_finalize(uint8_t *frame, int flen) {
+void UDP_finalize(uint8_t *frame, int size) {
     auto &packet = FrameUdp4::from(frame);
 
     // compute UDP length
-    flen -= sizeof(struct HeaderEthernet);
-    flen -= sizeof(struct HeaderIp4);
+    size -= sizeof(HeaderEthernet);
+    size -= sizeof(HeaderIp4);
     // set UDP length
-    packet.udp.length = htons(flen);
+    packet.udp.length = htons(size);
     // clear checksum field
     packet.udp.chksum = 0;
     // partial checksum of header and data
-    const uint16_t partial = RFC1071_checksum(&packet.udp, flen);
+    const uint16_t partial = RFC1071_checksum(&packet.udp, size);
 
     // append pseudo header to checksum
     const struct [[gnu::packed]] {

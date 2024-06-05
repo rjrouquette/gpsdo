@@ -157,9 +157,9 @@ void ARP_init() {
     runSleep(RUN_SEC / 2, arpRun, nullptr);
 }
 
-void ARP_process(uint8_t *frame, const int flen) {
+void ARP_process(uint8_t *frame, const int size) {
     // reject if packet is incorrect size
-    if (flen != ARP_FRAME_LEN)
+    if (size != ARP_FRAME_LEN)
         return;
     // map header and payload
     const auto &packet = FrameArp4::from(frame);
