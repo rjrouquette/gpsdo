@@ -184,6 +184,9 @@ static void initCaptureTimer(volatile GPTM_MAP &timer) {
     // disable overflow interrupt
     timer.TAMR.CINTD = 0;
     timer.TBMR.CINTD = 0;
+    // full 24-bit extension via pre-scaler
+    timer.TAPR = 255;
+    timer.TBPR = 255;
     // full count range
     timer.TAILR = -1;
     timer.TBILR = -1;
