@@ -150,7 +150,7 @@ static void snmp::process(uint8_t *frame, int flen) {
 
 static void sendResults(const uint8_t *frame, const uint8_t *data, int dlen) {
     // allocate and clear frame
-    uint8_t txFrame[snmp::FrameSnmp::DATA_OFFSET + dlen];
+    uint8_t txFrame[1520];
     memcpy(txFrame, frame, FrameUdp4::DATA_OFFSET);
 
     // map headers

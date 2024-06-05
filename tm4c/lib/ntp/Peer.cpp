@@ -284,9 +284,9 @@ void ntp::Peer::pollSend() {
 
     // transmit request
     ++txCount;
-    UDP_finalize(frame, sizeof(FrameNtp));
-    IPv4_finalize(frame, sizeof(FrameNtp));
-    network::transmit(frame, sizeof(FrameNtp), pollXleave ? nullptr : txCallback, this);
+    UDP_finalize(frame, sizeof(frame));
+    IPv4_finalize(frame, sizeof(frame));
+    network::transmit(frame, sizeof(frame), pollXleave ? nullptr : txCallback, this);
 }
 
 bool ntp::Peer::isMacInvalid() {

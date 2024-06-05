@@ -425,6 +425,10 @@ uint32_t network::getOverflowRx() {
 }
 
 bool network::transmit(const uint8_t *frame, const int size, const CallbackTx callback, void *ref) {
+    // restrict transmission length
+    if (size > TX_BUFF_SIZE)
+        faultBlink(4, 2);
+
     const int ptr = ptrTX;
     if (txDesc[ptr].TDES0.OWN)
         faultBlink(4, 1);
@@ -436,10 +440,6 @@ bool network::transmit(const uint8_t *frame, const int size, const CallbackTx ca
     // set callback
     txCallback[ptr].call = callback;
     txCallback[ptr].ref = ref;
-
-    // restrict transmission length
-    if (size > TX_BUFF_SIZE)
-        faultBlink(4, 2);
 
     // copy data
     memcpy(txBuffer[ptr], frame, size);
