@@ -233,10 +233,8 @@ void ntp::Peer::pollEnd() {
 }
 
 void ntp::Peer::pollSend() {
-    const int txDesc = NET_getTxDesc();
     // allocate and clear frame buffer
-    uint8_t *frame = NET_getTxBuff(txDesc);
-    memset(frame, 0, sizeof(FrameNtp));
+    uint8_t frame[sizeof(FrameNtp)] = {};
 
     // map headers
     auto &packet = FrameNtp::from(frame);
@@ -282,15 +280,13 @@ void ntp::Peer::pollSend() {
         packet.ntp.origTime = 0;
         packet.ntp.rxTime = filterRx;
         packet.ntp.txTime = filterTx;
-        // set callback for tx timestamp
-        NET_setTxCallback(txDesc, txCallback, this);
     }
 
     // transmit request
     ++txCount;
     UDP_finalize(frame, sizeof(FrameNtp));
     IPv4_finalize(frame, sizeof(FrameNtp));
-    NET_transmit(txDesc, sizeof(FrameNtp));
+    network::transmit(frame, sizeof(FrameNtp), pollXleave ? nullptr : txCallback, this);
 }
 
 bool ntp::Peer::isMacInvalid() {
@@ -323,7 +319,7 @@ void ntp::Peer::arpCallback(void *ref, uint32_t remoteAddr, const uint8_t *macAd
     }
 }
 
-void ntp::Peer::txCallback(void *ref, uint8_t *frame, int flen) {
+void ntp::Peer::txCallback(void *ref, const uint8_t *frame, const int size) {
     // set hardware timestamp
     network::getTxTime(static_cast<Peer*>(ref)->local_tx_hw);
 }

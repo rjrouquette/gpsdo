@@ -149,9 +149,8 @@ static void snmp::process(uint8_t *frame, int flen) {
 }
 
 static void sendResults(const uint8_t *frame, const uint8_t *data, int dlen) {
-    // copy request frame
-    const int txDesc = NET_getTxDesc();
-    uint8_t *txFrame = NET_getTxBuff(txDesc);
+    // allocate and clear frame
+    uint8_t txFrame[snmp::FrameSnmp::DATA_OFFSET + dlen];
     memcpy(txFrame, frame, FrameUdp4::DATA_OFFSET);
 
     // map headers
@@ -159,13 +158,13 @@ static void sendResults(const uint8_t *frame, const uint8_t *data, int dlen) {
     // return response directly to sender
     response.returnToSender();
 
-    int flen = snmp::FrameSnmp::DATA_OFFSET;
-    flen += snmp::wrapVars(snmp::reqId, response.data, data, dlen);
+    int size = snmp::FrameSnmp::DATA_OFFSET;
+    size += snmp::wrapVars(snmp::reqId, response.data, data, dlen);
 
     // transmit response
-    UDP_finalize(txFrame, flen);
-    IPv4_finalize(txFrame, flen);
-    NET_transmit(txDesc, flen);
+    UDP_finalize(txFrame, size);
+    IPv4_finalize(txFrame, size);
+    network::transmit(txFrame, size);
 }
 
 static void snmp::sendBatt(const uint8_t *frame) {

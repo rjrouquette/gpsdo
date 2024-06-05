@@ -39,7 +39,7 @@ struct [[gnu::packed]] FrameIcmp4 : FrameIp4 {
 static_assert(sizeof(FrameIcmp4) == 42, "FrameIcmp4 must be 42 bytes");
 
 
-static void sendPingResponse(uint8_t *frame, int flen);
+static void sendPingResponse(uint8_t *frame, int size);
 
 static constexpr struct {
     uint8_t type;
@@ -66,17 +66,13 @@ void ICMP_process(uint8_t *frame, const int size) {
     }
 }
 
-static void sendPingResponse(uint8_t *frame, const int flen) {
+static void sendPingResponse(uint8_t *frame, const int size) {
     // ICMP code must be zero
     if (FrameIcmp4::from(frame).icmp.code != 0)
         return;
 
-    // get TX descriptor
-    const int txDesc = NET_getTxDesc();
-    const auto txFrame = NET_getTxBuff(txDesc);
-    memcpy(txFrame, frame, flen);
     // map headers
-    auto &packet = FrameIcmp4::from(txFrame);
+    auto &packet = FrameIcmp4::from(frame);
 
     // modify ethernet frame header
     copyMAC(packet.eth.macDst, packet.eth.macSrc);
@@ -93,6 +89,6 @@ static void sendPingResponse(uint8_t *frame, const int flen) {
     packet.icmp.chksum[0] += 0x08;
 
     // transmit response
-    IPv4_finalize(txFrame, flen);
-    NET_transmit(txDesc, flen);
+    IPv4_finalize(frame, size);
+    network::transmit(frame, size);
 }

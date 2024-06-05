@@ -105,15 +105,14 @@ uint32_t ntp::refId() {
     return ::refId;
 }
 
-static void ntpTxCallback(void *ref, uint8_t *frame, int flen) {
-    // map headers
-    auto &packet = FrameNtp::from(frame);
-
+static void ntpTxCallback(void *ref, const uint8_t *frame, const int size) {
     // retrieve hardware transmit time
     uint64_t stamps[3];
     network::getTxTime(stamps);
     const uint64_t txTime = (stamps[2] - clkTaiUtcOffset) + NTP_UTC_OFFSET;
 
+    // map headers
+    auto &packet = FrameNtp::from(frame);
     // record hardware transmit time
     const uint32_t cell = hashXleave(packet.ip4.dst);
     tsXleave[cell].rxTime = packet.ntp.rxTime;
@@ -159,12 +158,8 @@ static void ntpRequest(uint8_t *frame, const int flen) {
     // translate TAI timestamp into NTP domain
     const uint64_t rxTime = stamps[2] - clkTaiUtcOffset + NTP_UTC_OFFSET;
 
-    // get TX descriptor
-    const int txDesc = NET_getTxDesc();
-    // set callback for precise TX timestamp
-    NET_setTxCallback(txDesc, ntpTxCallback, nullptr);
-    // duplicate packet for sending
-    const auto txFrame = NET_getTxBuff(txDesc);
+    // copy packet for sending
+    uint8_t txFrame[flen];
     memcpy(txFrame, frame, flen);
 
     // map headers
@@ -202,7 +197,7 @@ static void ntpRequest(uint8_t *frame, const int flen) {
     UDP_finalize(txFrame, flen);
     IPv4_finalize(txFrame, flen);
     // transmit packet
-    NET_transmit(txDesc, flen);
+    network::transmit(txFrame, flen, ntpTxCallback, nullptr);
 }
 
 // process peer response
@@ -462,10 +457,8 @@ static void chronycRequest(uint8_t *frame, const int flen) {
             return;
     }
 
-    const int txDesc = NET_getTxDesc();
     // allocate and clear frame buffer
-    uint8_t *resp = NET_getTxBuff(txDesc);
-    memset(resp, 0, FrameUdp4::DATA_OFFSET + sizeof(CMD_Reply));
+    uint8_t resp[FrameUdp4::DATA_OFFSET + sizeof(CMD_Reply)] = {};
     memcpy(resp, frame, FrameUdp4::DATA_OFFSET);
 
     // map headers
@@ -499,7 +492,7 @@ static void chronycRequest(uint8_t *frame, const int flen) {
     UDP_finalize(resp, flen);
     IPv4_finalize(resp, flen);
     // transmit packet
-    NET_transmit(txDesc, flen);
+    network::transmit(resp, flen);
 }
 
 static void chronycReply(CMD_Reply *cmdReply, const CMD_Request *cmdRequest) {

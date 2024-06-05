@@ -89,8 +89,7 @@ static void status::process(uint8_t *frame, int flen) {
     LED_act1();
 
     // get TX buffer
-    const int txDesc = NET_getTxDesc();
-    uint8_t *txFrame = NET_getTxBuff(txDesc);
+    uint8_t txFrame[1520];
     memcpy(txFrame, frame, flen);
     auto &response = FrameStatus::from(txFrame);
     response.returnToSender();
@@ -138,7 +137,7 @@ static void status::process(uint8_t *frame, int flen) {
     UDP_finalize(txFrame, flen);
     IPv4_finalize(txFrame, flen);
     // transmit response
-    NET_transmit(txDesc, flen);
+    network::transmit(txFrame, flen);
 }
 
 static unsigned statusClock(char *body) {

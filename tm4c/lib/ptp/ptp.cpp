@@ -14,6 +14,7 @@
 #include "../ntp/ntp.hpp"
 #include "../ntp/pll.hpp"
 
+#include <algorithm>
 #include <memory.h>
 
 
@@ -23,8 +24,8 @@
 uint8_t ptpClockId[8];
 static volatile uint32_t seqId;
 
-static void processDelayRequest(uint8_t *frame, int flen);
-static void processPDelayRequest(uint8_t *frame, int flen);
+static void processDelayRequest(const uint8_t *frame, int size);
+static void processPDelayRequest(const uint8_t *frame, int size);
 
 static void sendAnnounce(void *ref);
 static void sendSync(void *ref);
@@ -64,17 +65,15 @@ void PTP_process(uint8_t *frame, const int size) {
         return processPDelayRequest(frame, size);
 }
 
-static void processDelayRequest(uint8_t *frame, int flen) {
+static void processDelayRequest(const uint8_t *frame, int size) {
     // verify request length
-    if (flen < static_cast<int>(PTP2_MIN_SIZE + sizeof(PTP2_TIMESTAMP)))
+    if (size < static_cast<int>(PTP2_MIN_SIZE + sizeof(PTP2_TIMESTAMP)))
         return;
 
-    const int txDesc = NET_getTxDesc();
-    // allocate and copy frame buffer
-    uint8_t *txFrame = NET_getTxBuff(txDesc);
-    memcpy(txFrame, frame, flen);
-    // resize frame
-    flen = PTP2_MIN_SIZE + sizeof(PTP2_DELAY_RESP);
+    // copy and resize frame
+    constexpr int txSize = PTP2_MIN_SIZE + sizeof(PTP2_DELAY_RESP);
+    uint8_t txFrame[txSize] = {};
+    memcpy(txFrame, frame, std::min(size, txSize));
 
     // map headers
     auto &response = PacketPTP<PTP2_DELAY_RESP>::from(txFrame);
@@ -96,18 +95,18 @@ static void processDelayRequest(uint8_t *frame, int flen) {
     response.ptp.logMessageInterval = 0;
 
     // transmit response
-    NET_transmit(txDesc, flen);
+    network::transmit(txFrame, txSize);
 }
 
-static void peerDelayRespFollowup(void *ref, uint8_t *txFrame, int flen) {
-    const int txDesc = NET_getTxDesc();
-    uint8_t *followup = NET_getTxBuff(txDesc);
-    memcpy(followup, txFrame, flen);
-    flen = PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_FOLLOW_UP);
-
+static void peerDelayRespFollowup(void *ref, const uint8_t *frame, int size) {
     // get precise TX time
     uint64_t stamps[3];
     network::getTxTime(stamps);
+
+    // copy and resize frame
+    constexpr int txSize = PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_FOLLOW_UP);
+    uint8_t txFrame[txSize] = {};
+    memcpy(txFrame, frame, std::min(size, txSize));
 
     // map headers
     auto &response = PacketPTP<PTP2_PDELAY_FOLLOW_UP>::from(txFrame);
@@ -118,20 +117,18 @@ static void peerDelayRespFollowup(void *ref, uint8_t *txFrame, int flen) {
     toPtpTimestamp(stamps[2], &(response.data.responseTimestamp));
 
     // transmit request
-    NET_transmit(txDesc, flen);
+    network::transmit(txFrame, txSize);
 }
 
-static void processPDelayRequest(uint8_t *frame, int flen) {
+static void processPDelayRequest(const uint8_t *frame, int size) {
     // verify request length
-    if (flen < static_cast<int>(PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_REQ)))
+    if (size < static_cast<int>(PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_REQ)))
         return;
 
-    const int txDesc = NET_getTxDesc();
-    // allocate and copy frame buffer
-    uint8_t *txFrame = NET_getTxBuff(txDesc);
-    memcpy(txFrame, frame, flen);
-    // resize frame
-    flen = PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_RESP);
+    // copy and resize frame
+    constexpr int txSize = PTP2_MIN_SIZE + sizeof(PTP2_PDELAY_RESP);
+    uint8_t txFrame[txSize] = {};
+    memcpy(txFrame, frame, std::min(size, txSize));
 
     // map headers
     auto &response = PacketPTP<PTP2_PDELAY_RESP>::from(txFrame);
@@ -153,16 +150,13 @@ static void processPDelayRequest(uint8_t *frame, int flen) {
     response.ptp.logMessageInterval = 0;
 
     // transmit response
-    NET_setTxCallback(txDesc, peerDelayRespFollowup, nullptr);
-    NET_transmit(txDesc, flen);
+    network::transmit(txFrame, txSize, peerDelayRespFollowup, nullptr);
 }
 
 static void sendAnnounce(void *ref) {
-    const int txDesc = NET_getTxDesc();
     // allocate and clear frame buffer
-    constexpr int flen = PTP2_MIN_SIZE + sizeof(PTP2_ANNOUNCE);
-    uint8_t *frame = NET_getTxBuff(txDesc);
-    memset(frame, 0, flen);
+    constexpr int size = PTP2_MIN_SIZE + sizeof(PTP2_ANNOUNCE);
+    uint8_t frame[size] = {};
 
     // map headers
     auto &announce = PacketPTP<PTP2_ANNOUNCE>::from(frame);
@@ -195,36 +189,34 @@ static void sendAnnounce(void *ref) {
         announce.data.grandMasterClockQuality = 0x31;
     toPtpTimestamp(clock::tai::now(), &announce.data.originTimestamp);
 
-    // transmit request
-    NET_transmit(txDesc, flen);
+    // transmit announce frame
+    network::transmit(frame, size);
 }
 
-static void syncFollowup(void *ref, uint8_t *txFrame, const int flen) {
-    const int txDesc = NET_getTxDesc();
-    uint8_t *followup = NET_getTxBuff(txDesc);
-    memcpy(followup, txFrame, flen);
-
+static void syncFollowup(void *ref, const uint8_t *frame, const int size) {
     // get precise TX time
     uint64_t stamps[3];
     network::getTxTime(stamps);
 
+    // copy frame
+    uint8_t txFrame[size];
+    memcpy(txFrame, frame, size);
+
     // map headers
-    auto &response = PacketPTP<PTP2_TIMESTAMP>::from(followup);
+    auto &followup = PacketPTP<PTP2_TIMESTAMP>::from(txFrame);
 
     // set followup fields
-    response.ptp.messageType = PTP2_MT_FOLLOW_UP;
-    toPtpTimestamp(stamps[2], &response.data);
+    followup.ptp.messageType = PTP2_MT_FOLLOW_UP;
+    toPtpTimestamp(stamps[2], &followup.data);
 
     // transmit request
-    NET_transmit(txDesc, flen);
+    network::transmit(txFrame, size);
 }
 
 static void sendSync(void *ref) {
-    const int txDesc = NET_getTxDesc();
     // allocate and clear frame buffer
-    constexpr int flen = PTP2_MIN_SIZE + sizeof(PTP2_TIMESTAMP);
-    uint8_t *frame = NET_getTxBuff(txDesc);
-    memset(frame, 0, flen);
+    constexpr int size = PTP2_MIN_SIZE + sizeof(PTP2_TIMESTAMP);
+    uint8_t frame[size] = {};
 
     // map headers
     auto &sync = PacketPTP<PTP2_TIMESTAMP>::from(frame);
@@ -245,7 +237,6 @@ static void sendSync(void *ref) {
     // set preliminary timestamp
     toPtpTimestamp(clock::tai::now(), &sync.data);
 
-    // transmit request
-    NET_setTxCallback(txDesc, syncFollowup, nullptr);
-    NET_transmit(txDesc, flen);
+    // transmit sync frame
+    network::transmit(frame, size, syncFollowup, nullptr);
 }

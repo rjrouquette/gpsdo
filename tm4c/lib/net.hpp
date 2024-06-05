@@ -10,17 +10,12 @@
 #define PHY_STATUS_100M (2)
 #define PHY_STATUS_LINK (1)
 
-typedef void (*CallbackNetTX)(void *ref, uint8_t *frame, int flen);
-
 void NET_getMacAddress(char *strAddr);
 int NET_getPhyStatus();
 
-int NET_getTxDesc();
-uint8_t* NET_getTxBuff(int desc);
-void NET_setTxCallback(int desc, CallbackNetTX callback, volatile void *ref);
-void NET_transmit(int desc, int len);
-
 namespace network {
+    using CallbackTx = void (*)(void *ref, const uint8_t *frame, int size);
+
     /**
      * Initialize network stack.
      */
@@ -51,4 +46,14 @@ namespace network {
      *               2 - TAI clock
      */
     void getTxTime(uint64_t *stamps);
+
+    /**
+     * Submit an ethernet frame for transmission.
+     * @param frame the data to transmit
+     * @param size the size of the frame to transmit
+     * @param callback function to invoke when transmission is complete
+     * @param ref pointer to reference data for callback
+     * @return true if the frame was added to the transmit buffer, false if the frame would overrun the transmit buffer
+     */
+    bool transmit(const uint8_t *frame, int size, CallbackTx callback = nullptr, void *ref = nullptr);
 }

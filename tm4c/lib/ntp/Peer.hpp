@@ -57,7 +57,7 @@ namespace ntp {
 
         static void arpCallback(void *ref, uint32_t remoteAddr, const uint8_t *macAddr);
 
-        static void txCallback(void *ref, uint8_t *frame, int flen);
+        static void txCallback(void *ref, const uint8_t *frame, int size);
 
     public:
         explicit Peer(uint32_t ipAddr);

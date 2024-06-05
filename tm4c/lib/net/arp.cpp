@@ -105,20 +105,16 @@ static void arpAnnounce() {
     // our IP address must be valid
     if (ipAddress == 0)
         return;
-    // get TX descriptor
-    const int txDesc = NET_getTxDesc();
-    if (txDesc < 0)
-        return;
     // create request frame
     const uint8_t wildCard[6] = {0, 0, 0, 0, 0, 0};
-    uint8_t *packetTX = NET_getTxBuff(txDesc);
+    uint8_t frame[ARP_FRAME_LEN];
     makeArpIp4(
-        packetTX, ARP_OP_REQUEST,
+        frame, ARP_OP_REQUEST,
         wildCard, ipAddress
     );
-    broadcastMAC(reinterpret_cast<HeaderEthernet*>(packetTX)->macDst);
+    broadcastMAC(reinterpret_cast<HeaderEthernet*>(frame)->macDst);
     // transmit frame
-    NET_transmit(txDesc, ARP_FRAME_LEN);
+    network::transmit(frame, sizeof(frame));
 }
 
 static void arpRun(void *ref) {
@@ -178,14 +174,13 @@ void ARP_process(uint8_t *frame, const int size) {
         // send response
         if (ipAddress) {
             if (ipAddress == packet.arp.TPA) {
-                const int txDesc = NET_getTxDesc();
-                uint8_t *packetTX = NET_getTxBuff(txDesc);
+                uint8_t txFrame[ARP_FRAME_LEN];
                 makeArpIp4(
-                    packetTX, ARP_OP_REPLY,
+                    txFrame, ARP_OP_REPLY,
                     packet.arp.SHA, packet.arp.SPA
                 );
-                copyMAC(reinterpret_cast<HeaderEthernet*>(packetTX)->macDst, packet.eth.macSrc);
-                NET_transmit(txDesc, ARP_FRAME_LEN);
+                copyMAC(reinterpret_cast<HeaderEthernet*>(txFrame)->macDst, packet.eth.macSrc);
+                network::transmit(txFrame, sizeof(txFrame));
             }
         }
     }
@@ -211,23 +206,21 @@ int ARP_request(const uint32_t remoteAddress, const CallbackARP callback, void *
         // look for empty slot
         if (request.remoteAddress != 0)
             continue;
-        // get TX descriptor
-        const int txDesc = NET_getTxDesc();
         // create request frame
         const uint8_t wildCard[6] = {0, 0, 0, 0, 0, 0};
-        uint8_t *packetTX = NET_getTxBuff(txDesc);
+        uint8_t frame[ARP_FRAME_LEN];
         makeArpIp4(
-            packetTX, ARP_OP_REQUEST,
+            frame, ARP_OP_REQUEST,
             wildCard, remoteAddress
         );
-        broadcastMAC(reinterpret_cast<HeaderEthernet*>(packetTX)->macDst);
+        broadcastMAC(reinterpret_cast<HeaderEthernet*>(frame)->macDst);
         // register callback
         request.callback = callback;
         request.ref = ref;
         request.remoteAddress = remoteAddress;
         request.expire = now + REQUEST_EXPIRE;
         // transmit frame
-        NET_transmit(txDesc, ARP_FRAME_LEN);
+        network::transmit(frame, sizeof(frame));
         return 0;
     }
     return -1;

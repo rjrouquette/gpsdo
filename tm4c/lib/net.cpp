@@ -20,6 +20,7 @@
 #include "net/ip.hpp"
 #include "net/util.hpp"
 
+#include <algorithm>
 #include <memory.h>
 
 // assign ethernet MAC peripheral
@@ -62,7 +63,7 @@ static volatile struct {
 } rxTime, txTime;
 
 static struct {
-    CallbackNetTX call;
+    network::CallbackTx call;
     void *ref;
 } txCallback[TX_RING_SIZE];
 
@@ -276,7 +277,7 @@ void ISR_EthernetMAC() {
     if (DMARIS.RI)
         runWake(taskRx);
 
-    // check for transmit interruot
+    // check for transmit interrupt
     if (DMARIS.TI)
         runWake(taskTx);
 
@@ -423,7 +424,7 @@ uint32_t network::getOverflowRx() {
     return overflowRx;
 }
 
-int NET_getTxDesc() {
+bool network::transmit(const uint8_t *frame, const int size, const CallbackTx callback, void *ref) {
     const int ptr = ptrTX;
     if (txDesc[ptr].TDES0.OWN)
         faultBlink(4, 1);
@@ -431,33 +432,26 @@ int NET_getTxDesc() {
     int temp = ptr;
     incrTx(temp);
     ptrTX = temp;
-    return ptr;
-}
 
-uint8_t* NET_getTxBuff(const int desc) {
-    return txBuffer[desc & TX_RING_MASK];
-}
+    // set callback
+    txCallback[ptr].call = callback;
+    txCallback[ptr].ref = ref;
 
-void NET_setTxCallback(int desc, CallbackNetTX callback, volatile void *ref) {
-    desc &= TX_RING_MASK;
-    txCallback[desc].call = callback;
-    txCallback[desc].ref = const_cast<void*>(ref);
-}
-
-void NET_transmit(int desc, int len) {
-    desc &= TX_RING_MASK;
     // restrict transmission length
-    if (len < 60)
-        len = 60;
-    if (len > TX_BUFF_SIZE)
+    if (size > TX_BUFF_SIZE)
         faultBlink(4, 2);
+
+    // copy data
+    memcpy(txBuffer[ptr], frame, size);
+
     // set transmission size
-    txDesc[desc].TDES1.TBS1 = len;
+    txDesc[ptr].TDES1.TBS1 = std::max(60, size);
     // release descriptor
-    txDesc[desc].TDES0.IC = 1;
-    txDesc[desc].TDES0.OWN = 1;
+    txDesc[ptr].TDES0.IC = 1;
+    txDesc[ptr].TDES0.OWN = 1;
     // wake TX DMA
     EMAC.TXPOLLD = 1;
+    return true;
 }
 
 /**

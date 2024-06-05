@@ -131,10 +131,8 @@ void DHCP_renew() {
     // create request ID
     dhcpXID = dhcpUUID + clock::monotonic::seconds();
 
-    // get TX descriptor
-    const int txDesc = NET_getTxDesc();
     // initialize frame
-    uint8_t *frame = NET_getTxBuff(txDesc);
+    uint8_t frame[1520];
     initPacket(frame);
     int flen = sizeof(HeaderEthernet);
     flen += sizeof(HeaderIp4);
@@ -182,7 +180,7 @@ void DHCP_renew() {
     // transmit frame
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
-    NET_transmit(txDesc, flen);
+    network::transmit(frame, flen);
 }
 
 uint32_t DHCP_expires() {
@@ -346,10 +344,8 @@ static void processFrame(uint8_t *frame, const int flen) {
 }
 
 static void sendReply(const HEADER_DHCP *response) {
-    // get TX descriptor
-    const int txDesc = NET_getTxDesc();
     // initialize frame
-    uint8_t *frame = NET_getTxBuff(txDesc);
+    uint8_t frame[1520];
     initPacket(frame);
     int flen = sizeof(HeaderEthernet);
     flen += sizeof(HeaderIp4);
@@ -391,7 +387,7 @@ static void sendReply(const HEADER_DHCP *response) {
     // transmit frame
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
-    NET_transmit(txDesc, flen);
+    network::transmit(frame, flen);
 }
 
 const char* DHCP_hostname() {

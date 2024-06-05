@@ -227,8 +227,7 @@ static void processFrame(uint8_t *frame, const int flen) {
 }
 
 static void sendRequest(const char *hostname, const uint16_t requestId) {
-    const int txDesc = NET_getTxDesc();
-    uint8_t *frame = NET_getTxBuff(txDesc);
+    uint8_t frame[1520];
 
     // clear frame buffer
     memset(frame, 0, FrameDns::DATA_OFFSET);
@@ -284,5 +283,5 @@ static void sendRequest(const char *hostname, const uint16_t requestId) {
     const int flen = FrameDns::DATA_OFFSET + (tail - base);
     UDP_finalize(frame, flen);
     IPv4_finalize(frame, flen);
-    NET_transmit(txDesc, flen);
+    network::transmit(frame, flen);
 }
