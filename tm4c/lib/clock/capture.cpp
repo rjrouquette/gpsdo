@@ -30,6 +30,8 @@ static volatile int ringTail = 0;
 // ring buffer
 static volatile uint32_t ringBuffer[RING_SIZE];
 
+// filter smoothing constant
+static constexpr float emaRate = 0.5f;
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
 // ema accumulator for period mean
@@ -79,10 +81,9 @@ static void runTemperature([[maybe_unused]] void *ref) {
         tail = next;
         // update mean
         const auto diff = period - toFloat(mean);
-        const auto alpha = var / (var + diff * diff);
-        mean += toFixedPoint(period * alpha * diff);
+        mean += toFixedPoint(emaRate * period * diff);
         // update variance
-        var += period * (diff * diff - var);
+        var += emaRate * period * (diff * diff - var);
     }
 
     // apply updates
