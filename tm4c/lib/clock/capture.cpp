@@ -32,8 +32,6 @@ static volatile uint32_t ringBuffer[RING_SIZE];
 
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
-// scale factor for converting timer ticks temperature
-static constexpr float conversionScale = 0.25f * static_cast<float>(CLK_FREQ);
 // ema accumulator for temperature mean
 static volatile float temperatureMean = 0;
 // ema accumulator for temperature mean residual offset
@@ -55,6 +53,16 @@ void ISR_Timer4B() {
     ringHead = next;
 }
 
+/**
+ * Convert timer-tick period to temperature in degrees Celsius.
+ * @param period the cycle period in timer ticks
+ * @return the temperature in degrees Celsius
+ */
+inline float periodToCelsius(const uint32_t period) {
+    static constexpr float conversionScale = 0.25f * static_cast<float>(CLK_FREQ);
+    return conversionScale / static_cast<float>(period) - 273.15f;
+}
+
 // update mean and standard deviation
 static void runTemperature([[maybe_unused]] void *ref) {
     const auto head = ringHead;
@@ -68,18 +76,17 @@ static void runTemperature([[maybe_unused]] void *ref) {
         tail = (tail + 1) & RING_MASK;
         // compute cycle period
         const auto next = (tail + 1) & RING_MASK;
-        const auto period = ringBuffer[next] - ringBuffer[tail];
-        mean = conversionScale / static_cast<float>(period);
+        mean = periodToCelsius(ringBuffer[next] - ringBuffer[tail]);
         tail = next;
     }
 
     // append new samples
-    while(tail != head) {
+    while (tail != head) {
         // compute cycle period
         const auto next = (tail + 1) & RING_MASK;
         const auto periodRaw = ringBuffer[next] - ringBuffer[tail];
         const auto period = timeScale * static_cast<float>(periodRaw);
-        const auto temperature = conversionScale / static_cast<float>(periodRaw);
+        const auto temperature = periodToCelsius(periodRaw);
         tail = next;
 
         // update mean
@@ -102,7 +109,7 @@ static void runTemperature([[maybe_unused]] void *ref) {
 }
 
 float clock::capture::temperature() {
-    return temperatureMean - 273.15f;
+    return temperatureMean;
 }
 
 float clock::capture::temperatureNoise() {
