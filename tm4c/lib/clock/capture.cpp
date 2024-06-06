@@ -32,10 +32,14 @@ static volatile uint32_t ringBuffer[RING_SIZE];
 
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
-// ema accumulator for period mean
-static volatile float emaPeriodMean = 0;
-// ema accumulator for period variance
-static volatile float emaPeriodVar = 0;
+// scale factor for converting timer ticks temperature
+static constexpr float conversionScale = 0.25f * static_cast<float>(CLK_FREQ);
+// ema accumulator for temperature mean
+static volatile float temperatureMean = 0;
+// ema accumulator for temperature mean residual offset
+static volatile float temperatureMeanResidual = 0;
+// ema accumulator for temperature variance
+static volatile float temperatureVar = 0;
 
 // capture rising edge of temperature sensor output
 void ISR_Timer4B() {
@@ -55,16 +59,17 @@ void ISR_Timer4B() {
 static void runTemperature([[maybe_unused]] void *ref) {
     const auto head = ringHead;
     auto tail = ringTail;
-    float mean = emaPeriodMean;
-    float var = emaPeriodVar;
+    float mean = temperatureMean;
+    float residual = temperatureMeanResidual;
+    float var = temperatureVar;
 
     // check initial sample
     if (mean == 0) {
         tail = (tail + 1) & RING_MASK;
         // compute cycle period
         const auto next = (tail + 1) & RING_MASK;
-        const auto periodRaw = ringBuffer[next] - ringBuffer[tail];
-        mean = timeScale * static_cast<float>(periodRaw);
+        const auto period = ringBuffer[next] - ringBuffer[tail];
+        mean = conversionScale / static_cast<float>(period);
         tail = next;
     }
 
@@ -74,28 +79,34 @@ static void runTemperature([[maybe_unused]] void *ref) {
         const auto next = (tail + 1) & RING_MASK;
         const auto periodRaw = ringBuffer[next] - ringBuffer[tail];
         const auto period = timeScale * static_cast<float>(periodRaw);
+        const auto temperature = conversionScale / static_cast<float>(periodRaw);
         tail = next;
+
         // update mean
-        const auto diff = period - mean;
+        const auto diff = temperature - mean;
         const auto sqr = diff * diff;
-        const auto alpha = std::exp(-sqr / var);
-        mean += alpha * period * diff;
+        const auto delta = std::exp(-sqr / var) * period * diff;
+        const auto orig = mean;
+        mean += delta + residual;
+        residual += delta - (mean - orig);
+
         // update variance
         var += period * (sqr - var);
     }
 
     // apply updates
     ringTail = tail;
-    emaPeriodMean = mean;
-    emaPeriodVar = var;
+    temperatureMean = mean;
+    temperatureMeanResidual = residual;
+    temperatureVar = var;
 }
 
 float clock::capture::temperature() {
-    return 0.25f / emaPeriodMean - 273.15f;
+    return temperatureMean - 273.15f;
 }
 
 float clock::capture::temperatureNoise() {
-    return 0.25f * std::sqrt(emaPeriodVar) / (emaPeriodMean * emaPeriodMean);
+    return std::sqrt(temperatureVar);
 }
 
 
