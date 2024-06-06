@@ -5,7 +5,6 @@
 #include "net.hpp"
 
 #include "delay.hpp"
-#include "led.hpp"
 #include "run.hpp"
 #include "../hw/crc.h"
 #include "../hw/emac.h"
@@ -28,9 +27,16 @@ static auto &EMAC = EMAC0;
 // assign ethernet PHY LED GPIO port
 static auto &PHY_GPIO = PORTF;
 
+// maximum frame length
 static constexpr int MTU = 1518;
 // 128 bytes = smallest ethernet frame (64-bytes) plus interframe gap (64-bytes)
 static constexpr int SEGMENT_SIZE = 128;
+// mask for clearing segment TDES0 field
+static constexpr uint32_t MASK_CLEAR = 1 << 21;
+// flags for first segment TDES0 field (FS, TTSE)
+static constexpr uint32_t FLAGS_FIRST = 1 << 28 | 1 << 25;
+// flags for last segment TDES0 field (LS, IC)
+static constexpr uint32_t FLAGS_LAST = 1 << 30 | 1 << 29;
 
 // 128 frames = 1.31 ms
 static constexpr int RX_RING_SIZE = 128;
@@ -89,13 +95,10 @@ static constexpr struct {
 
 static void initRx() {
     // init receive descriptors
+    memset(rxDesc, 0, sizeof(rxDesc));
     for (int i = 0; i < RX_RING_SIZE; i++) {
         rxDesc[i].BUFF1 = reinterpret_cast<uint32_t>(rxBuffer[i]);
-        rxDesc[i].BUFF2 = 0;
         rxDesc[i].RDES1.RBS1 = SEGMENT_SIZE;
-        rxDesc[i].RDES1.RBS2 = 0;
-        rxDesc[i].RDES1.RER = 0;
-        rxDesc[i].RDES1.RCH = 0;
         rxDesc[i].RDES0.OWN = 1;
     }
     rxDesc[RX_RING_MASK].RDES1.RER = 1;
@@ -115,19 +118,11 @@ static void initDescriptors() {
     initRx();
 
     // init transmit descriptors
+    memset(txDesc, 0, sizeof(txDesc));
+    memset(txCallback, 0, sizeof(txCallback));
     for (int i = 0; i < TX_RING_SIZE; i++) {
         txDesc[i].BUFF1 = reinterpret_cast<uint32_t>(txBuffer[i]);
-        txDesc[i].BUFF2 = 0;
-        txDesc[i].TDES1.TBS1 = 0;
-        txDesc[i].TDES1.TBS2 = 0;
-        // replace source address
         txDesc[i].TDES1.SAIC = EMAC_SADDR_REP0;
-        // not end-of-ring
-        txDesc[i].TDES0.TER = 0;
-        // mark descriptor as incomplete
-        txDesc[i].TDES0.OWN = 0;
-        // clear callback
-        txCallback[i].call = nullptr;
     }
     txDesc[TX_RING_MASK].TDES0.TER = 1;
 }
@@ -477,12 +472,9 @@ bool network::transmit(const uint8_t *frame, int size, const CallbackTx callback
     if (size > MTU)
         return false;
 
-    // get ring state
-    const int head = txHead;
-    const int tail = (txTail - 1) & RX_RING_MASK;
-
     // check for overflow
-    if (((tail - head) & TX_RING_MASK) < ((size + SEGMENT_SIZE - 1) / SEGMENT_SIZE)) {
+    const int head = txHead;
+    if (((txTail - head - 1) & TX_RING_MASK) < ((size + SEGMENT_SIZE - 1) / SEGMENT_SIZE)) {
         ++overflowTx;
         return false;
     }
@@ -495,10 +487,8 @@ bool network::transmit(const uint8_t *frame, int size, const CallbackTx callback
         memcpy(txBuffer[ptr], frame, segment);
         // set segment size
         txDesc[ptr].TDES1.TBS1 = segment;
-        txDesc[ptr].TDES0.FS = 0;
-        txDesc[ptr].TDES0.LS = 0;
-        txDesc[ptr].TDES0.IC = 0;
-        txDesc[ptr].TDES0.TTSE = 0;
+        // clear segment flags
+        txDesc[ptr].TDES0.raw &= MASK_CLEAR;
 
         frame += segment;
         size -= segment;
@@ -511,12 +501,9 @@ bool network::transmit(const uint8_t *frame, int size, const CallbackTx callback
     }
 
     // mark first segment
-    txDesc[head].TDES0.FS = 1;
-    txDesc[head].TDES0.TTSE = 1;
-
+    txDesc[head].TDES0.raw |= FLAGS_FIRST;
     // mark last segment
-    txDesc[ptr].TDES0.LS = 1;
-    txDesc[ptr].TDES0.IC = 1;
+    txDesc[ptr].TDES0.raw |= FLAGS_LAST;
 
     // set callback
     txCallback[ptr].call = callback;
