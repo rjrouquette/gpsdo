@@ -30,16 +30,12 @@ static volatile int ringTail = 0;
 // ring buffer
 static volatile uint32_t ringBuffer[RING_SIZE];
 
-// filter smoothing constant
-static constexpr float emaRate = 0.5f;
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
 // ema accumulator for period mean
-static volatile int64_t emaPeriodMeanFixed = 0;
-// ema accumulator for period mean
 static volatile float emaPeriodMean = 0;
 // ema accumulator for period variance
-static volatile float emaPeriodVar = 1e-6f;
+static volatile float emaPeriodVar = 0;
 
 // capture rising edge of temperature sensor output
 void ISR_Timer4B() {
@@ -59,7 +55,7 @@ void ISR_Timer4B() {
 static void runTemperature([[maybe_unused]] void *ref) {
     const auto head = ringHead;
     auto tail = ringTail;
-    int64_t mean = emaPeriodMeanFixed;
+    float mean = emaPeriodMean;
     float var = emaPeriodVar;
 
     // check initial sample
@@ -68,7 +64,7 @@ static void runTemperature([[maybe_unused]] void *ref) {
         // compute cycle period
         const auto next = (tail + 1) & RING_MASK;
         const auto periodRaw = ringBuffer[next] - ringBuffer[tail];
-        mean = toFixedPoint(static_cast<float>(periodRaw) * timeScale);
+        mean = timeScale * static_cast<float>(periodRaw);
         tail = next;
     }
 
@@ -77,19 +73,20 @@ static void runTemperature([[maybe_unused]] void *ref) {
         // compute cycle period
         const auto next = (tail + 1) & RING_MASK;
         const auto periodRaw = ringBuffer[next] - ringBuffer[tail];
-        const auto period = static_cast<float>(periodRaw) * timeScale;
+        const auto period = timeScale * static_cast<float>(periodRaw);
         tail = next;
         // update mean
-        const auto diff = period - toFloat(mean);
-        mean += toFixedPoint(emaRate * period * diff);
+        const auto diff = period - mean;
+        const auto sqr = diff * diff;
+        const auto alpha = std::exp(-sqr / var);
+        mean += alpha * period * diff;
         // update variance
-        var += emaRate * period * (diff * diff - var);
+        var += period * (sqr - var);
     }
 
     // apply updates
     ringTail = tail;
-    emaPeriodMeanFixed = mean;
-    emaPeriodMean = toFloat(mean);
+    emaPeriodMean = mean;
     emaPeriodVar = var;
 }
 
