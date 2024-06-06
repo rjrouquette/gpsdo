@@ -355,6 +355,12 @@ static unsigned statusETH(char *body) {
     end = append(end, tmp);
     end = append(end, "\n");
 
+    // tx overflow errors
+    tmp[toBase(network::getOverflowTx(), 10, tmp)] = 0;
+    end = append(end, "tx overflows: ");
+    end = append(end, tmp);
+    end = append(end, "\n");
+
     // link status
     const int phyStatus = NET_getPhyStatus();
     end = append(end, "link speed: ");

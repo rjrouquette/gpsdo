@@ -28,16 +28,19 @@ static auto &EMAC = EMAC0;
 // assign ethernet PHY LED GPIO port
 static auto &PHY_GPIO = PORTF;
 
+static constexpr int MTU = 1518;
+// 128 bytes = smallest ethernet frame (64-bytes) plus interframe gap (64-bytes)
+static constexpr int SEGMENT_SIZE = 128;
+
 // 128 frames = 1.31 ms
 static constexpr int RX_RING_SIZE = 128;
 // circular buffer modulo mask
 static constexpr int RX_RING_MASK = RX_RING_SIZE - 1;
-// 128 bytes = smallest ethernet frame (64-bytes) plus interframe gap (64-bytes)
-static constexpr int RX_BUFF_SIZE = 128;
 
-static constexpr int TX_RING_SIZE = 32;
+// 128 frames = 1.31 ms
+static constexpr int TX_RING_SIZE = 128;
+// circular buffer modulo mask
 static constexpr int TX_RING_MASK = TX_RING_SIZE - 1;
-static constexpr int TX_BUFF_SIZE = 1520;
 
 inline void incrRx(int &ptr) {
     ptr = (ptr + 1) & RX_RING_MASK;
@@ -47,29 +50,30 @@ inline void incrTx(int &ptr) {
     ptr = (ptr + 1) & TX_RING_MASK;
 }
 
-static volatile int ptrRX = 0;
-static volatile int ptrTX = 0;
-static volatile int endTX = 0;
+static volatile int rxTail = 0;
+static volatile int txHead = 0;
+static volatile int txTail = 0;
 static volatile int phyStatus = 0;
 static volatile uint32_t overflowRx = 0;
-
-static void *volatile taskRx;
-static EMAC_RX_DESC rxDesc[RX_RING_SIZE];
-static uint8_t rxBuffer[RX_RING_SIZE][RX_BUFF_SIZE];
+static volatile uint32_t overflowTx = 0;
 
 static volatile struct {
     uint32_t lo;
     uint32_t hi;
 } rxTime, txTime;
 
+static void *volatile taskRx;
+static EMAC_RX_DESC rxDesc[RX_RING_SIZE];
+static uint8_t rxBuffer[RX_RING_SIZE][SEGMENT_SIZE];
+
+static void *volatile taskTx;
+static EMAC_TX_DESC txDesc[TX_RING_SIZE];
+static uint8_t txBuffer[TX_RING_SIZE][SEGMENT_SIZE];
+
 static struct {
     network::CallbackTx call;
     void *ref;
 } txCallback[TX_RING_SIZE];
-
-static void *volatile taskTx;
-static EMAC_TX_DESC txDesc[TX_RING_SIZE];
-static uint8_t txBuffer[TX_RING_SIZE][TX_BUFF_SIZE];
 
 
 void PTP_process(uint8_t *frame, int size);
@@ -88,7 +92,7 @@ static void initRx() {
     for (int i = 0; i < RX_RING_SIZE; i++) {
         rxDesc[i].BUFF1 = reinterpret_cast<uint32_t>(rxBuffer[i]);
         rxDesc[i].BUFF2 = 0;
-        rxDesc[i].RDES1.RBS1 = RX_BUFF_SIZE;
+        rxDesc[i].RDES1.RBS1 = SEGMENT_SIZE;
         rxDesc[i].RDES1.RBS2 = 0;
         rxDesc[i].RDES1.RER = 0;
         rxDesc[i].RDES1.RCH = 0;
@@ -101,7 +105,7 @@ static void restartRx() {
     // reset receive descriptors
     initRx();
     // reset receive pointer
-    ptrRX = 0;
+    rxTail = 0;
     // restart DMA controller
     EMAC.RXDLADDR = reinterpret_cast<uint32_t>(rxDesc);
     EMAC.DMAOPMODE.SR = 1;
@@ -122,11 +126,6 @@ static void initDescriptors() {
         txDesc[i].TDES0.TER = 0;
         // mark descriptor as incomplete
         txDesc[i].TDES0.OWN = 0;
-        // each descriptor is one frame
-        txDesc[i].TDES0.FS = 1;
-        txDesc[i].TDES0.LS = 1;
-        // capture timestamp
-        txDesc[i].TDES0.TTSE = 1;
         // clear callback
         txCallback[i].call = nullptr;
     }
@@ -289,9 +288,12 @@ void ISR_EthernetMAC() {
     }
 }
 
-static bool processFrame() {
+static bool processFrameRx() {
+    // get ring state
+    const int tail = rxTail;
+
     // determine if a complete frame is available
-    auto ptr = ptrRX;
+    auto ptr = tail;
     for (;;) {
         const auto status = rxDesc[ptr].RDES0;
         // check for DMA ownership
@@ -310,14 +312,14 @@ static bool processFrame() {
 
     // discard frames with errors
     if (last.RDES0.ES) {
-        ptr = ptrRX;
+        ptr = tail;
         while (ptr != end) {
             // restore DMA ownership
             rxDesc[ptr].RDES0.OWN = 1;
             // advance ring pointer
             incrRx(ptr);
         }
-        ptrRX = ptr;
+        rxTail = ptr;
         return true;
     }
 
@@ -326,7 +328,7 @@ static bool processFrame() {
     rxTime.lo = last.RTSL;
     rxTime.hi = last.RTSH;
     int length = 0;
-    ptr = ptrRX;
+    ptr = tail;
     while (ptr != end) {
         auto &desc = rxDesc[ptr];
         // copy segment contents
@@ -338,7 +340,7 @@ static bool processFrame() {
         // advance ring pointer
         incrRx(ptr);
     }
-    ptrRX = ptr;
+    rxTail = ptr;
 
     // only process the frame if the source MAC is not a broadcast address
     // (prevents packet amplification attacks)
@@ -360,35 +362,77 @@ static bool processFrame() {
 
 static void runRx(void *ref) {
     // check for completed receptions
-    while (processFrame()) {}
+    while (processFrameRx()) {}
 
     // check for receiver reset
     if (!EMAC.DMAOPMODE.SR)
         restartRx();
 }
 
-static void runTx(void *ref) {
-    // check for completed transmissions
-    const int ptr = ptrTX;
-    int end = endTX;
-    while ((end != ptr) && !txDesc[end].TDES0.OWN) {
-        // check for callback
-        if (
-            const auto pCall = txCallback[end].call;
-            pCall != nullptr
-        ) {
-            // record timestamp
-            txTime.lo = txDesc[end].TTSL;
-            txTime.hi = txDesc[end].TTSH;
-            // invoke callback
-            (*pCall)(txCallback[end].ref, txBuffer[end], txDesc[end].TDES1.TBS1);
-            // clear callback
-            txCallback[end].call = nullptr;
-        }
-        // advance pointer
-        incrTx(end);
+static bool processFrameTx() {
+    // get ring state
+    const int head = txHead;
+    const int tail = txTail;
+
+    // check for completed transmission
+    int ptr = tail;
+    unsigned size = 0;
+    for (;;) {
+        const auto status = txDesc[ptr].TDES0;
+        // check for end of ring or DMA ownership
+        if (ptr == head || status.OWN)
+            return false;
+        // accumulate size
+        size += txDesc[ptr].TDES1.TBS1;
+        // check for last segment flag
+        if (status.LS)
+            break;
+        incrTx(ptr);
     }
-    endTX = end;
+
+    // reassemble frame
+    const auto last = ptr;
+    incrTx(ptr);
+    const int end = ptr;
+
+    // check for callback
+    const auto pCall = txCallback[last].call;
+    if (
+        pCall == nullptr
+    ) {
+        // update ring buffer state
+        txTail = end;
+        return true;
+    }
+
+    // clear callback
+    txCallback[last].call = nullptr;
+
+    // assemble full frame
+    uint8_t buffer[size];
+    txTime.lo = txDesc[last].TTSL;
+    txTime.hi = txDesc[last].TTSH;
+    size = 0;
+    ptr = tail;
+    while (ptr != end) {
+        // copy segment contents
+        const auto segment = txDesc[ptr].TDES1.TBS1;
+        memcpy(buffer + size, txBuffer[ptr], segment);
+        size += segment;
+        // advance ring pointer
+        incrTx(ptr);
+    }
+
+    // update ring buffer state
+    txTail = end;
+
+    // invoke callback
+    (*pCall)(txCallback[last].ref, buffer, static_cast<int>(size));
+    return true;
+}
+
+static void runTx(void *ref) {
+    while (processFrameTx()) {}
 }
 
 extern volatile uint16_t ipID;
@@ -424,31 +468,70 @@ uint32_t network::getOverflowRx() {
     return overflowRx;
 }
 
-bool network::transmit(const uint8_t *frame, const int size, const CallbackTx callback, void *ref) {
+uint32_t network::getOverflowTx() {
+    return overflowTx;
+}
+
+bool network::transmit(const uint8_t *frame, int size, const CallbackTx callback, void *ref) {
     // restrict transmission length
-    if (size > TX_BUFF_SIZE)
-        faultBlink(4, 2);
+    if (size > MTU)
+        return false;
 
-    const int ptr = ptrTX;
-    if (txDesc[ptr].TDES0.OWN)
-        faultBlink(4, 1);
+    // get ring state
+    const int head = txHead;
+    const int tail = (txTail - 1) & RX_RING_MASK;
 
-    int temp = ptr;
-    incrTx(temp);
-    ptrTX = temp;
+    // check for overflow
+    if (((tail - head) & TX_RING_MASK) < ((size + SEGMENT_SIZE - 1) / SEGMENT_SIZE)) {
+        ++overflowTx;
+        return false;
+    }
+
+    int ptr = head;
+    for (;;) {
+        const int segment = std::min(size, SEGMENT_SIZE);
+
+        // copy data
+        memcpy(txBuffer[ptr], frame, segment);
+        // set segment size
+        txDesc[ptr].TDES1.TBS1 = segment;
+        txDesc[ptr].TDES0.FS = 0;
+        txDesc[ptr].TDES0.LS = 0;
+        txDesc[ptr].TDES0.IC = 0;
+        txDesc[ptr].TDES0.TTSE = 0;
+
+        frame += segment;
+        size -= segment;
+        if (size == 0)
+            break;
+
+        // mark as intermediate segment
+        // advance segment pointer
+        incrTx(ptr);
+    }
+
+    // mark first segment
+    txDesc[head].TDES0.FS = 1;
+    txDesc[head].TDES0.TTSE = 1;
+
+    // mark last segment
+    txDesc[ptr].TDES0.LS = 1;
+    txDesc[ptr].TDES0.IC = 1;
 
     // set callback
     txCallback[ptr].call = callback;
     txCallback[ptr].ref = ref;
 
-    // copy data
-    memcpy(txBuffer[ptr], frame, size);
+    // update ring buffer state
+    incrTx(ptr);
+    txHead = ptr;
 
-    // set transmission size
-    txDesc[ptr].TDES1.TBS1 = std::max(60, size);
-    // release descriptor
-    txDesc[ptr].TDES0.IC = 1;
-    txDesc[ptr].TDES0.OWN = 1;
+    // mark segments for transmission
+    while (ptr != head) {
+        ptr = (ptr - 1) & TX_RING_MASK;
+        txDesc[ptr].TDES0.OWN = 1;
+    }
+
     // wake TX DMA
     EMAC.TXPOLLD = 1;
     return true;

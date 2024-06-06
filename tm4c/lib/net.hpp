@@ -28,6 +28,12 @@ namespace network {
     uint32_t getOverflowRx();
 
     /**
+     * Get the number of ethernet transmitter DMA overflow events
+     * @return the number ethernet transmitter DMA overflow events
+     */
+    uint32_t getOverflowTx();
+
+    /**
      * Get the link-level receive timestamp associated with the current callback context.
      * @param stamps array of length 3 that will be populated with
      *               64-bit fixed-point format (32.32) timestamps <br/>
