@@ -20,24 +20,20 @@
 static constexpr int EDGE_MASK = (1 << 24) - 1;
 
 // sample ring size
-static constexpr int RING_SIZE = 32;
+static constexpr int RING_SIZE = 256;
 // sample ring mask
 static constexpr int RING_MASK = RING_SIZE - 1;
-// ring head position
-static volatile int ringHead = 0;
-// ring tail position
-static volatile int ringTail = 0;
+// ring position
+static volatile int ringPos = 0;
 // ring buffer
 static volatile uint32_t ringBuffer[RING_SIZE];
 
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
-// ema accumulator for temperature mean
-static volatile float temperatureMean = 0;
-// ema accumulator for temperature mean residual offset
-static volatile float temperatureMeanResidual = 0;
-// ema accumulator for temperature variance
-static volatile float temperatureVar = 0;
+static volatile uint32_t temperatureUpdated = 0;
+static volatile float temperatureOffset = 0;
+static volatile float temperatureRate = 0;
+static volatile float temperatureStdDev = 0;
 
 // capture rising edge of temperature sensor output
 void ISR_Timer4B() {
@@ -48,9 +44,9 @@ void ISR_Timer4B() {
     // determine edge time
     timer -= (timer - GPTM4.TBR.raw) & EDGE_MASK;
     // add sample to buffer
-    const int next = (ringHead + 1) & RING_MASK;
+    const int next = (ringPos + 1) & RING_MASK;
     ringBuffer[next] = timer;
-    ringHead = next;
+    ringPos = next;
 }
 
 /**
@@ -65,55 +61,53 @@ inline float periodToCelsius(const uint32_t period) {
 
 // update mean and standard deviation
 static void runTemperature([[maybe_unused]] void *ref) {
-    const auto head = ringHead;
-    auto tail = ringTail;
-    float mean = temperatureMean;
-    float residual = temperatureMeanResidual;
-    float var = temperatureVar;
+    const auto pos = ringPos;
+    const auto updated = ringBuffer[pos];
 
-    // check initial sample
-    if (mean == 0) {
-        tail = (tail + 1) & RING_MASK;
-        // compute cycle period
-        const auto next = (tail + 1) & RING_MASK;
-        mean = periodToCelsius(ringBuffer[next] - ringBuffer[tail]);
-        tail = next;
+    // constant terms
+    static constexpr auto cc = static_cast<float>(RING_MASK);
+    static constexpr auto xc_ = 0.5f * cc * (cc - 1.0f);
+    static constexpr auto xx_ = 2.0f * (cc - 0.5f) * xc_ / 3.0f;
+    static constexpr auto xc = xc_ / cc;
+    static constexpr auto xx = xx_ / cc;
+
+    // dynamic terms
+    float yc = 0, yx = 0;
+    for (int i = 0; i < RING_MASK; ++i) {
+        const auto x = static_cast<float>(i);
+        const auto y = static_cast<float>(ringBuffer[(pos - i) & RING_MASK] - updated);
+        yc += y;
+        yx += y * x;
     }
+    yc /= cc;
+    yx /= cc;
 
-    // append new samples
-    while (tail != head) {
-        // compute cycle period
-        const auto next = (tail + 1) & RING_MASK;
-        const auto periodRaw = ringBuffer[next] - ringBuffer[tail];
-        const auto period = timeScale * static_cast<float>(periodRaw);
-        const auto temperature = periodToCelsius(periodRaw);
-        tail = next;
+    const auto slope = (yx - yc * xc) / (xx - xc * xc);
+    const auto offset = yc - xc * slope;
 
-        // update mean
-        const auto diff = temperature - mean;
-        const auto sqr = diff * diff;
-        const auto delta = std::exp(-sqr / var) * period * diff;
-        const auto orig = mean;
-        mean += delta + residual;
-        residual += delta - (mean - orig);
-
-        // update variance
-        var += period * (sqr - var);
+    float mse = 0;
+    for (int i = 0; i < RING_MASK; ++i) {
+        const auto x = static_cast<float>(i);
+        const auto y = static_cast<float>(ringBuffer[(pos - i) & RING_MASK] - updated);
+        const float error = y - offset - x * slope;
+        mse += error * error;
     }
+    mse /= cc;
 
-    // apply updates
-    ringTail = tail;
-    temperatureMean = mean;
-    temperatureMeanResidual = residual;
-    temperatureVar = var;
+    const auto slopeVariance = mse / (xx - xc * xc);
+    const auto offsetVariance = slopeVariance * xx;
+
+    temperatureOffset = 0.25f / (timeScale * offset) - 273.15f;
+    temperatureStdDev = 0.25f * std::sqrt(offsetVariance + slopeVariance) / (offset * offset);
 }
 
 float clock::capture::temperature() {
-    return temperatureMean;
+    const auto x = static_cast<float>(monotonic::raw() - temperatureUpdated);
+    return temperatureOffset + x * temperatureRate;
 }
 
 float clock::capture::temperatureNoise() {
-    return std::sqrt(temperatureVar);
+    return temperatureStdDev;
 }
 
 
@@ -254,7 +248,5 @@ void clock::capture::init() {
     PORTM.LOCK = 0;
 
     // start temperature worker task
-    ringHead = 0;
-    ringTail = 0;
-    runSleep(RUN_SEC / 128, runTemperature, nullptr);
+    runSleep(RUN_SEC / 32, runTemperature, nullptr);
 }
