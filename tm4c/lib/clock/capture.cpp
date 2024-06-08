@@ -30,10 +30,9 @@ static volatile uint32_t ringBuffer[RING_SIZE];
 
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
-static volatile uint32_t temperatureUpdated = 0;
-static volatile float temperatureOffset = 0;
-static volatile float temperatureRate = 0;
-static volatile float temperatureStdDev = 0;
+static volatile float emaTemperatureMean = 0;
+static volatile float emaTemperatureVar = 0;
+static volatile int initCounter = 0;
 
 // capture rising edge of temperature sensor output
 void ISR_Timer4B() {
@@ -61,6 +60,11 @@ inline float periodToCelsius(const uint32_t period) {
 
 // update mean and standard deviation
 static void runTemperature([[maybe_unused]] void *ref) {
+    if(initCounter < 16) {
+        ++initCounter;
+        return;
+    }
+
     const auto pos = ringPos;
     const auto updated = ringBuffer[pos];
 
@@ -70,44 +74,40 @@ static void runTemperature([[maybe_unused]] void *ref) {
     static constexpr auto xx_ = 2.0f * (cc - 0.5f) * xc_ / 3.0f;
     static constexpr auto xc = xc_ / cc;
     static constexpr auto xx = xx_ / cc;
+    static constexpr auto norm = timeScale / (xx - xc * xc);
 
     // dynamic terms
     float yc = 0, yx = 0;
-    for (int i = 0; i < RING_MASK; ++i) {
+    for (int i = 1; i < RING_MASK; ++i) {
         const auto x = static_cast<float>(i);
-        const auto y = static_cast<float>(ringBuffer[(pos - i) & RING_MASK] - updated);
+        const auto y = static_cast<float>(updated - ringBuffer[(pos - i) & RING_MASK]);
         yc += y;
         yx += y * x;
     }
     yc /= cc;
     yx /= cc;
 
-    const auto slope = (yx - yc * xc) / (xx - xc * xc);
-    const auto offset = yc - xc * slope;
+    const auto slope = (yx - yc * xc) * norm;
+    const auto temp = 0.25f / slope - 273.15f;
 
-    float mse = 0;
-    for (int i = 0; i < RING_MASK; ++i) {
-        const auto x = static_cast<float>(i);
-        const auto y = static_cast<float>(ringBuffer[(pos - i) & RING_MASK] - updated);
-        const float error = y - offset - x * slope;
-        mse += error * error;
+    const auto mean = emaTemperatureMean;
+    if(mean == 0) {
+        emaTemperatureMean = temp;
+        return;
     }
-    mse /= cc;
+    const auto diff = temp - mean;
+    emaTemperatureMean = mean + 0x1p-6f * diff;
 
-    const auto slopeVariance = mse / (xx - xc * xc);
-    const auto offsetVariance = slopeVariance * xx;
-
-    temperatureOffset = 0.25f / (timeScale * offset) - 273.15f;
-    temperatureStdDev = 0.25f * std::sqrt(offsetVariance + slopeVariance) / (offset * offset);
+    const auto var = emaTemperatureVar;
+    emaTemperatureVar = var + 0x1p-6f * (diff * diff - var);
 }
 
 float clock::capture::temperature() {
-    const auto x = static_cast<float>(monotonic::raw() - temperatureUpdated);
-    return temperatureOffset + x * temperatureRate;
+    return emaTemperatureMean;
 }
 
 float clock::capture::temperatureNoise() {
-    return temperatureStdDev;
+    return std::sqrt(emaTemperatureVar);
 }
 
 
