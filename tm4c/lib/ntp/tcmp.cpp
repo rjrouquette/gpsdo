@@ -309,25 +309,25 @@ static int step0() {
 }
 
 static int step1() {
-    // compute initial fit
-    fitQuadratic(somNode[0]);
-    return 0;
-}
-
-static int step2() {
     // require sufficient data
     if (mean[2] < SOM_FILL_OFF)
         return 1;
 
-    // update means
-    tcmpMean[0] = mean[0];
-    tcmpMean[1] = mean[1];
-    tcmpMean[2] = mean[2];
-
     // require sufficient data
-    if (mean[2] < SOM_FILL_REG)
+    if (mean[2] < SOM_FILL_REG) {
+        // only update means
+        tcmpMean[0] = mean[0];
+        tcmpMean[1] = mean[1];
+        tcmpMean[2] = mean[2];
         return 2;
+    }
 
+    return 0;
+}
+
+static int step2() {
+    // compute initial fit
+    fitQuadratic(somNode[0]);
     return 0;
 }
 
