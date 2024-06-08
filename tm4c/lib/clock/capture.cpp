@@ -28,10 +28,15 @@ static volatile int ringPos = 0;
 // ring buffer
 static volatile uint32_t ringBuffer[RING_SIZE];
 
+// EMA slew rate
+static constexpr float emaRate = 0x1p-6f;
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
+// EMA temperature mean
 static volatile float emaTemperatureMean = 0;
+// EMA temperature variance
 static volatile float emaTemperatureVar = 0;
+// temperature initialization counter
 static volatile int initCounter = 0;
 
 // capture rising edge of temperature sensor output
@@ -46,16 +51,6 @@ void ISR_Timer4B() {
     const int next = (ringPos + 1) & RING_MASK;
     ringBuffer[next] = timer;
     ringPos = next;
-}
-
-/**
- * Convert timer-tick period to temperature in degrees Celsius.
- * @param period the cycle period in timer ticks
- * @return the temperature in degrees Celsius
- */
-inline float periodToCelsius(const uint32_t period) {
-    static constexpr float conversionScale = 0.25f * static_cast<float>(CLK_FREQ);
-    return conversionScale / static_cast<float>(period) - 273.15f;
 }
 
 // update mean and standard deviation
@@ -96,10 +91,10 @@ static void runTemperature([[maybe_unused]] void *ref) {
         return;
     }
     const auto diff = temp - mean;
-    emaTemperatureMean = mean + 0x1p-6f * diff;
+    emaTemperatureMean = mean + emaRate * diff;
 
     const auto var = emaTemperatureVar;
-    emaTemperatureVar = var + 0x1p-6f * (diff * diff - var);
+    emaTemperatureVar = var + emaRate * (diff * diff - var);
 }
 
 float clock::capture::temperature() {
