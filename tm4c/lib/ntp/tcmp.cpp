@@ -70,11 +70,11 @@ static float tcmpEstimate(float temp);
 static void runComp(void *ref) {
     // update temperature compensation
     const auto temp = clock::capture::temperature();
-    const auto comp = tcmpEstimate(temp);
-    clock::compensated::setTrim(static_cast<int32_t>(0x1p32f * comp));
+    const auto trim = static_cast<int32_t>(0x1p32f * tcmpEstimate(temp));
+    clock::compensated::setTrim(trim);
     // update global variables
+    tcmpValue = 0x1p-32f * static_cast<float>(trim);
     tempValue = temp;
-    tcmpValue = comp;
 }
 
 void tcmp::init() {
