@@ -60,29 +60,24 @@ static void runTemperature([[maybe_unused]] void *ref) {
         return;
     }
 
-    const auto pos = ringPos;
-    const auto updated = ringBuffer[pos];
-
     // constant terms
-    static constexpr auto cc = static_cast<float>(RING_MASK);
-    static constexpr auto xc_ = 0.5f * cc * (cc - 1.0f);
-    static constexpr auto xx_ = 2.0f * (cc - 0.5f) * xc_ / 3.0f;
-    static constexpr auto xc = xc_ / cc;
-    static constexpr auto xx = xx_ / cc;
-    static constexpr auto norm = timeScale / (xx - xc * xc);
+    static constexpr int mid = RING_MASK / 2;
+    static constexpr auto cc_ = static_cast<float>(mid + 1);
+    static constexpr auto xc_ = 0.5f * cc_ * (cc_ - 1.0f);
+    static constexpr auto xx_ = 2.0f * (cc_ - 0.5f) * xc_ / 3.0f;
+    static constexpr auto norm = 0.5f * timeScale / xx_;
 
     // dynamic terms
-    float yc = 0, yx = 0;
-    for (int i = 1; i < RING_MASK; ++i) {
+    const auto pivot = ringPos - mid;
+    const auto zero = ringBuffer[pivot & RING_MASK];
+    float yx = 0;
+    for (int i = -mid; i <= mid; ++i) {
         const auto x = static_cast<float>(i);
-        const auto y = static_cast<float>(updated - ringBuffer[(pos - i) & RING_MASK]);
-        yc += y;
+        const auto y = static_cast<float>(static_cast<int32_t>(zero - ringBuffer[(pivot - i) & RING_MASK]));
         yx += y * x;
     }
-    yc /= cc;
-    yx /= cc;
 
-    const auto slope = (yx - yc * xc) * norm;
+    const auto slope = yx * norm;
     const auto temp = 0.25f / slope - 273.15f;
 
     const auto mean = emaTemperatureMean;
