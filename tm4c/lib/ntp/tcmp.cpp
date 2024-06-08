@@ -30,7 +30,19 @@
 #define REG_DIM_COEF (3)
 #define REG_MIN_RMSE (250e-9f)
 
+
+
+// sample ring size
+static constexpr int RING_SIZE = 256;
+// sample ring mask
+static constexpr int RING_MASK = RING_SIZE - 1;
+// ring position
+static int ringPos = 0;
+// ring buffer
+static float tempRing[RING_SIZE];
 static volatile float tempValue;
+static volatile float tempNoise;
+static int initCounter;
 
 static volatile uint32_t tcmpSaved;
 static volatile float tcmpValue;
@@ -68,13 +80,61 @@ static float tcmpEstimate(float temp);
  * @param ref unused context argument
  */
 static void runComp(void *ref) {
-    // update temperature compensation
+    // update temperature measurement
     const auto temp = clock::capture::temperature();
-    const auto trim = static_cast<int32_t>(0x1p32f * tcmpEstimate(temp));
+    const auto head = (ringPos + 1) & RING_MASK;
+    tempRing[head] = temp;
+    ringPos = head;
+
+    // wait for ring to fill with valid data
+    if(initCounter < (8 + RING_SIZE)) {
+        ++initCounter;
+        return;
+    }
+
+    // constant terms
+    static constexpr auto cc = static_cast<float>(RING_SIZE);
+    static constexpr auto xc_ = 0.5f * cc * (cc - 1.0f);
+    static constexpr auto xx_ = 2.0f * (cc - 0.5f) * xc_ / 3.0f;
+    static constexpr auto xc = xc_ / cc;
+    static constexpr auto xx = xx_ / cc;
+
+    // dynamic terms
+    float yc = 0, yx = 0;
+    for (int i = 0; i < RING_SIZE; ++i) {
+        const auto x = static_cast<float>(i);
+        const auto y = tempRing[(head - i) & RING_MASK];
+        yc += y;
+        yx += y * x;
+    }
+    yc /= cc;
+    yx /= cc;
+
+    // compute offset and slope
+    const auto slope = (yx - yc * xc) / (xx - xc * xc);
+    const auto offset = yc - xc * slope;
+
+    // compute mean-squared error
+    float mse = 0;
+    for (int i = 0; i < RING_SIZE; ++i) {
+        const auto x = static_cast<float>(i);
+        const auto y = tempRing[(head - i) & RING_MASK];
+        const float error = y - offset - x * slope;
+        mse += error * error;
+    }
+    mse /= cc;
+
+    // compute variance
+    const auto slopeVariance = mse / (xx - xc * xc);
+    const auto offsetVariance = slopeVariance * xx;
+
+    // update temperature compensation
+    const auto trim = static_cast<int32_t>(0x1p32f * tcmpEstimate(offset));
     clock::compensated::setTrim(trim);
     // update global variables
     tcmpValue = 0x1p-32f * static_cast<float>(trim);
-    tempValue = temp;
+    tempValue = offset;
+    tempNoise = std::sqrt(offsetVariance);
 }
 
 void tcmp::init() {
@@ -124,7 +184,7 @@ unsigned tcmp::status(char *buffer) {
     end = append(end, tmp);
     end = append(end, " C\n");
 
-    tmp[fmtFloat(clock::capture::temperatureNoise(), 12, 4, tmp)] = 0;
+    tmp[fmtFloat(tempNoise, 12, 4, tmp)] = 0;
     end = append(end, "  - noise:   ");
     end = append(end, tmp);
     end = append(end, " C\n");

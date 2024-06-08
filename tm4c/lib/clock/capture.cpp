@@ -28,14 +28,10 @@ static volatile int ringPos = 0;
 // ring buffer
 static volatile uint32_t ringBuffer[RING_SIZE];
 
-// EMA slew rate
-static constexpr float emaRate = 0x1p-6f;
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
-// EMA temperature mean
-static volatile float emaTemperatureMean = 0;
-// EMA temperature variance
-static volatile float emaTemperatureVar = 0;
+// temperature measurement
+static volatile float tempValue = 0;
 // temperature initialization counter
 static volatile int initCounter = 0;
 
@@ -65,9 +61,9 @@ static void runTemperature([[maybe_unused]] void *ref) {
     static constexpr auto cc_ = static_cast<float>(mid + 1);
     static constexpr auto xc_ = 0.5f * cc_ * (cc_ - 1.0f);
     static constexpr auto xx_ = 2.0f * (cc_ - 0.5f) * xc_ / 3.0f;
-    static constexpr auto norm = 0.5f * timeScale / xx_;
+    static constexpr auto scale = 0.5f * xx_ / timeScale;
 
-    // dynamic terms
+    // compute slope
     const auto pivot = ringPos - mid;
     const auto zero = ringBuffer[pivot & RING_MASK];
     float yx = 0;
@@ -77,27 +73,12 @@ static void runTemperature([[maybe_unused]] void *ref) {
         yx += y * x;
     }
 
-    const auto slope = yx * norm;
-    const auto temp = 0.25f / slope - 273.15f;
-
-    const auto mean = emaTemperatureMean;
-    if(mean == 0) {
-        emaTemperatureMean = temp;
-        return;
-    }
-    const auto diff = temp - mean;
-    emaTemperatureMean = mean + emaRate * diff;
-
-    const auto var = emaTemperatureVar;
-    emaTemperatureVar = var + emaRate * (diff * diff - var);
+    // update temperature measurement
+    tempValue = scale / yx - 273.15f;
 }
 
 float clock::capture::temperature() {
-    return emaTemperatureMean;
-}
-
-float clock::capture::temperatureNoise() {
-    return std::sqrt(emaTemperatureVar);
+    return tempValue;
 }
 
 
