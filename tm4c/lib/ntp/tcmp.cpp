@@ -16,7 +16,6 @@
 #include <cmath>
 
 #define INTV_REGR (1u << (24 - 14)) // 16384 Hz
-#define INTV_TCMP (1u << (24 - 4))  // 16 Hz
 
 #define TCMP_SAVE_INTV (3600) // save state every hour
 
@@ -75,19 +74,22 @@ static void computeMSE(const float *data);
  */
 static float tcmpEstimate(float temp);
 
-/**
- * Update the current temperature compensation value.
- * @param ref unused context argument
- */
-static void runComp(void *ref) {
+// update mean and standard deviation
+static void runTemperature([[maybe_unused]] void *ref) {
     // update temperature measurement
     const auto temp = clock::capture::temperature();
     const auto head = (ringPos + 1) & RING_MASK;
     tempRing[head] = temp;
     ringPos = head;
+}
 
+/**
+ * Update the current temperature compensation value.
+ * @param ref unused context argument
+ */
+static void runCompensation(void *ref) {
     // wait for ring to fill with valid data
-    if(initCounter < (8 + RING_SIZE)) {
+    if(initCounter < 68) {
         ++initCounter;
         return;
     }
@@ -101,6 +103,7 @@ static void runComp(void *ref) {
 
     // dynamic terms
     float yc = 0, yx = 0;
+    const auto head = ringPos;
     for (int i = 0; i < RING_SIZE; ++i) {
         const auto x = static_cast<float>(i);
         const auto y = tempRing[(head - i) & RING_MASK];
@@ -142,8 +145,9 @@ void tcmp::init() {
     if (std::isfinite(somNode[0][0]))
         runSleep(INTV_REGR, runRegression, nullptr);
 
-    // schedule thread
-    runPeriodic(INTV_TCMP, runComp, nullptr);
+    // schedule tasks
+    runPeriodic(RUN_SEC / 16, runTemperature, nullptr);
+    runPeriodic(RUN_SEC / 4, runCompensation, nullptr);
 }
 
 float tcmp::temp() {

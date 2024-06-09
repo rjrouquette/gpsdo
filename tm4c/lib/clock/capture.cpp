@@ -28,10 +28,6 @@ static volatile uint32_t ringBuffer[RING_SIZE];
 
 // scale factor for converting timer ticks to seconds
 static constexpr float timeScale = 1.0f / static_cast<float>(CLK_FREQ);
-// temperature measurement
-static volatile float tempValue = 0;
-// temperature initialization counter
-static volatile int initCounter = 0;
 
 // capture rising edge of temperature sensor output
 void ISR_Timer4B() {
@@ -47,13 +43,7 @@ void ISR_Timer4B() {
     ringPos = next;
 }
 
-// update mean and standard deviation
-static void runTemperature([[maybe_unused]] void *ref) {
-    if(initCounter < 16) {
-        ++initCounter;
-        return;
-    }
-
+float clock::capture::temperature() {
     // constant terms
     static constexpr int mid = RING_MASK / 2;
     static constexpr auto cc_ = static_cast<float>(mid + 1);
@@ -72,11 +62,7 @@ static void runTemperature([[maybe_unused]] void *ref) {
     }
 
     // update temperature measurement
-    tempValue = scale / yx - 273.15f;
-}
-
-float clock::capture::temperature() {
-    return tempValue;
+    return scale / yx - 273.15f;
 }
 
 
@@ -215,7 +201,4 @@ void clock::capture::init() {
     // lock GPIO config
     PORTM.CR = 0;
     PORTM.LOCK = 0;
-
-    // start temperature worker task
-    runSleep(RUN_SEC / 32, runTemperature, nullptr);
 }
