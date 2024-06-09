@@ -14,8 +14,6 @@
 #include "../hw/gpio.h"
 #include "../hw/interrupts.h"
 
-#include <cmath>
-
 // mask for timer edge events
 static constexpr int EDGE_MASK = (1 << 24) - 1;
 
