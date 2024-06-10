@@ -30,7 +30,6 @@
 #define REG_MIN_RMSE (250e-9f)
 
 
-
 // sample ring size
 static constexpr int RING_SIZE = 256;
 // sample ring mask
@@ -52,6 +51,7 @@ static volatile float tcmpRmse;
 
 // SOM filter for compensation samples
 static float somNode[SOM_NODE_CNT][SOM_NODE_DIM];
+static float somResidual[SOM_NODE_CNT][SOM_NODE_DIM];
 static float somNW[SOM_NODE_CNT];
 
 // regression step counter
@@ -89,7 +89,7 @@ static void runTemperature([[maybe_unused]] void *ref) {
  */
 static void runCompensation(void *ref) {
     // wait for ring to fill with valid data
-    if(initCounter < 68) {
+    if (initCounter < 68) {
         ++initCounter;
         return;
     }
@@ -269,6 +269,12 @@ static void seedSom(const float temp, const float comp) {
     }
 }
 
+inline void accumulate(float &accumulator, float &residual, const float delta) {
+    const auto initial = accumulator;
+    accumulator += residual + delta;
+    residual += delta - (accumulator - initial);
+}
+
 static void updateSom(const float temp, const float comp, float alpha) {
     // initialize som nodes if necessary
     if (!std::isfinite(somNode[0][0])) {
@@ -294,9 +300,9 @@ static void updateSom(const float temp, const float comp, float alpha) {
         // compute node alpha
         const float w = alpha * somNW[std::abs(i - best)];
         // update node weights
-        somNode[i][0] += (temp - somNode[i][0]) * w;
-        somNode[i][1] += (comp - somNode[i][1]) * w;
-        somNode[i][2] += (1.0f - somNode[i][2]) * w;
+        accumulate(somNode[i][0], somResidual[i][0], (temp - somNode[i][0]) * w);
+        accumulate(somNode[i][1], somResidual[i][1], (comp - somNode[i][1]) * w);
+        accumulate(somNode[i][2], somResidual[i][2], (1.0f - somNode[i][2]) * w);
     }
 }
 
